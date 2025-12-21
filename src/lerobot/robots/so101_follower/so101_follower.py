@@ -161,8 +161,15 @@ class SO101Follower(Robot):
             self.bus.configure_motors()
             for motor in self.bus.motors:
                 self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value)
-                # Set P_Coefficient to lower value to avoid shakiness (Default is 32)
-                self.bus.write("P_Coefficient", motor, 16)
+                # NOTE:
+                # For Cartesian-style moves (IK / small deltas), the arm needs enough stiffness to actually
+                # track small position changes under gravity and static friction.
+                # The previous value (16) was very compliant and often resulted in "Goal_Position updates but
+                # Present_Position barely changes", i.e. apparent stalls for small moves.
+                #
+                # We keep the gripper conservative, but restore body joints closer to the default (32).
+                p = 16 if motor == "gripper" else 32
+                self.bus.write("P_Coefficient", motor, p)
                 # Set I_Coefficient and D_Coefficient to default value 0 and 32
                 self.bus.write("I_Coefficient", motor, 0)
                 self.bus.write("D_Coefficient", motor, 32)

@@ -1,0 +1,293 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    DUAL CAMERA CHESS ROBOT SETUP                           ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+
+PHYSICAL SETUP DIAGRAM
+═══════════════════════
+
+                    📱 Main Camera (iPhone/Webcam)
+                         |  [Overview]
+                         |  30-50cm height
+                         |  16:9 aspect ratio
+                         |  1280x720 resolution
+                         ↓
+        ┌────────────────────────────────────────┐
+        │                                        │
+        │         Chess Board (8×8)              │
+        │                                        │
+        │    ♜ ♞ ♝ ♛ ♚ ♝ ♞ ♜                   │
+        │    ♟ ♟ ♟ ♟ ♟ ♟ ♟ ♟                   │
+        │    · · · · · · · ·                    │
+        │    · · · · · · · ·                    │
+        │    · · · · · · · ·                    │
+        │    · · · · · · · ·                    │
+        │    ♙ ♙ ♙ ♙ ♙ ♙ ♙ ♙                   │
+        │    ♖ ♘ ♗ ♕ ♔ ♗ ♘ ♖                   │
+        │                                        │
+        └────────────────────────────────────────┘
+                         ↑
+                         │
+                    Robot Arm
+                         │
+                         │
+                    ┌────┴────┐
+                    │ Shoulder │
+                    └────┬────┘
+                         │
+                    ┌────┴────┐
+                    │  Elbow  │
+                    └────┬────┘
+                         │
+                    ┌────┴────┐
+                    │  Wrist  │
+                    └────┬────┘
+                         │
+                    ┌────┴────┐  ← 🔍 Gripper Camera
+                    │ Gripper │     [Last Mile]
+                    │  🤏🤏   │     2-5cm above fingers
+                    └─────────┘     640x480 resolution
+                                    4:3 aspect ratio
+
+
+CAMERA DATA FLOW
+═════════════════
+
+    Main Camera          Gripper Camera
+    (iPhone/USB)         (USB Webcam)
+         │                     │
+         │  Index 0/1          │  Index 1/2
+         │  RTSP URL           │  USB Device
+         └──────┬──────────────┘
+                │
+         OpenCV Capture
+                │
+         ┌──────┴──────┐
+         │             │
+    main_camera   gripper_camera
+         │             │
+    ┌────┴────┐   ┌────┴────┐
+    │ Resize  │   │ Resize  │
+    │ 640x360 │   │ 320x240 │
+    └────┬────┘   └────┬────┘
+         │             │
+    QPixmap       QPixmap
+         │             │
+    main_camera_  gripper_camera_
+    update Signal update Signal
+         │             │
+         └─────┬───────┘
+               │
+          UI Display
+               │
+    ┌──────────┴──────────┐
+    │  ┌────────────────┐ │
+    │  │ Main Camera    │ │ ← Larger panel (640x360)
+    │  │ [Overview]     │ │   Shows entire board
+    │  └────────────────┘ │
+    │  ┌────────────────┐ │
+    │  │ Gripper Camera │ │ ← Smaller panel (320x240)
+    │  │ [Last Mile]    │ │   Shows gripper close-up
+    │  └────────────────┘ │
+    │  FPS: M:30 | G:30   │
+    └─────────────────────┘
+
+
+SYSTEM ARCHITECTURE
+════════════════════
+
+┌─────────────────────────────────────────────────────────────┐
+│                     Chess Robot UI                          │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌──────────────────────┐  ┌──────────────────────┐       │
+│  │  Main Camera Panel   │  │   Motor Status       │       │
+│  │  ┌────────────────┐  │  │   ┌──────────────┐  │       │
+│  │  │                │  │  │   │ shoulder_pan │  │       │
+│  │  │   Overview     │  │  │   │ shoulder_lift│  │       │
+│  │  │                │  │  │   │ elbow_flex   │  │       │
+│  │  └────────────────┘  │  │   │ wrist_flex   │  │       │
+│  │  [Status: LIVE]      │  │   │ wrist_roll   │  │       │
+│  └──────────────────────┘  │   │ gripper      │  │       │
+│                             │   └──────────────┘  │       │
+│  ┌──────────────────────┐  └──────────────────────┘       │
+│  │ Gripper Camera Panel │                                 │
+│  │  ┌────────────────┐  │  ┌──────────────────────┐       │
+│  │  │                │  │  │   Chess Board        │       │
+│  │  │  Last Mile     │  │  │   ┌──────────────┐  │       │
+│  │  │                │  │  │   │  a b c d e f │  │       │
+│  │  └────────────────┘  │  │   │ 8□■□■□■□■    │  │       │
+│  │  [Status: LIVE]      │  │   │ 7■□■□■□■□    │  │       │
+│  └──────────────────────┘  │   │ 6□■□■□■□■    │  │       │
+│                             │   │ 5■□■□■□■□    │  │       │
+│  FPS: Main: 30 | Gripper: 30   │ 4□■□■□■□■    │  │       │
+│                             │   │ 3■□■□■□■□    │  │       │
+│                             │   │ 2□■□■□■□■    │  │       │
+│                             │   │ 1■□■□■□■□    │  │       │
+│                             │   └──────────────┘  │       │
+│                             └──────────────────────┘       │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  3D Robot Visualization & Workspace Control          │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+
+CAMERA SPECIFICATIONS
+══════════════════════
+
+Main Camera (Overview):
+┌──────────────────────────────────────┐
+│ Purpose:  Overall scene awareness    │
+│ Position: 30-50cm above board        │
+│ Angle:    15-30° from vertical       │
+│ Coverage: Full 8×8 board + robot     │
+│                                      │
+│ Resolution: 1280×720 (HD)            │
+│ FPS:        30                       │
+│ Aspect:     16:9                     │
+│                                      │
+│ Options:                             │
+│ • iPhone via USB (index 1/2)         │
+│ • iPhone via RTSP (network)          │
+│ • USB webcam (index 0)               │
+│ • Built-in laptop cam (index 0)      │
+└──────────────────────────────────────┘
+
+Gripper Camera (Last Mile):
+┌──────────────────────────────────────┐
+│ Purpose:  Precision gripper control  │
+│ Position: 2-5cm above gripper        │
+│ Angle:    Straight down              │
+│ Coverage: Gripper + 5cm radius       │
+│                                      │
+│ Resolution: 640×480 (VGA)            │
+│ FPS:        30                       │
+│ Aspect:     4:3                      │
+│                                      │
+│ Requirements:                        │
+│ • Small USB camera module            │
+│ • Wide angle lens (120-160°)         │
+│ • Mounted on gripper housing         │
+│ • USB cable routed along arm         │
+└──────────────────────────────────────┘
+
+
+CONNECTION DIAGRAM
+═══════════════════
+
+Computer/Robot Controller
+┌─────────────────────────────────────┐
+│                                     │
+│  USB Port 1  ──→  Main Camera       │
+│                   (iPhone/Webcam)   │
+│                                     │
+│  USB Port 2  ──→  Gripper Camera    │
+│                   (USB Webcam)      │
+│                                     │
+│  Serial Port ──→  Robot Motors      │
+│  (USB-TTL)        (Feetech Bus)     │
+│                                     │
+│  WiFi/Ethernet ──→ iPhone (optional)│
+│  (Optional)        (RTSP stream)    │
+│                                     │
+└─────────────────────────────────────┘
+
+
+CABLE ROUTING (Gripper Camera)
+════════════════════════════════
+
+    Robot Base
+        │
+        │ ← USB cable secured here
+        │
+    Shoulder Joint
+        │
+        │ ← Cable clip
+        │
+    Elbow Joint
+        │
+        │ ← Cable clip
+        │
+    Wrist Joint
+        │
+        │ ← Cable clip with strain relief
+        │
+    Gripper Mount
+        │
+        └──→ Camera Module
+              (2-5cm above fingers)
+
+
+SOFTWARE STACK
+═══════════════
+
+Application Layer:
+├─ chess_robot_ui.py / chess_robot_ui_llm.py
+│  ├─ PySide6 Qt GUI
+│  ├─ Dual camera panels
+│  └─ Motor status displays
+
+Camera Layer:
+├─ OpenCVCamera (lerobot)
+│  ├─ Main camera (index 0/1 or RTSP)
+│  └─ Gripper camera (index 1/2)
+
+Processing Layer:
+├─ MonitoringThread (Qt)
+│  ├─ Camera frame capture
+│  ├─ Motor data reading
+│  └─ Signal emission to UI
+
+Hardware Layer:
+├─ OpenCV (cv2.VideoCapture)
+│  ├─ USB camera drivers
+│  ├─ V4L2 (Linux)
+│  └─ AVFoundation (macOS)
+└─ FeetechMotorsBus
+   └─ Serial communication
+
+
+CONFIGURATION FILE LOCATIONS
+══════════════════════════════
+
+Camera setup:
+📄 chess_robot_ui.py
+   └─ setup_camera() method
+      ├─ main_camera_cfg (line ~730)
+      └─ gripper_camera_cfg (line ~740)
+
+📄 chess_robot_ui_llm.py
+   └─ setup_camera() method
+      ├─ main_camera_cfg (line ~890)
+      └─ gripper_camera_cfg (line ~900)
+
+
+QUICK TEST COMMANDS
+═════════════════════
+
+Test cameras:
+$ python test_dual_cameras.py
+
+Test with specific indices:
+$ python test_dual_cameras.py 0 1
+
+List available cameras:
+$ lerobot find-cameras
+
+Run chess robot UI:
+$ python chess_robot_ui.py --port /dev/ttyUSB0
+
+Run chess robot UI with LLM:
+$ python chess_robot_ui_llm.py --port /dev/ttyUSB0
+
+
+═══════════════════════════════════════════════════════════════════════════════
+For detailed setup instructions, see: DUAL_CAMERA_SETUP.md
+For summary of changes, see: DUAL_CAMERA_CHANGES.md
+═══════════════════════════════════════════════════════════════════════════════
+
+
+
+

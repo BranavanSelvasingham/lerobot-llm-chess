@@ -504,16 +504,17 @@ class Robot3DWidget(QWidget):
 
 
 class MonitoringThread(QThread):
-    """Thread for monitoring robot and camera."""
+    """Thread for monitoring robot and cameras."""
     
-    camera_update = Signal(object)  # QPixmap
+    main_camera_update = Signal(object)  # QPixmap for main camera
+    gripper_camera_update = Signal(object)  # QPixmap for gripper camera
     motor_update = Signal(dict)  # Motor data dict
     status_update = Signal(str)  # Status message
     
-    def __init__(self, bus, camera, parent=None):
+    def __init__(self, bus, cameras, parent=None):
         super().__init__(parent)
         self.bus = bus
-        self.camera = camera
+        self.cameras = cameras  # dict of cameras
         self.running = False
         
     def run(self):
@@ -521,87 +522,133 @@ class MonitoringThread(QThread):
         try:
             # Connect systems
             self.bus._connect(handshake=False)
-            self.camera.connect()
             
-            self.status_update.emit("✅ Robot and camera connected - Live monitoring active")
+            # Connect all cameras
+            for cam_name, camera in self.cameras.items():
+                try:
+                    camera.connect()
+                    print(f"✅ {cam_name} camera connected")
+                except Exception as e:
+                    print(f"⚠️ {cam_name} camera connection failed: {e}")
+            
+            self.status_update.emit("✅ Robot and cameras connected - Live monitoring active")
+            
+            # Performance optimization: separate update counters
+            iteration = 0
+            motor_update_counter = 0
+            # Track motors that are having issues to skip them temporarily
+            motor_skip_count = {}  # motor_name -> skip countdown
             
             while self.running:
-                # Update camera
+                iteration += 1
+                
+                # Update main camera (every iteration for smooth video)
                 try:
-                    if self.camera.is_connected:
-                        frame = self.camera.read()
-                        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        frame_resized = cv2.resize(frame_rgb, (320, 240))
-                        
-                        height, width, channel = frame_resized.shape
-                        bytes_per_line = 3 * width
-                        q_image = QImage(frame_resized.data, width, height, bytes_per_line, QImage.Format_RGB888)
-                        pixmap = QPixmap.fromImage(q_image)
-                        self.camera_update.emit(pixmap)
+                    main_cam = self.cameras.get("main")
+                    if main_cam and main_cam.is_connected:
+                        frame = main_cam.read()
+                        if frame is not None and frame.size > 0:
+                            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                            frame_resized = cv2.resize(frame_rgb, (640, 360))  # 16:9 for main camera
+                            
+                            height, width, channel = frame_resized.shape
+                            bytes_per_line = 3 * width
+                            q_image = QImage(frame_resized.data, width, height, bytes_per_line, QImage.Format_RGB888)
+                            pixmap = QPixmap.fromImage(q_image)
+                            self.main_camera_update.emit(pixmap)
                 except Exception as e:
                     pass
                 
-                # Update motors - read all available signals
+                # Update gripper camera (every iteration for smooth video)
                 try:
-                    if self.bus.is_connected:
-                        motor_data = {}
-                        for motor_name in ["shoulder_pan", "shoulder_lift", "elbow_flex", 
-                                         "wrist_flex", "wrist_roll", "gripper"]:
-                            try:
-                                # Read all available signals
-                                pos = self.bus.read("Present_Position", motor_name, normalize=True)
-                                
-                                # Try to read additional signals (may fail for some motors)
-                                signals = {"position": pos, "status": "ok"}
-                                
-                                try:
-                                    signals["velocity"] = self.bus.read("Present_Velocity", motor_name, normalize=False)
-                                except:
-                                    signals["velocity"] = None
-                                
-                                try:
-                                    signals["load"] = self.bus.read("Present_Load", motor_name, normalize=False)
-                                except:
-                                    signals["load"] = None
-                                
-                                try:
-                                    signals["voltage"] = self.bus.read("Present_Voltage", motor_name, normalize=False)
-                                except:
-                                    signals["voltage"] = None
-                                
-                                try:
-                                    signals["temperature"] = self.bus.read("Present_Temperature", motor_name, normalize=False)
-                                except:
-                                    signals["temperature"] = None
-                                
-                                try:
-                                    signals["current"] = self.bus.read("Present_Current", motor_name, normalize=False)
-                                except:
-                                    signals["current"] = None
-                                
-                                try:
-                                    signals["moving"] = self.bus.read("Moving", motor_name, normalize=False)
-                                except:
-                                    signals["moving"] = None
-                                
-                                try:
-                                    signals["goal_position"] = self.bus.read("Goal_Position", motor_name, normalize=True)
-                                except:
-                                    signals["goal_position"] = None
-                                
-                                try:
-                                    signals["torque_enable"] = self.bus.read("Torque_Enable", motor_name, normalize=False)
-                                except:
-                                    signals["torque_enable"] = None
-                                
-                                motor_data[motor_name] = signals
-                            except:
-                                motor_data[motor_name] = {"position": None, "status": "error"}
-                        self.motor_update.emit(motor_data)
+                    gripper_cam = self.cameras.get("gripper")
+                    if gripper_cam and gripper_cam.is_connected:
+                        frame = gripper_cam.read()
+                        if frame is not None and frame.size > 0:
+                            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                            frame_resized = cv2.resize(frame_rgb, (320, 240))  # 4:3 for gripper camera
+                            
+                            height, width, channel = frame_resized.shape
+                            bytes_per_line = 3 * width
+                            q_image = QImage(frame_resized.data, width, height, bytes_per_line, QImage.Format_RGB888)
+                            pixmap = QPixmap.fromImage(q_image)
+                            self.gripper_camera_update.emit(pixmap)
                 except Exception as e:
                     pass
                 
-                time.sleep(0.1)  # 10 FPS update rate
+                # Update motors - only every 3rd iteration (reduces bus traffic)
+                motor_update_counter += 1
+                if motor_update_counter >= 3:
+                    motor_update_counter = 0
+                    try:
+                        if self.bus.is_connected:
+                            motor_data = {}
+                            for motor_name in ["shoulder_pan", "shoulder_lift", "elbow_flex", 
+                                             "wrist_flex", "wrist_roll", "gripper"]:
+                                # Skip motors that are having issues (overload, etc.)
+                                if motor_name in motor_skip_count:
+                                    motor_skip_count[motor_name] -= 1
+                                    if motor_skip_count[motor_name] <= 0:
+                                        del motor_skip_count[motor_name]
+                                    motor_data[motor_name] = {"position": None, "status": "skipped"}
+                                    continue
+                                
+                                try:
+                                    # Read position with error handling - use non-blocking read
+                                    try:
+                                        pos = self.bus.read("Present_Position", motor_name, normalize=True, num_retry=0)
+                                        signals = {"position": pos, "status": "ok"}
+                                    except (RuntimeError, ConnectionError) as e:
+                                        error_msg = str(e).lower()
+                                        # Check for overload or other motor errors
+                                        if "overload" in error_msg or "error" in error_msg:
+                                            # Skip this motor for 10 iterations (~1 second)
+                                            motor_skip_count[motor_name] = 10
+                                            motor_data[motor_name] = {"position": None, "status": "overload"}
+                                            continue
+                                        else:
+                                            # Other error - mark but don't skip
+                                            signals = {"position": None, "status": "error"}
+                                    
+                                    # Only read additional signals if position read succeeded
+                                    if signals.get("status") == "ok":
+                                        # Read additional signals less frequently (only critical ones)
+                                        try:
+                                            signals["velocity"] = self.bus.read("Present_Velocity", motor_name, normalize=False, num_retry=0)
+                                        except:
+                                            signals["velocity"] = None
+                                        
+                                        try:
+                                            signals["voltage"] = self.bus.read("Present_Voltage", motor_name, normalize=False, num_retry=0)
+                                        except:
+                                            signals["voltage"] = None
+                                        
+                                        try:
+                                            signals["moving"] = self.bus.read("Moving", motor_name, normalize=False, num_retry=0)
+                                        except:
+                                            signals["moving"] = None
+                                        
+                                        # Optional signals (read less frequently or skip)
+                                        signals["load"] = None
+                                        signals["temperature"] = None
+                                        signals["current"] = None
+                                        signals["goal_position"] = None
+                                        signals["torque_enable"] = None
+                                    
+                                    motor_data[motor_name] = signals
+                                except Exception as e:
+                                    # Catch-all for any other errors
+                                    error_msg = str(e).lower()
+                                    if "overload" in error_msg:
+                                        motor_skip_count[motor_name] = 10
+                                    motor_data[motor_name] = {"position": None, "status": "error"}
+                            self.motor_update.emit(motor_data)
+                    except Exception as e:
+                        # Don't let bus-level errors crash the monitoring loop
+                        pass
+                
+                # Faster camera updates, slower motor updates
+                time.sleep(0.033)  # ~30 FPS for cameras, ~10 FPS effective for motors
                 
         except Exception as e:
             self.status_update.emit(f"❌ Monitoring error: {e}")
@@ -609,8 +656,12 @@ class MonitoringThread(QThread):
             try:
                 if hasattr(self, 'bus'):
                     self.bus.disconnect()
-                if hasattr(self, 'camera'):
-                    self.camera.disconnect()
+                if hasattr(self, 'cameras'):
+                    for camera in self.cameras.values():
+                        try:
+                            camera.disconnect()
+                        except:
+                            pass
             except:
                 pass
     
@@ -719,9 +770,35 @@ class ChessRobotUI(QMainWindow):
         self.bus = FeetechMotorsBus(port=self.port, motors=self.all_motors, calibration=calibration)
         
     def setup_camera(self):
-        """Initialize camera connection."""
-        cfg = OpenCVCameraConfig(index_or_path=0, width=640, height=480, fps=30)
-        self.camera = OpenCVCamera(cfg)
+        """Initialize camera connections for dual-camera setup."""
+        # Main camera (iPhone or fixed overhead camera)
+        # For iPhone via USB: use index 1 or 2 (try different indices)
+        # For iPhone via network: use RTSP URL like "rtsp://192.168.x.x:8080/h264_ulaw.sdp"
+        main_camera_cfg = OpenCVCameraConfig(
+            index_or_path=0,  # Change to 1, 2, or RTSP URL for iPhone
+            width=1280,       # Higher resolution for main overview
+            height=720,
+            fps=30
+        )
+        self.main_camera = OpenCVCamera(main_camera_cfg)
+        
+        # Gripper-mounted camera for precision "last mile" control
+        gripper_camera_cfg = OpenCVCameraConfig(
+            index_or_path=1,  # Adjust based on your USB camera index
+            width=640,        # Lower resolution is fine for gripper cam
+            height=480,
+            fps=30
+        )
+        self.gripper_camera = OpenCVCamera(gripper_camera_cfg)
+        
+        # Store in dict for easier management (following lerobot pattern)
+        self.cameras = {
+            "main": self.main_camera,
+            "gripper": self.gripper_camera
+        }
+        
+        # Maintain backwards compatibility with single camera reference
+        self.camera = self.main_camera
     
     def setup_kinematics(self):
         """Initialize robot kinematics for forward kinematics calculations."""
@@ -760,19 +837,27 @@ class ChessRobotUI(QMainWindow):
         
         # Header section with title and quick stats
         header_widget = QWidget()
+        header_widget.setStyleSheet("""
+            QWidget {
+                background: #2c3e50;
+                border: 2px solid #34495e;
+                border-radius: 8px;
+                padding: 0px;
+            }
+        """)
         header_layout = QHBoxLayout(header_widget)
         header_layout.setSpacing(15)
+        header_layout.setContentsMargins(18, 22, 18, 18)  # Match QGroupBox padding
         
-        # Main title - solid desktop app styling
+        # Main title - remove border/background to match grid
         title = QLabel("♟️ Chess Robot Control Center")
         title.setStyleSheet("""
             font-size: 20pt;
             font-weight: 600;
             color: #ecf0f1;
-            padding: 18px 28px;
-            background: #2c3e50;
-            border-radius: 8px;
-            border: 1px solid #34495e;
+            padding: 0px;
+            background: transparent;
+            border: none;
         """)
         title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         header_layout.addWidget(title, 1)
@@ -819,8 +904,8 @@ class ChessRobotUI(QMainWindow):
         panels_layout.setSpacing(15)
         panels_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Left column: Camera view
-        self.create_camera_panel(panels_layout)
+        # Left column: Camera views (both main and gripper)
+        self.create_camera_panels(panels_layout)
         
         # Middle column: Motor status
         self.create_motor_panel(panels_layout)
@@ -844,10 +929,17 @@ class ChessRobotUI(QMainWindow):
         # Bottom: Control buttons
         self.create_control_panel(main_layout)
         
-    def create_camera_panel(self, parent_layout):
-        """Create camera view panel."""
-        camera_group = QGroupBox("📸 Camera View")
-        camera_group.setStyleSheet("""
+    def create_camera_panels(self, parent_layout):
+        """Create dual camera view panels."""
+        # Container for both cameras
+        cameras_container = QWidget()
+        cameras_layout = QVBoxLayout(cameras_container)
+        cameras_layout.setSpacing(12)
+        cameras_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Main camera panel (iPhone/Overview)
+        main_camera_group = QGroupBox("📸 Main Camera (Overview)")
+        main_camera_group.setStyleSheet("""
             QGroupBox {
                 font-size: 11pt;
                 font-weight: 600;
@@ -868,14 +960,13 @@ class ChessRobotUI(QMainWindow):
                 color: #3498db;
             }
         """)
-        camera_group.setToolTip("Live camera feed from robot-mounted camera. Shows real-time view of chess board.")
-        camera_layout = QVBoxLayout(camera_group)
-        camera_layout.setSpacing(12)
-        camera_layout.setContentsMargins(12, 12, 12, 12)
+        main_camera_group.setToolTip("Main overview camera - shows entire chess board and robot setup")
+        main_camera_layout = QVBoxLayout(main_camera_group)
+        main_camera_layout.setSpacing(8)
+        main_camera_layout.setContentsMargins(12, 12, 12, 12)
         
-        # Camera display - solid desktop styling
-        self.camera_label = QLabel("Initializing camera...")
-        self.camera_label.setStyleSheet("""
+        self.main_camera_label = QLabel("Initializing main camera...")
+        self.main_camera_label.setStyleSheet("""
             background-color: #1e2329;
             color: #95a5a6;
             padding: 15px;
@@ -883,61 +974,99 @@ class ChessRobotUI(QMainWindow):
             border-radius: 6px;
             font-size: 10pt;
         """)
-        self.camera_label.setAlignment(Qt.AlignCenter)
-        self.camera_label.setMinimumSize(300, 220)
-        self.camera_label.setMaximumSize(420, 320)
-        self.camera_label.setScaledContents(True)
-        self.camera_label.setToolTip("Camera feed will appear here when connected")
-        camera_layout.addWidget(self.camera_label)
+        self.main_camera_label.setAlignment(Qt.AlignCenter)
+        self.main_camera_label.setMinimumSize(320, 180)
+        self.main_camera_label.setMaximumSize(640, 360)
+        self.main_camera_label.setScaledContents(True)
+        main_camera_layout.addWidget(self.main_camera_label)
         
-        # Camera info bar - solid styling
-        camera_info = QHBoxLayout()
-        camera_info.setSpacing(10)
-        
-        # FPS counter (will be updated)
-        self.fps_label = QLabel("FPS: --")
-        self.fps_label.setStyleSheet("""
+        self.main_camera_status = QLabel("● Connecting...")
+        self.main_camera_status.setStyleSheet("""
             font-size: 9pt;
-            font-weight: 500;
-            color: #bdc3c7;
-            padding: 6px 12px;
-            background-color: #34495e;
-            border-radius: 4px;
-        """)
-        camera_info.addWidget(self.fps_label)
-        
-        camera_info.addStretch()
-        
-        # Resolution
-        res_label = QLabel("640×480")
-        res_label.setStyleSheet("""
-            font-size: 9pt;
-            font-weight: 500;
-            color: #bdc3c7;
-            padding: 6px 12px;
-            background-color: #34495e;
-            border-radius: 4px;
-        """)
-        camera_info.addWidget(res_label)
-        
-        camera_layout.addLayout(camera_info)
-        
-        # Camera status - solid desktop indicator
-        self.camera_status = QLabel("● Connecting...")
-        self.camera_status.setStyleSheet("""
-            font-size: 10pt;
             font-weight: 600;
             color: #f39c12;
-            padding: 10px 18px;
+            padding: 6px 12px;
             background-color: #3d2817;
-            border-radius: 6px;
+            border-radius: 4px;
             border: 1px solid #f39c12;
         """)
-        self.camera_status.setAlignment(Qt.AlignCenter)
-        self.camera_status.setToolTip("Camera connection status")
-        camera_layout.addWidget(self.camera_status)
+        self.main_camera_status.setAlignment(Qt.AlignCenter)
+        main_camera_layout.addWidget(self.main_camera_status)
         
-        parent_layout.addWidget(camera_group)
+        cameras_layout.addWidget(main_camera_group)
+        
+        # Gripper camera panel (Last Mile)
+        gripper_camera_group = QGroupBox("🔍 Gripper Camera (Last Mile)")
+        gripper_camera_group.setStyleSheet("""
+            QGroupBox {
+                font-size: 11pt;
+                font-weight: 600;
+                color: #ecf0f1;
+                background: #2c3e50;
+                border: 2px solid #34495e;
+                border-radius: 8px;
+                padding-top: 22px;
+                padding-bottom: 18px;
+                padding-left: 18px;
+                padding-right: 18px;
+                margin-top: 8px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 18px;
+                padding: 0 10px 0 10px;
+                color: #e74c3c;
+            }
+        """)
+        gripper_camera_group.setToolTip("Gripper-mounted camera - for precision piece pickup and placement")
+        gripper_camera_layout = QVBoxLayout(gripper_camera_group)
+        gripper_camera_layout.setSpacing(8)
+        gripper_camera_layout.setContentsMargins(12, 12, 12, 12)
+        
+        self.gripper_camera_label = QLabel("Initializing gripper camera...")
+        self.gripper_camera_label.setStyleSheet("""
+            background-color: #1e2329;
+            color: #95a5a6;
+            padding: 15px;
+            border: 2px solid #34495e;
+            border-radius: 6px;
+            font-size: 10pt;
+        """)
+        self.gripper_camera_label.setAlignment(Qt.AlignCenter)
+        self.gripper_camera_label.setMinimumSize(320, 240)
+        self.gripper_camera_label.setMaximumSize(320, 240)
+        self.gripper_camera_label.setScaledContents(True)
+        gripper_camera_layout.addWidget(self.gripper_camera_label)
+        
+        self.gripper_camera_status = QLabel("● Connecting...")
+        self.gripper_camera_status.setStyleSheet("""
+            font-size: 9pt;
+            font-weight: 600;
+            color: #f39c12;
+            padding: 6px 12px;
+            background-color: #3d2817;
+            border-radius: 4px;
+            border: 1px solid #f39c12;
+        """)
+        self.gripper_camera_status.setAlignment(Qt.AlignCenter)
+        gripper_camera_layout.addWidget(self.gripper_camera_status)
+        
+        cameras_layout.addWidget(gripper_camera_group)
+        
+        # FPS counter for debugging
+        self.fps_label = QLabel("FPS: Main: -- | Gripper: --")
+        self.fps_label.setStyleSheet("""
+            font-size: 8pt;
+            font-weight: 500;
+            color: #95a5a6;
+            padding: 4px 8px;
+            background-color: #34495e;
+            border-radius: 3px;
+        """)
+        self.fps_label.setAlignment(Qt.AlignCenter)
+        cameras_layout.addWidget(self.fps_label)
+        
+        parent_layout.addWidget(cameras_container)
         
     def create_motor_panel(self, parent_layout):
         """Create motor status panel."""
@@ -971,6 +1100,7 @@ class ChessRobotUI(QMainWindow):
         # Motor signals storage - comprehensive data structure
         self.motor_labels = {}
         self.motor_signal_labels = {}  # Store all signal labels per motor
+        self.motor_status_labels = {}  # Store status indicator labels per motor
         
         # Create scrollable area for motor details
         from PySide6.QtWidgets import QScrollArea
@@ -1957,31 +2087,61 @@ class ChessRobotUI(QMainWindow):
         except:
             return None
     
-    def update_camera(self, pixmap):
-        """Update camera view from monitoring thread."""
-        self.camera_label.setPixmap(pixmap)
-        self.camera_status.setText("● Live")
-        self.camera_status.setStyleSheet("""
-            font-size: 10pt;
-            font-weight: 500;
+    def update_main_camera(self, pixmap):
+        """Update main camera view from monitoring thread."""
+        self.main_camera_label.setPixmap(pixmap)
+        self.main_camera_status.setText("● Live")
+        self.main_camera_status.setStyleSheet("""
+            font-size: 9pt;
+            font-weight: 600;
             color: #27ae60;
-            padding: 8px 15px;
+            padding: 6px 12px;
             background-color: rgba(39, 174, 96, 20);
-            border-radius: 8px;
+            border-radius: 4px;
             border: 1px solid rgba(39, 174, 96, 60);
         """)
         
-        # Update FPS (simple counter - could be improved)
-        if not hasattr(self, '_frame_count'):
-            self._frame_count = 0
-            self._last_fps_time = time.time()
-        self._frame_count += 1
+        # Update FPS for main camera
+        if not hasattr(self, '_main_frame_count'):
+            self._main_frame_count = 0
+            self._main_last_fps_time = time.time()
+        self._main_frame_count += 1
         current_time = time.time()
-        if current_time - self._last_fps_time >= 1.0:
-            fps = self._frame_count / (current_time - self._last_fps_time)
-            self.fps_label.setText(f"FPS: {fps:.1f}")
-            self._frame_count = 0
-            self._last_fps_time = current_time
+        if current_time - self._main_last_fps_time >= 1.0:
+            main_fps = self._main_frame_count / (current_time - self._main_last_fps_time)
+            self._main_fps = main_fps
+            gripper_fps = getattr(self, '_gripper_fps', 0)
+            self.fps_label.setText(f"FPS: Main: {main_fps:.1f} | Gripper: {gripper_fps:.1f}")
+            self._main_frame_count = 0
+            self._main_last_fps_time = current_time
+    
+    def update_gripper_camera(self, pixmap):
+        """Update gripper camera view from monitoring thread."""
+        self.gripper_camera_label.setPixmap(pixmap)
+        self.gripper_camera_status.setText("● Live")
+        self.gripper_camera_status.setStyleSheet("""
+            font-size: 9pt;
+            font-weight: 600;
+            color: #27ae60;
+            padding: 6px 12px;
+            background-color: rgba(39, 174, 96, 20);
+            border-radius: 4px;
+            border: 1px solid rgba(39, 174, 96, 60);
+        """)
+        
+        # Update FPS for gripper camera
+        if not hasattr(self, '_gripper_frame_count'):
+            self._gripper_frame_count = 0
+            self._gripper_last_fps_time = time.time()
+        self._gripper_frame_count += 1
+        current_time = time.time()
+        if current_time - self._gripper_last_fps_time >= 1.0:
+            gripper_fps = self._gripper_frame_count / (current_time - self._gripper_last_fps_time)
+            self._gripper_fps = gripper_fps
+            main_fps = getattr(self, '_main_fps', 0)
+            self.fps_label.setText(f"FPS: Main: {main_fps:.1f} | Gripper: {gripper_fps:.1f}")
+            self._gripper_frame_count = 0
+            self._gripper_last_fps_time = current_time
     
     def update_motors(self, motor_data):
         """Update motor positions and status from monitoring thread."""
@@ -2090,8 +2250,8 @@ class ChessRobotUI(QMainWindow):
                         min-width: 20px;
                     """)
                 
-                # Update robot overall status
-                if all_good:
+            # Update robot overall status
+            if all_good:
                 self.robot_status.setText("● All Motors OK")
                 self.robot_status.setStyleSheet("""
                     font-size: 10pt;
@@ -2113,87 +2273,87 @@ class ChessRobotUI(QMainWindow):
                     border: 1px solid rgba(39, 174, 96, 100);
                 """)
                 
-                # Calculate robot base coordinates
-                joint_positions = {name: data["position"] for name, data in motor_data.items() 
-                                 if data["position"] is not None}
+            # Calculate robot base coordinates
+            joint_positions = {name: data["position"] for name, data in motor_data.items() 
+                             if data["position"] is not None}
+            
+            # Update 3D robot visualization
+            if hasattr(self, 'robot_3d_widget') and len(joint_positions) >= 5:
+                joint_angles = {
+                    "shoulder_pan": joint_positions.get("shoulder_pan", 0),
+                    "shoulder_lift": joint_positions.get("shoulder_lift", 0),
+                    "elbow_flex": joint_positions.get("elbow_flex", 0),
+                    "wrist_flex": joint_positions.get("wrist_flex", 0),
+                    "wrist_roll": joint_positions.get("wrist_roll", 0),
+                    "gripper": joint_positions.get("gripper", 0)
+                }
+                self.robot_3d_widget.update_joints(joint_angles)
+            
+            if len(joint_positions) >= 5:
+                x_mm, y_mm, z_mm, method = self.calculate_base_coordinates(joint_positions)
                 
-                # Update 3D robot visualization
-                if hasattr(self, 'robot_3d_widget') and len(joint_positions) >= 5:
-                    joint_angles = {
-                        "shoulder_pan": joint_positions.get("shoulder_pan", 0),
-                        "shoulder_lift": joint_positions.get("shoulder_lift", 0),
-                        "elbow_flex": joint_positions.get("elbow_flex", 0),
-                        "wrist_flex": joint_positions.get("wrist_flex", 0),
-                        "wrist_roll": joint_positions.get("wrist_roll", 0),
-                        "gripper": joint_positions.get("gripper", 0)
-                    }
-                    self.robot_3d_widget.update_joints(joint_angles)
+                # Update coordinate display
+                self.coord_x.setText(f"X: {x_mm:6.1f} mm")
+                self.coord_y.setText(f"Y: {y_mm:6.1f} mm")
+                self.coord_z.setText(f"Z: {z_mm:6.1f} mm")
                 
-                if len(joint_positions) >= 5:
-                        x_mm, y_mm, z_mm, method = self.calculate_base_coordinates(joint_positions)
-                        
-                        # Update coordinate display
-                    self.coord_x.setText(f"X: {x_mm:6.1f} mm")
-                    self.coord_y.setText(f"Y: {y_mm:6.1f} mm")
-                    self.coord_z.setText(f"Z: {z_mm:6.1f} mm")
-                        
-                        # Calculate distance from base
-                        distance = np.sqrt(x_mm**2 + y_mm**2 + z_mm**2)
-                    self.distance_label.setText(f"Distance: {distance:.1f} mm")
-                        
-                        # Update workspace status
-                    workspace_text = f"Method: {method} | Distance: {distance:.0f}mm"
-                        if distance < 400:
-                        workspace_color = '#27ae60'
-                        elif distance < 500:
-                        workspace_color = '#f39c12'
-                        else:
-                        workspace_color = '#e74c3c'
-                    
-                    self.workspace_status.setText(workspace_text)
-                    self.workspace_status.setStyleSheet(f"""
-                        font-size: 9pt;
-                        color: {workspace_color};
-                        padding: 4px 0px;
-                    """)
-                        
-                        # Update workspace visualization
-                        self.update_workspace_position(x_mm, y_mm, z_mm)
-                        self.update_workspace_display(x_mm, y_mm, z_mm)
-                        
-                        # Update current position in control panel
-                    pos_text = f"Current Position:\nX: {x_mm:6.1f} mm | Y: {y_mm:6.1f} mm | Z: {z_mm:6.1f} mm"
-                    self.current_pos_label.setText(pos_text)
-                        
-                    # Update workspace bounds
-                        bounds_text = f"X: [{x_mm-100:.0f}, {x_mm+100:.0f}] mm\nY: [{y_mm-100:.0f}, {y_mm+100:.0f}] mm\nZ: [{z_mm-50:.0f}, {z_mm+50:.0f}] mm"
-                    self.workspace_bounds.setText(bounds_text)
-                        
-                        # Update joint configuration display
-                        pan = joint_positions.get("shoulder_pan", 0)
-                        lift = joint_positions.get("shoulder_lift", 0)
-                        elbow = joint_positions.get("elbow_flex", 0)
-                        wrist_flex = joint_positions.get("wrist_flex", 0)
-                        wrist_roll = joint_positions.get("wrist_roll", 0)
-                        
-                    config_text = f"Shoulder: {pan:.1f}°, {lift:.1f}° | Elbow: {elbow:.1f}° | Wrist: {wrist_flex:.1f}°, {wrist_roll:.1f}°"
-                    self.joint_config.setText(config_text)
-                    
-                    # Calculate robot position on chess board
-                    if "shoulder_pan" in motor_data and "shoulder_lift" in motor_data:
-                        if motor_data["shoulder_pan"]["position"] is not None and motor_data["shoulder_lift"]["position"] is not None:
+                # Calculate distance from base
+                distance = np.sqrt(x_mm**2 + y_mm**2 + z_mm**2)
+                self.distance_label.setText(f"Distance: {distance:.1f} mm")
+                
+                # Update workspace status
+                workspace_text = f"Method: {method} | Distance: {distance:.0f}mm"
+                if distance < 400:
+                    workspace_color = '#27ae60'
+                elif distance < 500:
+                    workspace_color = '#f39c12'
+                else:
+                    workspace_color = '#e74c3c'
+                
+                self.workspace_status.setText(workspace_text)
+                self.workspace_status.setStyleSheet(f"""
+                    font-size: 9pt;
+                    color: {workspace_color};
+                    padding: 4px 0px;
+                """)
+                
+                # Update workspace visualization
+                self.update_workspace_position(x_mm, y_mm, z_mm)
+                self.update_workspace_display(x_mm, y_mm, z_mm)
+                
+                # Update current position in control panel
+                pos_text = f"Current Position:\nX: {x_mm:6.1f} mm | Y: {y_mm:6.1f} mm | Z: {z_mm:6.1f} mm"
+                self.current_pos_label.setText(pos_text)
+                
+                # Update workspace bounds
+                bounds_text = f"X: [{x_mm-100:.0f}, {x_mm+100:.0f}] mm\nY: [{y_mm-100:.0f}, {y_mm+100:.0f}] mm\nZ: [{z_mm-50:.0f}, {z_mm+50:.0f}] mm"
+                self.workspace_bounds.setText(bounds_text)
+                
+                # Update joint configuration display
+                pan = joint_positions.get("shoulder_pan", 0)
+                lift = joint_positions.get("shoulder_lift", 0)
+                elbow = joint_positions.get("elbow_flex", 0)
+                wrist_flex = joint_positions.get("wrist_flex", 0)
+                wrist_roll = joint_positions.get("wrist_roll", 0)
+                
+                config_text = f"Shoulder: {pan:.1f}°, {lift:.1f}° | Elbow: {elbow:.1f}° | Wrist: {wrist_flex:.1f}°, {wrist_roll:.1f}°"
+                self.joint_config.setText(config_text)
+                
+                # Calculate robot position on chess board
+                if "shoulder_pan" in motor_data and "shoulder_lift" in motor_data:
+                    if motor_data["shoulder_pan"]["position"] is not None and motor_data["shoulder_lift"]["position"] is not None:
                         square = self.calculate_robot_square(
                             motor_data["shoulder_pan"]["position"],
                             motor_data["shoulder_lift"]["position"]
                         )
                         if square:
-                                self.robot_position_label.setText(f"📍 {square.upper()}")
+                            self.robot_position_label.setText(f"📍 {square.upper()}")
                             
                             pan_pos = motor_data["shoulder_pan"]["position"]
                             lift_pos = motor_data["shoulder_lift"]["position"]
                             elbow_pos = motor_data.get("elbow_flex", {}).get("position", 0)
                             
-                                details_text = f"Position: {square.upper()} | Pan: {pan_pos:.1f}° | Lift: {lift_pos:.1f}° | Elbow: {elbow_pos:.1f}°"
+                            details_text = f"Position: {square.upper()} | Pan: {pan_pos:.1f}° | Lift: {lift_pos:.1f}° | Elbow: {elbow_pos:.1f}°"
                             self.robot_details.setText(details_text)
                             self.robot_details.setStyleSheet("font-size: 9pt; color: #27ae60; padding: 5px;")
                             
@@ -2204,7 +2364,7 @@ class ChessRobotUI(QMainWindow):
                             self.robot_details.setText("Position: Off board\nMove robot over\nchessboard")
                             self.robot_details.setStyleSheet("font-size: 9pt; color: #f39c12; padding: 5px;")
                             self.chess_board.set_robot_square(None)
-                else:
+            else:
                 self.robot_status.setText("⚠ Motor Issues")
                 self.robot_status.setStyleSheet("""
                     font-size: 10pt;
@@ -2250,8 +2410,9 @@ class ChessRobotUI(QMainWindow):
     
     def start_monitoring(self):
         """Start monitoring threads."""
-        self.monitor_thread = MonitoringThread(self.bus, self.camera)
-        self.monitor_thread.camera_update.connect(self.update_camera)
+        self.monitor_thread = MonitoringThread(self.bus, self.cameras)
+        self.monitor_thread.main_camera_update.connect(self.update_main_camera)
+        self.monitor_thread.gripper_camera_update.connect(self.update_gripper_camera)
         self.monitor_thread.motor_update.connect(self.update_motors)
         self.monitor_thread.status_update.connect(self.status_bar.setText)
         self.monitor_thread.running = True

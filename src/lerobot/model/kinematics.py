@@ -126,3 +126,65 @@ class RobotKinematics:
             return result
         else:
             return joint_pos_deg
+
+    def compute_jacobian(self, joint_pos_deg):
+        """
+        Compute the position Jacobian (3xN) at the given joint configuration.
+
+        Args:
+            joint_pos_deg: Joint positions in degrees (numpy array)
+
+        Returns:
+            3xN numpy array where N is the number of joints.
+            Maps joint velocities (rad/s) to EE linear velocity (m/s).
+        """
+        n = len(self.joint_names)
+        # Numerical differentiation step (radians).
+        # Too small makes the FK difference drown in solver/float noise; too large reduces linear accuracy.
+        eps = 1e-3
+
+        # Get current EE position
+        T0 = self.forward_kinematics(joint_pos_deg)
+        p0 = T0[:3, 3]
+
+        J = np.zeros((3, n))
+        for i in range(n):
+            q_plus = joint_pos_deg.copy()
+            q_plus[i] += np.rad2deg(eps)  # Perturb in degrees
+            T_plus = self.forward_kinematics(q_plus)
+            p_plus = T_plus[:3, 3]
+            J[:, i] = (p_plus - p0) / eps  # dp/dq (m per rad)
+
+        # Restore original configuration
+        self.forward_kinematics(joint_pos_deg)
+        return J
+
+    def jacobian_delta_ik(self, joint_pos_deg, delta_xyz_m, max_joint_delta_deg=5.0):
+        """
+        Compute joint deltas for a small EE position delta using the Jacobian.
+
+        This is more stable than full IK for small movements as it keeps the
+        arm in roughly the same configuration.
+
+        Args:
+            joint_pos_deg: Current joint positions in degrees
+            delta_xyz_m: Desired EE position change [dx, dy, dz] in meters
+            max_joint_delta_deg: Maximum allowed joint change per axis (degrees)
+
+        Returns:
+            New joint positions in degrees
+        """
+        J = self.compute_jacobian(joint_pos_deg)
+
+        # Use damped least squares (pseudo-inverse with regularization)
+        # J @ dq = dp  =>  dq = J^+ @ dp
+        damping = 0.01
+        JTJ = J.T @ J + damping * np.eye(J.shape[1])
+        dq_rad = np.linalg.solve(JTJ, J.T @ delta_xyz_m)
+
+        dq_deg = np.rad2deg(dq_rad)
+
+        # Clamp joint deltas to avoid large jumps
+        dq_deg = np.clip(dq_deg, -max_joint_delta_deg, max_joint_delta_deg)
+
+        return joint_pos_deg[:len(self.joint_names)] + dq_deg

@@ -1087,9 +1087,24 @@ class MotorsBus(abc.ABC):
         addr, length = get_address(self.model_ctrl_table, model, data_name)
 
         err_msg = f"Failed to sync read '{data_name}' on {ids=} after {num_retry + 1} tries."
-        ids_values, _ = self._sync_read(
-            addr, length, ids, num_retry=num_retry, raise_on_error=True, err_msg=err_msg
+        ids_values, comm = self._sync_read(
+            addr, length, ids, num_retry=num_retry, raise_on_error=False, err_msg=err_msg
         )
+
+        # Fallback to individual reads if sync read fails (common with some Feetech daisy-chain setups)
+        if not self._is_comm_success(comm):
+            # Only log once per data_name to avoid spamming during continuous reads
+            fallback_key = f"_sync_read_fallback_warned_{data_name}"
+            if not getattr(self, fallback_key, False):
+                logger.warning(f"Sync read failed for '{data_name}', using individual reads (this warning shown once)")
+                setattr(self, fallback_key, True)
+            ids_values = {}
+            for motor_name, motor_id in zip(names, ids):
+                try:
+                    val = self.read(data_name, motor_name, normalize=False)
+                    ids_values[motor_id] = val
+                except Exception as e:
+                    raise ConnectionError(f"{err_msg} Individual read also failed for {motor_name}: {e}")
 
         ids_values = self._decode_sign(data_name, ids_values)
 

@@ -1,3 +1,16 @@
+## Repo layout (cleaned)
+
+This repo has been cleaned up to keep the current, actively-used code in the root:
+
+- `chess_robot_ui_llm.py`: main SO-101 gripper-camera UI + LLM control
+- `src/`: `lerobot` package code used by the UI
+- `so101_new_calib.nomesh.urdf` / `so101_new_calib.urdf`: URDFs used for kinematics
+- `requirements-*.txt`, `requirements.in`, `pyproject.toml`: dependencies
+
+Older demos, experiments, and legacy docs/scripts were moved to:
+
+- `archive/`
+
 <p align="center">
   <img alt="LeRobot, Hugging Face Robotics Library" src="https://raw.githubusercontent.com/huggingface/lerobot/main/media/lerobot-logo-thumbnail.png" width="100%">
   <br/>

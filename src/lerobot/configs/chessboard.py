@@ -27,6 +27,17 @@ class ChessBoardParams:
     board_size: tuple[int, int] = (8, 8)
     board_height_mm: float = 15.0
     origin_square: Square = "a1"  # world origin aligned to lower-left square in image convention
+    # Optional separate X/Y sizes (if board isn't perfectly square)
+    square_size_x_mm: float | None = None
+    square_size_y_mm: float | None = None
+    
+    @property
+    def effective_square_size_x_mm(self) -> float:
+        return self.square_size_x_mm if self.square_size_x_mm is not None else self.square_size_mm
+    
+    @property
+    def effective_square_size_y_mm(self) -> float:
+        return self.square_size_y_mm if self.square_size_y_mm is not None else self.square_size_mm
 
 
 @dataclass

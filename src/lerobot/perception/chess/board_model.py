@@ -48,9 +48,10 @@ class BoardModel:
         file_idx: 0..7 for a..h; rank_idx: 0..7 for 1..8
         Board frame convention: origin at a1 corner, +x to files (a->h), +y to ranks (1->8), z up.
         """
-        sx = self.params.square_size_mm / 1000.0
+        sx = self.params.effective_square_size_x_mm / 1000.0
+        sy = self.params.effective_square_size_y_mm / 1000.0
         x = (file_idx + 0.5) * sx
-        y = (rank_idx + 0.5) * sx
+        y = (rank_idx + 0.5) * sy
         z = self.params.board_height_mm / 1000.0
         return np.array([x, y, z], dtype=float)
 
