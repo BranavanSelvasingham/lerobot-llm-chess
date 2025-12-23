@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/huggingface/lerobot/main/media/lerobot-logo-thumbnail.png" width="300" alt="LeRobot">
-</p>
-
 <h1 align="center">♟️ LeRobot Chess</h1>
 
 <p align="center">
