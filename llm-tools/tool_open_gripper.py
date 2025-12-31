@@ -1,8 +1,18 @@
-"""Tool: open_gripper - fully open the gripper."""
+"""Tool: open_gripper - fully open the gripper via Skill API."""
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from typing import Any, TYPE_CHECKING
+
+# Make skills importable
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_SKILLS_DIR = _REPO_ROOT / "skills"
+if _SKILLS_DIR.exists() and str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from skills.skill_api import release as skill_release
 
 if TYPE_CHECKING:
     from llm_toolkit import KinematicsTools
@@ -24,10 +34,9 @@ def schema() -> dict[str, Any]:
 
 
 def execute(tools: "KinematicsTools", args: dict[str, Any]) -> dict[str, Any]:
+    """Execute open_gripper via Skill API (release)."""
     _ = args
-    with tools._lock:
-        # 95% open (leaving small margin)
-        tools._send_joint_targets_deg({"gripper": 95.0})
-        # Wait for gripper to finish moving
-        stopped = tools.wait_until_motors_stopped(timeout_s=3.0)
-        return {"ok": True, "gripper_percent": 95.0, "action": "opened", "motors_stopped": stopped}
+    result = skill_release(tools, percent=95.0)
+    # Add backward-compatible fields
+    result["action"] = "opened"
+    return result

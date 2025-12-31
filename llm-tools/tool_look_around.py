@@ -1,6 +1,18 @@
+"""Tool: look_around - move camera to search for target via Skill API."""
+
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from typing import Any, TYPE_CHECKING
+
+# Make skills importable
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_SKILLS_DIR = _REPO_ROOT / "skills"
+if _SKILLS_DIR.exists() and str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from skills.skill_api import move_delta as skill_move_delta
 
 if TYPE_CHECKING:
     from llm_toolkit import KinematicsTools
@@ -36,15 +48,15 @@ def schema() -> dict[str, Any]:
 
 
 def execute(tools: "KinematicsTools", args: dict[str, Any]) -> dict[str, Any]:
+    """Execute look_around via Skill API (move_delta)."""
     direction = str(args.get("direction", "")).strip().lower()
     step_mm = float(args.get("step_mm", 25.0))
     if step_mm <= 0:
         step_mm = 25.0
-
-    # Map view directions to the existing base-centric polar interface:
+    
+    # Map view directions to delta moves:
     # - left/right -> tangential (dy_mm)
     # - up/down -> radial (dx_mm)
-    # The caller should adapt based on visual feedback.
     dx_mm = 0.0
     dy_mm = 0.0
     if direction == "left":
@@ -57,14 +69,15 @@ def execute(tools: "KinematicsTools", args: dict[str, Any]) -> dict[str, Any]:
         dx_mm = -step_mm
     else:
         return {"ok": False, "error": f"Invalid direction: {direction!r}"}
-
-    move_args = {"dx_mm": float(dx_mm), "dy_mm": float(dy_mm), "dz_mm": 0.0}
-    res = tools.execute_tool("move_gripper_delta", move_args)
+    
+    res = skill_move_delta(tools, dx_mm=dx_mm, dy_mm=dy_mm, dz_mm=0.0)
+    
     return {
         "ok": bool(res.get("ok", False)),
+        "skill": "look_around",
         "direction": direction,
         "step_mm": float(step_mm),
-        "move_args": move_args,
+        "move_args": {"dx_mm": dx_mm, "dy_mm": dy_mm, "dz_mm": 0.0},
         "move_result": res,
         "note": "Call look_around one step at a time and stop when the target is visible.",
     }

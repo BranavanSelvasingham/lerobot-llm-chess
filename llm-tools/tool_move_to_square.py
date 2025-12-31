@@ -1,22 +1,21 @@
-"""Tool: move_to_square - position gripper above a chess square."""
+"""Tool: move_to_square - position gripper above a chess square via Skill API."""
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
-import numpy as np
+# Make skills importable
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_SKILLS_DIR = _REPO_ROOT / "skills"
+if _SKILLS_DIR.exists() and str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from skills.skill_api import reach_square as skill_reach_square
 
 if TYPE_CHECKING:
     from llm_toolkit import KinematicsTools
-
-
-def _square_to_indices(sq: str) -> tuple[int, int]:
-    sq = sq.strip().lower()
-    if len(sq) != 2 or sq[0] < "a" or sq[0] > "h" or sq[1] < "1" or sq[1] > "8":
-        raise ValueError(f"Invalid square: {sq!r}")
-    file_idx = ord(sq[0]) - ord("a")
-    rank_idx = int(sq[1]) - 1
-    return file_idx, rank_idx
 
 
 def schema() -> dict[str, Any]:
@@ -49,48 +48,21 @@ def schema() -> dict[str, Any]:
 
 
 def execute(tools: "KinematicsTools", args: dict[str, Any]) -> dict[str, Any]:
+    """Execute move_to_square via Skill API (reach_square)."""
     square = str(args.get("square", "")).strip()
     height = str(args.get("height", "hover")).strip().lower()
     
-    with tools._lock:
-        tools._require_kin()
-        
-        if tools.board_model is None or tools.board_model.T_base_board is None:
-            raise RuntimeError("Board model not loaded or missing T_base_board")
-        
-        # Get current orientation to preserve
-        T_start = tools.get_ee_pose()
-        R_fixed = T_start[:3, :3].astype(float)
-        
-        # Compute square center in base frame
-        fi, ri = _square_to_indices(square)
-        p_board = tools.board_model.square_center_in_board(fi, ri)
-        
-        Tbb = tools.board_model.T_base_board.T
-        p_base = (Tbb @ np.hstack([p_board, 1.0]))[:3].astype(float)
-        
-        # Set height
-        if height == "low":
-            # At piece level for grasping
-            target_z = p_base[2]
-        else:
-            # Hover above (~80mm above board)
-            target_z = p_base[2] + 0.08
-        
-        target_xyz = np.array([p_base[0], p_base[1], target_z], dtype=float)
-        
-        # Move to position
-        res = tools._move_ee_to(xyz_m=target_xyz, R_fixed=R_fixed, gripper_pos=None)  # Keep gripper as-is
-        
-        # Wait for motors to stop
-        stopped = tools.wait_until_motors_stopped(timeout_s=5.0)
-        
-        return {
-            "ok": res.get("ok", False),
-            "square": square,
-            "height": height,
-            "target_xyz_mm": [float(x * 1000) for x in target_xyz],
-            "achieved_xyz_mm": [float(x * 1000) for x in res.get("ee_after_m", target_xyz)],
-            "motors_stopped": stopped,
-            "position_err_mm": res.get("achieved_position_err_mm", 0),
-        }
+    # Map height parameter to approach_height_mm
+    if height == "low":
+        # At piece level for grasping (~20mm above board surface)
+        approach_height_mm = 20.0
+    else:
+        # Hover above (~80mm above board)
+        approach_height_mm = 80.0
+    
+    result = skill_reach_square(tools, square, approach_height_mm=approach_height_mm)
+    
+    # Add backward-compatible fields
+    result["height"] = height
+    
+    return result
