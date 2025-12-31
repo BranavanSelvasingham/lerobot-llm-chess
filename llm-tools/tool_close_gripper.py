@@ -1,8 +1,18 @@
-"""Tool: close_gripper - close the gripper to grasp a piece."""
+"""Tool: close_gripper - close the gripper to grasp a piece via Skill API."""
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from typing import Any, TYPE_CHECKING
+
+# Make skills importable
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_SKILLS_DIR = _REPO_ROOT / "skills"
+if _SKILLS_DIR.exists() and str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from skills.skill_api import grasp as skill_grasp
 
 if TYPE_CHECKING:
     from llm_toolkit import KinematicsTools
@@ -24,14 +34,9 @@ def schema() -> dict[str, Any]:
 
 
 def execute(tools: "KinematicsTools", args: dict[str, Any]) -> dict[str, Any]:
+    """Execute close_gripper via Skill API (grasp)."""
     _ = args
-    with tools._lock:
-        # Close gripper until it stalls on object or reaches target
-        result = tools.close_gripper_until_stall(target_percent=0.0, timeout_s=3.0)
-        return {
-            "ok": result.get("ok", False),
-            "action": "closed",
-            "gripped_object": result.get("stalled", False),
-            "final_position": result.get("final_position", 0),
-            **result
-        }
+    result = skill_grasp(tools, profile="default")
+    # Add backward-compatible fields
+    result["action"] = "closed"
+    return result
