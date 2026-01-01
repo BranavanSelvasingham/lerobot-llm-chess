@@ -9,6 +9,20 @@ if TYPE_CHECKING:
     from llm_toolkit import KinematicsTools
 
 
+# Waypoint names for logging
+WAYPOINT_NAMES = [
+    "hover_above_source",      # 1. Move above source square
+    "lower_to_source",         # 2. Lower to piece at source
+    "grasp_piece",             # 3. Close gripper to grasp
+    "lift_from_source",        # 4. Lift piece from source
+    "transit_high",            # 5. Move to high transit position
+    "hover_above_dest",        # 6. Move above destination
+    "lower_to_dest",           # 7. Lower piece to destination
+    "release_piece",           # 8. Open gripper to release
+    "retract_from_dest",       # 9. Lift away from destination
+]
+
+
 def _square_to_indices(sq: str) -> tuple[int, int]:
     sq = sq.strip().lower()
     if len(sq) != 2 or sq[0] < "a" or sq[0] > "h" or sq[1] < "1" or sq[1] > "8":
@@ -38,7 +52,18 @@ def schema() -> dict[str, Any]:
     }
 
 
-def execute(tools: "KinematicsTools", args: dict[str, Any]) -> dict[str, Any]:
+def execute(
+    tools: "KinematicsTools",
+    args: dict[str, Any],
+    episode_ctx: Any = None,
+) -> dict[str, Any]:
+    """Execute move_piece with optional waypoint-level recording.
+    
+    Args:
+        tools: KinematicsTools instance
+        args: Tool arguments (from_square, to_square, etc.)
+        episode_ctx: Optional episode context for waypoint logging
+    """
     from_square = str(args.get("from_square", "")).strip()
     to_square = str(args.get("to_square", "")).strip()
     hover_height_m = float(args.get("hover_height_m", 0.08))
@@ -87,24 +112,37 @@ def execute(tools: "KinematicsTools", args: dict[str, Any]) -> dict[str, Any]:
         open_value = 95.0
         grasp_close = 0.0  # Fully closed to grip piece
 
-        waypoints: list[tuple[np.ndarray, float]] = [
-            (src_hover, open_value),
-            (p_src_base, open_value),
-            (p_src_base, grasp_close),
-            (src_hover, grasp_close),
-            (high, grasp_close),
-            (dst_hover, grasp_close),
-            (p_dst_base, grasp_close),
-            (p_dst_base, open_value),
-            (dst_hover, open_value),
+        waypoints: list[tuple[np.ndarray, float, str]] = [
+            (src_hover, open_value, WAYPOINT_NAMES[0]),
+            (p_src_base, open_value, WAYPOINT_NAMES[1]),
+            (p_src_base, grasp_close, WAYPOINT_NAMES[2]),
+            (src_hover, grasp_close, WAYPOINT_NAMES[3]),
+            (high, grasp_close, WAYPOINT_NAMES[4]),
+            (dst_hover, grasp_close, WAYPOINT_NAMES[5]),
+            (p_dst_base, grasp_close, WAYPOINT_NAMES[6]),
+            (p_dst_base, open_value, WAYPOINT_NAMES[7]),
+            (dst_hover, open_value, WAYPOINT_NAMES[8]),
         ]
 
         results: list[dict[str, Any]] = []
         prev_gripper = open_value
         
-        for idx, (xyz, g) in enumerate(waypoints, start=1):
+        for idx, (xyz, g, waypoint_name) in enumerate(waypoints):
+            # Log PRE-waypoint observation
+            tools.log_waypoint(
+                episode_ctx=episode_ctx,
+                waypoint_idx=idx,
+                waypoint_name=waypoint_name,
+                target_xyz_m=xyz.tolist(),
+                target_gripper_pct=g,
+                action_result=None,
+                is_pre=True,
+            )
+            
+            # Execute the move
             res = tools._move_ee_to(xyz_m=xyz, R_fixed=R_fixed, gripper_pos=g)
             res["waypoint_index"] = idx
+            res["waypoint_name"] = waypoint_name
             res["waypoint_gripper"] = float(g)
             results.append(res)
             
@@ -118,6 +156,17 @@ def execute(tools: "KinematicsTools", args: dict[str, Any]) -> dict[str, Any]:
                 # Regular move - wait for motors to stop
                 stopped = tools.wait_until_motors_stopped(timeout_s=5.0)
                 res["motors_stopped"] = stopped
+            
+            # Log POST-waypoint observation with action result
+            tools.log_waypoint(
+                episode_ctx=episode_ctx,
+                waypoint_idx=idx,
+                waypoint_name=waypoint_name,
+                target_xyz_m=xyz.tolist(),
+                target_gripper_pct=g,
+                action_result=res,
+                is_pre=False,
+            )
             
             prev_gripper = g
             

@@ -48,7 +48,18 @@ def schema() -> dict[str, Any]:
     }
 
 
-def execute(tools: "KinematicsTools", args: dict[str, Any]) -> dict[str, Any]:
+def execute(
+    tools: "KinematicsTools",
+    args: dict[str, Any],
+    episode_ctx: Any = None,
+) -> dict[str, Any]:
+    """Execute move_to_square with optional waypoint-level recording.
+    
+    Args:
+        tools: KinematicsTools instance
+        args: Tool arguments (square, height)
+        episode_ctx: Optional episode context for waypoint logging
+    """
     square = str(args.get("square", "")).strip()
     height = str(args.get("height", "hover")).strip().lower()
     
@@ -73,17 +84,42 @@ def execute(tools: "KinematicsTools", args: dict[str, Any]) -> dict[str, Any]:
         if height == "low":
             # At piece level for grasping
             target_z = p_base[2]
+            waypoint_name = f"lower_to_{square}"
         else:
             # Hover above (~80mm above board)
             target_z = p_base[2] + 0.08
+            waypoint_name = f"hover_above_{square}"
         
         target_xyz = np.array([p_base[0], p_base[1], target_z], dtype=float)
+        
+        # Log PRE-move observation
+        tools.log_waypoint(
+            episode_ctx=episode_ctx,
+            waypoint_idx=0,
+            waypoint_name=waypoint_name,
+            target_xyz_m=target_xyz.tolist(),
+            target_gripper_pct=None,  # Gripper unchanged
+            action_result=None,
+            is_pre=True,
+        )
         
         # Move to position
         res = tools._move_ee_to(xyz_m=target_xyz, R_fixed=R_fixed, gripper_pos=None)  # Keep gripper as-is
         
         # Wait for motors to stop
         stopped = tools.wait_until_motors_stopped(timeout_s=5.0)
+        res["motors_stopped"] = stopped
+        
+        # Log POST-move observation
+        tools.log_waypoint(
+            episode_ctx=episode_ctx,
+            waypoint_idx=0,
+            waypoint_name=waypoint_name,
+            target_xyz_m=target_xyz.tolist(),
+            target_gripper_pct=None,
+            action_result=res,
+            is_pre=False,
+        )
         
         return {
             "ok": res.get("ok", False),
