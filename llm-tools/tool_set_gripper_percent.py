@@ -1,9 +1,18 @@
+"""Tool: set_gripper_percent - set gripper opening percentage via Skill API."""
+
 from __future__ import annotations
 
-import time
+import sys
+from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
-import numpy as np
+# Make skills importable
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_SKILLS_DIR = _REPO_ROOT / "skills"
+if _SKILLS_DIR.exists() and str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from skills.skill_api import set_gripper as skill_set_gripper
 
 if TYPE_CHECKING:
     from llm_toolkit import KinematicsTools
@@ -28,50 +37,25 @@ def schema() -> dict[str, Any]:
 
 
 def execute(tools: "KinematicsTools", args: dict[str, Any]) -> dict[str, Any]:
-    with tools._lock:
-        pct_req = float(args.get("percent", 0.0))
-        pct = float(np.clip(pct_req, 0.0, 100.0))
-
-        # Readback before/after so logs reflect physical reality.
-        before: dict[str, Any]
-        after: dict[str, Any]
-        try:
-            before = tools._read_joints_deg(["gripper"])  # type: ignore[attr-defined]
-        except Exception as e:
-            before = {"_error": str(e)}
-
-        send_info = tools._send_gripper_percent(pct)  # returns action actually sent
-
-        # Give the bus/motor some time to move before reading again.
-        time.sleep(0.25)
-        try:
-            after = tools._read_joints_deg(["gripper"])  # type: ignore[attr-defined]
-        except Exception as e:
-            after = {"_error": str(e)}
-
-        moved = None
-        delta = None
-        try:
-            if isinstance(before.get("gripper"), (int, float)) and isinstance(after.get("gripper"), (int, float)):
-                delta = float(after["gripper"]) - float(before["gripper"])
-                moved = bool(abs(delta) >= 1.0)
-        except Exception:
-            pass
-
-        result: dict[str, Any] = {
-            "ok": True,
-            "percent_requested": float(pct_req),
-            "percent": float(pct),
-            "gripper_before": before,
-            "gripper_after": after,
-            "delta": delta,
-            "moved": moved,
-            **(send_info if isinstance(send_info, dict) else {"send_info": send_info}),
-        }
-        if moved is False:
-            result["warning"] = (
-                "Gripper readback did not change >= 1.0 (in 0..100 units). "
-                "This may indicate torque disabled, motor unplugged, a stalled gripper, "
-                "or that the robot clips the goal position."
-            )
-        return result
+    """Execute set_gripper_percent via Skill API (set_gripper)."""
+    percent = float(args.get("percent", 0.0))
+    
+    result = skill_set_gripper(tools, percent=percent)
+    
+    # Add backward-compatible fields
+    result["percent_requested"] = percent
+    result["gripper_before"] = {"gripper": result.get("before")}
+    result["gripper_after"] = {"gripper": result.get("after")}
+    
+    # Compute delta and moved
+    before = result.get("before")
+    after = result.get("after")
+    if before is not None and after is not None:
+        delta = float(after) - float(before)
+        result["delta"] = delta
+        result["moved"] = bool(abs(delta) >= 1.0)
+    else:
+        result["delta"] = None
+        result["moved"] = None
+    
+    return result

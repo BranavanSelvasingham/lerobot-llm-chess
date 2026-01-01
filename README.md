@@ -84,7 +84,12 @@ lerobot-llm-chess/
 ├── so101_ik_visualizer.py        # Interactive IK visualization tool
 ├── so101_new_calib.urdf          # Robot URDF for kinematics
 │
-├── llm-tools/                    # LLM tool implementations
+├── skills/                       # ⭐ Skill API layer (abstraction boundary)
+│   ├── __init__.py               # Public exports
+│   ├── skill_api.py              # High-level manipulation primitives
+│   └── demo.py                   # CLI demo: python -m skills.demo
+│
+├── llm-tools/                    # LLM tool implementations (use Skill API)
 │   ├── llm_toolkit.py            # Robot connection, FK/IK, tool dispatch
 │   ├── tool_go_home.py           # Return to home position
 │   ├── tool_move_to_square.py    # Move gripper to chess square
@@ -117,6 +122,90 @@ lerobot-llm-chess/
 │
 └── archive/                      # Legacy code (not actively used)
 ```
+
+## 🎯 Skill API
+
+The Skill API (`skills/skill_api.py`) provides a **canonical abstraction boundary** between high-level manipulation primitives and low-level motor/IK control. All LLM tools route through this layer.
+
+### Design Principles
+
+1. **Stable Names**: Skill function names are stable across versions
+2. **Deterministic Delegation**: Skills delegate to existing IK/trajectory/motor code
+3. **Rich Return Dicts**: Every skill returns `{"ok": bool, ...}` with context
+4. **No Behavior Changes**: The Skill API wraps existing logic without modification
+
+### Available Skills
+
+| Skill | Description |
+|-------|-------------|
+| `home()` | Move robot to saved home/rest position |
+| `reach_square(square, approach_height_mm)` | Position gripper above a chess square |
+| `reach_pose(pose, frame)` | Move gripper to arbitrary XYZ pose |
+| `grasp(profile)` | Close gripper with stall detection |
+| `release(percent)` | Open gripper to release |
+| `place_square(square, retreat_height_mm)` | Lower, release, and retreat from square |
+| `recover(reason)` | Attempt recovery (open gripper, go home) |
+| `scan_board()` | Move to bird's eye view (stub for vision) |
+| `nudge(direction, distance_mm)` | Small position adjustment |
+| `move_delta(dx_mm, dy_mm, dz_mm)` | Cartesian delta move |
+| `set_gripper(percent)` | Set gripper opening percentage |
+| `read_joints(include_gripper)` | Read current joint positions |
+| `move_joints(targets, relative, max_step_deg)` | Direct joint control |
+
+### Usage Examples
+
+**Via SkillContext (recommended)**:
+```python
+from skills import SkillContext
+
+with SkillContext(port="/dev/tty.usbmodem...") as ctx:
+    ctx.home()
+    ctx.reach_square("e2", approach_height_mm=80)
+    ctx.grasp()
+    ctx.place_square("e4", retreat_height_mm=80)
+    ctx.home()
+```
+
+**Via module-level functions**:
+```python
+from skills.skill_api import home, reach_square, grasp
+from llm_toolkit import AppConfig, KinematicsTools
+
+tools = KinematicsTools(AppConfig(port="/dev/tty.usbmodem..."))
+home(tools)
+reach_square(tools, "e2", approach_height_mm=80)
+grasp(tools, profile="default")
+```
+
+### CLI Demo
+
+Run a simple pick-and-place sequence:
+
+```bash
+# With robot connected
+python -m skills.demo --port /dev/tty.usbmodem...
+
+# Dry run (prints planned sequence)
+python -m skills.demo --dry-run
+```
+
+### Tool → Skill Mapping
+
+| LLM Tool | Skill API Call |
+|----------|----------------|
+| `go_home` | `home()` |
+| `go_birds_eye` | `scan_board()` |
+| `move_to_square` | `reach_square()` |
+| `open_gripper` | `release()` |
+| `close_gripper` | `grasp()` |
+| `move_piece` | Sequence: `release` → `reach_square` → `grasp` → `reach_square` → `release` |
+| `nudge_gripper` | `nudge()` |
+| `set_gripper_percent` | `set_gripper()` |
+| `read_joints` | `read_joints()` |
+| `move_joints` | `move_joints()` |
+| `set_all_joints` | `move_joints()` |
+| `look_around` | `move_delta()` |
+| `move_gripper_delta` | `reach_pose()` (with polar conversion) |
 
 ## 🛠️ LLM Tools
 

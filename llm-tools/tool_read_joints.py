@@ -1,12 +1,21 @@
+"""Tool: read_joints - read current joint positions via Skill API."""
+
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from typing import Any, TYPE_CHECKING
+
+# Make skills importable
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_SKILLS_DIR = _REPO_ROOT / "skills"
+if _SKILLS_DIR.exists() and str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from skills.skill_api import read_joints as skill_read_joints
 
 if TYPE_CHECKING:
     from llm_toolkit import KinematicsTools
-
-
-_SO101_JOINTS: list[str] = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll"]
 
 
 def schema() -> dict[str, Any]:
@@ -30,33 +39,12 @@ def schema() -> dict[str, Any]:
 
 
 def execute(tools: "KinematicsTools", args: dict[str, Any]) -> dict[str, Any]:
-    with tools._lock:
-        tools._require_robot()
-        include_gripper = bool(args.get("include_gripper", True))
-
-        names = list(_SO101_JOINTS)
-        if include_gripper:
-            names.append("gripper")
-
-        # Robust read: try each joint so one overloaded motor doesn't wipe the whole snapshot.
-        joints: dict[str, float | None] = {n: None for n in names}
-        errors: dict[str, str] = {}
-        for n in names:
-            try:
-                q = tools._read_joints_deg([n])  # type: ignore[attr-defined]
-                if n in q:
-                    joints[n] = float(q[n])
-            except Exception as e:
-                errors[n] = str(e)
-
-        ok = any(v is not None for v in joints.values())
-        out: dict[str, Any] = {
-            "ok": bool(ok),
-            "torque_disabled": bool(getattr(tools, "torque_disabled", False)),
-            "joints": joints,
-        }
-        if errors:
-            out["errors"] = errors
-        if not ok and errors:
-            out["error"] = "Failed to read any joints."
-        return out
+    """Execute read_joints via Skill API."""
+    include_gripper = bool(args.get("include_gripper", True))
+    
+    result = skill_read_joints(tools, include_gripper=include_gripper)
+    
+    # Add backward-compatible fields
+    result["torque_disabled"] = bool(getattr(tools, "torque_disabled", False))
+    
+    return result

@@ -1,22 +1,21 @@
-"""Tool: move_to_square - position gripper above a chess square."""
+"""Tool: move_to_square - position gripper above a chess square via Skill API."""
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
-import numpy as np
+# Make skills importable
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_SKILLS_DIR = _REPO_ROOT / "skills"
+if _SKILLS_DIR.exists() and str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from skills.skill_api import reach_square as skill_reach_square
 
 if TYPE_CHECKING:
     from llm_toolkit import KinematicsTools
-
-
-def _square_to_indices(sq: str) -> tuple[int, int]:
-    sq = sq.strip().lower()
-    if len(sq) != 2 or sq[0] < "a" or sq[0] > "h" or sq[1] < "1" or sq[1] > "8":
-        raise ValueError(f"Invalid square: {sq!r}")
-    file_idx = ord(sq[0]) - ord("a")
-    rank_idx = int(sq[1]) - 1
-    return file_idx, rank_idx
 
 
 def schema() -> dict[str, Any]:

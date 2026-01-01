@@ -1,21 +1,21 @@
-"""Tool: go_birds_eye - move to bird's eye view position for board observation."""
+"""Tool: go_birds_eye - move to bird's eye view position via Skill API."""
 
 from __future__ import annotations
 
-import json
+import sys
+from pathlib import Path
 from typing import Any, TYPE_CHECKING
+
+# Make skills importable
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_SKILLS_DIR = _REPO_ROOT / "skills"
+if _SKILLS_DIR.exists() and str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from skills.skill_api import scan_board as skill_scan_board
 
 if TYPE_CHECKING:
     from llm_toolkit import KinematicsTools
-
-_SO101_AND_GRIPPER = [
-    "shoulder_pan",
-    "shoulder_lift",
-    "elbow_flex",
-    "wrist_flex",
-    "wrist_roll",
-    "gripper",
-]
 
 
 def schema() -> dict[str, Any]:
@@ -37,40 +37,9 @@ def schema() -> dict[str, Any]:
 
 
 def execute(tools: "KinematicsTools", args: dict[str, Any]) -> dict[str, Any]:
+    """Execute go_birds_eye via Skill API (scan_board)."""
     _ = args
-    with tools._lock:
-        targets: dict[str, float] = {}
-        
-        # Load bird's_eye_view from saved_positions.json
-        saved_positions_path = tools.home_position_path.with_name("saved_positions.json")
-        if not saved_positions_path.is_file():
-            raise RuntimeError(
-                f"No saved_positions.json found at {saved_positions_path}. "
-                "Run setup_birds_eye_view.py first."
-            )
-        
-        try:
-            obj = json.loads(saved_positions_path.read_text())
-            birds_eye = (obj.get("bird's_eye_view") or {}).get("positions") or {}
-            if not isinstance(birds_eye, dict) or not birds_eye:
-                raise RuntimeError(
-                    "bird's_eye_view position not found in saved_positions.json. "
-                    "Run setup_birds_eye_view.py first."
-                )
-            
-            for j in _SO101_AND_GRIPPER:
-                if j in birds_eye:
-                    targets[j] = float(birds_eye[j])
-        except json.JSONDecodeError as e:
-            raise RuntimeError(f"Failed to parse saved_positions.json: {e}")
-        
-        if not targets:
-            raise RuntimeError("No valid joint positions found in bird's_eye_view.")
-        
-        tools._send_joint_targets_deg(targets)
-        
-        return {
-            "ok": True,
-            "position": "bird's_eye_view",
-            "targets_deg": targets,
-        }
+    result = skill_scan_board(tools)
+    # Rename skill field for backward compatibility
+    result["position"] = "bird's_eye_view"
+    return result

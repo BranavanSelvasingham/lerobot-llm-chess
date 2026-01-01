@@ -1,9 +1,24 @@
+"""Tool: move_piece - pick and place chess piece via Skill API."""
+
 from __future__ import annotations
 
+import sys
 import time
+from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
-import numpy as np
+# Make skills importable
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_SKILLS_DIR = _REPO_ROOT / "skills"
+if _SKILLS_DIR.exists() and str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from skills.skill_api import (
+    reach_square as skill_reach_square,
+    grasp as skill_grasp,
+    release as skill_release,
+    place_square as skill_place_square,
+)
 
 if TYPE_CHECKING:
     from llm_toolkit import KinematicsTools
