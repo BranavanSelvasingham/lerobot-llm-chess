@@ -24,6 +24,29 @@ if TYPE_CHECKING:
     from llm_toolkit import KinematicsTools
 
 
+# Waypoint names for logging
+WAYPOINT_NAMES = [
+    "hover_above_source",      # 1. Move above source square
+    "lower_to_source",         # 2. Lower to piece at source
+    "grasp_piece",             # 3. Close gripper to grasp
+    "lift_from_source",        # 4. Lift piece from source
+    "transit_high",            # 5. Move to high transit position
+    "hover_above_dest",        # 6. Move above destination
+    "lower_to_dest",           # 7. Lower piece to destination
+    "release_piece",           # 8. Open gripper to release
+    "retract_from_dest",       # 9. Lift away from destination
+]
+
+
+def _square_to_indices(sq: str) -> tuple[int, int]:
+    sq = sq.strip().lower()
+    if len(sq) != 2 or sq[0] < "a" or sq[0] > "h" or sq[1] < "1" or sq[1] > "8":
+        raise ValueError(f"Invalid square: {sq!r}")
+    file_idx = ord(sq[0]) - ord("a")
+    rank_idx = int(sq[1]) - 1
+    return file_idx, rank_idx
+
+
 def schema() -> dict[str, Any]:
     return {
         "type": "function",
@@ -44,81 +67,133 @@ def schema() -> dict[str, Any]:
     }
 
 
-def execute(tools: "KinematicsTools", args: dict[str, Any]) -> dict[str, Any]:
-    """Execute move_piece as a sequence of Skill API calls."""
+def execute(
+    tools: "KinematicsTools",
+    args: dict[str, Any],
+    episode_ctx: Any = None,
+) -> dict[str, Any]:
+    """Execute move_piece with optional waypoint-level recording.
+    
+    Args:
+        tools: KinematicsTools instance
+        args: Tool arguments (from_square, to_square, etc.)
+        episode_ctx: Optional episode context for waypoint logging
+    """
     from_square = str(args.get("from_square", "")).strip()
     to_square = str(args.get("to_square", "")).strip()
     hover_height_m = float(args.get("hover_height_m", 0.08))
     transit_height_m = float(args.get("transit_height_m", 0.15))
-    
-    hover_height_mm = hover_height_m * 1000
-    transit_height_mm = transit_height_m * 1000
-    
-    results: list[dict[str, Any]] = []
-    
-    # Step 1: Open gripper
-    res = skill_release(tools, percent=95.0)
-    res["waypoint_index"] = 1
-    res["waypoint"] = "open_gripper"
-    results.append(res)
-    
-    # Step 2: Move to hover above source square
-    res = skill_reach_square(tools, from_square, approach_height_mm=hover_height_mm)
-    res["waypoint_index"] = 2
-    res["waypoint"] = f"hover_above_{from_square}"
-    results.append(res)
-    
-    # Step 3: Lower to grasp height
-    res = skill_reach_square(tools, from_square, approach_height_mm=20.0)  # Low for grasping
-    res["waypoint_index"] = 3
-    res["waypoint"] = f"lower_to_{from_square}"
-    results.append(res)
-    
-    # Step 4: Grasp
-    res = skill_grasp(tools, profile="default")
-    res["waypoint_index"] = 4
-    res["waypoint"] = "grasp"
-    results.append(res)
-    time.sleep(0.1)
-    
-    # Step 5: Lift to transit height
-    res = skill_reach_square(tools, from_square, approach_height_mm=transit_height_mm)
-    res["waypoint_index"] = 5
-    res["waypoint"] = f"lift_from_{from_square}"
-    results.append(res)
-    
-    # Step 6: Move to hover above destination
-    res = skill_reach_square(tools, to_square, approach_height_mm=transit_height_mm)
-    res["waypoint_index"] = 6
-    res["waypoint"] = f"transit_to_{to_square}"
-    results.append(res)
-    
-    # Step 7: Lower to place height
-    res = skill_reach_square(tools, to_square, approach_height_mm=20.0)
-    res["waypoint_index"] = 7
-    res["waypoint"] = f"lower_to_{to_square}"
-    results.append(res)
-    
-    # Step 8: Release
-    res = skill_release(tools, percent=95.0)
-    res["waypoint_index"] = 8
-    res["waypoint"] = "release"
-    results.append(res)
-    time.sleep(0.1)
-    
-    # Step 9: Retreat
-    res = skill_reach_square(tools, to_square, approach_height_mm=hover_height_mm)
-    res["waypoint_index"] = 9
-    res["waypoint"] = f"retreat_from_{to_square}"
-    results.append(res)
-    
-    return {
-        "ok": True,
-        "skill": "move_piece",
-        "from": from_square,
-        "to": to_square,
-        "hover_height_m": float(hover_height_m),
-        "transit_height_m": float(transit_height_m),
-        "waypoints_executed": len(results),
-        "waypoints": results,
-    }
+
+    with tools._lock:
+        tools._require_kin()
+
+        if tools.board_model is None:
+            raise RuntimeError("Board model not loaded")
+        if tools.board_model.T_base_board is None:
+            raise RuntimeError(
+                f"Board model missing T_base_board (run calibration). Expected at {tools.chess_board_model_path}"
+            )
+
+        # Fixed orientation for the whole move = current orientation.
+        T_start = tools.get_ee_pose()
+        R_fixed = T_start[:3, :3].astype(float)
+
+        # Compute square centers in base frame.
+        fi_s, ri_s = _square_to_indices(from_square)
+        fi_d, ri_d = _square_to_indices(to_square)
+
+        p_src_board = tools.board_model.square_center_in_board(fi_s, ri_s)
+        p_dst_board = tools.board_model.square_center_in_board(fi_d, ri_d)
+
+        Tbb = tools.board_model.T_base_board.T
+        p_src_base = (Tbb @ np.hstack([p_src_board, 1.0]))[:3].astype(float)
+        p_dst_base = (Tbb @ np.hstack([p_dst_board, 1.0]))[:3].astype(float)
+
+        src_hover = p_src_base.copy()
+        src_hover[2] += float(hover_height_m)
+        dst_hover = p_dst_base.copy()
+        dst_hover[2] += float(hover_height_m)
+
+        high = np.array(
+            [
+                float(src_hover[0]),
+                float(src_hover[1]),
+                float(max(src_hover[2], dst_hover[2], float(transit_height_m))),
+            ],
+            dtype=float,
+        )
+
+        # Gripper values on this robot: 0=closed, 100=open
+        open_value = 95.0
+        grasp_close = 0.0  # Fully closed to grip piece
+
+        waypoints: list[tuple[np.ndarray, float, str]] = [
+            (src_hover, open_value, WAYPOINT_NAMES[0]),
+            (p_src_base, open_value, WAYPOINT_NAMES[1]),
+            (p_src_base, grasp_close, WAYPOINT_NAMES[2]),
+            (src_hover, grasp_close, WAYPOINT_NAMES[3]),
+            (high, grasp_close, WAYPOINT_NAMES[4]),
+            (dst_hover, grasp_close, WAYPOINT_NAMES[5]),
+            (p_dst_base, grasp_close, WAYPOINT_NAMES[6]),
+            (p_dst_base, open_value, WAYPOINT_NAMES[7]),
+            (dst_hover, open_value, WAYPOINT_NAMES[8]),
+        ]
+
+        results: list[dict[str, Any]] = []
+        prev_gripper = open_value
+        
+        for idx, (xyz, g, waypoint_name) in enumerate(waypoints):
+            # Log PRE-waypoint observation
+            tools.log_waypoint(
+                episode_ctx=episode_ctx,
+                waypoint_idx=idx,
+                waypoint_name=waypoint_name,
+                target_xyz_m=xyz.tolist(),
+                target_gripper_pct=g,
+                action_result=None,
+                is_pre=True,
+            )
+            
+            # Execute the move
+            res = tools._move_ee_to(xyz_m=xyz, R_fixed=R_fixed, gripper_pos=g)
+            res["waypoint_index"] = idx
+            res["waypoint_name"] = waypoint_name
+            res["waypoint_gripper"] = float(g)
+            results.append(res)
+            
+            # For gripper close (grasp), use stall detection
+            if g < prev_gripper and g == grasp_close:
+                # This is a grasp action - wait for stall
+                grip_result = tools.close_gripper_until_stall(target_percent=g, timeout_s=3.0)
+                res["grip_result"] = grip_result
+                res["gripped_object"] = grip_result.get("stalled", False)
+            else:
+                # Regular move - wait for motors to stop
+                stopped = tools.wait_until_motors_stopped(timeout_s=5.0)
+                res["motors_stopped"] = stopped
+            
+            # Log POST-waypoint observation with action result
+            tools.log_waypoint(
+                episode_ctx=episode_ctx,
+                waypoint_idx=idx,
+                waypoint_name=waypoint_name,
+                target_xyz_m=xyz.tolist(),
+                target_gripper_pct=g,
+                action_result=res,
+                is_pre=False,
+            )
+            
+            prev_gripper = g
+            
+            # Small extra settle time
+            time.sleep(0.1)
+
+        return {
+            "ok": True,
+            "from": from_square,
+            "to": to_square,
+            "hover_height_m": float(hover_height_m),
+            "transit_height_m": float(transit_height_m),
+            "waypoints_executed": len(results),
+            "waypoints": results,
+        }

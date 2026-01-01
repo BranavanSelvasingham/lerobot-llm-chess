@@ -14,6 +14,10 @@ The per-tool implementations live alongside this file:
 - `tool_move_piece.py`
 
 This file intentionally contains **no UI code**.
+
+Recording/telemetry:
+- Set RECORDING_ENABLED=1 to enable recording of tool executions
+- Set RECORDING_DIR=./runs to specify output directory
 """
 
 from __future__ import annotations
@@ -27,7 +31,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from xml.etree import ElementTree as ET
 
 import numpy as np
@@ -35,8 +39,11 @@ import numpy as np
 # Make `src/` importable when running from repo root.
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _SRC_DIR = _REPO_ROOT / "src"
+_DATA_DIR = _REPO_ROOT / "data"
 if _SRC_DIR.exists() and str(_SRC_DIR) not in sys.path:
     sys.path.insert(0, str(_SRC_DIR))
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from lerobot.configs.chessboard import ChessBoardParams
 from lerobot.model.kinematics import RobotKinematics
@@ -44,6 +51,15 @@ from lerobot.perception.chess.board_model import BoardModel
 from lerobot.robots.so101_follower.config_so101_follower import SO101FollowerConfig
 from lerobot.robots.so101_follower.so101_follower import SO101Follower
 from lerobot.utils.constants import HF_LEROBOT_CALIBRATION, ROBOTS
+
+# Recording/telemetry (lazy import to avoid circular deps)
+try:
+    from data.recording import get_recorder, Recorder
+    _RECORDING_AVAILABLE = True
+except ImportError:
+    _RECORDING_AVAILABLE = False
+    get_recorder = None  # type: ignore
+    Recorder = None  # type: ignore
 
 
 _SO101_JOINTS: list[str] = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll"]
@@ -149,6 +165,172 @@ class KinematicsTools:
 
         self.load_kinematics(cfg.urdf_path)
         self.load_board_model()
+
+        # Initialize recorder for telemetry (respects RECORDING_ENABLED env var)
+        self._recorder: "Recorder | None" = None
+        self._init_recorder()
+
+    # -----------------------------
+    # Recording/telemetry helpers
+    # -----------------------------
+
+    def _init_recorder(self) -> None:
+        """Initialize the recorder if recording is available and enabled."""
+        if not _RECORDING_AVAILABLE or get_recorder is None:
+            self._recorder = None
+            return
+        
+        try:
+            self._recorder = get_recorder()
+            if self._recorder.enabled:
+                # Start session with robot info
+                robot_id = self.cfg.robot_id if self.cfg else None
+                self._recorder.start_session(
+                    robot_id=robot_id,
+                    urdf_path=self.urdf_path_resolved,
+                    config={"port": self.cfg.port} if self.cfg else None,
+                )
+        except Exception:
+            # Recording is optional - don't crash if it fails
+            self._recorder = None
+
+    def end_recording_session(self) -> None:
+        """End the recording session (call on shutdown)."""
+        if self._recorder is not None:
+            try:
+                self._recorder.end_session()
+            except Exception:
+                pass
+
+    @property
+    def recorder(self) -> "Recorder | None":
+        """Get the recorder instance."""
+        return self._recorder
+
+    def capture_observation(self) -> dict[str, Any]:
+        """Capture current robot state as an observation dict.
+        
+        Returns a dict with joint positions, EE pose, and gripper state.
+        Tools can call this to log waypoint-level observations.
+        """
+        obs: dict[str, Any] = {}
+        
+        try:
+            # Joint positions
+            joints_result = self._execute_tool_impl("read_joints", {"include_gripper": True})
+            if joints_result.get("ok"):
+                obs["joint_positions_deg"] = joints_result.get("joints", {})
+        except Exception:
+            obs["joint_positions_deg"] = {}
+        
+        try:
+            # EE pose via FK
+            if self.kin is not None:
+                T = self.get_ee_pose()
+                if T is not None:
+                    obs["ee_xyz_m"] = T[:3, 3].tolist()
+                    obs["ee_rotation"] = T[:3, :3].tolist()
+        except Exception:
+            pass
+        
+        try:
+            # Gripper state
+            gripper_pct = obs.get("joint_positions_deg", {}).get("gripper")
+            if gripper_pct is not None:
+                obs["gripper_pct"] = gripper_pct
+        except Exception:
+            pass
+        
+        obs["timestamp_s"] = time.time()
+        return obs
+
+    def log_waypoint(
+        self,
+        episode_ctx: Any,
+        waypoint_idx: int,
+        waypoint_name: str,
+        target_xyz_m: list[float] | None = None,
+        target_gripper_pct: float | None = None,
+        action_result: dict[str, Any] | None = None,
+        is_pre: bool = True,
+    ) -> None:
+        """Log a waypoint step within an episode.
+        
+        Call this before (is_pre=True) and after (is_pre=False) each waypoint.
+        
+        Args:
+            episode_ctx: The EpisodeContext from recorder.episode()
+            waypoint_idx: Index of this waypoint (0-based)
+            waypoint_name: Human-readable name (e.g., "hover_above_source")
+            target_xyz_m: Target EE position for this waypoint
+            target_gripper_pct: Target gripper position
+            action_result: Result from _move_ee_to (for post-waypoint logging)
+            is_pre: True for pre-waypoint observation, False for post-waypoint
+        """
+        if episode_ctx is None or not hasattr(episode_ctx, 'log_step'):
+            return
+        
+        if not _RECORDING_AVAILABLE:
+            return
+        
+        try:
+            from data.recording import (
+                make_observation,
+                make_joint_state,
+                make_ee_pose,
+                make_gripper_state,
+                make_goal,
+                make_action,
+                make_metrics,
+            )
+            
+            # Capture current observation
+            obs_dict = self.capture_observation()
+            
+            observation = make_observation(
+                joint_state=make_joint_state(obs_dict.get("joint_positions_deg", {})),
+                ee_pose=make_ee_pose(obs_dict.get("ee_xyz_m")),
+                gripper_state=make_gripper_state(position_pct=obs_dict.get("gripper_pct")),
+            )
+            
+            # Goal for this waypoint
+            goal = make_goal(
+                target_pose_xyz_m=target_xyz_m,
+                target_gripper_pct=target_gripper_pct,
+                extra={"waypoint_idx": waypoint_idx, "waypoint_name": waypoint_name},
+            )
+            
+            # Action and metrics only for post-waypoint
+            action = None
+            metrics = None
+            
+            if not is_pre and action_result is not None:
+                action = make_action(
+                    joint_targets_deg=action_result.get("joint_targets_deg"),
+                    ee_delta_xyz_m=action_result.get("ee_delta_m"),
+                    gripper_command_pct=target_gripper_pct,
+                    raw_action={"waypoint_idx": waypoint_idx, "waypoint_name": waypoint_name},
+                )
+                
+                metrics = make_metrics(
+                    pose_error_mm=action_result.get("achieved_position_err_mm") or action_result.get("final_position_err_mm"),
+                    success=action_result.get("ok", False),
+                    extra={
+                        "ik_ok": action_result.get("ik_ok"),
+                        "stalled": action_result.get("stalled"),
+                        "is_pre": is_pre,
+                    },
+                )
+            
+            episode_ctx.log_step(
+                observation=observation,
+                goal=goal,
+                action=action,
+                metrics=metrics,
+            )
+        except Exception:
+            # Recording should never break tool execution
+            pass
 
     # -----------------------------
     # Calibration helpers
@@ -359,6 +541,9 @@ class KinematicsTools:
             finally:
                 self.robot = None
                 self.torque_disabled = False
+        
+        # End recording session when robot disconnects
+        self.end_recording_session()
 
     def disable_torque(self, motors: list[str] | None = None) -> dict[str, Any]:
         """Disable torque on motors (E-stop like behavior)."""
@@ -1065,72 +1250,57 @@ class KinematicsTools:
     # Tool dispatch + schemas
     # -----------------------------
 
-    def execute_tool(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
-        name = str(name)
-        args = dict(args or {})
-
-        # When torque is off, allow only safe introspection + torque recovery tools.
-        if self.torque_disabled and name not in {"read_joints", "read_motor_diagnostics", "enable_torque", "disable_torque"}:
-            return {
-                "ok": False,
-                "error": "Torque is disabled. Re-enable torque before running tools.",
-                "tool": name,
-            }
-
+    def _execute_tool_impl(self, name: str, args: dict[str, Any], episode_ctx: Any = None) -> dict[str, Any]:
+        """Internal tool dispatch.
+        
+        Args:
+            name: Tool name
+            args: Tool arguments
+            episode_ctx: Optional episode context for waypoint-level logging
+        """
+        # Tools that support waypoint-level logging receive episode_ctx
+        if name == "move_piece":
+            from tool_move_piece import execute as exec_tool
+            return exec_tool(self, args, episode_ctx=episode_ctx)
+        if name == "move_to_square":
+            from tool_move_to_square import execute as exec_tool
+            return exec_tool(self, args, episode_ctx=episode_ctx)
+        
+        # Other tools use standard execution
         if name == "move_gripper_delta":
             from tool_move_gripper_delta import execute as exec_tool
-
             return exec_tool(self, args)
         if name == "set_gripper_percent":
             from tool_set_gripper_percent import execute as exec_tool
-
             return exec_tool(self, args)
         if name == "open_gripper":
             from tool_open_gripper import execute as exec_tool
-
             return exec_tool(self, args)
         if name == "close_gripper":
             from tool_close_gripper import execute as exec_tool
-
             return exec_tool(self, args)
         if name == "go_home":
             from tool_go_home import execute as exec_tool
-
             return exec_tool(self, args)
         if name == "go_birds_eye":
             from tool_go_birds_eye import execute as exec_tool
-
-            return exec_tool(self, args)
-        if name == "move_piece":
-            from tool_move_piece import execute as exec_tool
-
-            return exec_tool(self, args)
-        if name == "move_to_square":
-            from tool_move_to_square import execute as exec_tool
-
             return exec_tool(self, args)
         if name == "nudge_gripper":
             from tool_nudge_gripper import execute as exec_tool
-
             return exec_tool(self, args)
         if name == "look_around":
             from tool_look_around import execute as exec_tool
-
             return exec_tool(self, args)
         if name == "read_joints":
             from tool_read_joints import execute as exec_tool
-
             return exec_tool(self, args)
         if name == "move_joints":
             from tool_move_joints import execute as exec_tool
-
             return exec_tool(self, args)
         if name == "set_all_joints":
             from tool_set_all_joints import execute as exec_tool
-
             return exec_tool(self, args)
         if name == "read_motor_diagnostics":
-            # Expose diagnostics as an LLM tool as well.
             motors = args.get("motors")
             motors_list = None
             if isinstance(motors, list) and all(isinstance(x, str) for x in motors):
@@ -1150,6 +1320,39 @@ class KinematicsTools:
             return self.enable_torque(motors=motors_list)
 
         return {"ok": False, "error": f"Unknown tool: {name}"}
+
+    def execute_tool(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
+        """Execute a tool with optional recording.
+        
+        If recording is enabled (RECORDING_ENABLED=1), this will:
+        - Log pre-state observations
+        - Execute the tool
+        - Log post-state observations, actions, and metrics
+        """
+        name = str(name)
+        args = dict(args or {})
+
+        # When torque is off, allow only safe introspection + torque recovery tools.
+        if self.torque_disabled and name not in {"read_joints", "read_motor_diagnostics", "enable_torque", "disable_torque"}:
+            return {
+                "ok": False,
+                "error": "Torque is disabled. Re-enable torque before running tools.",
+                "tool": name,
+            }
+
+        # Skip recording for pure read operations to avoid excessive log spam
+        skip_recording_tools = {"read_joints", "read_motor_diagnostics"}
+        
+        # Use recorder wrapper if enabled and available
+        if (
+            self._recorder is not None
+            and self._recorder.enabled
+            and name not in skip_recording_tools
+        ):
+            return self._recorder.wrap_tool_execution(self, name, args)
+        
+        # No recording - execute directly
+        return self._execute_tool_impl(name, args)
 
     def tool_schemas(self) -> list[dict[str, Any]]:
         from tool_go_home import schema as schema_go_home

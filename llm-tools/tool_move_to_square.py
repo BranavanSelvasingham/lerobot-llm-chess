@@ -47,22 +47,85 @@ def schema() -> dict[str, Any]:
     }
 
 
-def execute(tools: "KinematicsTools", args: dict[str, Any]) -> dict[str, Any]:
-    """Execute move_to_square via Skill API (reach_square)."""
+def execute(
+    tools: "KinematicsTools",
+    args: dict[str, Any],
+    episode_ctx: Any = None,
+) -> dict[str, Any]:
+    """Execute move_to_square with optional waypoint-level recording.
+    
+    Args:
+        tools: KinematicsTools instance
+        args: Tool arguments (square, height)
+        episode_ctx: Optional episode context for waypoint logging
+    """
     square = str(args.get("square", "")).strip()
     height = str(args.get("height", "hover")).strip().lower()
     
-    # Map height parameter to approach_height_mm
-    if height == "low":
-        # At piece level for grasping (~20mm above board surface)
-        approach_height_mm = 20.0
-    else:
-        # Hover above (~80mm above board)
-        approach_height_mm = 80.0
-    
-    result = skill_reach_square(tools, square, approach_height_mm=approach_height_mm)
-    
-    # Add backward-compatible fields
-    result["height"] = height
-    
-    return result
+    with tools._lock:
+        tools._require_kin()
+        
+        if tools.board_model is None or tools.board_model.T_base_board is None:
+            raise RuntimeError("Board model not loaded or missing T_base_board")
+        
+        # Get current orientation to preserve
+        T_start = tools.get_ee_pose()
+        R_fixed = T_start[:3, :3].astype(float)
+        
+        # Compute square center in base frame
+        fi, ri = _square_to_indices(square)
+        p_board = tools.board_model.square_center_in_board(fi, ri)
+        
+        Tbb = tools.board_model.T_base_board.T
+        p_base = (Tbb @ np.hstack([p_board, 1.0]))[:3].astype(float)
+        
+        # Set height
+        if height == "low":
+            # At piece level for grasping
+            target_z = p_base[2]
+            waypoint_name = f"lower_to_{square}"
+        else:
+            # Hover above (~80mm above board)
+            target_z = p_base[2] + 0.08
+            waypoint_name = f"hover_above_{square}"
+        
+        target_xyz = np.array([p_base[0], p_base[1], target_z], dtype=float)
+        
+        # Log PRE-move observation
+        tools.log_waypoint(
+            episode_ctx=episode_ctx,
+            waypoint_idx=0,
+            waypoint_name=waypoint_name,
+            target_xyz_m=target_xyz.tolist(),
+            target_gripper_pct=None,  # Gripper unchanged
+            action_result=None,
+            is_pre=True,
+        )
+        
+        # Move to position
+        res = tools._move_ee_to(xyz_m=target_xyz, R_fixed=R_fixed, gripper_pos=None)  # Keep gripper as-is
+        
+        # Wait for motors to stop
+        stopped = tools.wait_until_motors_stopped(timeout_s=5.0)
+        res["motors_stopped"] = stopped
+        
+        # Log POST-move observation
+        tools.log_waypoint(
+            episode_ctx=episode_ctx,
+            waypoint_idx=0,
+            waypoint_name=waypoint_name,
+            target_xyz_m=target_xyz.tolist(),
+            target_gripper_pct=None,
+            action_result=res,
+            is_pre=False,
+        )
+        
+        return {
+            "ok": res.get("ok", False),
+            "square": square,
+            "height": height,
+            "target_xyz_mm": [float(x * 1000) for x in target_xyz],
+            "achieved_xyz_mm": [float(x * 1000) for x in res.get("ee_after_m", target_xyz)],
+            "motors_stopped": stopped,
+            "position_err_mm": res.get("achieved_position_err_mm", 0),
+        }
