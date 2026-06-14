@@ -5,11 +5,41 @@ from __future__ import annotations
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from lerobot.cameras import CameraConfig, ColorMode
 from lerobot.robots.config import RobotConfig
 
 BoardCorners = tuple[tuple[float, float], tuple[float, float], tuple[float, float], tuple[float, float]]
+
+SIM_CAMERA_REFERENCE_WIDTH = 640.0
+SIM_CAMERA_REFERENCE_HEIGHT = 480.0
+REFERENCE_GRIPPER_BOARD_CORNERS: BoardCorners = ((32.0, 338.0), (594.0, 340.0), (540.0, 20.0), (86.0, 12.0))
+OVERVIEW_BOARD_CORNERS: BoardCorners = ((94.0, 420.0), (546.0, 420.0), (546.0, 48.0), (94.0, 48.0))
+CURRENT_GRIPPER_REFERENCE_PROFILE = "current_gripper_reference"
+CURRENT_GRIPPER_REFERENCE_IMAGE = Path("archive/chess_test_images/current_view.jpg")
+
+SIM_CAMERA_CALIBRATION_PROFILES: dict[str, dict[str, Any]] = {
+    CURRENT_GRIPPER_REFERENCE_PROFILE: {
+        "width": int(SIM_CAMERA_REFERENCE_WIDTH),
+        "height": int(SIM_CAMERA_REFERENCE_HEIGHT),
+        "fps": 30,
+        "color_mode": ColorMode.BGR,
+        "view": "gripper",
+        "board_corners_xy": REFERENCE_GRIPPER_BOARD_CORNERS,
+        "draw_pieces": True,
+        "piece_layout": "single_pawn",
+        "piece_square": "e4",
+        "gripper_visible": True,
+        "gripper_center_x_px": 320,
+        "gripper_y_px": 374,
+        "gripper_opening_px": 56,
+        "gripper_finger_width_px": 72,
+        "gripper_length_px": 170,
+        "track_robot_gripper": True,
+        "reference_image_path": CURRENT_GRIPPER_REFERENCE_IMAGE,
+    }
+}
 
 
 @CameraConfig.register_subclass("sim_camera")
@@ -52,6 +82,16 @@ class SimCameraConfig(CameraConfig):
             raise ValueError("SimCameraConfig.piece_layout must be one of: single_pawn, starting, empty.")
         if self.board_corners_xy is not None and len(self.board_corners_xy) != 4:
             raise ValueError("board_corners_xy must contain four (x, y) image corners.")
+
+
+def make_sim_camera_config_from_profile(profile_name: str, **overrides: Any) -> SimCameraConfig:
+    try:
+        profile_values = SIM_CAMERA_CALIBRATION_PROFILES[profile_name]
+    except KeyError as exc:
+        known_profiles = ", ".join(sorted(SIM_CAMERA_CALIBRATION_PROFILES))
+        raise ValueError(f"Unknown SimCamera calibration profile {profile_name!r}. Known profiles: {known_profiles}") from exc
+
+    return SimCameraConfig(**{**profile_values, **overrides})
 
 
 @RobotConfig.register_subclass("sim_so101")
