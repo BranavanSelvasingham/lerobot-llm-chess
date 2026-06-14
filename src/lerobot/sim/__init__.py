@@ -3,15 +3,24 @@
 """Small simulation backends for hardware-free SO-101 chess development."""
 
 from .camera import SimCamera
-from .config import SimCameraConfig, SimRobotConfig
+from .config import (
+    CURRENT_GRIPPER_REFERENCE_PROFILE,
+    SIM_CAMERA_CALIBRATION_PROFILES,
+    SimCameraConfig,
+    SimRobotConfig,
+    make_sim_camera_config_from_profile,
+)
 
 __all__ = [
+    "CURRENT_GRIPPER_REFERENCE_PROFILE",
     "SO101_BODY_JOINTS",
     "SO101_JOINTS",
+    "SIM_CAMERA_CALIBRATION_PROFILES",
     "SimCamera",
     "SimCameraConfig",
     "SimRobot",
     "SimRobotConfig",
+    "make_sim_camera_config_from_profile",
 ]
 
 

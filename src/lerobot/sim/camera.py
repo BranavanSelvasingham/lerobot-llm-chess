@@ -11,12 +11,13 @@ from lerobot.cameras.camera import Camera
 from lerobot.cameras.configs import ColorMode
 from lerobot.utils.errors import DeviceAlreadyConnectedError, DeviceNotConnectedError
 
-from .config import SimCameraConfig
-
-_REFERENCE_WIDTH = 640.0
-_REFERENCE_HEIGHT = 480.0
-_REFERENCE_GRIPPER_BOARD_CORNERS = ((32.0, 338.0), (594.0, 340.0), (540.0, 20.0), (86.0, 12.0))
-_OVERVIEW_BOARD_CORNERS = ((94.0, 420.0), (546.0, 420.0), (546.0, 48.0), (94.0, 48.0))
+from .config import (
+    OVERVIEW_BOARD_CORNERS,
+    REFERENCE_GRIPPER_BOARD_CORNERS,
+    SIM_CAMERA_REFERENCE_HEIGHT,
+    SIM_CAMERA_REFERENCE_WIDTH,
+    SimCameraConfig,
+)
 
 
 class SimCamera(Camera):
@@ -134,7 +135,7 @@ class SimCamera(Camera):
         if self.config.board_corners_xy is not None:
             corners = np.array(self.config.board_corners_xy, dtype=float)
         elif self.config.view == "overview":
-            corners = np.array(_OVERVIEW_BOARD_CORNERS, dtype=float)
+            corners = np.array(OVERVIEW_BOARD_CORNERS, dtype=float)
         elif self.config.view == "birdseye":
             margin = 44.0
             corners = np.array(
@@ -148,9 +149,9 @@ class SimCamera(Camera):
             )
             return corners
         else:
-            corners = np.array(_REFERENCE_GRIPPER_BOARD_CORNERS, dtype=float)
+            corners = np.array(REFERENCE_GRIPPER_BOARD_CORNERS, dtype=float)
 
-        scale = np.array([width / _REFERENCE_WIDTH, height / _REFERENCE_HEIGHT], dtype=float)
+        scale = np.array([width / SIM_CAMERA_REFERENCE_WIDTH, height / SIM_CAMERA_REFERENCE_HEIGHT], dtype=float)
         return corners * scale
 
     def _draw_board(self, frame: np.ndarray, corners: np.ndarray) -> None:
