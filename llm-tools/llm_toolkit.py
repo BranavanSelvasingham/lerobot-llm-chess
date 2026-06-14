@@ -50,6 +50,7 @@ from lerobot.model.kinematics import RobotKinematics
 from lerobot.perception.chess.board_model import BoardModel
 from lerobot.robots.so101_follower.config_so101_follower import SO101FollowerConfig
 from lerobot.robots.so101_follower.so101_follower import SO101Follower
+from lerobot.sim import SimRobotConfig
 from lerobot.utils.constants import HF_LEROBOT_CALIBRATION, ROBOTS
 
 # Recording/telemetry (lazy import to avoid circular deps)
@@ -70,6 +71,7 @@ class AppConfig:
     port: str | None
     robot_id: str = "so101_chess"
     urdf_path: str | None = None
+    sim: bool = False
 
     # UI-related settings (kept here for convenience)
     camera_index: int = 0
@@ -129,7 +131,7 @@ class KinematicsTools:
 
         self._lock = Lock()
 
-        self.robot: SO101Follower | None = None
+        self.robot: Any | None = None
         self.kin: RobotKinematics | None = None
         self.board_model: BoardModel | None = None
 
@@ -160,7 +162,9 @@ class KinematicsTools:
         self._load_board_view_calibration()
         self._load_workspace_bounds()
 
-        if cfg.port:
+        if cfg.sim:
+            self.connect_sim_robot()
+        elif cfg.port:
             self.connect_robot(cfg.port)
 
         self.load_kinematics(cfg.urdf_path)
@@ -406,6 +410,28 @@ class KinematicsTools:
             self.torque_disabled = False
             
             # Set a reasonable default speed (not max)
+            self.set_motor_speed(500)
+
+    def connect_sim_robot(self) -> None:
+        with self._lock:
+            if self.robot is not None and self.robot.is_connected:
+                return
+
+            from lerobot.sim import SimRobot
+
+            robot_cfg = SimRobotConfig(id=self.cfg.robot_id or "so101_sim", cameras={}, use_degrees=True)
+            self.robot = SimRobot(robot_cfg)
+            self.robot.connect()
+
+            self.calib_dir = Path(robot_cfg.calibration_dir)
+            self.board_view_calib_path = self.calib_dir / "board_view_calibration.json"
+            self.workspace_estimate_path = self.calib_dir / "workspace_estimate.json"
+            self.home_position_path = self.calib_dir / "home_position.json"
+            self.chess_board_model_path = self.calib_dir / "chess_board_model.json"
+
+            self._load_board_view_calibration()
+            self._load_workspace_bounds()
+            self.torque_disabled = False
             self.set_motor_speed(500)
     
     def set_motor_speed(self, speed: int = 500) -> None:
@@ -850,9 +876,10 @@ class KinematicsTools:
     # Low-level kinematics helpers
     # -----------------------------
 
-    def _require_robot(self) -> SO101Follower:
+    def _require_robot(self) -> Any:
         if self.robot is None or not self.robot.is_connected:
-            raise RuntimeError("Robot not connected (run with --port)")
+            hint = "run with --sim or --port" if not self.cfg.sim else "sim robot failed to initialize"
+            raise RuntimeError(f"Robot not connected ({hint})")
         return self.robot
 
     def _require_kin(self) -> RobotKinematics:

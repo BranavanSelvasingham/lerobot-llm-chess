@@ -11,6 +11,7 @@ Kinematics-based tools are implemented via `lerobot.model.kinematics.RobotKinema
 
 Run:
   python chess_robot_ui_llm_v2.py --port /dev/tty.usbmodemXXXX
+  python chess_robot_ui_llm_v2.py --sim
 
 Notes:
 - Requires a URDF available on disk for IK.
@@ -71,8 +72,10 @@ except Exception:
 
 import cv2
 
+from lerobot.cameras.camera import Camera
 from lerobot.cameras.opencv.configuration_opencv import ColorMode, OpenCVCameraConfig
 from lerobot.cameras.opencv.camera_opencv import OpenCVCamera
+from lerobot.sim import SimCamera, SimCameraConfig
 from llm_toolkit import AppConfig, KinematicsTools  # pyright: ignore[reportMissingImports]
 
 
@@ -502,13 +505,14 @@ class ChessRobotUILLMV2(QMainWindow):
         # AppConfig is frozen; keep UI-selected values separately.
         self._selected_model: str = str(getattr(cfg, "model", "gpt-4o-mini"))
 
-        self.setWindowTitle("Chess Robot UI (LLM v2) - Camera + Tools")
+        title_suffix = " [SIM]" if cfg.sim else ""
+        self.setWindowTitle(f"Chess Robot UI (LLM v2) - Camera + Tools{title_suffix}")
         self.resize(1280, 720)
 
         self.tools = KinematicsTools(cfg)
         self._torque_disabled_ui: bool = False
 
-        self._camera: OpenCVCamera | None = None
+        self._camera: Camera | None = None
         self._last_frame_bgr: np.ndarray | None = None
 
         self._llm_init_error: str | None = None
@@ -996,16 +1000,28 @@ class ChessRobotUILLMV2(QMainWindow):
 
     def _setup_camera(self) -> None:
         try:
-            cfg = OpenCVCameraConfig(
-                index_or_path=int(self.cfg.camera_index),
-                width=int(self.cfg.camera_width),
-                height=int(self.cfg.camera_height),
-                fps=int(self.cfg.camera_fps),
-                color_mode=ColorMode.BGR,
-            )
-            self._camera = OpenCVCamera(cfg)
+            if self.cfg.sim:
+                cfg = SimCameraConfig(
+                    width=int(self.cfg.camera_width),
+                    height=int(self.cfg.camera_height),
+                    fps=int(self.cfg.camera_fps),
+                    color_mode=ColorMode.BGR,
+                    view="gripper",
+                )
+                self._camera = SimCamera(cfg)
+                camera_label = "Synthetic camera connected"
+            else:
+                cfg = OpenCVCameraConfig(
+                    index_or_path=int(self.cfg.camera_index),
+                    width=int(self.cfg.camera_width),
+                    height=int(self.cfg.camera_height),
+                    fps=int(self.cfg.camera_fps),
+                    color_mode=ColorMode.BGR,
+                )
+                self._camera = OpenCVCamera(cfg)
+                camera_label = f"Camera connected (index={self.cfg.camera_index})"
             self._camera.connect(warmup=True)
-            self._log(f"Camera connected (index={self.cfg.camera_index})")
+            self._log(camera_label)
         except Exception as e:
             self._camera = None
             self._log(f"Camera failed to connect: {e}")
@@ -1026,7 +1042,8 @@ class ChessRobotUILLMV2(QMainWindow):
             qimg = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
             pix = QPixmap.fromImage(qimg)
             self.camera_label.setPixmap(pix.scaled(self.camera_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            self.camera_status.setText(f"Camera: {w}x{h} @ ~{self.cfg.camera_fps}fps")
+            label = "Sim camera" if self.cfg.sim else "Camera"
+            self.camera_status.setText(f"{label}: {w}x{h} @ ~{self.cfg.camera_fps}fps")
         except Exception:
             # Don't spam; just keep last frame
             self.camera_status.setText("Camera: read failed")
@@ -1236,6 +1253,7 @@ def _parse_args() -> AppConfig:
 
     p = argparse.ArgumentParser(description="Chess Robot UI (LLM v2): camera + tool calls")
     p.add_argument("--port", required=False, help="Robot serial port (SO-101)")
+    p.add_argument("--sim", action="store_true", help="Use the synthetic SO-101 robot and calibration camera")
     p.add_argument("--robot-id", default="so101_chess", help="Calibration id (default: so101_chess)")
     p.add_argument("--urdf", default=None, help="URDF path (or set SO101_URDF)")
     p.add_argument("--camera-index", type=int, default=0)
@@ -1246,10 +1264,14 @@ def _parse_args() -> AppConfig:
     p.add_argument("--api-key", default=None, help="OpenAI API key (or set OPENAI_API_KEY)")
 
     a = p.parse_args()
+    if a.sim and a.port:
+        p.error("--sim and --port are mutually exclusive")
+
     return AppConfig(
         port=a.port,
         robot_id=str(a.robot_id),
         urdf_path=str(a.urdf) if a.urdf else None,
+        sim=bool(a.sim),
         camera_index=int(a.camera_index),
         camera_width=int(a.camera_width),
         camera_height=int(a.camera_height),
