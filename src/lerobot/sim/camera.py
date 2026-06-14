@@ -86,12 +86,17 @@ class SimCamera(Camera):
         self._robot_joints = {str(name): float(value) for name, value in joints.items()}
 
     def calibration_metadata(self) -> dict[str, Any]:
+        gripper_percent = self._robot_joints.get("gripper")
         return {
             "view": self.config.view,
             "board_corners_xy": self._board_corners(int(self.width or 640), int(self.height or 480)).tolist(),
             "piece_layout": self.config.piece_layout,
             "piece_square": self.config.piece_square,
             "gripper_visible": self.config.gripper_visible,
+            "track_robot_gripper": self.config.track_robot_gripper,
+            "tracked_gripper_percent": gripper_percent,
+            "current_gripper_opening_px": self._current_gripper_opening_px(),
+            "robot_joints": dict(self._robot_joints),
             "reference_image_path": (
                 str(self.config.reference_image_path) if self.config.reference_image_path else None
             ),
