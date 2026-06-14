@@ -33,6 +33,10 @@ def make_robot_from_config(config: RobotConfig) -> Robot:
         from .so101_follower import SO101Follower
 
         return SO101Follower(config)
+    elif config.type == "sim_so101":
+        from lerobot.sim.robot import SimRobot
+
+        return SimRobot(config)
     elif config.type == "lekiwi":
         from .lekiwi import LeKiwi
 
