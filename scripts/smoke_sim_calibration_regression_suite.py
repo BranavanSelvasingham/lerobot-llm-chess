@@ -46,6 +46,11 @@ def parse_args() -> argparse.Namespace:
             "fail clearly without making the aggregate suite fail."
         ),
     )
+    parser.add_argument(
+        "--skip-artifact-index-report",
+        action="store_true",
+        help="Do not render the optional Markdown artifact-index report at the end of the suite.",
+    )
     return parser.parse_args()
 
 
@@ -592,6 +597,37 @@ def main() -> int:
         "categories": artifact_index.get("categories") if artifact_index else None,
     }
     write_json(summary_path, summary)
+
+    if not args.skip_artifact_index_report:
+        report_result = subprocess.run(
+            [
+                python,
+                str(REPO_ROOT / "scripts" / "render_sim_calibration_artifact_index_report.py"),
+                str(artifact_index_path),
+                "--output-md",
+                str(output_dir / "artifact_index_report.md"),
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if report_result.returncode != 0:
+            if report_result.stdout:
+                sys.stdout.write(report_result.stdout)
+            if report_result.stderr:
+                sys.stderr.write(report_result.stderr)
+            required_ok = False
+            summary["ok"] = False
+            summary["status"] = "validation_failed"
+            failed_children = list(summary["aggregate_status"].get("failed_children", []))
+            failed_children.append("artifact_index_report")
+            summary["aggregate_status"] = {
+                "ok": False,
+                "failed_children": failed_children,
+            }
+            write_json(summary_path, summary)
+
     print(json.dumps(summary, indent=2))
     return 0 if required_ok else 1
 
