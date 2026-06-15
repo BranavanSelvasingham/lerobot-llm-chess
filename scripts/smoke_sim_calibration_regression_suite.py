@@ -87,6 +87,7 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `session/session_summary.json`",
         "- `fixture/fixture_summary.json`",
         "- `sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json`",
+        "- `gripper_camera_pov_review/gripper_camera_pov_review_summary.json`",
         "- `pick_place_scenario_matrix/scenario_matrix_summary.json`",
         "- `app_entrypoint/smoke_sim_app_entrypoints_summary.json`",
         "- `app_entrypoint/smoke_sim_app_metadata.json`",
@@ -112,6 +113,10 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         (
             "- SimCamera pose metadata includes `image_size_px`, `camera_matrix_px`, "
             "`intrinsics`, `distortion_coefficients`, and `extrinsics.board_to_camera`."
+        ),
+        (
+            "- Gripper-camera POV evidence records target center, projected square geometry, "
+            "gripper opening, and synthetic visibility/occlusion/clearance rows."
         ),
         (
             "- App-entrypoint metadata evidence runs `smoke_sim_app_entrypoints.py --sim` "
@@ -475,6 +480,77 @@ def matrix_summary_section(matrix: dict[str, Any] | None, summary_path: Path) ->
     }
 
 
+def gripper_camera_pov_section(pov: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
+    artifacts = pov.get("artifacts") if pov else None
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    frame_paths = artifacts.get("frame_paths")
+    annotated_frame_paths = artifacts.get("annotated_frame_paths")
+    metadata_paths = artifacts.get("metadata_paths")
+    states = pov.get("states") if pov else None
+    state_rows = states if isinstance(states, list) else []
+    visibility_by_state: dict[str, dict[str, Any]] = {}
+    projection_by_state: dict[str, dict[str, Any]] = {}
+    gripper_by_state: dict[str, dict[str, Any]] = {}
+    for state in state_rows:
+        if not isinstance(state, dict):
+            continue
+        state_id = state.get("state_id")
+        if not isinstance(state_id, str):
+            continue
+        visibility = state.get("visibility_row")
+        if isinstance(visibility, dict):
+            visibility_by_state[state_id] = {
+                "available": visibility.get("available"),
+                "status": visibility.get("status"),
+                "piece_square": visibility.get("piece_square"),
+                "piece_center_xy": visibility.get("piece_center_xy"),
+                "visible_fraction": visibility.get("visible_fraction"),
+                "occlusion_fraction": visibility.get("occlusion_fraction"),
+                "min_clearance_px": visibility.get("min_clearance_px"),
+                "clear_of_gripper": visibility.get("clear_of_gripper"),
+                "current_gripper_opening_px": visibility.get("current_gripper_opening_px"),
+                "tracked_gripper_percent": visibility.get("tracked_gripper_percent"),
+            }
+        projection = state.get("projection")
+        if isinstance(projection, dict):
+            target_square = projection.get("target_square")
+            piece_square = projection.get("piece_square")
+            projection_by_state[state_id] = {
+                "target_square": target_square if isinstance(target_square, dict) else None,
+                "piece_square": piece_square if isinstance(piece_square, dict) else None,
+            }
+        gripper_state = state.get("gripper_state")
+        if isinstance(gripper_state, dict):
+            gripper_by_state[state_id] = {
+                "action": gripper_state.get("action"),
+                "requested_percent": gripper_state.get("requested_percent"),
+                "tracked_gripper_percent": gripper_state.get("tracked_gripper_percent"),
+                "current_gripper_opening_px": gripper_state.get("current_gripper_opening_px"),
+            }
+
+    return {
+        "summary_path": str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(pov.get("ok", False)) if pov else False,
+        "status": pov.get("status") if pov else None,
+        "target_square": pov.get("target_square") if pov else None,
+        "state_count": pov.get("state_count") if pov else None,
+        "state_ids": pov.get("state_ids") if pov else None,
+        "frame_paths": frame_paths if isinstance(frame_paths, dict) else {},
+        "annotated_frame_paths": annotated_frame_paths if isinstance(annotated_frame_paths, dict) else {},
+        "metadata_paths": metadata_paths if isinstance(metadata_paths, dict) else {},
+        "hardware_skipped": pov.get("hardware_skipped") if pov else None,
+        "gui_skipped": pov.get("gui_skipped") if pov else None,
+        "openai_skipped": pov.get("openai_skipped") if pov else None,
+        "metadata_contract": pov.get("metadata_contract") if pov else None,
+        "piece_visibility": pov.get("piece_visibility") if pov else None,
+        "visibility_by_state": visibility_by_state,
+        "projection_by_state": projection_by_state,
+        "gripper_by_state": gripper_by_state,
+        "limitations": pov.get("limitations") if pov else None,
+    }
+
+
 def run_negative_empty_inventory(
     *,
     args: argparse.Namespace,
@@ -641,6 +717,24 @@ def main() -> int:
         expected_json_path=pose_fixture_summary_path,
     )
 
+    pov_dir = output_dir / "gripper_camera_pov_review"
+    pov_summary_path = pov_dir / "gripper_camera_pov_review_summary.json"
+    pov_record, pov = run_child(
+        name="gripper_camera_pov_review",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_gripper_camera_pov_review.py"),
+            "--output-dir",
+            str(pov_dir),
+            "--profile",
+            str(args.base_profile),
+            "--target-square",
+            str(args.source_square),
+        ],
+        output_dir=pov_dir,
+        expected_json_path=pov_summary_path,
+    )
+
     matrix_dir = output_dir / "pick_place_scenario_matrix"
     matrix_summary_path = matrix_dir / "scenario_matrix_summary.json"
     matrix_record, matrix = run_child(
@@ -692,6 +786,7 @@ def main() -> int:
         "calibration_session_report": session_record,
         "perception_regression_fixture": fixture_record,
         "sim_camera_pose_fixture": pose_fixture_record,
+        "gripper_camera_pov_review": pov_record,
         "pick_place_scenario_matrix": matrix_record,
     }
     if negative_record is not None:
@@ -757,6 +852,7 @@ def main() -> int:
             pose_fixture,
             pose_fixture_summary_path,
         ),
+        "gripper_camera_pov_review": gripper_camera_pov_section(pov, pov_summary_path),
         "pick_place_scenario_matrix": matrix_summary_section(matrix, matrix_summary_path),
         "app_entrypoint_metadata": app_entrypoint_metadata_section(
             app_entrypoint,
