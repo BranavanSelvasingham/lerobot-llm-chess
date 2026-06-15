@@ -118,6 +118,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `visual_review/pick_place_perceived_depth_comparison.csv`",
         "- `visual_review/pick_place_pnp_residual_diagnostics.json`",
         "- `visual_review/pick_place_pnp_residual_diagnostics.csv`",
+        "- `visual_review/pick_place_metadata_native_depth_view.png`",
+        "- `visual_review/pick_place_metadata_native_depth_view.json`",
+        "- `visual_review/pick_place_metadata_native_depth_view.csv`",
         "- `reference_capture_checklist/reference_capture_checklist.json`",
         "- `reference_capture_checklist/reference_capture_checklist.md`",
         "- `negative_empty_inventory/comparison_set_summary.json`",
@@ -184,6 +187,12 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             "- Pick/place PnP residual diagnostics compare simulator ground-truth "
             "extrinsics, rendered-board-corner PnP, and metadata-projected 3D board corners "
             "with source comparability labels."
+        ),
+        (
+            "- Pick/place metadata-native depth view projects known board, piece, and target "
+            "points through SimCamera `camera_matrix_px` and `extrinsics.board_to_camera`, "
+            "reports camera-frame z/depth/range in millimeters, and does not use rendered "
+            "overlay corners as depth authority."
         ),
         (
             f"- Optional visual review recording produced: `{markdown_bool(recording.get('produced'))}`; "
@@ -699,6 +708,10 @@ def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Pa
     pnp_residual_diagnostics = (
         pnp_residual_diagnostics if isinstance(pnp_residual_diagnostics, dict) else {}
     )
+    metadata_native_depth_view = visual_review.get("metadata_native_depth_view")
+    metadata_native_depth_view = (
+        metadata_native_depth_view if isinstance(metadata_native_depth_view, dict) else {}
+    )
     recordings = visual_review.get("recordings")
     recordings = recordings if isinstance(recordings, dict) else {}
     return {
@@ -717,6 +730,7 @@ def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Pa
         "distance_metrics": distance_metrics,
         "perceived_depth_comparison": perceived_depth_comparison,
         "pnp_residual_diagnostics": pnp_residual_diagnostics,
+        "metadata_native_depth_view": metadata_native_depth_view,
         "app_entrypoint_frame": visual_review.get("app_entrypoint_frame"),
         "recording": visual_review.get("recording"),
         "recordings": recordings,

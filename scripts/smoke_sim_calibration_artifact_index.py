@@ -603,6 +603,53 @@ def collect_visual_review_artifacts(
             ),
         )
 
+    metadata_native = visual_review.get("metadata_native_depth_view")
+    metadata_native = metadata_native if isinstance(metadata_native, dict) else {}
+    metadata_native_paths = metadata_native.get("paths")
+    metadata_native_paths = metadata_native_paths if isinstance(metadata_native_paths, dict) else {}
+    metadata_native_example = metadata_native.get("example_row")
+    metadata_native_example = metadata_native_example if isinstance(metadata_native_example, dict) else {}
+    metadata_native_visual = metadata_native.get("visual")
+    metadata_native_visual = metadata_native_visual if isinstance(metadata_native_visual, dict) else {}
+    metadata_native_artifact_summary = {
+        "status": metadata_native.get("status"),
+        "ok": metadata_native.get("ok"),
+        "frame_count": metadata_native.get("frame_count"),
+        "row_count": metadata_native.get("row_count"),
+        "point_roles": metadata_native.get("point_roles"),
+        "source_model": metadata_native.get("source_model"),
+        "source_projection_model": metadata_native.get("source_projection_model"),
+        "uses_rendered_overlay_corners": metadata_native.get("uses_rendered_overlay_corners"),
+        "ground_truth_scope": metadata_native.get("ground_truth_scope"),
+        "source_artifacts": metadata_native.get("source_artifacts"),
+        "example_stage": metadata_native_example.get("stage"),
+        "example_point_role": metadata_native_example.get("point_role"),
+        "example_square": metadata_native_example.get("square"),
+        "example_metadata_projected_pixel_xy": metadata_native_example.get("metadata_projected_pixel_xy"),
+        "example_camera_frame_xyz_mm": metadata_native_example.get("camera_frame_xyz_mm"),
+        "example_camera_z_depth_mm": metadata_native_example.get("camera_z_depth_mm"),
+        "example_camera_range_mm": metadata_native_example.get("camera_range_mm"),
+        "example_board_plane_distance_mm": metadata_native_example.get("board_plane_distance_mm"),
+        "output_dimensions": metadata_native_visual.get("output_dimensions"),
+    }
+    for key, label_suffix in (("png", "png"), ("json", "json"), ("csv", "csv")):
+        add_path(
+            artifacts,
+            category="visual_review",
+            label=f"visual_review:pick_place_metadata_native_depth_view:{label_suffix}",
+            value=metadata_native_paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"visual_review.metadata_native_depth_view.paths.{key}",
+            metrics=metadata_native_artifact_summary,
+            scenario_id=(
+                metadata_native.get("scenario_id")
+                if isinstance(metadata_native.get("scenario_id"), str)
+                else None
+            ),
+        )
+
     contact_sheets = visual_review.get("contact_sheets")
     contact_sheet_rows = contact_sheets if isinstance(contact_sheets, list) else []
     for sheet in contact_sheet_rows:
