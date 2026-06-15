@@ -88,6 +88,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `fixture/fixture_summary.json`",
         "- `sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json`",
         "- `pick_place_scenario_matrix/scenario_matrix_summary.json`",
+        "- `app_entrypoint/smoke_sim_app_entrypoints_summary.json`",
+        "- `app_entrypoint/smoke_sim_app_metadata.json`",
         "- `negative_empty_inventory/comparison_set_summary.json`",
         "",
         "Review markers:",
@@ -100,12 +102,20 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             f"- `gui_skipped: {markdown_bool(summary.get('gui_skipped'))}`: "
             f"{markers.get('gui', '')}"
         ),
+        (
+            f"- `openai_skipped: {markdown_bool(summary.get('openai_skipped'))}`: "
+            f"{markers.get('openai', '')}"
+        ),
         "- Real-media gap: the current inventory is limited to `archive/chess_test_images/current_view.jpg`.",
         "- No real-world videos are present for motion, recovery, or timing references.",
         "- No reference media currently documents failure modes.",
         (
             "- SimCamera pose metadata includes `image_size_px`, `camera_matrix_px`, "
             "`intrinsics`, `distortion_coefficients`, and `extrinsics.board_to_camera`."
+        ),
+        (
+            "- App-entrypoint metadata evidence runs `smoke_sim_app_entrypoints.py --sim` "
+            "compatibility paths against a synthetic SimCamera frame."
         ),
         "- Those extrinsics are simulator reference metadata, not physical calibration truth.",
         "",
@@ -352,6 +362,55 @@ def sim_camera_pose_fixture_section(pose_fixture: dict[str, Any] | None, summary
             for case in case_rows
             if isinstance(case, dict)
         ],
+    }
+
+
+def app_entrypoint_metadata_section(
+    app_entrypoint: dict[str, Any] | None,
+    *,
+    summary_path: Path,
+    frame_path: Path,
+    metadata_path: Path,
+) -> dict[str, Any]:
+    app_entrypoint = app_entrypoint if isinstance(app_entrypoint, dict) else {}
+    camera = app_entrypoint.get("camera")
+    camera = camera if isinstance(camera, dict) else {}
+    contract = camera.get("metadata_contract")
+    contract = contract if isinstance(contract, dict) else {}
+    checks = contract.get("checks")
+    check_rows = [check for check in checks if isinstance(check, dict)] if isinstance(checks, list) else []
+    contract_checks = {
+        str(check.get("name")): bool(check.get("ok"))
+        for check in check_rows
+        if isinstance(check.get("name"), str)
+    }
+    return {
+        "summary_path": str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(app_entrypoint.get("ok", False)),
+        "status": app_entrypoint.get("status") or ("ok" if app_entrypoint.get("ok") is True else None),
+        "sim_camera_profile": app_entrypoint.get("sim_camera_profile"),
+        "frame_path": app_entrypoint.get("frame") if isinstance(app_entrypoint.get("frame"), str) else str(frame_path),
+        "metadata_path": (
+            app_entrypoint.get("metadata")
+            if isinstance(app_entrypoint.get("metadata"), str)
+            else str(metadata_path)
+        ),
+        "hardware_skipped": app_entrypoint.get("hardware_skipped", True),
+        "gui_skipped": app_entrypoint.get("gui_skipped", True),
+        "openai_skipped": app_entrypoint.get("openai_skipped", True),
+        "skipped_markers": app_entrypoint.get("skipped_markers"),
+        "metadata_contract": contract,
+        "metadata_contract_checks": contract_checks,
+        "camera": {
+            "width": camera.get("width"),
+            "height": camera.get("height"),
+            "fps": camera.get("fps"),
+            "view": camera.get("view"),
+            "piece_square": camera.get("piece_square"),
+            "piece_layout": camera.get("piece_layout"),
+            "gripper_visible": camera.get("gripper_visible"),
+        },
     }
 
 
@@ -605,6 +664,28 @@ def main() -> int:
     if args.include_negative_check:
         negative_record, negative_summary = run_negative_empty_inventory(args=args, output_dir=output_dir)
 
+    app_entrypoint_dir = output_dir / "app_entrypoint"
+    app_entrypoint_summary_path = app_entrypoint_dir / "smoke_sim_app_entrypoints_summary.json"
+    app_entrypoint_frame_path = app_entrypoint_dir / "smoke_sim_app_frame.jpg"
+    app_entrypoint_metadata_path = app_entrypoint_dir / "smoke_sim_app_metadata.json"
+    app_entrypoint_record, app_entrypoint = run_child(
+        name="app_entrypoint_metadata",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_app_entrypoints.py"),
+            "--sim-camera-profile",
+            str(args.base_profile),
+            "--frame-out",
+            str(app_entrypoint_frame_path),
+            "--metadata-out",
+            str(app_entrypoint_metadata_path),
+            "--summary-out",
+            str(app_entrypoint_summary_path),
+        ],
+        output_dir=app_entrypoint_dir,
+        expected_json_path=app_entrypoint_summary_path,
+    )
+
     child_records = {
         "inventory": inventory_record,
         "comparison_set": comparison_record,
@@ -615,6 +696,7 @@ def main() -> int:
     }
     if negative_record is not None:
         child_records["negative_empty_inventory_comparison_set"] = negative_record
+    child_records["app_entrypoint_metadata"] = app_entrypoint_record
 
     required_ok = all(record["ok"] for record in child_records.values())
     selected_candidate = selected_from_session(session, int(args.select_rank))
@@ -636,9 +718,11 @@ def main() -> int:
         "python": python,
         "hardware_skipped": True,
         "gui_skipped": True,
+        "openai_skipped": True,
         "skipped_markers": {
             "hardware": "Suite and child smokes use simulator/reference media only; no robot hardware paths are invoked.",
             "gui": "Suite passes explicit non-interactive inputs and does not request OpenCV click/display flows.",
+            "openai": "Suite and child smokes exercise local simulator/tool paths only; no OpenAI credentials or network calls are required.",
         },
         "candidate_inputs": candidate_paths,
         "child_commands": child_records,
@@ -674,6 +758,12 @@ def main() -> int:
             pose_fixture_summary_path,
         ),
         "pick_place_scenario_matrix": matrix_summary_section(matrix, matrix_summary_path),
+        "app_entrypoint_metadata": app_entrypoint_metadata_section(
+            app_entrypoint,
+            summary_path=app_entrypoint_summary_path,
+            frame_path=app_entrypoint_frame_path,
+            metadata_path=app_entrypoint_metadata_path,
+        ),
         "selected_candidate": {
             "requested_rank": int(args.select_rank),
             "candidate_id": selected_candidate.get("candidate_id") if selected_candidate else None,

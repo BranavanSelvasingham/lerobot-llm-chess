@@ -17,9 +17,10 @@ CATEGORY_ORDER = {
     "ranked_candidate": 2,
     "perception_fixture": 3,
     "sim_camera_pose_fixture": 4,
-    "pick_place_scenario": 5,
-    "negative_check": 6,
-    "logs": 7,
+    "app_entrypoint": 5,
+    "pick_place_scenario": 6,
+    "negative_check": 7,
+    "logs": 8,
 }
 CATEGORY_LABELS = {
     "real_reference_media": "Real Reference Media",
@@ -27,6 +28,7 @@ CATEGORY_LABELS = {
     "ranked_candidate": "Ranked Candidate Captures",
     "perception_fixture": "Perception Fixture Evidence",
     "sim_camera_pose_fixture": "SimCamera Pose Fixture",
+    "app_entrypoint": "App Entrypoint Metadata",
     "pick_place_scenario": "Pick/Place Release Frames",
     "negative_check": "Negative Check",
     "logs": "Child Logs",
@@ -229,6 +231,11 @@ def skipped_marker_rows(index: dict[str, Any], suite: dict[str, Any] | None) -> 
             value_from_suite_or_index(index, suite, "gui_skipped"),
             markers.get("gui", ""),
         ],
+        [
+            "openai",
+            value_from_suite_or_index(index, suite, "openai_skipped"),
+            markers.get("openai", ""),
+        ],
     ]
 
 
@@ -341,6 +348,25 @@ def pose_fixture_row(artifact: dict[str, Any]) -> list[Any]:
     ]
 
 
+def app_entrypoint_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("sim_camera_profile", ""),
+        "ok" if metrics.get("metadata_contract_ok") is True else "",
+        metrics.get("metadata_contract_check_count", ""),
+        metrics.get("metadata_contract_failed_check_count", ""),
+        metrics.get("hardware_skipped", ""),
+        metrics.get("gui_skipped", ""),
+        metrics.get("openai_skipped", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
 def negative_status(index: dict[str, Any], suite: dict[str, Any] | None) -> Any:
     if suite is not None:
         negative = suite.get("negative_check")
@@ -433,7 +459,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         )
     )
 
-    lines.extend(["", "## Skipped Hardware And GUI"])
+    lines.extend(["", "## Skipped Hardware, GUI, And OpenAI"])
     lines.extend(table(["Path", "Skipped", "Marker"], skipped_marker_rows(index, suite)))
 
     lines.extend(["", "## Real Reference Media Gap"])
@@ -510,6 +536,29 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         else ["_No SimCamera pose fixture artifacts indexed._"]
     )
 
+    app_entrypoint = grouped.get("app_entrypoint", [])
+    lines.extend(["", "### App Entrypoint Metadata"])
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Profile",
+                "Metadata Contract",
+                "Checks",
+                "Failed Checks",
+                "Hardware Skipped",
+                "GUI Skipped",
+                "OpenAI Skipped",
+                "Status",
+            ],
+            [app_entrypoint_row(row) for row in app_entrypoint],
+        )
+        if app_entrypoint
+        else ["_No app-entrypoint artifacts indexed._"]
+    )
+
     releases = [
         row
         for row in grouped.get("pick_place_scenario", [])
@@ -557,7 +606,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "",
             "- This report is a deterministic Markdown view of existing JSON artifacts only.",
             "- SimCamera pose fixture intrinsics/extrinsics are simulator reference metadata, not physical calibration truth.",
-            "- It does not rerun child smokes, open GUI calibration flows, or touch SO-101 hardware.",
+            "- It does not rerun child smokes, open GUI calibration flows, call OpenAI, or touch SO-101 hardware.",
             "",
         ]
     )

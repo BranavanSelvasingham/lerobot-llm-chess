@@ -48,6 +48,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional path for the app-facing SimCamera metadata contract sidecar JSON.",
     )
+    parser.add_argument(
+        "--summary-out",
+        type=Path,
+        default=None,
+        help="Optional path for the full app-entrypoint smoke summary JSON.",
+    )
     parser.add_argument("--width", type=int, default=320)
     parser.add_argument("--height", type=int, default=240)
     parser.add_argument("--fps", type=int, default=15)
@@ -375,58 +381,64 @@ def main() -> int:
         tools.disconnect_robot()
 
     metadata_out: Path | None = None
+    metadata_sidecar_payload = {
+        "ok": True,
+        "camera_metadata_contract": metadata_contract,
+        "camera_metadata": metadata,
+        "frame": str(frame_out),
+    }
     if args.metadata_out:
         metadata_out = args.metadata_out.expanduser().resolve()
         metadata_out.parent.mkdir(parents=True, exist_ok=True)
-        metadata_out.write_text(
-            json.dumps(
-                {
-                    "ok": True,
-                    "camera_metadata_contract": metadata_contract,
-                    "camera_metadata": metadata,
-                    "frame": str(frame_out),
-                },
-                indent=2,
-            )
-            + "\n"
-        )
+        metadata_out.write_text(json.dumps(metadata_sidecar_payload, indent=2) + "\n")
 
-    print(
-        json.dumps(
-            {
-                "ok": True,
-                "robot": "sim_so101",
-                "sim_camera_profile": sim_camera_profile,
-                "sim_camera_profile_overrides": (
-                    str(args.sim_camera_profile_overrides.expanduser().resolve())
-                    if args.sim_camera_profile_overrides
-                    else None
-                ),
-                "sim_calibration_session_summary": (
-                    str(args.sim_calibration_session_summary.expanduser().resolve())
-                    if args.sim_calibration_session_summary
-                    else None
-                ),
-                "selected_calibration": selected_calibration,
-                "profile_overrides": camera_overrides,
-                "frame": str(frame_out),
-                "metadata": str(metadata_out) if metadata_out else None,
-                "shape": [int(value) for value in frame.shape],
-                "camera": {
-                    "width": int(camera_cfg.width),
-                    "height": int(camera_cfg.height),
-                    "fps": int(camera_cfg.fps),
-                    "view": str(camera_cfg.view),
-                    "piece_square": str(camera_cfg.piece_square),
-                    "piece_layout": str(camera_cfg.piece_layout),
-                    "gripper_visible": bool(camera_cfg.gripper_visible),
-                    "metadata_contract": metadata_contract,
-                    "metadata": metadata,
-                },
-            },
-            indent=2,
-        )
-    )
+    summary_payload = {
+        "ok": True,
+        "status": "ok",
+        "robot": "sim_so101",
+        "hardware_skipped": True,
+        "gui_skipped": True,
+        "openai_skipped": True,
+        "skipped_markers": {
+            "hardware": "Sim smoke uses KinematicsTools with sim=True and never opens a robot serial port.",
+            "gui": "Sim smoke captures a synthetic frame directly and never opens a GUI/display flow.",
+            "openai": "Sim smoke exercises local tool entrypoints only and never creates an OpenAI client.",
+        },
+        "sim_camera_profile": sim_camera_profile,
+        "sim_camera_profile_overrides": (
+            str(args.sim_camera_profile_overrides.expanduser().resolve())
+            if args.sim_camera_profile_overrides
+            else None
+        ),
+        "sim_calibration_session_summary": (
+            str(args.sim_calibration_session_summary.expanduser().resolve())
+            if args.sim_calibration_session_summary
+            else None
+        ),
+        "selected_calibration": selected_calibration,
+        "profile_overrides": camera_overrides,
+        "frame": str(frame_out),
+        "metadata": str(metadata_out) if metadata_out else None,
+        "shape": [int(value) for value in frame.shape],
+        "camera": {
+            "width": int(camera_cfg.width),
+            "height": int(camera_cfg.height),
+            "fps": int(camera_cfg.fps),
+            "view": str(camera_cfg.view),
+            "piece_square": str(camera_cfg.piece_square),
+            "piece_layout": str(camera_cfg.piece_layout),
+            "gripper_visible": bool(camera_cfg.gripper_visible),
+            "metadata_contract": metadata_contract,
+            "metadata": metadata,
+        },
+    }
+
+    if args.summary_out:
+        summary_out = args.summary_out.expanduser().resolve()
+        summary_out.parent.mkdir(parents=True, exist_ok=True)
+        summary_out.write_text(json.dumps(summary_payload, indent=2) + "\n")
+
+    print(json.dumps(summary_payload, indent=2))
     return 0
 
 
