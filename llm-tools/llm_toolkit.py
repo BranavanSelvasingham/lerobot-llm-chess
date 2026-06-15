@@ -78,6 +78,7 @@ class AppConfig:
     camera_width: int = 640
     camera_height: int = 480
     camera_fps: int = 30
+    sim_camera_profile: str | None = None
 
     # LLM-related settings
     model: str = "gpt-5.2"
