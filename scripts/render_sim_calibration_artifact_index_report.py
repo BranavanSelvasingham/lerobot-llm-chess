@@ -16,20 +16,22 @@ CATEGORY_ORDER = {
     "reference_capture_checklist": 1,
     "visual_review": 2,
     "real_reference_comparison": 3,
-    "ranked_candidate": 4,
-    "perception_fixture": 5,
-    "sim_camera_pose_fixture": 6,
-    "gripper_camera_pov": 7,
-    "app_entrypoint": 8,
-    "pick_place_scenario": 9,
-    "negative_check": 10,
-    "logs": 11,
+    "real_projection_intake": 4,
+    "ranked_candidate": 5,
+    "perception_fixture": 6,
+    "sim_camera_pose_fixture": 7,
+    "gripper_camera_pov": 8,
+    "app_entrypoint": 9,
+    "pick_place_scenario": 10,
+    "negative_check": 11,
+    "logs": 12,
 }
 CATEGORY_LABELS = {
     "real_reference_media": "Real Reference Media",
     "reference_capture_checklist": "Reference Capture Checklist",
     "visual_review": "Visual Review Artifacts",
     "real_reference_comparison": "Real Reference Comparisons",
+    "real_projection_intake": "Real Projection Intake",
     "ranked_candidate": "Ranked Candidate Captures",
     "perception_fixture": "Perception Fixture Evidence",
     "sim_camera_pose_fixture": "SimCamera Pose Fixture",
@@ -672,6 +674,68 @@ def metadata_native_depth_stage_rows(view: dict[str, Any]) -> list[list[Any]]:
     return out
 
 
+def real_projection_intake_artifact_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("real_reference_media_count", ""),
+        metrics.get("comparable_count", ""),
+        metrics.get("depth_comparable_count", ""),
+        metrics.get("missing_inputs", ""),
+        metrics.get("sim_expected_projected_point_count", ""),
+        metrics.get("real_camera_capture_skipped", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def real_projection_intake_signal(index: dict[str, Any], suite: dict[str, Any] | None) -> dict[str, Any]:
+    candidates: list[dict[str, Any]] = []
+    intake = index.get("real_projection_intake")
+    if isinstance(intake, dict):
+        candidates.append(intake)
+    if suite is not None and isinstance(suite.get("real_projection_intake"), dict):
+        candidates.append(suite["real_projection_intake"])
+    for candidate in candidates:
+        if candidate:
+            return candidate
+    return {}
+
+
+def real_projection_intake_record_rows(intake: dict[str, Any]) -> list[list[Any]]:
+    records = intake.get("records")
+    records = records if isinstance(records, list) else []
+    rows: list[list[Any]] = []
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        next_requirements = record.get("next_capture_requirements")
+        requirement_ids = [
+            item.get("id")
+            for item in next_requirements
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        ] if isinstance(next_requirements, list) else []
+        rows.append(
+            [
+                record.get("real_reference_media_relative_path") or record.get("real_reference_media_path", ""),
+                record.get("status", ""),
+                record.get("real_intrinsics_status", ""),
+                record.get("real_extrinsics_status", ""),
+                record.get("real_board_pose_status", ""),
+                record.get("real_depth_status", ""),
+                record.get("sim_expected_projected_point_count", ""),
+                record.get("comparable", ""),
+                record.get("missing_inputs", ""),
+                requirement_ids,
+            ]
+        )
+    return rows
+
+
 def app_entrypoint_row(artifact: dict[str, Any]) -> list[Any]:
     metrics = artifact.get("metrics")
     metrics = metrics if isinstance(metrics, dict) else {}
@@ -1053,6 +1117,56 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         )
         if metadata_stage_rows
         else ["_No metadata-native per-point rows were available._"]
+    )
+
+    real_projection_artifacts = grouped.get("real_projection_intake", [])
+    real_projection_intake = real_projection_intake_signal(index, suite)
+    lines.extend(["", "### Real Projection Intake"])
+    lines.append(
+        "This artifact links selected real reference media to the metadata-native SimCamera "
+        "projection/depth view. It is expected to report `missing_real_calibration` until "
+        "real intrinsics plus board pose/extrinsics or corner detections are supplied; it "
+        "does not pretend real depth is available."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Real Refs",
+                "Comparable",
+                "Depth Comparable",
+                "Missing Inputs",
+                "Sim Points",
+                "Real Camera Skipped",
+                "Artifact Status",
+            ],
+            [real_projection_intake_artifact_row(row) for row in real_projection_artifacts],
+        )
+        if real_projection_artifacts
+        else ["_No real projection intake artifacts indexed._"]
+    )
+    intake_record_rows = real_projection_intake_record_rows(real_projection_intake)
+    lines.extend(
+        table(
+            [
+                "Media",
+                "Status",
+                "Intrinsics",
+                "Extrinsics",
+                "Board Pose",
+                "Real Depth",
+                "Sim Points",
+                "Comparable",
+                "Missing Inputs",
+                "Next Requirements",
+            ],
+            intake_record_rows,
+        )
+        if intake_record_rows
+        else ["_No real projection intake rows were available._"]
     )
 
     pnp_residual_artifacts = [

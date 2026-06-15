@@ -25,6 +25,11 @@ The manifest schema is intentionally compact:
 - `failure_mode`: `none_documented` for nominal media, or a short label such as `missed_grasp`, `occluded_piece`, `bad_lighting`, or `recovery_motion`.
 - `sim_profiles`: simulator profiles the media should inform, for example `current_gripper_reference`.
 - `declared_tags`, `notes`, and `limitations`: review context that should survive into generated inventory JSON.
+- Optional calibration sidecar paths for projection/depth comparison: `real_intrinsics_path`,
+  `real_extrinsics_path`, `real_board_pose_path`, `board_corner_detections_path`,
+  `real_depth_path`, and `depth_reference_path`. These should point to repo-local JSON
+  artifacts with image size/camera matrix/distortion, real board pose or ordered `a1,h1,h8,a8`
+  corner detections, and depth units/scale when true depth is available.
 
 Current real-media state:
 
@@ -34,6 +39,14 @@ Current real-media state:
 - Hardware, GUI display, real camera capture, and OpenAI paths remain skipped.
 
 The inventory output records `manifest_summary`, per-record `declared_metadata`, `manifest_validation`, merged `reference_tags`, and `calibration_utility` coverage. Downstream comparison artifacts keep the selected record metadata, so future real media can be reviewed without changing simulator rendering constants or physical robot paths.
+
+The full regression suite also writes `real_projection_intake/real_projection_intake.json`,
+`.csv`, and `real_projection_intake_contact_sheet.png`. That artifact links selected
+real reference media to `visual_review/pick_place_metadata_native_depth_view.json`.
+Until the optional calibration sidecars above are supplied, rows should report
+`status: "missing_real_calibration"`, `comparable: false`, missing real intrinsics,
+missing real board pose/corner detections, and missing real depth rather than inventing
+real-camera depth evidence.
 
 To turn the current gap into a capture plan without adding hardware requirements, generate the reference capture checklist from an existing inventory or suite summary:
 
