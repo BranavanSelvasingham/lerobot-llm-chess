@@ -19,6 +19,7 @@ from .config import (
     SIM_CAMERA_DISTORTION_MODEL,
     SIM_CAMERA_INTRINSICS_MODEL,
     SIM_CAMERA_INTRINSICS_SCHEMA,
+    SIM_CAMERA_REFERENCE_BOARD_SIZE_M,
     SIM_CAMERA_REFERENCE_HEIGHT,
     SIM_CAMERA_REFERENCE_WIDTH,
     SimCameraConfig,
@@ -123,6 +124,8 @@ class SimCamera(Camera):
             "coordinate_frame_convention": sim_camera_coordinate_frame_convention(),
             "view": self.config.view,
             "board_corners_xy": self._board_corners(width, height).tolist(),
+            "board_corners_xy_source": self._board_corners_source(width, height),
+            "board_geometry_projection_model": self._board_geometry_projection_model(width, height),
             "piece_layout": self.config.piece_layout,
             "piece_square": self.config.piece_square,
             "gripper_visible": self.config.gripper_visible,
@@ -187,6 +190,9 @@ class SimCamera(Camera):
         return np.repeat(row[:, None, :], width, axis=1).astype(np.uint8)
 
     def _board_corners(self, width: int, height: int) -> np.ndarray:
+        projected = self._metadata_projected_board_corners(width, height)
+        if projected is not None:
+            return projected
         if self.config.board_corners_xy is not None:
             corners = np.array(self.config.board_corners_xy, dtype=float)
         elif self.config.view == "overview":
@@ -208,6 +214,68 @@ class SimCamera(Camera):
 
         scale = np.array([width / SIM_CAMERA_REFERENCE_WIDTH, height / SIM_CAMERA_REFERENCE_HEIGHT], dtype=float)
         return corners * scale
+
+    def _board_corners_source(self, width: int, height: int) -> str:
+        if self._metadata_projected_board_corners(width, height) is not None:
+            return "camera_metadata_pinhole_projection"
+        if self.config.board_corners_xy is not None:
+            return "configured_image_corners"
+        if self.config.view == "overview":
+            return "overview_profile_image_corners"
+        if self.config.view == "birdseye":
+            return "birdseye_synthetic_image_corners"
+        return "reference_gripper_image_corners"
+
+    def _board_geometry_projection_model(self, width: int, height: int) -> str:
+        if self._metadata_projected_board_corners(width, height) is not None:
+            return "camera_matrix_px + extrinsics.board_to_camera"
+        return "image-space quadrilateral interpolation"
+
+    def _metadata_projected_board_corners(self, width: int, height: int) -> np.ndarray | None:
+        if not bool(self.config.metadata_projected_board_geometry) or self.config.view != "gripper":
+            return None
+        _ = (width, height)
+        board_size_m = float(SIM_CAMERA_REFERENCE_BOARD_SIZE_M)
+        board_points = np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [board_size_m, 0.0, 0.0],
+                [board_size_m, board_size_m, 0.0],
+                [0.0, board_size_m, 0.0],
+            ],
+            dtype=float,
+        )
+        projected = [self._project_board_point_m(point) for point in board_points]
+        if any(point is None for point in projected):
+            return None
+        corners = np.asarray(projected, dtype=float)
+        if corners.shape != (4, 2) or not np.isfinite(corners).all():
+            return None
+        return corners
+
+    def _project_board_point_m(self, board_point_m: np.ndarray) -> np.ndarray | None:
+        try:
+            camera_matrix = np.asarray(self.config.camera_matrix_px, dtype=float)
+            extrinsics = self.config.board_to_camera_extrinsics or {}
+            rotation = np.asarray(extrinsics.get("rotation_matrix"), dtype=float)
+            translation = np.asarray(extrinsics.get("translation_m"), dtype=float)
+        except (TypeError, ValueError):
+            return None
+        if camera_matrix.shape != (3, 3) or rotation.shape != (3, 3) or translation.shape != (3,):
+            return None
+        if not (
+            np.isfinite(camera_matrix).all()
+            and np.isfinite(rotation).all()
+            and np.isfinite(translation).all()
+        ):
+            return None
+
+        camera_point = rotation @ np.asarray(board_point_m, dtype=float).reshape(3) + translation
+        if not np.isfinite(camera_point).all() or float(camera_point[2]) <= 1e-9:
+            return None
+        homogeneous = camera_matrix @ camera_point
+        image_xy = homogeneous[:2] / homogeneous[2]
+        return image_xy if np.isfinite(image_xy).all() else None
 
     def _draw_board(self, frame: np.ndarray, corners: np.ndarray) -> None:
         light = np.array([208, 215, 210], dtype=np.uint8)
