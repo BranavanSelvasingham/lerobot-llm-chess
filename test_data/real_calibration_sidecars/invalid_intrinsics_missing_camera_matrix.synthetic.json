@@ -1,0 +1,11 @@
+{
+  "schema": "lerobot.sim.real_calibration_sidecar.intrinsics.v1",
+  "sidecar_type": "intrinsics",
+  "example_only": true,
+  "real_capture": false,
+  "camera_id": "synthetic_so101_gripper_camera",
+  "calibration_source": "negative fixture missing required camera_matrix_px",
+  "image_size_px": [640, 480],
+  "distortion_coefficients": [0.0, 0.0, 0.0, 0.0],
+  "units": "pixels"
+}

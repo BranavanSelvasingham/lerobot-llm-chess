@@ -1,0 +1,43 @@
+{
+  "schema": "lerobot.sim.reference_media_manifest.v1",
+  "notes": [
+    "Synthetic/example-only sidecar fixture manifest for validator and intake smoke tests.",
+    "The media path is an existing repo image, but the calibration sidecars below are not real hardware calibration."
+  ],
+  "media": [
+    {
+      "relative_path": "archive/chess_test_images/current_view.jpg",
+      "capture_id": "synthetic_sidecar_contract_example",
+      "camera_view": "Existing static reference image paired with synthetic sidecar schemas.",
+      "board_visibility": "Used only to exercise validation plumbing.",
+      "piece_layout": "Existing chess-test capture; sidecars are synthetic examples.",
+      "gripper_visibility": "Not used by the sidecar validator.",
+      "calibration_targets": [
+        "camera_pov",
+        "board_corners",
+        "piece_scale",
+        "workspace_geometry"
+      ],
+      "failure_mode": "none_documented",
+      "sim_profiles": [
+        "current_gripper_reference"
+      ],
+      "real_intrinsics_path": "test_data/real_calibration_sidecars/example_intrinsics.synthetic.json",
+      "real_extrinsics_path": "test_data/real_calibration_sidecars/example_extrinsics.synthetic.json",
+      "board_corner_detections_path": "test_data/real_calibration_sidecars/example_board_corners.synthetic.json",
+      "depth_reference_path": "test_data/real_calibration_sidecars/example_depth_references.synthetic.json",
+      "declared_tags": [
+        "synthetic_example_only",
+        "sidecar_schema_contract"
+      ],
+      "notes": [
+        "This fixture is capture/validation scaffolding only.",
+        "Do not treat these sidecars as physical SO-101 calibration."
+      ],
+      "limitations": [
+        "Synthetic sidecars are deliberately not real calibration.",
+        "No real depth map or measured camera-board pose is supplied."
+      ]
+    }
+  ]
+}

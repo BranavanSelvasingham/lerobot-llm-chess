@@ -12,6 +12,8 @@ from typing import Any
 import cv2
 import numpy as np
 
+from smoke_sim_real_calibration_sidecars import validate_sidecar_path, validate_sidecar_payload
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "real_projection_intake"
 SCHEMA = "lerobot.sim.real_projection_intake.v1"
@@ -206,12 +208,36 @@ def sidecar_status(
     repo_root: Path,
 ) -> dict[str, Any]:
     for key in inline_keys:
-        if nonempty(declared_metadata.get(key)):
+        value = declared_metadata.get(key)
+        if nonempty(value):
+            validation: dict[str, Any] | None = None
+            valid = True
+            if isinstance(value, dict):
+                kind, issues = validate_sidecar_payload(value, path=Path(key))
+                valid = not issues
+                validation = {
+                    "source": f"inline.{key}",
+                    "kind": kind,
+                    "ok": valid,
+                    "status": "valid" if valid else "invalid",
+                    "issues": issues,
+                    "schema": value.get("schema"),
+                    "sidecar_type": value.get("sidecar_type"),
+                    "example_only": value.get("example_only"),
+                    "real_capture": value.get("real_capture"),
+                }
+            real_capture = bool(validation and validation.get("real_capture") is True)
+            status = "inline_invalid"
+            if valid and real_capture:
+                status = "available_inline"
+            elif valid:
+                status = "valid_example_inline"
             return {
-                "status": "available_inline",
+                "status": status,
                 "field": key,
                 "path": None,
                 "exists": True,
+                "validation": validation,
             }
     for key in path_keys:
         value = declared_metadata.get(key)
@@ -219,18 +245,30 @@ def sidecar_status(
             continue
         resolved = (repo_root / value).resolve() if not Path(value).expanduser().is_absolute() else Path(value).expanduser().resolve()
         exists = resolved.is_file()
+        validation = validate_sidecar_path(resolved, repo_root=repo_root, source=key) if exists else None
+        valid = bool(validation and validation.get("ok") is True)
+        real_capture = bool(validation and validation.get("real_capture") is True)
+        status = "declared_missing"
+        if valid and real_capture:
+            status = "available"
+        elif valid:
+            status = "valid_example"
+        elif exists:
+            status = "declared_invalid"
         return {
-            "status": "available" if exists else "declared_missing",
+            "status": status,
             "field": key,
             "path": str(resolved),
             "repo_relative_path": repo_relative(resolved, repo_root),
             "exists": exists,
+            "validation": validation,
         }
     return {
         "status": missing_status,
         "field": None,
         "path": None,
         "exists": False,
+        "validation": None,
     }
 
 
@@ -257,6 +295,58 @@ def missing_inputs_for(
     if depth.get("status") not in {"available", "available_inline"}:
         missing.append("real_depth_map_or_metric_distance_reference")
     return missing
+
+
+def sidecar_validation_summary(sidecars: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    valid = 0
+    invalid = 0
+    missing = 0
+    for name, sidecar in sidecars.items():
+        validation = sidecar.get("validation") if isinstance(sidecar, dict) else None
+        validation = validation if isinstance(validation, dict) else None
+        status = sidecar.get("status") if isinstance(sidecar, dict) else "missing"
+        if validation is not None:
+            is_valid = validation.get("ok") is True
+            valid += int(is_valid)
+            invalid += int(not is_valid)
+            rows.append(
+                {
+                    "name": name,
+                    "status": status,
+                    "validation_status": validation.get("status"),
+                    "ok": is_valid,
+                    "kind": validation.get("kind"),
+                    "schema": validation.get("schema"),
+                    "example_only": validation.get("example_only"),
+                    "real_capture": validation.get("real_capture"),
+                    "issues": validation.get("issues"),
+                    "path": sidecar.get("path"),
+                    "repo_relative_path": sidecar.get("repo_relative_path"),
+                    "field": sidecar.get("field"),
+                }
+            )
+        else:
+            missing += int(status not in {"available", "available_inline"})
+            rows.append(
+                {
+                    "name": name,
+                    "status": status,
+                    "validation_status": None,
+                    "ok": False,
+                    "kind": None,
+                    "issues": [],
+                    "path": sidecar.get("path") if isinstance(sidecar, dict) else None,
+                    "repo_relative_path": sidecar.get("repo_relative_path") if isinstance(sidecar, dict) else None,
+                    "field": sidecar.get("field") if isinstance(sidecar, dict) else None,
+                }
+            )
+    return {
+        "valid_count": valid,
+        "invalid_count": invalid,
+        "missing_count": missing,
+        "sidecars": rows,
+    }
 
 
 def capture_requirement_templates(missing_inputs: list[str]) -> list[dict[str, Any]]:
@@ -356,6 +446,14 @@ def build_record(
         missing_status="missing_real_depth",
         repo_root=repo_root,
     )
+    validation_summary = sidecar_validation_summary(
+        {
+            "intrinsics": intrinsics,
+            "extrinsics": extrinsics,
+            "board_pose": board_pose,
+            "depth": depth,
+        }
+    )
     paths = metadata_native.get("paths")
     paths = paths if isinstance(paths, dict) else {}
     sim_view_available = bool(sim_expected_points) and isinstance(paths.get("json"), str)
@@ -416,6 +514,7 @@ def build_record(
         "real_board_pose": board_pose,
         "real_depth_status": depth.get("status"),
         "real_depth": depth,
+        "sidecar_validation": validation_summary,
         "sim_metadata_native_depth_view_path": paths.get("json"),
         "sim_metadata_native_depth_view_png_path": paths.get("png"),
         "sim_metadata_native_depth_view_csv_path": paths.get("csv"),
@@ -736,6 +835,21 @@ def build_summary(args: argparse.Namespace) -> dict[str, Any]:
             for item in (record.get("missing_inputs") if isinstance(record.get("missing_inputs"), list) else [])
         }
     )
+    sidecar_valid_count = sum(
+        int(record.get("sidecar_validation", {}).get("valid_count", 0))
+        for record in records
+        if isinstance(record.get("sidecar_validation"), dict)
+    )
+    sidecar_invalid_count = sum(
+        int(record.get("sidecar_validation", {}).get("invalid_count", 0))
+        for record in records
+        if isinstance(record.get("sidecar_validation"), dict)
+    )
+    sidecar_missing_count = sum(
+        int(record.get("sidecar_validation", {}).get("missing_count", 0))
+        for record in records
+        if isinstance(record.get("sidecar_validation"), dict)
+    )
     if not records:
         aggregate_missing_inputs = ["real_reference_media_file"]
     paths = metadata_native.get("paths")
@@ -763,6 +877,9 @@ def build_summary(args: argparse.Namespace) -> dict[str, Any]:
         "comparable_count": comparable_count,
         "projection_comparable_count": comparable_count,
         "depth_comparable_count": sum(1 for record in records if record.get("depth_comparable") is True),
+        "sidecar_valid_count": sidecar_valid_count,
+        "sidecar_invalid_count": sidecar_invalid_count,
+        "sidecar_missing_count": sidecar_missing_count,
         "missing_input_count": len(aggregate_missing_inputs),
         "missing_inputs": aggregate_missing_inputs,
         "next_capture_requirements": capture_requirement_templates(aggregate_missing_inputs),

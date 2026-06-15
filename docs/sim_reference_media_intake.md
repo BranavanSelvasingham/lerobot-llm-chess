@@ -31,6 +31,39 @@ The manifest schema is intentionally compact:
   artifacts with image size/camera matrix/distortion, real board pose or ordered `a1,h1,h8,a8`
   corner detections, and depth units/scale when true depth is available.
 
+Calibration sidecar schemas are intentionally hardware-free validation scaffolding. They define
+the shape of future real capture files but do not make real calibration available:
+
+- Intrinsics sidecars use `schema: "lerobot.sim.real_calibration_sidecar.intrinsics.v1"`,
+  `sidecar_type: "intrinsics"`, `camera_id`, `calibration_source`, `image_size_px`,
+  `camera_matrix_px`, `distortion_coefficients`, and `units: "pixels"`.
+- Extrinsics sidecars use `schema: "lerobot.sim.real_calibration_sidecar.extrinsics.v1"`,
+  `sidecar_type: "extrinsics"`, `camera_id`, `transform_convention` set to
+  `board_to_camera` or `camera_to_board`, `coordinate_frame_convention`, and either a
+  `transform.matrix_4x4` or `translation_m` plus `rotation_matrix`.
+- Board-pose or corner-detection sidecars use
+  `schema: "lerobot.sim.real_calibration_sidecar.board_pose.v1"`,
+  `sidecar_type: "board_pose"`, `image_size_px`, `corner_order: ["a1", "h1", "h8", "a8"]`,
+  four ordered `corners[].pixel_xy` detections, and `detection_source`.
+- Depth-reference sidecars use `schema: "lerobot.sim.real_calibration_sidecar.depth.v1"`,
+  `sidecar_type: "depth"`, `depth_units`, `depth_scale_to_m`, `reference_frame`, and either
+  `metric_references[]` with measured `distance_m` values or depth-map metadata.
+- Synthetic fixtures must set `example_only: true`; they validate schema shape but do not
+  make projection/depth rows comparable. Future real captures should set `real_capture: true`
+  and include capture provenance in source/notes fields.
+
+Validate the synthetic/example-only complete fixture set:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_real_calibration_sidecars.py --manifest test_data/real_calibration_sidecars/reference_media_manifest.synthetic_sidecars.example.json --require-valid-count 4 --output-dir /private/tmp/lerobot_sim/real_calibration_sidecars_valid
+```
+
+Validate a deliberate negative missing-field fixture:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_real_calibration_sidecars.py --sidecar test_data/real_calibration_sidecars/invalid_intrinsics_missing_camera_matrix.synthetic.json --expect-invalid --output-dir /private/tmp/lerobot_sim/real_calibration_sidecars_invalid
+```
+
 Current real-media state:
 
 - The only wired real reference remains `archive/chess_test_images/current_view.jpg`.
@@ -46,7 +79,11 @@ real reference media to `visual_review/pick_place_metadata_native_depth_view.jso
 Until the optional calibration sidecars above are supplied, rows should report
 `status: "missing_real_calibration"`, `comparable: false`, missing real intrinsics,
 missing real board pose/corner detections, and missing real depth rather than inventing
-real-camera depth evidence.
+real-camera depth evidence. When sidecar paths are declared, the intake validates the
+sidecar JSON shape and reports `sidecar_validation`, `sidecar_valid_count`,
+`sidecar_invalid_count`, and `sidecar_missing_count` so reviewers can distinguish valid
+schemas from missing or malformed inputs. Valid `example_only` sidecars are reported as
+`valid_example`; they do not satisfy real calibration availability.
 
 To turn the current gap into a capture plan without adding hardware requirements, generate the reference capture checklist from an existing inventory or suite summary:
 
