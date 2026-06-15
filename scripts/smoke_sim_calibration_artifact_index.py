@@ -15,9 +15,10 @@ CATEGORY_ORDER = {
     "ranked_candidate": 2,
     "perception_fixture": 3,
     "sim_camera_pose_fixture": 4,
-    "pick_place_scenario": 5,
-    "negative_check": 6,
-    "logs": 7,
+    "app_entrypoint": 5,
+    "pick_place_scenario": 6,
+    "negative_check": 7,
+    "logs": 8,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 
@@ -424,6 +425,68 @@ def collect_sim_camera_pose_fixture_artifacts(
     return metadata_contract
 
 
+def collect_app_entrypoint_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    app_entrypoint = suite.get("app_entrypoint_metadata")
+    app_entrypoint = app_entrypoint if isinstance(app_entrypoint, dict) else {}
+    metadata_contract = app_entrypoint.get("metadata_contract")
+    metadata_contract = metadata_contract if isinstance(metadata_contract, dict) else {}
+    contract_checks = app_entrypoint.get("metadata_contract_checks")
+    contract_checks = contract_checks if isinstance(contract_checks, dict) else {}
+    metrics = {
+        "status": app_entrypoint.get("status"),
+        "ok": app_entrypoint.get("ok"),
+        "sim_camera_profile": app_entrypoint.get("sim_camera_profile"),
+        "metadata_contract_ok": metadata_contract.get("ok"),
+        "metadata_contract_check_count": metadata_contract.get("check_count"),
+        "metadata_contract_failed_check_count": metadata_contract.get("failed_check_count"),
+        "metadata_contract_checks": contract_checks,
+        "hardware_skipped": app_entrypoint.get("hardware_skipped"),
+        "gui_skipped": app_entrypoint.get("gui_skipped"),
+        "openai_skipped": app_entrypoint.get("openai_skipped"),
+    }
+    add_path(
+        artifacts,
+        category="app_entrypoint",
+        label="app_entrypoint:summary",
+        value=app_entrypoint.get("summary_path"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="app_entrypoint_metadata.summary_path",
+        metrics=metrics,
+    )
+    add_path(
+        artifacts,
+        category="app_entrypoint",
+        label="app_entrypoint:frame",
+        value=app_entrypoint.get("frame_path"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="app_entrypoint_metadata.frame_path",
+        metrics=metrics,
+    )
+    add_path(
+        artifacts,
+        category="app_entrypoint",
+        label="app_entrypoint:metadata_sidecar",
+        value=app_entrypoint.get("metadata_path"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="app_entrypoint_metadata.metadata_path",
+        metrics=metrics,
+    )
+    return metadata_contract
+
+
 def collect_pick_place_artifacts(
     *,
     suite: dict[str, Any],
@@ -621,6 +684,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    app_entrypoint_metadata_contract = collect_app_entrypoint_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
     release_metrics = collect_pick_place_artifacts(
         suite=suite,
         artifacts=artifacts,
@@ -674,6 +744,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "repo_root": str(repo_root) if repo_root else None,
         "hardware_skipped": suite.get("hardware_skipped"),
         "gui_skipped": suite.get("gui_skipped"),
+        "openai_skipped": suite.get("openai_skipped"),
         "skipped_markers": suite.get("skipped_markers"),
         "suite_status": {
             "ok": suite.get("ok"),
@@ -682,6 +753,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         },
         "selected_real_reference_media": selected_media,
         "sim_camera_pose_fixture_metadata_contract": sim_camera_pose_metadata_contract,
+        "app_entrypoint_metadata_contract": app_entrypoint_metadata_contract,
         "pick_place_release_frame_count": sum(
             1 for row in sorted_rows if row["category"] == "pick_place_scenario" and row.get("scenario_id")
         ),
@@ -706,6 +778,7 @@ def failure_index(output_json: Path, suite_summary_path: Path, error: str) -> di
         "output_dir": None,
         "hardware_skipped": None,
         "gui_skipped": None,
+        "openai_skipped": None,
         "error": error,
         "categories": [],
         "artifacts": [],
