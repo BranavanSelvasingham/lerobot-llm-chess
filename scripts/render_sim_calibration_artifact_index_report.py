@@ -468,6 +468,26 @@ def visual_review_row(artifact: dict[str, Any]) -> list[Any]:
     ]
 
 
+def depth_distance_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    true_depth = metrics.get("true_depth_estimation")
+    true_depth = true_depth if isinstance(true_depth, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("frame_count", ""),
+        metrics.get("example_camera_to_piece_distance_mm", ""),
+        metrics.get("example_camera_to_board_plane_distance_mm", ""),
+        metrics.get("example_gripper_to_piece_distance_mm", ""),
+        metrics.get("gripper_to_piece_distance_source", ""),
+        metrics.get("perceived_depth_status", true_depth.get("status", "")),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
 def app_entrypoint_row(artifact: dict[str, Any]) -> list[Any]:
     metrics = artifact.get("metrics")
     metrics = metrics if isinstance(metrics, dict) else {}
@@ -710,6 +730,37 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         )
         if visual_review
         else ["_No visual-review artifacts indexed._"]
+    )
+
+    pick_place_depth_metrics = [
+        row
+        for row in grouped.get("visual_review", [])
+        if str(row.get("label") or "").startswith("visual_review:pick_place_depth_distance_metrics")
+    ]
+    lines.extend(["", "### Pick/Place Depth/Distance Metrics"])
+    lines.append(
+        "These rows are simulator ground truth unless the source column says otherwise; "
+        "the current gripper-to-piece value is a board-plane proxy and perceived depth is "
+        "explicitly marked when not implemented."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Frames",
+                "Example Cam-Piece mm",
+                "Example Cam-Board mm",
+                "Example Grip-Piece mm",
+                "Grip Source",
+                "Perceived Depth",
+                "Status",
+            ],
+            [depth_distance_row(row) for row in pick_place_depth_metrics],
+        )
+        if pick_place_depth_metrics
+        else ["_No pick/place depth-distance metric artifacts indexed._"]
     )
 
     pick_place_sequence = [

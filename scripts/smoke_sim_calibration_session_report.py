@@ -958,9 +958,10 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     candidates = [run_candidate_session(spec, output_dir=output_dir, args=args) for spec in specs]
-    ok = all(candidate["ok"] for candidate in candidates)
     summary_path = output_dir / "session_summary.json"
     ranking = build_ranking(candidates)
+    selected_candidate = ranking[0] if ranking else None
+    ok = bool(selected_candidate and selected_candidate.get("all_smokes_ok") is True)
     summary = {
         "ok": ok,
         "scenario": SCENARIO,
@@ -973,6 +974,11 @@ def main() -> int:
         "hardware_skipped": True,
         "gui_skipped": True,
         "smoke_names": ["comparison", "app_frame", "board_pose", "pick_place"],
+        "session_pass_criteria": (
+            "At least one rankable candidate must have every child smoke passing. "
+            "Lower-ranked candidate failures remain in the report as comparative calibration evidence."
+        ),
+        "failed_candidate_count": sum(1 for candidate in candidates if not bool(candidate.get("ok"))),
         "ranking_criteria": {
             "order": [
                 "all child smokes passing",
