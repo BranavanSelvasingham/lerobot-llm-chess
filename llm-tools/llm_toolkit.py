@@ -80,6 +80,7 @@ class AppConfig:
     camera_fps: int = 30
     sim_camera_profile: str | None = None
     sim_camera_profile_overrides: dict[str, Any] | None = None
+    sim_camera_profile_selection: dict[str, Any] | None = None
 
     # LLM-related settings
     model: str = "gpt-5.2"

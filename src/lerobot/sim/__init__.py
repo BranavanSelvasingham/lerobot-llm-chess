@@ -6,10 +6,13 @@ from .camera import SimCamera
 from .config import (
     CURRENT_GRIPPER_REFERENCE_PROFILE,
     SIM_CAMERA_CALIBRATION_PROFILES,
+    RankedSimCameraProfileSelection,
     SimCameraConfig,
     SimRobotConfig,
+    load_ranked_sim_camera_profile_overrides,
     load_sim_camera_profile_overrides,
     make_sim_camera_config_from_profile,
+    select_ranked_sim_camera_profile_overrides,
 )
 
 __all__ = [
@@ -17,12 +20,15 @@ __all__ = [
     "SO101_BODY_JOINTS",
     "SO101_JOINTS",
     "SIM_CAMERA_CALIBRATION_PROFILES",
+    "RankedSimCameraProfileSelection",
     "SimCamera",
     "SimCameraConfig",
     "SimRobot",
     "SimRobotConfig",
+    "load_ranked_sim_camera_profile_overrides",
     "load_sim_camera_profile_overrides",
     "make_sim_camera_config_from_profile",
+    "select_ranked_sim_camera_profile_overrides",
 ]
 
 

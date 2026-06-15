@@ -81,6 +81,7 @@ from lerobot.sim import (
     SimCameraConfig,
     load_sim_camera_profile_overrides,
     make_sim_camera_config_from_profile,
+    select_ranked_sim_camera_profile_overrides,
 )
 from llm_toolkit import AppConfig, KinematicsTools  # pyright: ignore[reportMissingImports]
 
@@ -1024,7 +1025,14 @@ class ChessRobotUILLMV2(QMainWindow):
                 self._camera = SimCamera(cfg)
                 profile_suffix = f" profile={self.cfg.sim_camera_profile}" if self.cfg.sim_camera_profile else ""
                 overrides_suffix = " profile_overrides=loaded" if camera_overrides else ""
-                camera_label = f"Synthetic camera connected{profile_suffix}{overrides_suffix}"
+                selection_suffix = ""
+                if self.cfg.sim_camera_profile_selection:
+                    selection = self.cfg.sim_camera_profile_selection
+                    selection_suffix = (
+                        f" selected_candidate={selection.get('candidate_id')} "
+                        f"rank={selection.get('rank')}"
+                    )
+                camera_label = f"Synthetic camera connected{profile_suffix}{overrides_suffix}{selection_suffix}"
             else:
                 cfg = OpenCVCameraConfig(
                     index_or_path=int(self.cfg.camera_index),
@@ -1284,6 +1292,26 @@ def _parse_args() -> AppConfig:
             "Requires --sim and composes with --sim-camera-profile."
         ),
     )
+    p.add_argument(
+        "--sim-calibration-session-summary",
+        type=Path,
+        default=None,
+        help=(
+            "Ranked simulator calibration session_summary.json. Requires --sim and selects "
+            "a candidate profile override by rank or candidate id."
+        ),
+    )
+    p.add_argument(
+        "--sim-calibration-rank",
+        type=int,
+        default=1,
+        help="1-based ranking entry to select from --sim-calibration-session-summary.",
+    )
+    p.add_argument(
+        "--sim-calibration-candidate-id",
+        default=None,
+        help="Candidate id to select from --sim-calibration-session-summary. When set, rank is ignored.",
+    )
     p.add_argument("--robot-id", default="so101_chess", help="Calibration id (default: so101_chess)")
     p.add_argument("--urdf", default=None, help="URDF path (or set SO101_URDF)")
     p.add_argument("--camera-index", type=int, default=0)
@@ -1300,13 +1328,44 @@ def _parse_args() -> AppConfig:
         p.error("--sim-camera-profile requires --sim")
     if a.sim_camera_profile_overrides and not a.sim:
         p.error("--sim-camera-profile-overrides requires --sim")
+    if a.sim_calibration_session_summary and not a.sim:
+        p.error("--sim-calibration-session-summary requires --sim")
+    if a.sim_calibration_session_summary and a.sim_camera_profile_overrides:
+        p.error("--sim-calibration-session-summary cannot be combined with --sim-camera-profile-overrides")
+    if (a.sim_calibration_rank != 1 or a.sim_calibration_candidate_id) and not a.sim_calibration_session_summary:
+        p.error("--sim-calibration-rank and --sim-calibration-candidate-id require --sim-calibration-session-summary")
 
     sim_camera_profile_overrides = None
+    sim_camera_profile_selection = None
+    sim_camera_profile = str(a.sim_camera_profile) if a.sim_camera_profile else None
     if a.sim_camera_profile_overrides:
         try:
             sim_camera_profile_overrides = load_sim_camera_profile_overrides(a.sim_camera_profile_overrides)
         except ValueError as exc:
             p.error(str(exc))
+    elif a.sim_calibration_session_summary:
+        try:
+            selection = select_ranked_sim_camera_profile_overrides(
+                a.sim_calibration_session_summary,
+                rank=int(a.sim_calibration_rank),
+                candidate_id=str(a.sim_calibration_candidate_id) if a.sim_calibration_candidate_id else None,
+            )
+        except ValueError as exc:
+            p.error(str(exc))
+        if sim_camera_profile is not None and sim_camera_profile != selection.base_profile:
+            p.error(
+                f"--sim-camera-profile {sim_camera_profile!r} does not match selected candidate "
+                f"base_profile {selection.base_profile!r}"
+            )
+        sim_camera_profile = selection.base_profile
+        sim_camera_profile_overrides = selection.profile_overrides
+        sim_camera_profile_selection = {
+            "summary_path": str(selection.summary_path),
+            "rank": int(selection.rank),
+            "candidate_id": selection.candidate_id,
+            "candidate_path": str(selection.candidate_path),
+            "candidate_artifact_dir": selection.candidate_artifact_dir,
+        }
 
     return AppConfig(
         port=a.port,
@@ -1317,8 +1376,9 @@ def _parse_args() -> AppConfig:
         camera_width=int(a.camera_width),
         camera_height=int(a.camera_height),
         camera_fps=int(a.camera_fps),
-        sim_camera_profile=str(a.sim_camera_profile) if a.sim_camera_profile else None,
+        sim_camera_profile=sim_camera_profile,
         sim_camera_profile_overrides=sim_camera_profile_overrides,
+        sim_camera_profile_selection=sim_camera_profile_selection,
         model=str(a.model),
         api_key=str(a.api_key) if a.api_key else None,
     )

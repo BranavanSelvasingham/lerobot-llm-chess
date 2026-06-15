@@ -91,6 +91,19 @@ class SimCameraConfig(CameraConfig):
             raise ValueError("board_corners_xy must contain four (x, y) image corners.")
 
 
+@dataclass(frozen=True)
+class RankedSimCameraProfileSelection:
+    """Resolved simulator camera overrides selected from a ranked session summary."""
+
+    summary_path: Path
+    rank: int
+    candidate_id: str
+    candidate_path: Path
+    base_profile: str
+    profile_overrides: dict[str, Any]
+    candidate_artifact_dir: str | None = None
+
+
 def make_sim_camera_config_from_profile(profile_name: str, **overrides: Any) -> SimCameraConfig:
     try:
         profile_values = SIM_CAMERA_CALIBRATION_PROFILES[profile_name]
@@ -99,6 +112,131 @@ def make_sim_camera_config_from_profile(profile_name: str, **overrides: Any) -> 
         raise ValueError(f"Unknown SimCamera calibration profile {profile_name!r}. Known profiles: {known_profiles}") from exc
 
     return SimCameraConfig(**{**profile_values, **overrides})
+
+
+def select_ranked_sim_camera_profile_overrides(
+    summary_path: str | Path,
+    *,
+    rank: int = 1,
+    candidate_id: str | None = None,
+) -> RankedSimCameraProfileSelection:
+    """Select simulator camera profile overrides from a ranked session_summary.json.
+
+    The selected ranking entry points at an existing profile_candidate.json, which
+    is then loaded through load_sim_camera_profile_overrides so summary selection
+    has the same validation behavior as direct candidate loading.
+    """
+
+    resolved_summary_path = Path(summary_path).expanduser().resolve()
+    payload = _load_ranked_session_summary_payload(resolved_summary_path)
+    ranking = payload.get("ranking")
+    if not isinstance(ranking, list) or not ranking:
+        raise ValueError(f"Ranked simulator calibration summary {resolved_summary_path} must contain a non-empty ranking list.")
+
+    entry: dict[str, Any] | None = None
+    if candidate_id is not None:
+        candidate_id = str(candidate_id).strip()
+        if not candidate_id:
+            raise ValueError("sim calibration candidate id must be non-empty.")
+        matches = [
+            item
+            for item in ranking
+            if isinstance(item, dict) and str(item.get("candidate_id", "")) == candidate_id
+        ]
+        if not matches:
+            known = ", ".join(
+                str(item.get("candidate_id"))
+                for item in ranking
+                if isinstance(item, dict) and item.get("candidate_id")
+            )
+            raise ValueError(
+                f"Candidate id {candidate_id!r} was not found in ranked simulator calibration summary "
+                f"{resolved_summary_path}. Known candidate ids: {known or '(none)'}."
+            )
+        if len(matches) > 1:
+            raise ValueError(
+                f"Candidate id {candidate_id!r} appears more than once in ranked simulator calibration summary "
+                f"{resolved_summary_path}."
+            )
+        entry = matches[0]
+    else:
+        if isinstance(rank, bool) or not isinstance(rank, int) or rank < 1:
+            raise ValueError(f"sim calibration rank must be a positive integer, got {rank!r}.")
+        matches = [item for item in ranking if isinstance(item, dict) and item.get("rank") == rank]
+        if matches:
+            if len(matches) > 1:
+                raise ValueError(
+                    f"Rank {rank} appears more than once in ranked simulator calibration summary "
+                    f"{resolved_summary_path}."
+                )
+            entry = matches[0]
+        elif rank <= len(ranking) and isinstance(ranking[rank - 1], dict):
+            entry = ranking[rank - 1]
+        else:
+            raise ValueError(
+                f"Rank {rank} was not found in ranked simulator calibration summary {resolved_summary_path}; "
+                f"available ranks: 1..{len(ranking)}."
+            )
+
+    if not isinstance(entry, dict):
+        raise ValueError(f"Selected ranking entry in {resolved_summary_path} must be a JSON object.")
+
+    selected_rank = entry.get("rank")
+    if isinstance(selected_rank, bool) or not isinstance(selected_rank, int) or selected_rank < 1:
+        selected_rank = int(rank)
+    selected_candidate_id = entry.get("candidate_id")
+    if not isinstance(selected_candidate_id, str) or not selected_candidate_id.strip():
+        raise ValueError(f"Selected ranking entry in {resolved_summary_path} must include candidate_id.")
+
+    raw_candidate_path = entry.get("candidate_path")
+    if not isinstance(raw_candidate_path, str) or not raw_candidate_path.strip():
+        artifact_paths = entry.get("artifact_paths")
+        if isinstance(artifact_paths, dict):
+            raw_candidate_path = artifact_paths.get("candidate_path")
+    if not isinstance(raw_candidate_path, str) or not raw_candidate_path.strip():
+        raise ValueError(
+            f"Selected ranking entry {selected_candidate_id!r} in {resolved_summary_path} must include candidate_path."
+        )
+    candidate_path = _resolve_summary_referenced_path(raw_candidate_path, summary_path=resolved_summary_path)
+    if not candidate_path.is_file():
+        raise ValueError(
+            f"Selected candidate {selected_candidate_id!r} from {resolved_summary_path} does not exist: "
+            f"{candidate_path}"
+        )
+
+    candidate_payload = _load_json_object(candidate_path, label="simulator camera profile candidate")
+    base_profile = str(candidate_payload.get("base_profile") or CURRENT_GRIPPER_REFERENCE_PROFILE)
+    if base_profile not in SIM_CAMERA_CALIBRATION_PROFILES:
+        known_profiles = ", ".join(sorted(SIM_CAMERA_CALIBRATION_PROFILES))
+        raise ValueError(
+            f"Unknown base profile {base_profile!r} in selected candidate {candidate_path}. "
+            f"Known profiles: {known_profiles}"
+        )
+    profile_overrides = load_sim_camera_profile_overrides(candidate_path)
+
+    candidate_artifact_dir = entry.get("candidate_artifact_dir")
+    return RankedSimCameraProfileSelection(
+        summary_path=resolved_summary_path,
+        rank=int(selected_rank),
+        candidate_id=selected_candidate_id,
+        candidate_path=candidate_path,
+        base_profile=base_profile,
+        profile_overrides=profile_overrides,
+        candidate_artifact_dir=str(candidate_artifact_dir) if isinstance(candidate_artifact_dir, str) else None,
+    )
+
+
+def load_ranked_sim_camera_profile_overrides(
+    summary_path: str | Path,
+    *,
+    rank: int = 1,
+    candidate_id: str | None = None,
+) -> dict[str, Any]:
+    """Load selected simulator camera overrides from a ranked session_summary.json."""
+
+    return select_ranked_sim_camera_profile_overrides(
+        summary_path, rank=rank, candidate_id=candidate_id
+    ).profile_overrides
 
 
 def load_sim_camera_profile_overrides(path: str | Path) -> dict[str, Any]:
@@ -163,6 +301,36 @@ def load_sim_camera_profile_overrides(path: str | Path) -> dict[str, Any]:
             overrides["reference_image_path"], source=json_path
         )
     return normalized
+
+
+def _load_ranked_session_summary_payload(summary_path: Path) -> dict[str, Any]:
+    payload = _load_json_object(summary_path, label="ranked simulator calibration summary")
+    scenario = payload.get("scenario")
+    if scenario is not None and scenario != "sim_calibration_session_report":
+        raise ValueError(
+            f"Unsupported ranked simulator calibration summary scenario in {summary_path}: {scenario!r}. "
+            "Expected 'sim_calibration_session_report'."
+        )
+    return payload
+
+
+def _load_json_object(path: Path, *, label: str) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text())
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON in {label} {path}: {exc}") from exc
+    except OSError as exc:
+        raise ValueError(f"Could not read {label} {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"{label} {path} must contain a JSON object, got {type(payload).__name__}.")
+    return payload
+
+
+def _resolve_summary_referenced_path(value: str, *, summary_path: Path) -> Path:
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = summary_path.parent / path
+    return path.resolve()
 
 
 def _positive_int_override(value: Any, *, key: str, source: Path) -> int:
