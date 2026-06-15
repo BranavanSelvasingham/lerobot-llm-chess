@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import math
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -18,6 +20,11 @@ REFERENCE_GRIPPER_BOARD_CORNERS: BoardCorners = ((32.0, 338.0), (594.0, 340.0), 
 OVERVIEW_BOARD_CORNERS: BoardCorners = ((94.0, 420.0), (546.0, 420.0), (546.0, 48.0), (94.0, 48.0))
 CURRENT_GRIPPER_REFERENCE_PROFILE = "current_gripper_reference"
 CURRENT_GRIPPER_REFERENCE_IMAGE = Path("archive/chess_test_images/current_view.jpg")
+SIM_CAMERA_PROFILE_OVERRIDES_SCHEMA = "lerobot.sim.manual_corner_profile_candidate.v1"
+SIM_CAMERA_PROFILE_OVERRIDES_STATUS = "candidate_only_not_canonical"
+SIM_CAMERA_PROFILE_OVERRIDE_KEYS = frozenset(
+    {"width", "height", "board_corners_xy", "reference_image_path"}
+)
 
 SIM_CAMERA_CALIBRATION_PROFILES: dict[str, dict[str, Any]] = {
     CURRENT_GRIPPER_REFERENCE_PROFILE: {
@@ -92,6 +99,105 @@ def make_sim_camera_config_from_profile(profile_name: str, **overrides: Any) -> 
         raise ValueError(f"Unknown SimCamera calibration profile {profile_name!r}. Known profiles: {known_profiles}") from exc
 
     return SimCameraConfig(**{**profile_values, **overrides})
+
+
+def load_sim_camera_profile_overrides(path: str | Path) -> dict[str, Any]:
+    """Load simulator-only camera profile overrides from a manual-corner candidate JSON."""
+
+    json_path = Path(path).expanduser().resolve()
+    try:
+        payload = json.loads(json_path.read_text())
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON in simulator camera profile override file {json_path}: {exc}") from exc
+    except OSError as exc:
+        raise ValueError(f"Could not read simulator camera profile override file {json_path}: {exc}") from exc
+
+    if not isinstance(payload, dict):
+        raise ValueError(
+            f"Simulator camera profile override file {json_path} must contain a JSON object, "
+            f"got {type(payload).__name__}."
+        )
+
+    if "sim_camera_profile_overrides" in payload:
+        schema = payload.get("schema")
+        if schema is not None and schema != SIM_CAMERA_PROFILE_OVERRIDES_SCHEMA:
+            raise ValueError(
+                f"Unsupported simulator camera profile override schema in {json_path}: {schema!r}. "
+                f"Expected {SIM_CAMERA_PROFILE_OVERRIDES_SCHEMA!r}."
+            )
+        status = payload.get("status")
+        if status is not None and status != SIM_CAMERA_PROFILE_OVERRIDES_STATUS:
+            raise ValueError(
+                f"Unsupported simulator camera profile override status in {json_path}: {status!r}. "
+                f"Expected {SIM_CAMERA_PROFILE_OVERRIDES_STATUS!r}."
+            )
+        overrides = payload["sim_camera_profile_overrides"]
+    else:
+        overrides = payload
+
+    if not isinstance(overrides, dict):
+        raise ValueError(
+            f"sim_camera_profile_overrides in {json_path} must be an object, got {type(overrides).__name__}."
+        )
+    unknown_keys = sorted(set(overrides) - SIM_CAMERA_PROFILE_OVERRIDE_KEYS)
+    if unknown_keys:
+        allowed = ", ".join(sorted(SIM_CAMERA_PROFILE_OVERRIDE_KEYS))
+        raise ValueError(
+            f"Unsupported sim_camera_profile_overrides keys in {json_path}: {unknown_keys}. "
+            f"Allowed keys: {allowed}."
+        )
+    if not overrides:
+        raise ValueError(f"sim_camera_profile_overrides in {json_path} must contain at least one override.")
+
+    normalized: dict[str, Any] = {}
+    if "width" in overrides:
+        normalized["width"] = _positive_int_override(overrides["width"], key="width", source=json_path)
+    if "height" in overrides:
+        normalized["height"] = _positive_int_override(overrides["height"], key="height", source=json_path)
+    if "board_corners_xy" in overrides:
+        normalized["board_corners_xy"] = _board_corners_override(
+            overrides["board_corners_xy"], source=json_path
+        )
+    if "reference_image_path" in overrides:
+        normalized["reference_image_path"] = _reference_image_path_override(
+            overrides["reference_image_path"], source=json_path
+        )
+    return normalized
+
+
+def _positive_int_override(value: Any, *, key: str, source: Path) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{key} in {source} must be a positive integer, got {value!r}.")
+    if value <= 0:
+        raise ValueError(f"{key} in {source} must be positive, got {value!r}.")
+    return int(value)
+
+
+def _board_corners_override(value: Any, *, source: Path) -> BoardCorners:
+    if not isinstance(value, (list, tuple)) or len(value) != 4:
+        raise ValueError(f"board_corners_xy in {source} must contain four [x, y] corners.")
+
+    corners: list[tuple[float, float]] = []
+    for index, corner in enumerate(value):
+        if not isinstance(corner, (list, tuple)) or len(corner) != 2:
+            raise ValueError(f"board_corners_xy[{index}] in {source} must be an [x, y] pair.")
+        x, y = corner
+        if isinstance(x, bool) or isinstance(y, bool) or not isinstance(x, (int, float)) or not isinstance(
+            y, (int, float)
+        ):
+            raise ValueError(f"board_corners_xy[{index}] in {source} must contain numeric x/y values.")
+        x_float = float(x)
+        y_float = float(y)
+        if not math.isfinite(x_float) or not math.isfinite(y_float):
+            raise ValueError(f"board_corners_xy[{index}] in {source} must contain finite x/y values.")
+        corners.append((x_float, y_float))
+    return tuple(corners)  # type: ignore[return-value]
+
+
+def _reference_image_path_override(value: Any, *, source: Path) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"reference_image_path in {source} must be a non-empty string.")
+    return str(Path(value).expanduser())
 
 
 @RobotConfig.register_subclass("sim_so101")

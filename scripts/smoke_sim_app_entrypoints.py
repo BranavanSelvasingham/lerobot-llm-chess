@@ -23,6 +23,7 @@ from lerobot.sim import (
     SIM_CAMERA_CALIBRATION_PROFILES,
     SimCamera,
     SimCameraConfig,
+    load_sim_camera_profile_overrides,
     make_sim_camera_config_from_profile,
 )
 from llm_toolkit import AppConfig, KinematicsTools
@@ -47,11 +48,30 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Named simulator camera calibration profile. When set, profile dimensions and metadata are used.",
     )
+    parser.add_argument(
+        "--sim-camera-profile-overrides",
+        type=Path,
+        default=None,
+        help=(
+            "Simulator-only profile_candidate.json with sim_camera_profile_overrides. "
+            "Composes with --sim-camera-profile."
+        ),
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    try:
+        camera_overrides = (
+            load_sim_camera_profile_overrides(args.sim_camera_profile_overrides)
+            if args.sim_camera_profile_overrides
+            else {}
+        )
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+
     cfg = AppConfig(
         port=None,
         robot_id="so101_sim_smoke",
@@ -84,15 +104,18 @@ def main() -> int:
         assert abs(float(moved["after"]["gripper"]) - 55.0) < 1e-6, moved
 
         if args.sim_camera_profile:
-            camera_cfg = make_sim_camera_config_from_profile(str(args.sim_camera_profile))
-        else:
-            camera_cfg = SimCameraConfig(
-                width=int(args.width),
-                height=int(args.height),
-                fps=int(args.fps),
-                color_mode=ColorMode.BGR,
-                view="gripper",
+            camera_cfg = make_sim_camera_config_from_profile(
+                str(args.sim_camera_profile), **camera_overrides
             )
+        else:
+            camera_values = {
+                "width": int(args.width),
+                "height": int(args.height),
+                "fps": int(args.fps),
+                "color_mode": ColorMode.BGR,
+                "view": "gripper",
+            }
+            camera_cfg = SimCameraConfig(**{**camera_values, **camera_overrides})
         camera = SimCamera(camera_cfg)
         try:
             camera.connect(warmup=True)
@@ -119,6 +142,12 @@ def main() -> int:
                 "ok": True,
                 "robot": "sim_so101",
                 "sim_camera_profile": args.sim_camera_profile,
+                "sim_camera_profile_overrides": (
+                    str(args.sim_camera_profile_overrides.expanduser().resolve())
+                    if args.sim_camera_profile_overrides
+                    else None
+                ),
+                "profile_overrides": camera_overrides,
                 "frame": str(frame_out),
                 "shape": [int(value) for value in frame.shape],
                 "camera": {

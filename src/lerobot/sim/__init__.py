@@ -8,6 +8,7 @@ from .config import (
     SIM_CAMERA_CALIBRATION_PROFILES,
     SimCameraConfig,
     SimRobotConfig,
+    load_sim_camera_profile_overrides,
     make_sim_camera_config_from_profile,
 )
 
@@ -20,6 +21,7 @@ __all__ = [
     "SimCameraConfig",
     "SimRobot",
     "SimRobotConfig",
+    "load_sim_camera_profile_overrides",
     "make_sim_camera_config_from_profile",
 ]
 
