@@ -324,7 +324,7 @@ def main() -> int:
         },
         "scenarios": scenario_records,
         "notes": [
-            "This is intentionally separate from the canonical calibration regression suite until runtime and artifacts are stable.",
+            "The canonical calibration regression suite invokes this matrix as a hardware-free child gate.",
             "The matrix broadens pick/place coverage only; it does not change simulator rendering, camera profiles, perception, robot execution, dependencies, UI behavior, or calibration constants.",
         ],
     }

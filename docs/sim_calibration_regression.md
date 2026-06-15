@@ -22,6 +22,7 @@ The suite orchestrates these existing smoke scripts as subprocesses and records 
 - `smoke_sim_reference_media_comparison_set.py` runs real-reference comparison artifacts for selected images.
 - `smoke_sim_calibration_session_report.py` ranks baseline and perturbed local SimCamera candidates.
 - `smoke_sim_perception_regression_fixture.py` packages the selected ranked candidate into perception fixture evidence.
+- `smoke_sim_pick_place_scenario_matrix.py` runs center, edge-file, back-rank, and near-gripper pick/place scenarios.
 - With `--include-negative-check`, an empty-inventory comparison-set run must fail clearly while the aggregate suite still passes.
 
 A passing summary should show:
@@ -32,6 +33,7 @@ A passing summary should show:
 - `comparison_set.status: "ok"`
 - `calibration_session.selected_candidate` populated with the rank-1 candidate
 - `perception_fixture.status: "ok"` and fixture artifact paths populated
+- `pick_place_scenario_matrix.aggregate_status.ok: true` with four scenario IDs and release-frame paths populated
 - `negative_check.status: "no_reference_media_selected"` when `--include-negative-check` is used
 
 ## Outputs
@@ -55,6 +57,8 @@ Common artifact paths under the output directory:
 - `session/candidates/*/board_pose/frame_annotated.jpg`
 - `session/candidates/*/pick_place/06_target_release_open.jpg`
 - `fixture/fixture_summary.json`
+- `pick_place_scenario_matrix/scenario_matrix_summary.json`
+- `pick_place_scenario_matrix/scenarios/*/06_target_release_open.jpg`
 - `negative_empty_inventory/comparison_set_summary.json`
 
 Each child also writes captured stdout/stderr text files in its own output directory.
@@ -101,6 +105,8 @@ print({
     "hardware_skipped": summary["hardware_skipped"],
     "gui_skipped": summary["gui_skipped"],
     "selected_candidate": summary["selected_candidate"]["candidate_id"],
+    "matrix_scenarios": summary["pick_place_scenario_matrix"]["scenario_ids"],
+    "matrix_release_frames": summary["pick_place_scenario_matrix"]["release_frame_paths"],
     "negative_check": summary["negative_check"]["status"],
 })
 PY

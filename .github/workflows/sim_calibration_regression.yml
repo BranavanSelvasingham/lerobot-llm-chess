@@ -118,6 +118,17 @@ jobs:
           assert summary["comparison_set"]["artifacts"], summary["comparison_set"]
           assert summary["perception_fixture"]["status"] == "ok", summary["perception_fixture"]
           assert summary["perception_fixture"]["artifact_paths"], summary["perception_fixture"]
+          matrix = summary["pick_place_scenario_matrix"]
+          assert matrix["ok"] is True, matrix
+          assert matrix["aggregate_status"]["ok"] is True, matrix["aggregate_status"]
+          assert matrix["scenario_count"] == 4, matrix["scenario_count"]
+          assert matrix["scenario_ids"] == [
+              "center_to_center",
+              "left_edge_file",
+              "back_rank",
+              "near_gripper_lower_board",
+          ], matrix["scenario_ids"]
+          assert matrix["release_frame_paths"], matrix
           assert summary["negative_check"]["status"] == "no_reference_media_selected", summary["negative_check"]
 
           print(
@@ -127,6 +138,11 @@ jobs:
                       "selected_candidate": summary["selected_candidate"]["candidate_id"],
                       "hardware_skipped": summary["hardware_skipped"],
                       "gui_skipped": summary["gui_skipped"],
+                      "pick_place_scenario_matrix": {
+                          "summary_path": matrix["summary_path"],
+                          "scenario_ids": matrix["scenario_ids"],
+                          "release_frame_paths": matrix["release_frame_paths"],
+                      },
                       "negative_check": summary["negative_check"]["status"],
                   },
                   indent=2,
