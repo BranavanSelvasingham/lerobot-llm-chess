@@ -18,6 +18,7 @@ import numpy as np
 SCHEMA = "lerobot.sim.calibration_visual_review.v1"
 PERCEIVED_DEPTH_COMPARISON_SCHEMA = "lerobot.sim.pick_place_perceived_depth_comparison.v1"
 PNP_RESIDUAL_DIAGNOSTIC_SCHEMA = "lerobot.sim.pick_place_pnp_residual_diagnostics.v1"
+METADATA_NATIVE_DEPTH_VIEW_SCHEMA = "lerobot.sim.pick_place_metadata_native_depth_view.v1"
 DEFAULT_CONTACT_SHEET_CELL_WIDTH = 360
 DEFAULT_VIDEO_FPS = 1.0
 VIDEO_CODEC = "mp4v"
@@ -1427,6 +1428,529 @@ def write_pnp_residual_diagnostics(
     return summary
 
 
+def image_size_from_metadata(metadata: dict[str, Any]) -> tuple[int, int]:
+    image_size = metadata.get("image_size_px")
+    image_size = image_size if isinstance(image_size, dict) else {}
+    try:
+        width = int(image_size.get("width") or 640)
+        height = int(image_size.get("height") or 480)
+    except (TypeError, ValueError):
+        return 640, 480
+    return max(1, width), max(1, height)
+
+
+def board_plane_distance_m(metadata: dict[str, Any]) -> float | None:
+    camera_center = camera_center_board_m(metadata)
+    if camera_center is None:
+        return None
+    return rounded_float(abs(float(camera_center[2])))
+
+
+def metadata_native_depth_row(
+    *,
+    source_row: dict[str, Any],
+    metadata: dict[str, Any],
+    point_role: str,
+    point_label: str,
+    board_point_m: np.ndarray,
+    square: str | None,
+    source_depth_metric_id: str | None,
+    source_pnp_diagnostic_id: str | None,
+    stage: str | None = None,
+    capture_label: str | None = None,
+    description: str | None = None,
+) -> dict[str, Any]:
+    projection = project_board_point_m(metadata, board_point_m)
+    camera_point = projection[0] if projection is not None else None
+    image_xy = projection[1] if projection is not None else None
+    board_to_camera = metadata.get("extrinsics")
+    board_to_camera = board_to_camera if isinstance(board_to_camera, dict) else {}
+    board_to_camera = board_to_camera.get("board_to_camera")
+    board_to_camera = board_to_camera if isinstance(board_to_camera, dict) else {}
+    status = "ok" if camera_point is not None and image_xy is not None else "projection_unavailable"
+    row_id = source_depth_metric_id or source_row.get("id") or point_label
+    if stage == "reference_board_geometry":
+        row_id = f"reference_{point_label}"
+    return {
+        "id": row_id,
+        "capture_label": capture_label if capture_label is not None else source_row.get("capture_label"),
+        "stage": stage if stage is not None else source_row.get("stage"),
+        "description": description if description is not None else source_row.get("description"),
+        "scenario_id": source_row.get("scenario_id"),
+        "source_square": source_row.get("source_square"),
+        "target_square": source_row.get("target_square"),
+        "piece_square": source_row.get("piece_square"),
+        "point_role": point_role,
+        "point_label": point_label,
+        "square": square,
+        "status": status,
+        "ok": status == "ok",
+        "source_model": "simcamera_metadata",
+        "source_projection_model": "camera_metadata.camera_matrix_px + camera_metadata.extrinsics.board_to_camera",
+        "camera_model": "opencv_pinhole",
+        "uses_rendered_overlay_corners": False,
+        "simulator_ground_truth": True,
+        "not_perceived_real_camera_depth": True,
+        "board_frame": board_to_camera.get("from_frame"),
+        "camera_frame": board_to_camera.get("to_frame"),
+        "board_to_camera_source": board_to_camera.get("source"),
+        "metadata_projected_pixel_xy": rounded_list(image_xy, digits=3),
+        "camera_frame_xyz_mm": vector_m_to_mm(camera_point),
+        "camera_z_depth_mm": meters_to_mm(float(camera_point[2])) if camera_point is not None else None,
+        "camera_range_mm": (
+            meters_to_mm(float(np.linalg.norm(camera_point))) if camera_point is not None else None
+        ),
+        "board_plane_distance_mm": meters_to_mm(board_plane_distance_m(metadata)),
+        "board_frame_xyz_mm": vector_m_to_mm(board_point_m),
+        "source_depth_metric_id": source_depth_metric_id,
+        "source_pnp_diagnostic_id": source_pnp_diagnostic_id,
+        "depth_semantics": (
+            "camera_z_depth_mm is OpenCV camera-frame z from SimCamera metadata; "
+            "camera_range_mm is Euclidean range from the camera origin."
+        ),
+    }
+
+
+def metadata_native_reference_rows(
+    *,
+    metadata: dict[str, Any],
+    source_row: dict[str, Any],
+) -> list[dict[str, Any]]:
+    reference_points = [
+        ("board_corner", "board_corner_a1", None, np.array([0.0, 0.0, 0.0], dtype=float)),
+        ("board_corner", "board_corner_h1", None, np.array([SIM_BOARD_SIZE_M, 0.0, 0.0], dtype=float)),
+        (
+            "board_corner",
+            "board_corner_h8",
+            None,
+            np.array([SIM_BOARD_SIZE_M, SIM_BOARD_SIZE_M, 0.0], dtype=float),
+        ),
+        ("board_corner", "board_corner_a8", None, np.array([0.0, SIM_BOARD_SIZE_M, 0.0], dtype=float)),
+        (
+            "board_center",
+            "board_center",
+            None,
+            np.array([SIM_BOARD_SIZE_M / 2.0, SIM_BOARD_SIZE_M / 2.0, 0.0], dtype=float),
+        ),
+    ]
+    return [
+        metadata_native_depth_row(
+            source_row=source_row,
+            metadata=metadata,
+            point_role=role,
+            point_label=label,
+            board_point_m=point,
+            square=square,
+            source_depth_metric_id=None,
+            source_pnp_diagnostic_id=None,
+            stage="reference_board_geometry",
+            capture_label="metadata_reference",
+            description="Metadata-projected board reference point.",
+        )
+        for role, label, square, point in reference_points
+    ]
+
+
+def compute_metadata_native_depth_rows(
+    *,
+    metric_rows: list[dict[str, Any]],
+    source_rows: list[dict[str, Any]],
+    pnp_residual_diagnostics: dict[str, Any],
+) -> list[dict[str, Any]]:
+    source_by_id = {
+        str(row.get("id")): row
+        for row in source_rows
+        if isinstance(row, dict) and row.get("id") is not None
+    }
+    pnp_rows = pnp_residual_diagnostics.get("rows")
+    pnp_by_id = {
+        str(row.get("id")): row
+        for row in pnp_rows
+        if isinstance(row, dict) and row.get("id") is not None
+    } if isinstance(pnp_rows, list) else {}
+    rows: list[dict[str, Any]] = []
+    added_reference = False
+    for metric in metric_rows:
+        if not isinstance(metric, dict):
+            continue
+        metric_id = str(metric.get("id") or "")
+        source_row = source_by_id.get(metric_id, {})
+        capture = source_row.get("capture")
+        capture = capture if isinstance(capture, dict) else {}
+        metadata = capture.get("metadata")
+        metadata = metadata if isinstance(metadata, dict) else {}
+        if metadata_camera_model(metadata) is None:
+            continue
+        source_row_with_metric = {
+            **source_row,
+            "source_square": metric.get("source_square") or source_row.get("source_square"),
+            "target_square": metric.get("target_square") or source_row.get("target_square"),
+            "piece_square": metric.get("piece_square") or source_row.get("source_square"),
+        }
+        if not added_reference:
+            rows.extend(metadata_native_reference_rows(metadata=metadata, source_row=source_row_with_metric))
+            added_reference = True
+        source_depth_metric_id = metric_id or None
+        source_pnp_diagnostic_id = metric_id if metric_id in pnp_by_id else None
+        for point_role, point_label, square_value in (
+            ("piece_center", "piece_center", source_row_with_metric.get("piece_square")),
+            ("target_square_center", "target_square_center", source_row_with_metric.get("target_square")),
+        ):
+            if not isinstance(square_value, str) or not square_value:
+                continue
+            try:
+                board_point = board_square_center_m(square_value)
+            except ValueError:
+                continue
+            rows.append(
+                metadata_native_depth_row(
+                    source_row=source_row_with_metric,
+                    metadata=metadata,
+                    point_role=point_role,
+                    point_label=point_label,
+                    board_point_m=board_point,
+                    square=square_value,
+                    source_depth_metric_id=source_depth_metric_id,
+                    source_pnp_diagnostic_id=source_pnp_diagnostic_id,
+                )
+            )
+    return rows
+
+
+def canvas_point(row: dict[str, Any], *, y_offset: int) -> tuple[int, int] | None:
+    xy = row.get("metadata_projected_pixel_xy")
+    if not isinstance(xy, list) or len(xy) < 2:
+        return None
+    try:
+        return int(round(float(xy[0]))), int(round(float(xy[1]))) + y_offset
+    except (TypeError, ValueError):
+        return None
+
+
+def draw_projected_grid(image: np.ndarray, *, metadata: dict[str, Any], y_offset: int) -> None:
+    def projected_xy(point: np.ndarray) -> tuple[int, int] | None:
+        projection = project_board_point_m(metadata, point)
+        if projection is None:
+            return None
+        _, xy = projection
+        return int(round(float(xy[0]))), int(round(float(xy[1]))) + y_offset
+
+    square = SIM_BOARD_SIZE_M / 8.0
+    for index in range(9):
+        x = square * index
+        y = square * index
+        vertical = [
+            projected_xy(np.array([x, 0.0, 0.0], dtype=float)),
+            projected_xy(np.array([x, SIM_BOARD_SIZE_M, 0.0], dtype=float)),
+        ]
+        horizontal = [
+            projected_xy(np.array([0.0, y, 0.0], dtype=float)),
+            projected_xy(np.array([SIM_BOARD_SIZE_M, y, 0.0], dtype=float)),
+        ]
+        if vertical[0] is not None and vertical[1] is not None:
+            cv2.line(image, vertical[0], vertical[1], (78, 90, 102), 1, cv2.LINE_AA)
+        if horizontal[0] is not None and horizontal[1] is not None:
+            cv2.line(image, horizontal[0], horizontal[1], (78, 90, 102), 1, cv2.LINE_AA)
+
+    corners = [
+        projected_xy(np.array([0.0, 0.0, 0.0], dtype=float)),
+        projected_xy(np.array([SIM_BOARD_SIZE_M, 0.0, 0.0], dtype=float)),
+        projected_xy(np.array([SIM_BOARD_SIZE_M, SIM_BOARD_SIZE_M, 0.0], dtype=float)),
+        projected_xy(np.array([0.0, SIM_BOARD_SIZE_M, 0.0], dtype=float)),
+    ]
+    if all(point is not None for point in corners):
+        cv2.polylines(
+            image,
+            [np.asarray(corners, dtype=np.int32).reshape(-1, 1, 2)],
+            isClosed=True,
+            color=(95, 220, 150),
+            thickness=2,
+            lineType=cv2.LINE_AA,
+        )
+
+
+def render_metadata_native_depth_view_png(
+    *,
+    path: Path,
+    rows: list[dict[str, Any]],
+    metadata: dict[str, Any],
+    suite_output_dir: Path,
+) -> dict[str, Any]:
+    image_width, image_height = image_size_from_metadata(metadata)
+    header_height = 92
+    panel_width = 360
+    width = image_width + panel_width
+    height = image_height + header_height
+    canvas = np.zeros((height, width, 3), dtype=np.uint8)
+    canvas[:, :] = (24, 27, 31)
+    cv2.rectangle(
+        canvas,
+        (0, header_height),
+        (image_width - 1, header_height + image_height - 1),
+        (18, 20, 24),
+        thickness=-1,
+    )
+    cv2.rectangle(
+        canvas,
+        (0, header_height),
+        (image_width - 1, header_height + image_height - 1),
+        (96, 110, 122),
+        thickness=1,
+    )
+    cv2.putText(
+        canvas,
+        "Metadata-Native SimCamera Projection / Depth View",
+        (14, 30),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.72,
+        (255, 255, 255),
+        1,
+        cv2.LINE_AA,
+    )
+    cv2.putText(
+        canvas,
+        "Generated from camera_matrix_px and board_to_camera extrinsics; rendered overlay corners are not used.",
+        (14, 58),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.42,
+        (190, 214, 244),
+        1,
+        cv2.LINE_AA,
+    )
+    cv2.putText(
+        canvas,
+        "Simulator ground truth / camera-model-aligned. Not perceived real-camera depth.",
+        (14, 78),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.40,
+        (188, 232, 188),
+        1,
+        cv2.LINE_AA,
+    )
+
+    draw_projected_grid(canvas, metadata=metadata, y_offset=header_height)
+    reference_rows = [row for row in rows if row.get("stage") == "reference_board_geometry"]
+    stage_rows = [row for row in rows if row.get("stage") != "reference_board_geometry"]
+    for row in reference_rows:
+        point = canvas_point(row, y_offset=header_height)
+        if point is None:
+            continue
+        color = (115, 220, 160) if row.get("point_role") == "board_corner" else (150, 185, 255)
+        cv2.circle(canvas, point, 4, color, thickness=-1, lineType=cv2.LINE_AA)
+        cv2.putText(
+            canvas,
+            str(row.get("point_label") or ""),
+            (point[0] + 6, point[1] - 5),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.34,
+            color,
+            1,
+            cv2.LINE_AA,
+        )
+
+    stage_colors = {
+        "piece_center": (255, 170, 95),
+        "target_square_center": (85, 215, 255),
+    }
+    stage_index_by_id = {
+        str(row.get("id")): index
+        for index, row in enumerate(
+            [row for row in stage_rows if row.get("point_role") == "piece_center"],
+            start=1,
+        )
+    }
+    for row in stage_rows:
+        point = canvas_point(row, y_offset=header_height)
+        if point is None:
+            continue
+        role = str(row.get("point_role") or "")
+        color = stage_colors.get(role, (230, 230, 230))
+        if role == "target_square_center":
+            cv2.drawMarker(canvas, point, color, markerType=cv2.MARKER_DIAMOND, markerSize=16, thickness=2)
+        else:
+            cv2.circle(canvas, point, 7, color, thickness=2, lineType=cv2.LINE_AA)
+            label = str(stage_index_by_id.get(str(row.get("id")), ""))
+            cv2.putText(
+                canvas,
+                label,
+                (point[0] + 8, point[1] + 4),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.38,
+                color,
+                1,
+                cv2.LINE_AA,
+            )
+
+    panel_x = image_width + 18
+    panel_lines = [
+        "Source model: simcamera_metadata",
+        f"Rows: {len(rows)}",
+        "Board grid: metadata projected",
+        "Piece: orange circles by stage",
+        "Target: cyan diamonds",
+    ]
+    first_stage = next((row for row in stage_rows if row.get("point_role") == "piece_center"), None)
+    if first_stage:
+        panel_lines.extend(
+            [
+                "",
+                f"Example: {first_stage.get('stage')}",
+                f"pixel xy: {first_stage.get('metadata_projected_pixel_xy')}",
+                f"camera xyz mm: {first_stage.get('camera_frame_xyz_mm')}",
+                f"z depth mm: {first_stage.get('camera_z_depth_mm')}",
+                f"range mm: {first_stage.get('camera_range_mm')}",
+                f"board plane mm: {first_stage.get('board_plane_distance_mm')}",
+            ]
+        )
+    y = header_height + 28
+    for line in panel_lines:
+        cv2.putText(
+            canvas,
+            short_text(line, 48),
+            (panel_x, y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.42,
+            (230, 235, 238) if line else (230, 235, 238),
+            1,
+            cv2.LINE_AA,
+        )
+        y += 22 if line else 14
+
+    write_image(path, canvas)
+    return {
+        "path": str(path),
+        "relative_path": output_relative(path, suite_output_dir),
+        "output_dimensions": {
+            "width_px": int(canvas.shape[1]),
+            "height_px": int(canvas.shape[0]),
+            "channels": int(canvas.shape[2]),
+        },
+    }
+
+
+def write_metadata_native_depth_view_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    fieldnames = [
+        "id",
+        "stage",
+        "capture_label",
+        "scenario_id",
+        "source_square",
+        "target_square",
+        "piece_square",
+        "point_role",
+        "point_label",
+        "square",
+        "status",
+        "source_model",
+        "metadata_projected_pixel_xy",
+        "camera_frame_xyz_mm",
+        "camera_z_depth_mm",
+        "camera_range_mm",
+        "board_plane_distance_mm",
+        "board_frame_xyz_mm",
+        "source_depth_metric_id",
+        "source_pnp_diagnostic_id",
+        "uses_rendered_overlay_corners",
+        "not_perceived_real_camera_depth",
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({key: csv_value(row.get(key)) for key in fieldnames})
+
+
+def write_metadata_native_depth_view(
+    *,
+    metric_rows: list[dict[str, Any]],
+    source_rows: list[dict[str, Any]],
+    output_dir: Path,
+    suite_output_dir: Path,
+    sequence_metadata: dict[str, Any],
+    distance_metrics: dict[str, Any],
+    pnp_residual_diagnostics: dict[str, Any],
+) -> dict[str, Any]:
+    rows = compute_metadata_native_depth_rows(
+        metric_rows=metric_rows,
+        source_rows=source_rows,
+        pnp_residual_diagnostics=pnp_residual_diagnostics,
+    )
+    json_path = output_dir / "pick_place_metadata_native_depth_view.json"
+    csv_path = output_dir / "pick_place_metadata_native_depth_view.csv"
+    png_path = output_dir / "pick_place_metadata_native_depth_view.png"
+    first_metadata: dict[str, Any] | None = None
+    for source_row in source_rows:
+        capture = source_row.get("capture")
+        capture = capture if isinstance(capture, dict) else {}
+        metadata = capture.get("metadata")
+        metadata = metadata if isinstance(metadata, dict) else {}
+        if metadata_camera_model(metadata) is not None:
+            first_metadata = metadata
+            break
+    if first_metadata is None:
+        first_metadata = {}
+    visual = render_metadata_native_depth_view_png(
+        path=png_path,
+        rows=rows,
+        metadata=first_metadata,
+        suite_output_dir=suite_output_dir,
+    )
+    write_metadata_native_depth_view_csv(csv_path, rows)
+    ok = bool(rows) and all(row.get("ok") is True for row in rows)
+    first_stage_row = next(
+        (row for row in rows if row.get("stage") != "reference_board_geometry"),
+        rows[0] if rows else {},
+    )
+    summary = {
+        "schema": METADATA_NATIVE_DEPTH_VIEW_SCHEMA,
+        "ok": ok,
+        "status": "ok" if ok else "validation_failed",
+        "scenario_id": sequence_metadata.get("scenario_id"),
+        "source_square": sequence_metadata.get("source_square"),
+        "target_square": sequence_metadata.get("target_square"),
+        "frame_count": len(metric_rows),
+        "row_count": len(rows),
+        "point_roles": sorted({str(row.get("point_role")) for row in rows if row.get("point_role")}),
+        "paths": {
+            "png": str(png_path),
+            "json": str(json_path),
+            "csv": str(csv_path),
+            "png_relative_path": output_relative(png_path, suite_output_dir),
+            "json_relative_path": output_relative(json_path, suite_output_dir),
+            "csv_relative_path": output_relative(csv_path, suite_output_dir),
+        },
+        "visual": visual,
+        "source_artifacts": {
+            "depth_distance_metrics": distance_metrics.get("paths"),
+            "pnp_residual_diagnostics": pnp_residual_diagnostics.get("paths"),
+        },
+        "source_model": "simcamera_metadata",
+        "source_projection_model": "camera_metadata.camera_matrix_px + camera_metadata.extrinsics.board_to_camera",
+        "uses_rendered_overlay_corners": False,
+        "ground_truth_scope": (
+            "Simulator ground truth projected directly from SimCamera metadata. "
+            "This is camera-model-aligned and does not treat rendered board-corner overlays as depth authority."
+        ),
+        "units": {
+            "metadata_projected_pixel_xy": "pixels",
+            "camera_frame_xyz_mm": "millimeters",
+            "camera_z_depth_mm": "millimeters",
+            "camera_range_mm": "millimeters",
+            "board_plane_distance_mm": "millimeters",
+        },
+        "example_row": first_stage_row,
+        "rows": rows,
+        "review_note": (
+            "Use this artifact when reviewing simulator ground-truth pinhole projections and depth/range "
+            "expected by SimCamera metadata. Use the rendered-overlay PnP diagnostic only to explain "
+            "why rendered overlay corners disagree with that metadata, not as depth authority."
+        ),
+    }
+    write_json(json_path, summary)
+    return summary
+
+
 def compute_perceived_depth_comparison_row(
     metric: dict[str, Any],
     source_row: dict[str, Any],
@@ -2372,6 +2896,15 @@ def build_summary(
         distance_metrics=distance_metrics,
         perceived_depth_comparison=perceived_depth_comparison,
     )
+    metadata_native_depth_view = write_metadata_native_depth_view(
+        metric_rows=metric_rows,
+        source_rows=pick_place_source_rows,
+        output_dir=output_dir,
+        suite_output_dir=suite_output_dir,
+        sequence_metadata=pick_place_metadata,
+        distance_metrics=distance_metrics,
+        pnp_residual_diagnostics=pnp_residual_diagnostics,
+    )
     metrics_by_id = {
         str(metric.get("id")): metric
         for metric in metric_rows
@@ -2470,6 +3003,7 @@ def build_summary(
         "distance_metrics": distance_metrics,
         "perceived_depth_comparison": perceived_depth_comparison,
         "pnp_residual_diagnostics": pnp_residual_diagnostics,
+        "metadata_native_depth_view": metadata_native_depth_view,
         "app_entrypoint_frame": app_frame,
         "recording": recording,
         "recordings": {
@@ -2482,6 +3016,7 @@ def build_summary(
             "Pick/place depth artifacts label simulator ground truth separately from the unimplemented perceived-depth estimate; gripper-to-piece distance is currently a board-plane proxy from the rendered gripper overlay.",
             "Pick/place perceived-depth comparison artifacts add a metadata-derived rendered-board-corner PnP baseline and residuals against simulator ground truth; this is not a real-camera depth estimator.",
             "Pick/place PnP residual diagnostics compare metadata-projected board corners, rendered-corner PnP, and simulator ground-truth extrinsics so source mismatches are visible.",
+            "Pick/place metadata-native depth artifacts project board, piece, and target points directly through SimCamera metadata and do not use rendered overlay corners as depth authority.",
             "Optional MP4 recordings are best-effort only and are not required for the suite to pass.",
             "No simulator pixels, camera profiles, perception algorithms, UI behavior, or robot paths are changed by this helper.",
         ],
@@ -2503,6 +3038,7 @@ def failure_summary(output_dir: Path, suite_summary_path: Path, error: str) -> d
         "distance_metrics": {},
         "perceived_depth_comparison": {},
         "pnp_residual_diagnostics": {},
+        "metadata_native_depth_view": {},
         "app_entrypoint_frame": None,
         "recording": {
             "attempted": False,

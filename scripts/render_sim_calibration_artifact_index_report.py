@@ -612,6 +612,66 @@ def pnp_residual_stage_rows(diagnostic: dict[str, Any]) -> list[list[Any]]:
     return out
 
 
+def metadata_native_depth_artifact_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("frame_count", ""),
+        metrics.get("row_count", ""),
+        metrics.get("source_model", ""),
+        metrics.get("example_metadata_projected_pixel_xy", ""),
+        metrics.get("example_camera_z_depth_mm", ""),
+        metrics.get("example_camera_range_mm", ""),
+        metrics.get("example_board_plane_distance_mm", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def metadata_native_depth_view_signal(
+    index: dict[str, Any],
+    suite: dict[str, Any] | None,
+) -> dict[str, Any]:
+    candidates: list[dict[str, Any]] = []
+    visual_review = index.get("visual_review")
+    if isinstance(visual_review, dict):
+        candidates.append(visual_review)
+    if suite is not None and isinstance(suite.get("visual_review"), dict):
+        candidates.append(suite["visual_review"])
+    for candidate in candidates:
+        view = candidate.get("metadata_native_depth_view")
+        if isinstance(view, dict) and view:
+            return view
+    return {}
+
+
+def metadata_native_depth_stage_rows(view: dict[str, Any]) -> list[list[Any]]:
+    rows = view.get("rows")
+    rows = rows if isinstance(rows, list) else []
+    out: list[list[Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        out.append(
+            [
+                row.get("stage", ""),
+                row.get("point_role", ""),
+                row.get("square", ""),
+                row.get("metadata_projected_pixel_xy", ""),
+                row.get("camera_frame_xyz_mm", ""),
+                row.get("camera_z_depth_mm", ""),
+                row.get("camera_range_mm", ""),
+                row.get("board_plane_distance_mm", ""),
+                row.get("source_model", ""),
+                row.get("status", ""),
+            ]
+        )
+    return out
+
+
 def app_entrypoint_row(artifact: dict[str, Any]) -> list[Any]:
     metrics = artifact.get("metrics")
     metrics = metrics if isinstance(metrics, dict) else {}
@@ -940,6 +1000,61 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         else ["_No per-stage perceived-depth comparison rows were available._"]
     )
 
+    metadata_native_artifacts = [
+        row
+        for row in grouped.get("visual_review", [])
+        if str(row.get("label") or "").startswith("visual_review:pick_place_metadata_native_depth_view")
+    ]
+    metadata_native_view = metadata_native_depth_view_signal(index, suite)
+    lines.extend(["", "### Metadata-Native Projection/Depth View"])
+    lines.append(
+        "Use this artifact as the simulator ground-truth, camera-model-aligned projection/depth "
+        "view. It projects known board, piece, and target points through SimCamera metadata "
+        "(`camera_matrix_px` plus `extrinsics.board_to_camera`) and does not use rendered "
+        "overlay board corners as depth authority. Use the rendered-overlay PnP diagnostic "
+        "below only to explain source mismatch and residuals."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Frames",
+                "Rows",
+                "Source Model",
+                "Example Pixel XY",
+                "Example Z mm",
+                "Example Range mm",
+                "Board Plane mm",
+                "Status",
+            ],
+            [metadata_native_depth_artifact_row(row) for row in metadata_native_artifacts],
+        )
+        if metadata_native_artifacts
+        else ["_No metadata-native projection/depth artifacts indexed._"]
+    )
+    metadata_stage_rows = metadata_native_depth_stage_rows(metadata_native_view)
+    lines.extend(
+        table(
+            [
+                "Stage",
+                "Point",
+                "Square",
+                "Metadata Pixel XY",
+                "Camera XYZ mm",
+                "Z Depth mm",
+                "Range mm",
+                "Board Plane mm",
+                "Source Model",
+                "Status",
+            ],
+            metadata_stage_rows,
+        )
+        if metadata_stage_rows
+        else ["_No metadata-native per-point rows were available._"]
+    )
+
     pnp_residual_artifacts = [
         row
         for row in grouped.get("visual_review", [])
@@ -1176,6 +1291,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "- This report is a deterministic Markdown view of existing JSON artifacts only.",
             "- Visual review contact sheets are generated PNGs from existing suite frames and are the stable first-pass visual evidence.",
             "- The pick/place visual sequence is simulator-only evidence for approach, grasp/contact, lift/transfer, place/release, and retreat review.",
+            "- The metadata-native projection/depth view is the simulator camera-model-aligned ground-truth artifact; rendered-overlay PnP diagnostics are source-mismatch evidence, not depth authority.",
             "- SimCamera pose fixture intrinsics/extrinsics are simulator reference metadata, not physical calibration truth.",
             "- Gripper-camera POV visibility and clearance values are synthetic metadata evidence, not real-camera segmentation or physical contact proof.",
             "- It does not rerun child smokes, open GUI calibration flows, call OpenAI, or touch SO-101 hardware.",
