@@ -472,6 +472,266 @@ def smoke_artifact_paths(smokes: dict[str, dict[str, Any]]) -> list[str]:
     return dedupe_paths(paths)
 
 
+def as_float(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def round_float(value: float | None, digits: int = 6) -> float | None:
+    return round(value, digits) if value is not None else None
+
+
+def extract_candidate_validation(comparison_summary: dict[str, Any] | None) -> dict[str, Any] | None:
+    candidate = comparison_summary.get("candidate") if comparison_summary else None
+    validation = candidate.get("validation") if isinstance(candidate, dict) else None
+    return validation if isinstance(validation, dict) else None
+
+
+def extract_candidate_geometry(comparison_summary: dict[str, Any] | None) -> dict[str, Any] | None:
+    candidate = comparison_summary.get("candidate") if comparison_summary else None
+    geometry = candidate.get("geometry_vs_base_profile") if isinstance(candidate, dict) else None
+    return geometry if isinstance(geometry, dict) else None
+
+
+def image_score_metrics(comparison_summary: dict[str, Any] | None) -> dict[str, Any]:
+    image = comparison_summary.get("image") if comparison_summary else None
+    if not isinstance(image, dict):
+        return {"mean_abs_delta": None, "rmse": None}
+    return {
+        "mean_abs_delta": round_float(as_float(image.get("mean_abs_delta"))),
+        "rmse": round_float(as_float(image.get("rmse"))),
+    }
+
+
+def geometry_score_metrics(
+    comparison_summary: dict[str, Any] | None,
+    *,
+    width: int,
+    height: int,
+) -> dict[str, Any]:
+    validation = extract_candidate_validation(comparison_summary)
+    geometry = extract_candidate_geometry(comparison_summary)
+    area_delta_px2 = as_float(geometry.get("area_delta_px2")) if geometry else None
+    image_area = float(width * height)
+    return {
+        "valid": bool(validation) and bool(validation.get("in_bounds")) and bool(validation.get("convex")),
+        "area_ratio": round_float(as_float(validation.get("area_ratio")) if validation else None),
+        "signed_area_px2": round_float(as_float(validation.get("signed_area_px2")) if validation else None),
+        "mean_corner_l2_px": round_float(as_float(geometry.get("mean_corner_l2_px")) if geometry else None),
+        "max_corner_l2_px": round_float(as_float(geometry.get("max_corner_l2_px")) if geometry else None),
+        "area_delta_px2": round_float(area_delta_px2),
+        "area_delta_ratio": round_float(area_delta_px2 / image_area if area_delta_px2 is not None else None),
+    }
+
+
+def piece_score_evidence(
+    *,
+    source_square: str,
+    target_square: str,
+    comparison_summary: dict[str, Any] | None,
+    board_pose_summary: dict[str, Any] | None,
+    pick_place_summary: dict[str, Any] | None,
+) -> dict[str, Any]:
+    comparison_piece = comparison_summary.get("piece_square") if comparison_summary else None
+    board_pose_piece = board_pose_summary.get("piece_square") if board_pose_summary else None
+    transition = pick_place_summary.get("piece_square_transition") if pick_place_summary else None
+
+    comparison_square = comparison_piece.get("square") if isinstance(comparison_piece, dict) else None
+    board_pose_square = board_pose_piece.get("square") if isinstance(board_pose_piece, dict) else None
+    transition_source = transition.get("source_square") if isinstance(transition, dict) else None
+    transition_release = transition.get("release_square") if isinstance(transition, dict) else None
+    return {
+        "expected_source_square": source_square,
+        "expected_target_square": target_square,
+        "comparison_square": comparison_square,
+        "board_pose_square": board_pose_square,
+        "pick_place_source_square": transition_source,
+        "pick_place_release_square": transition_release,
+        "comparison_source_ok": comparison_square == source_square,
+        "board_pose_source_ok": board_pose_square == source_square,
+        "pick_place_source_ok": transition_source == source_square,
+        "pick_place_release_ok": transition_release == target_square,
+    }
+
+
+def gripper_score_evidence(
+    *,
+    comparison_summary: dict[str, Any] | None,
+    pick_place_summary: dict[str, Any] | None,
+) -> dict[str, Any]:
+    comparison_gripper = comparison_summary.get("gripper") if comparison_summary else None
+    captures = pick_place_summary.get("captures") if pick_place_summary else None
+    frame_deltas = pick_place_summary.get("frame_deltas") if pick_place_summary else None
+    capture_count = len(captures) if isinstance(captures, list) else 0
+    frame_delta_count = len(frame_deltas) if isinstance(frame_deltas, dict) else 0
+    return {
+        "comparison_visible": (
+            bool(comparison_gripper.get("visible")) if isinstance(comparison_gripper, dict) else False
+        ),
+        "comparison_track_robot_gripper": (
+            bool(comparison_gripper.get("track_robot_gripper")) if isinstance(comparison_gripper, dict) else False
+        ),
+        "comparison_tracked_gripper_percent": (
+            comparison_gripper.get("tracked_gripper_percent") if isinstance(comparison_gripper, dict) else None
+        ),
+        "comparison_current_gripper_opening_px": (
+            comparison_gripper.get("current_gripper_opening_px") if isinstance(comparison_gripper, dict) else None
+        ),
+        "pick_place_capture_count": capture_count,
+        "pick_place_frame_delta_count": frame_delta_count,
+    }
+
+
+def evidence_bonus(*, piece: dict[str, Any], gripper: dict[str, Any]) -> float:
+    bonus = 0.0
+    for key in (
+        "comparison_source_ok",
+        "board_pose_source_ok",
+        "pick_place_source_ok",
+        "pick_place_release_ok",
+    ):
+        if piece.get(key):
+            bonus += 10.0
+    if gripper.get("comparison_visible"):
+        bonus += 10.0
+    if gripper.get("comparison_track_robot_gripper"):
+        bonus += 5.0
+    bonus += min(float(gripper.get("pick_place_capture_count") or 0), 5.0)
+    bonus += min(float(gripper.get("pick_place_frame_delta_count") or 0), 3.0)
+    return bonus
+
+
+def build_score_components(
+    *,
+    spec: CandidateSpec,
+    smokes: dict[str, dict[str, Any]],
+    source_square: str,
+    target_square: str,
+    comparison_summary: dict[str, Any] | None,
+    board_pose_summary: dict[str, Any] | None,
+    pick_place_summary: dict[str, Any] | None,
+) -> dict[str, Any]:
+    smoke_ok = {name: bool(smoke.get("ok")) for name, smoke in smokes.items()}
+    smoke_failures = sorted(name for name, ok in smoke_ok.items() if not ok)
+    image = image_score_metrics(comparison_summary)
+    geometry = geometry_score_metrics(comparison_summary, width=spec.width, height=spec.height)
+    piece = piece_score_evidence(
+        source_square=source_square,
+        target_square=target_square,
+        comparison_summary=comparison_summary,
+        board_pose_summary=board_pose_summary,
+        pick_place_summary=pick_place_summary,
+    )
+    gripper = gripper_score_evidence(
+        comparison_summary=comparison_summary,
+        pick_place_summary=pick_place_summary,
+    )
+
+    rmse = as_float(image.get("rmse"))
+    mean_abs_delta = as_float(image.get("mean_abs_delta"))
+    mean_corner_l2 = as_float(geometry.get("mean_corner_l2_px"))
+    max_corner_l2 = as_float(geometry.get("max_corner_l2_px"))
+    area_delta_ratio = as_float(geometry.get("area_delta_ratio"))
+    bonus = evidence_bonus(piece=piece, gripper=gripper)
+    penalties = {
+        "smoke_failure_penalty": float(len(smoke_failures) * 100000.0),
+        "missing_image_metric_penalty": 0.0 if rmse is not None and mean_abs_delta is not None else 1000.0,
+        "missing_geometry_metric_penalty": 0.0 if mean_corner_l2 is not None and max_corner_l2 is not None else 1000.0,
+        "image_rmse_penalty": rmse if rmse is not None else 0.0,
+        "image_mean_abs_penalty": (mean_abs_delta * 0.25) if mean_abs_delta is not None else 0.0,
+        "corner_mean_l2_penalty": mean_corner_l2 if mean_corner_l2 is not None else 0.0,
+        "corner_max_l2_penalty": (max_corner_l2 * 0.25) if max_corner_l2 is not None else 0.0,
+        "area_delta_ratio_penalty": (abs(area_delta_ratio) * 1000.0) if area_delta_ratio is not None else 0.0,
+        "piece_and_gripper_evidence_bonus": -bonus,
+    }
+    total_penalty = sum(penalties.values())
+    return {
+        "smoke_ok": smoke_ok,
+        "smoke_failures": smoke_failures,
+        "image": image,
+        "geometry": geometry,
+        "piece_evidence": piece,
+        "gripper_evidence": gripper,
+        "penalties": {key: round_float(value) for key, value in penalties.items()},
+        "total_penalty": round_float(total_penalty),
+        "rank_score": round_float(10000.0 - total_penalty),
+    }
+
+
+def ranking_artifact_paths(candidate: dict[str, Any]) -> dict[str, str]:
+    smokes = candidate.get("smokes")
+    if not isinstance(smokes, dict):
+        return {}
+
+    def smoke_artifact(smoke_name: str, artifact_name: str) -> str | None:
+        smoke = smokes.get(smoke_name)
+        artifacts = smoke.get("artifacts") if isinstance(smoke, dict) else None
+        value = artifacts.get(artifact_name) if isinstance(artifacts, dict) else None
+        return value if isinstance(value, str) else None
+
+    def smoke_summary(smoke_name: str) -> str | None:
+        smoke = smokes.get(smoke_name)
+        value = smoke.get("summary_path") if isinstance(smoke, dict) else None
+        return value if isinstance(value, str) else None
+
+    paths = {
+        "candidate_path": candidate.get("candidate_path"),
+        "candidate_artifact_dir": candidate.get("candidate_artifact_dir"),
+        "comparison_summary_path": smoke_summary("comparison"),
+        "comparison_side_by_side_path": smoke_artifact("comparison", "side_by_side_path"),
+        "comparison_heatmap_path": smoke_artifact("comparison", "absolute_difference_heatmap_path"),
+        "app_frame_summary_path": smoke_summary("app_frame"),
+        "app_frame_path": smoke_artifact("app_frame", "frame_path"),
+        "board_pose_summary_path": smoke_summary("board_pose"),
+        "board_pose_annotated_frame_path": smoke_artifact("board_pose", "annotated_frame_path"),
+        "pick_place_summary_path": smoke_summary("pick_place"),
+        "pick_place_release_path": smoke_artifact("pick_place", "target_release_open_path"),
+    }
+    return {key: value for key, value in paths.items() if isinstance(value, str)}
+
+
+def build_ranking(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    ranked = []
+    for candidate in candidates:
+        score_components = candidate.get("score_components")
+        if not isinstance(score_components, dict):
+            continue
+        smoke_failures = score_components.get("smoke_failures")
+        if not isinstance(smoke_failures, list):
+            smoke_failures = []
+        total_penalty = as_float(score_components.get("total_penalty"))
+        rank_score = as_float(score_components.get("rank_score"))
+        ranked.append(
+            {
+                "candidate_id": candidate["candidate_id"],
+                "candidate_path": candidate["candidate_path"],
+                "candidate_artifact_dir": candidate["candidate_artifact_dir"],
+                "rank_score": round_float(rank_score),
+                "total_penalty": round_float(total_penalty),
+                "all_smokes_ok": bool(candidate.get("ok")),
+                "smoke_failures": smoke_failures,
+                "image": score_components.get("image"),
+                "geometry": score_components.get("geometry"),
+                "piece_evidence": score_components.get("piece_evidence"),
+                "gripper_evidence": score_components.get("gripper_evidence"),
+                "artifact_paths": ranking_artifact_paths(candidate),
+            }
+        )
+
+    ranked.sort(
+        key=lambda item: (
+            not bool(item["all_smokes_ok"]),
+            len(item["smoke_failures"]),
+            item["total_penalty"] if item["total_penalty"] is not None else float("inf"),
+            str(item["candidate_id"]),
+        )
+    )
+    for rank, item in enumerate(ranked, start=1):
+        item["rank"] = rank
+    return ranked
+
+
 def write_candidate_inputs(spec: CandidateSpec, candidate_dir: Path) -> dict[str, str]:
     candidate_input_dir = candidate_dir / "candidate"
     candidate_input_dir.mkdir(parents=True, exist_ok=True)
@@ -640,6 +900,15 @@ def run_candidate_session(spec: CandidateSpec, *, output_dir: Path, args: argpar
         ]
     )
     ok = all(smoke["ok"] for smoke in smokes.values())
+    score_components = build_score_components(
+        spec=spec,
+        smokes=smokes,
+        source_square=str(args.source_square),
+        target_square=str(args.target_square),
+        comparison_summary=comparison_summary,
+        board_pose_summary=board_pose_summary,
+        pick_place_summary=pick_place_summary,
+    )
     return {
         "ok": ok,
         "candidate_id": spec.candidate_id,
@@ -657,6 +926,7 @@ def run_candidate_session(spec: CandidateSpec, *, output_dir: Path, args: argpar
         "profile_values": jsonable(SIM_CAMERA_CALIBRATION_PROFILES[spec.base_profile]),
         "candidate_input_artifacts": candidate_input_artifacts,
         "smokes": smokes,
+        "score_components": score_components,
         "piece_metadata": extract_piece_metadata(
             source_square=str(args.source_square),
             target_square=str(args.target_square),
@@ -690,6 +960,7 @@ def main() -> int:
     candidates = [run_candidate_session(spec, output_dir=output_dir, args=args) for spec in specs]
     ok = all(candidate["ok"] for candidate in candidates)
     summary_path = output_dir / "session_summary.json"
+    ranking = build_ranking(candidates)
     summary = {
         "ok": ok,
         "scenario": SCENARIO,
@@ -702,6 +973,33 @@ def main() -> int:
         "hardware_skipped": True,
         "gui_skipped": True,
         "smoke_names": ["comparison", "app_frame", "board_pose", "pick_place"],
+        "ranking_criteria": {
+            "order": [
+                "all child smokes passing",
+                "fewest child smoke failures",
+                "lowest total_penalty",
+                "candidate_id lexical tiebreaker",
+            ],
+            "total_penalty_components": {
+                "smoke_failure_penalty": "100000 per failed child smoke",
+                "missing_image_metric_penalty": "1000 if comparison image RMSE or mean absolute delta is unavailable",
+                "missing_geometry_metric_penalty": "1000 if corner delta metrics are unavailable",
+                "image_rmse_penalty": "comparison image RMSE",
+                "image_mean_abs_penalty": "0.25 * comparison image mean_abs_delta",
+                "corner_mean_l2_penalty": "mean candidate-vs-base corner L2 delta in pixels",
+                "corner_max_l2_penalty": "0.25 * max candidate-vs-base corner L2 delta in pixels",
+                "area_delta_ratio_penalty": "1000 * absolute signed-area delta ratio vs base profile",
+                "piece_and_gripper_evidence_bonus": (
+                    "negative penalty for expected source/target piece transition and gripper metadata evidence"
+                ),
+            },
+            "rank_score": "10000 - total_penalty; higher is better after smoke-pass ordering",
+            "limits": (
+                "This is a deterministic simulator smoke heuristic for comparing review artifacts. "
+                "It is not a full photoreal calibration score and does not validate real hardware."
+            ),
+        },
+        "ranking": ranking,
         "candidates": candidates,
     }
     summary_path.write_text(json.dumps(summary, indent=2))
