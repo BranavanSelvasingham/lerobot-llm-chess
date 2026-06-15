@@ -64,6 +64,48 @@ Validate a deliberate negative missing-field fixture:
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_real_calibration_sidecars.py --sidecar test_data/real_calibration_sidecars/invalid_intrinsics_missing_camera_matrix.synthetic.json --expect-invalid --output-dir /private/tmp/lerobot_sim/real_calibration_sidecars_invalid
 ```
 
+Prepare sidecars from a hardware-free capture spec or manual file inputs:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/prepare_real_calibration_capture_sidecars.py --capture-spec test_data/real_calibration_sidecars/capture_workflow_example_spec.synthetic.json --example-only --require intrinsics --require extrinsics --require board_pose --require depth --output-dir /private/tmp/lerobot_sim/capture_workflow_smoke
+```
+
+That helper writes `capture_workflow_summary.json`, `capture_plan.md`, a generated
+reference-media manifest, and one validator-compatible sidecar JSON per complete input
+section. It is safe by default: it does not open a camera, move SO-101 motors, start GUI
+calibration, call OpenAI, or mark outputs as real calibration. Unless `--real-capture` is
+passed, generated sidecars set `example_only: true` and `real_capture: false`.
+
+For real physical capture, first place a sharp SO-101 chessboard image in the repository,
+then supply user-measured inputs instead of the synthetic fixture:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/prepare_real_calibration_capture_sidecars.py \
+  --image-path path/to/real_capture.jpg \
+  --capture-id so101_capture_001 \
+  --camera-id so101_gripper_camera \
+  --image-size 640x480 \
+  --camera-matrix-json '[[615.0,0.0,320.0],[0.0,615.0,240.0],[0.0,0.0,1.0]]' \
+  --distortion-json '[0.0,0.0,0.0,0.0,0.0]' \
+  --corner a1:82.0,356.0 --corner h1:562.0,350.0 --corner h8:536.0,44.0 --corner a8:112.0,38.0 \
+  --distance board_center_range:0.506:320.0,207.0 \
+  --real-capture \
+  --require intrinsics --require board_pose --require depth \
+  --output-dir /private/tmp/lerobot_sim/real_capture_sidecars
+```
+
+Only pass `--real-capture` for user-supplied physical measurements. The helper will still
+not validate calibration truth; it validates JSON shape and records the capture steps that
+remain before the residual gate can be treated as real-world evidence. A missing-input
+check can be run without hardware:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/prepare_real_calibration_capture_sidecars.py --image-path archive/chess_test_images/current_view.jpg --camera-id missing_inputs_example --require intrinsics --require board_pose --require depth --output-dir /private/tmp/lerobot_sim/capture_workflow_missing_inputs
+```
+
+That command should fail with `status: "missing_required_capture_inputs"` and list the
+missing intrinsics, board-pose/corner, and depth-reference inputs.
+
 Current real-media state:
 
 - The only wired real reference remains `archive/chess_test_images/current_view.jpg`.

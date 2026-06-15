@@ -1,0 +1,74 @@
+{
+  "schema": "lerobot.sim.real_calibration_capture_spec.v1",
+  "capture_id": "synthetic_capture_workflow_example",
+  "image_path": "archive/chess_test_images/current_view.jpg",
+  "camera_id": "synthetic_so101_gripper_camera",
+  "image_size_px": [640, 480],
+  "intrinsics": {
+    "calibration_source": "synthetic example capture spec for CLI smoke tests only",
+    "camera_matrix_px": [
+      [615.0, 0.0, 320.0],
+      [0.0, 615.0, 240.0],
+      [0.0, 0.0, 1.0]
+    ],
+    "distortion_model": "opencv_plumb_bob",
+    "distortion_coefficients": [0.01, -0.02, 0.0005, -0.0003, 0.0],
+    "notes": [
+      "Synthetic fixture only. Do not use as real SO-101 camera calibration."
+    ]
+  },
+  "extrinsics": {
+    "transform_convention": "board_to_camera",
+    "coordinate_frame_convention": "OpenCV camera frame: +x right, +y down, +z forward; board frame origin at a1.",
+    "transform": {
+      "matrix_4x4": [
+        [0.998, -0.012, 0.061, -0.145],
+        [0.018, 0.995, -0.096, 0.084],
+        [-0.059, 0.097, 0.994, 0.482],
+        [0.0, 0.0, 0.0, 1.0]
+      ],
+      "translation_m": [-0.145, 0.084, 0.482],
+      "rotation_representation": "matrix_4x4_board_to_camera"
+    },
+    "notes": [
+      "Synthetic fixture only. It documents shape and convention, not a physical board pose."
+    ]
+  },
+  "board": {
+    "board_size_m": 0.28,
+    "detection_source": "synthetic example corner detections for capture workflow smoke tests only",
+    "corners": [
+      {"label": "a1", "pixel_xy": [82.0, 356.0], "confidence": 0.99},
+      {"label": "h1", "pixel_xy": [562.0, 350.0], "confidence": 0.98},
+      {"label": "h8", "pixel_xy": [536.0, 44.0], "confidence": 0.98},
+      {"label": "a8", "pixel_xy": [112.0, 38.0], "confidence": 0.97}
+    ],
+    "notes": [
+      "Synthetic fixture only. Corner order is a1,h1,h8,a8 for downstream PnP compatibility."
+    ]
+  },
+  "depth": {
+    "depth_units": "m",
+    "depth_scale_to_m": 1.0,
+    "reference_frame": "OpenCV camera frame, distances measured along camera range unless noted per reference.",
+    "metric_references": [
+      {
+        "id": "board_center_range",
+        "target": "board_center",
+        "pixel_xy": [320.0, 207.0],
+        "distance_m": 0.506,
+        "distance_type": "camera_range"
+      },
+      {
+        "id": "e4_piece_top_range",
+        "target": "piece_top",
+        "pixel_xy": [318.0, 238.0],
+        "distance_m": 0.458,
+        "distance_type": "camera_range"
+      }
+    ],
+    "notes": [
+      "Synthetic fixture only. These distances are validation examples, not measured real depth."
+    ]
+  }
+}
