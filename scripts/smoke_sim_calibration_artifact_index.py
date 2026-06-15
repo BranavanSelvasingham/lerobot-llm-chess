@@ -11,16 +11,17 @@ from typing import Any
 SCHEMA = "lerobot.sim.calibration_artifact_index.v1"
 CATEGORY_ORDER = {
     "real_reference_media": 0,
-    "visual_review": 1,
-    "real_reference_comparison": 2,
-    "ranked_candidate": 3,
-    "perception_fixture": 4,
-    "sim_camera_pose_fixture": 5,
-    "gripper_camera_pov": 6,
-    "app_entrypoint": 7,
-    "pick_place_scenario": 8,
-    "negative_check": 9,
-    "logs": 10,
+    "reference_capture_checklist": 1,
+    "visual_review": 2,
+    "real_reference_comparison": 3,
+    "ranked_candidate": 4,
+    "perception_fixture": 5,
+    "sim_camera_pose_fixture": 6,
+    "gripper_camera_pov": 7,
+    "app_entrypoint": 8,
+    "pick_place_scenario": 9,
+    "negative_check": 10,
+    "logs": 11,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -295,6 +296,100 @@ def collect_comparison_artifacts(
                     source="comparison_set.artifacts.visual_artifact_paths",
                     reference_media=reference_media,
                 )
+
+
+def collect_reference_capture_checklist_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    checklist = suite.get("reference_capture_checklist")
+    checklist = checklist if isinstance(checklist, dict) else {}
+    checklist_summary = load_optional_json(
+        checklist.get("summary_path"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
+    checklist_summary = checklist_summary if isinstance(checklist_summary, dict) else {}
+    counts = checklist_summary.get("counts")
+    counts = counts if isinstance(counts, dict) else {}
+    media_summary = checklist_summary.get("media_summary")
+    media_summary = media_summary if isinstance(media_summary, dict) else {}
+    current_view = checklist_summary.get("current_view_representation")
+    current_view = current_view if isinstance(current_view, dict) else {}
+    metrics = {
+        "status": checklist_summary.get("status", checklist.get("status")),
+        "ok": checklist_summary.get("ok", checklist.get("ok")),
+        "represented_media_count": media_summary.get(
+            "represented_media_count",
+            checklist.get("represented_media_count"),
+        ),
+        "video_count": media_summary.get("video_count", checklist.get("video_count")),
+        "requirement_count": counts.get("requirement_count", checklist.get("requirement_count")),
+        "missing_requirement_count": counts.get(
+            "missing_requirement_count",
+            checklist.get("missing_requirement_count"),
+        ),
+        "partial_requirement_count": counts.get(
+            "partial_requirement_count",
+            checklist.get("partial_requirement_count"),
+        ),
+        "action_item_count": counts.get("action_item_count", checklist.get("action_item_count")),
+        "current_reference_detected": current_view.get("detected"),
+        "current_reference_roles": current_view.get("represented_roles"),
+        "hardware_skipped": checklist_summary.get("hardware_skipped", checklist.get("hardware_skipped")),
+        "gui_skipped": checklist_summary.get("gui_skipped", checklist.get("gui_skipped")),
+        "real_camera_skipped": checklist_summary.get(
+            "real_camera_skipped",
+            checklist.get("real_camera_skipped"),
+        ),
+        "openai_skipped": checklist_summary.get("openai_skipped", checklist.get("openai_skipped")),
+    }
+    add_path(
+        artifacts,
+        category="reference_capture_checklist",
+        label="reference_capture_checklist:json",
+        value=checklist.get("summary_path") or checklist_summary.get("checklist_path"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="reference_capture_checklist.summary_path",
+        metrics=metrics,
+    )
+    add_path(
+        artifacts,
+        category="reference_capture_checklist",
+        label="reference_capture_checklist:markdown",
+        value=checklist.get("markdown_path") or checklist_summary.get("markdown_path"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="reference_capture_checklist.markdown_path",
+        metrics=metrics,
+    )
+    return {
+        "status": checklist_summary.get("status", checklist.get("status")),
+        "ok": checklist_summary.get("ok", checklist.get("ok")),
+        "summary_path": checklist.get("summary_path") or checklist_summary.get("checklist_path"),
+        "markdown_path": checklist.get("markdown_path") or checklist_summary.get("markdown_path"),
+        "represented_media_count": metrics.get("represented_media_count"),
+        "represented_media": media_summary.get("represented_media", checklist.get("represented_media")),
+        "missing_requirement_count": metrics.get("missing_requirement_count"),
+        "partial_requirement_count": metrics.get("partial_requirement_count"),
+        "action_item_count": metrics.get("action_item_count"),
+        "hardware_skipped": metrics.get("hardware_skipped"),
+        "gui_skipped": metrics.get("gui_skipped"),
+        "real_camera_skipped": metrics.get("real_camera_skipped"),
+        "openai_skipped": metrics.get("openai_skipped"),
+        "current_view_representation": current_view or None,
+        "capture_requirements": checklist_summary.get("capture_requirements"),
+        "action_items": checklist_summary.get("action_items"),
+        "synthetic_visual_review_outputs": checklist_summary.get("synthetic_visual_review_outputs"),
+    }
 
 
 def collect_visual_review_artifacts(
@@ -909,6 +1004,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    reference_capture_checklist = collect_reference_capture_checklist_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
     visual_review = collect_visual_review_artifacts(
         suite=suite,
         artifacts=artifacts,
@@ -1020,6 +1122,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         },
         "reference_media_manifest": suite.get("reference_media_manifest"),
         "selected_real_reference_media": selected_media,
+        "reference_capture_checklist": reference_capture_checklist,
         "visual_review": visual_review,
         "sim_camera_pose_fixture_metadata_contract": sim_camera_pose_metadata_contract,
         "gripper_camera_pov": gripper_camera_pov,
