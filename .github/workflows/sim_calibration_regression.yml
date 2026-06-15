@@ -171,6 +171,100 @@ jobs:
 
           assert summary["negative_check"]["status"] == "no_reference_media_selected", summary["negative_check"]
 
+          artifact_index_summary = summary["artifact_index"]
+          artifact_index_path = Path(artifact_index_summary["path"])
+          assert artifact_index_summary["status"] == "ok", artifact_index_summary
+          assert isinstance(artifact_index_summary["artifact_count"], int), artifact_index_summary
+          assert not isinstance(artifact_index_summary["artifact_count"], bool), artifact_index_summary
+          assert artifact_index_summary["artifact_count"] > 0, artifact_index_summary
+          assert artifact_index_summary["missing_artifact_count"] == 0, artifact_index_summary
+          assert artifact_index_path.is_file(), artifact_index_summary
+
+          artifact_index = json.loads(artifact_index_path.read_text())
+          assert artifact_index["ok"] is True, artifact_index
+          assert artifact_index["status"] == "ok", artifact_index["status"]
+          assert artifact_index["artifact_index_path"] == str(artifact_index_path), artifact_index
+          assert artifact_index["suite_summary_path"] == str(summary_path), artifact_index
+          assert artifact_index["missing_artifacts"] == [], artifact_index["missing_artifacts"]
+          artifacts = artifact_index["artifacts"]
+          assert isinstance(artifacts, list) and artifacts, artifact_index
+          assert len(artifacts) == artifact_index_summary["artifact_count"], (
+              len(artifacts),
+              artifact_index_summary,
+          )
+
+          required_artifact_categories = {
+              "real_reference_comparison",
+              "ranked_candidate",
+              "perception_fixture",
+              "pick_place_scenario",
+              "negative_check",
+              "logs",
+          }
+          summary_category_rows = {
+              row["category"]: row
+              for row in artifact_index_summary["categories"]
+              if isinstance(row, dict) and isinstance(row.get("category"), str)
+          }
+          index_category_rows = {
+              row["category"]: row
+              for row in artifact_index["categories"]
+              if isinstance(row, dict) and isinstance(row.get("category"), str)
+          }
+          assert required_artifact_categories <= set(summary_category_rows), summary_category_rows
+          assert required_artifact_categories <= set(index_category_rows), index_category_rows
+          for category in required_artifact_categories:
+              for row in (summary_category_rows[category], index_category_rows[category]):
+                  assert isinstance(row["artifact_count"], int) and row["artifact_count"] > 0, row
+                  assert row["missing_count"] == 0, row
+
+          artifacts_by_category = {
+              category: [
+                  row
+                  for row in artifacts
+                  if isinstance(row, dict) and row.get("category") == category
+              ]
+              for category in required_artifact_categories
+          }
+          assert any(
+              row.get("kind") == "image" and row.get("exists") is True
+              for row in artifacts_by_category["real_reference_comparison"]
+          ), artifacts_by_category["real_reference_comparison"]
+          assert any(
+              row.get("exists") is True and row.get("candidate_id")
+              for row in artifacts_by_category["ranked_candidate"]
+          ), artifacts_by_category["ranked_candidate"]
+          assert any(
+              row.get("exists") is True and row.get("kind") in {"json", "image"}
+              for row in artifacts_by_category["perception_fixture"]
+          ), artifacts_by_category["perception_fixture"]
+          indexed_release_scenarios = {
+              row.get("scenario_id")
+              for row in artifacts_by_category["pick_place_scenario"]
+              if row.get("kind") == "image" and row.get("exists") is True
+          }
+          assert set(expected_scenario_ids) <= indexed_release_scenarios, (
+              expected_scenario_ids,
+              indexed_release_scenarios,
+          )
+          for scenario_id in expected_scenario_ids:
+              assert any(
+                  row.get("scenario_id") == scenario_id
+                  and row.get("path") == matrix["release_frame_paths"][scenario_id]
+                  and row.get("exists") is True
+                  for row in artifacts_by_category["pick_place_scenario"]
+              ), (scenario_id, artifacts_by_category["pick_place_scenario"])
+          assert any(
+              row.get("exists") is True
+              and isinstance(row.get("metrics"), dict)
+              and row["metrics"].get("status") == "no_reference_media_selected"
+              for row in artifacts_by_category["negative_check"]
+          ), artifacts_by_category["negative_check"]
+          assert any(
+              row.get("label") == "suite:summary" and row.get("path") == str(summary_path)
+              for row in artifacts_by_category["logs"]
+          ), artifacts_by_category["logs"]
+
           print(
               json.dumps(
                   {
@@ -185,6 +279,13 @@ jobs:
                           "piece_visibility": matrix["piece_visibility"],
                       },
                       "negative_check": summary["negative_check"]["status"],
+                      "artifact_index": {
+                          "path": str(artifact_index_path),
+                          "status": artifact_index_summary["status"],
+                          "artifact_count": artifact_index_summary["artifact_count"],
+                          "missing_artifact_count": artifact_index_summary["missing_artifact_count"],
+                          "categories": artifact_index_summary["categories"],
+                      },
                   },
                   indent=2,
               )
