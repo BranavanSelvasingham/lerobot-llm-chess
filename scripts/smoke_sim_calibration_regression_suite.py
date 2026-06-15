@@ -115,6 +115,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `visual_review/visual_review_summary.json`",
         "- `visual_review/pick_place_depth_distance_metrics.json`",
         "- `visual_review/pick_place_depth_distance_metrics.csv`",
+        "- `visual_review/pick_place_depth_distance_scorecard.png`",
+        "- `visual_review/pick_place_depth_distance_scorecard.json`",
         "- `visual_review/pick_place_perceived_depth_comparison.json`",
         "- `visual_review/pick_place_perceived_depth_comparison.csv`",
         "- `visual_review/pick_place_pnp_residual_diagnostics.json`",
@@ -181,6 +183,11 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             "camera-to-piece, target world/pixel coordinates, projection residuals, and a "
             "labeled gripper-to-piece board-plane proxy; perceived depth is explicitly marked "
             "`not_implemented`."
+        ),
+        (
+            "- Pick/place depth-distance scorecard evidence writes a PNG plus JSON that combines "
+            "SimCamera ground truth, the metadata-derived rendered-corner PnP baseline, mm/px "
+            "residual severity, and the explicit missing real-camera/depth-sensor reference."
         ),
         (
             "- Pick/place perceived-depth comparison evidence records a metadata-derived "
@@ -721,6 +728,10 @@ def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Pa
     metadata_native_depth_view = (
         metadata_native_depth_view if isinstance(metadata_native_depth_view, dict) else {}
     )
+    depth_distance_scorecard = visual_review.get("depth_distance_scorecard")
+    depth_distance_scorecard = (
+        depth_distance_scorecard if isinstance(depth_distance_scorecard, dict) else {}
+    )
     recordings = visual_review.get("recordings")
     recordings = recordings if isinstance(recordings, dict) else {}
     return {
@@ -740,6 +751,7 @@ def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Pa
         "perceived_depth_comparison": perceived_depth_comparison,
         "pnp_residual_diagnostics": pnp_residual_diagnostics,
         "metadata_native_depth_view": metadata_native_depth_view,
+        "depth_distance_scorecard": depth_distance_scorecard,
         "app_entrypoint_frame": visual_review.get("app_entrypoint_frame"),
         "recording": visual_review.get("recording"),
         "recordings": recordings,

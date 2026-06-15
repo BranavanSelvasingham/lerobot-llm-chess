@@ -490,6 +490,72 @@ def depth_distance_row(artifact: dict[str, Any]) -> list[Any]:
     ]
 
 
+def depth_distance_scorecard_artifact_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("frame_count", ""),
+        metrics.get("review_status", ""),
+        metrics.get("at_a_glance", ""),
+        metrics.get("baseline_quality", ""),
+        metrics.get("worst_mean_abs_depth_error_mm", ""),
+        metrics.get("mean_board_corner_reprojection_residual_px", ""),
+        metrics.get("mean_metadata_projected_corner_residual_px", ""),
+        metrics.get("not_geometrically_comparable_row_count", ""),
+        metrics.get("real_camera_depth_status", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def depth_distance_scorecard_signal(
+    index: dict[str, Any],
+    suite: dict[str, Any] | None,
+) -> dict[str, Any]:
+    candidates: list[dict[str, Any]] = []
+    visual_review = index.get("visual_review")
+    if isinstance(visual_review, dict):
+        candidates.append(visual_review)
+    if suite is not None and isinstance(suite.get("visual_review"), dict):
+        candidates.append(suite["visual_review"])
+    for candidate in candidates:
+        scorecard = candidate.get("depth_distance_scorecard")
+        if isinstance(scorecard, dict) and scorecard:
+            return scorecard
+    return {}
+
+
+def depth_distance_scorecard_stage_rows(scorecard: dict[str, Any]) -> list[list[Any]]:
+    rows = scorecard.get("stage_rows")
+    rows = rows if isinstance(rows, list) else []
+    out: list[list[Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        sim_ground_truth = row.get("sim_ground_truth")
+        sim_ground_truth = sim_ground_truth if isinstance(sim_ground_truth, dict) else {}
+        baseline = row.get("metadata_derived_baseline")
+        baseline = baseline if isinstance(baseline, dict) else {}
+        out.append(
+            [
+                row.get("stage", ""),
+                sim_ground_truth.get("camera_to_piece_distance_mm", ""),
+                baseline.get("estimated_camera_to_piece_distance_mm", ""),
+                baseline.get("camera_to_piece_abs_error_mm", ""),
+                sim_ground_truth.get("camera_to_board_plane_distance_mm", ""),
+                baseline.get("estimated_camera_to_board_plane_distance_mm", ""),
+                baseline.get("camera_to_board_abs_error_mm", ""),
+                baseline.get("board_corner_reprojection_mean_residual_px", ""),
+                baseline.get("pnp_vs_sim_ground_truth_status", ""),
+                row.get("status", ""),
+            ]
+        )
+    return out
+
+
 def perceived_depth_artifact_row(artifact: dict[str, Any]) -> list[Any]:
     metrics = artifact.get("metrics")
     metrics = metrics if isinstance(metrics, dict) else {}
@@ -999,6 +1065,61 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         )
         if visual_review
         else ["_No visual-review artifacts indexed._"]
+    )
+
+    depth_scorecard_artifacts = [
+        row
+        for row in grouped.get("visual_review", [])
+        if str(row.get("label") or "").startswith("visual_review:pick_place_depth_distance_scorecard")
+    ]
+    depth_scorecard = depth_distance_scorecard_signal(index, suite)
+    lines.extend(["", "### Pick/Place Depth-Distance Scorecard"])
+    lines.append(
+        "This is the first-pass scorecard for depth/distance judgment. It combines SimCamera "
+        "ground truth, the metadata-derived rendered-corner PnP baseline, residual severity, "
+        "and the explicit `not_real_camera_depth` gap before the detailed tables below."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Frames",
+                "Review Status",
+                "At A Glance",
+                "Baseline Quality",
+                "Worst Mean Abs Depth Error mm",
+                "Mean PnP Reproj px",
+                "Mean Metadata-Corner px",
+                "Not Comparable Rows",
+                "Real Depth",
+                "Status",
+            ],
+            [depth_distance_scorecard_artifact_row(row) for row in depth_scorecard_artifacts],
+        )
+        if depth_scorecard_artifacts
+        else ["_No pick/place depth-distance scorecard artifacts indexed._"]
+    )
+    scorecard_stage_rows = depth_distance_scorecard_stage_rows(depth_scorecard)
+    lines.extend(
+        table(
+            [
+                "Stage",
+                "GT Cam-Piece mm",
+                "Est Cam-Piece mm",
+                "Abs Piece Error mm",
+                "GT Cam-Board mm",
+                "Est Cam-Board mm",
+                "Abs Board Error mm",
+                "PnP Reproj px",
+                "PnP vs GT",
+                "Status",
+            ],
+            scorecard_stage_rows,
+        )
+        if scorecard_stage_rows
+        else ["_No per-stage depth-distance scorecard rows were available._"]
     )
 
     pick_place_depth_metrics = [
