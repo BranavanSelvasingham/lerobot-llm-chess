@@ -28,6 +28,7 @@ from lerobot.sim import (
     load_sim_camera_profile_overrides,
     make_sim_camera_config_from_profile,
     select_ranked_sim_camera_profile_overrides,
+    summarize_sim_camera_status,
 )
 from llm_toolkit import AppConfig, KinematicsTools
 
@@ -369,6 +370,16 @@ def main() -> int:
                 frame=frame,
                 robot_state=moved["after"],
             )
+            app_camera_status = summarize_sim_camera_status(
+                metadata,
+                metadata_contract=metadata_contract,
+                selected_calibration=selected_calibration,
+                sim_camera_profile=sim_camera_profile,
+            )
+            assert app_camera_status["ok"] is True, app_camera_status
+            assert app_camera_status["metadata_contract"]["status"] == "pass", app_camera_status
+            assert str(app_camera_status["readout"]).startswith("Sim calibration:"), app_camera_status
+            assert app_camera_status["target"]["square"] == metadata.get("piece_square"), app_camera_status
 
             frame_out = args.frame_out.expanduser().resolve()
             frame_out.parent.mkdir(parents=True, exist_ok=True)
@@ -385,6 +396,7 @@ def main() -> int:
         "ok": True,
         "camera_metadata_contract": metadata_contract,
         "camera_metadata": metadata,
+        "app_camera_status": app_camera_status,
         "frame": str(frame_out),
     }
     if args.metadata_out:
@@ -419,6 +431,7 @@ def main() -> int:
         "profile_overrides": camera_overrides,
         "frame": str(frame_out),
         "metadata": str(metadata_out) if metadata_out else None,
+        "app_camera_status": app_camera_status,
         "shape": [int(value) for value in frame.shape],
         "camera": {
             "width": int(camera_cfg.width),
@@ -429,6 +442,7 @@ def main() -> int:
             "piece_layout": str(camera_cfg.piece_layout),
             "gripper_visible": bool(camera_cfg.gripper_visible),
             "metadata_contract": metadata_contract,
+            "app_camera_status": app_camera_status,
             "metadata": metadata,
         },
     }
