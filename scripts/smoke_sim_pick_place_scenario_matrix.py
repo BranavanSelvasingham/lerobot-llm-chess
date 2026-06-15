@@ -231,6 +231,7 @@ def extract_selected_frames(artifacts: dict[str, str]) -> dict[str, str]:
         "source_closed_path",
         "target_hover_closed_path",
         "target_release_open_path",
+        "target_retreat_open_path",
     )
     return {key: artifacts[key] for key in wanted if key in artifacts}
 

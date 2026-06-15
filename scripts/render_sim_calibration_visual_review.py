@@ -17,6 +17,15 @@ SCHEMA = "lerobot.sim.calibration_visual_review.v1"
 DEFAULT_CONTACT_SHEET_CELL_WIDTH = 360
 DEFAULT_VIDEO_FPS = 1.0
 VIDEO_CODEC = "mp4v"
+PICK_PLACE_SEQUENCE_STAGES = (
+    ("source_open_path", "Ready/open", "open gripper with piece at source"),
+    ("source_hover_open_path", "Approach", "approach source square with gripper open"),
+    ("source_pinched_path", "Grasp/contact", "close gripper around the source piece"),
+    ("source_closed_path", "Lift", "closed-gripper pickup state before transfer"),
+    ("target_hover_closed_path", "Transfer", "move closed gripper toward target square"),
+    ("target_release_open_path", "Place/release", "open gripper with piece at target"),
+    ("target_retreat_open_path", "Retreat", "open gripper retreat after release"),
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -169,6 +178,212 @@ def ordered_path_rows(
         )
         rows.append({"id": item_id, "path": resolved, "path_value": value})
     return rows
+
+
+def load_pick_place_matrix_summary(
+    matrix: dict[str, Any],
+    *,
+    suite_summary_path: Path,
+    suite_output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    summary_path_value = matrix.get("summary_path")
+    if not isinstance(summary_path_value, str) or not summary_path_value:
+        return {}
+    summary_path = resolve_path(
+        summary_path_value,
+        suite_summary_path=suite_summary_path,
+        output_dir=suite_output_dir,
+        repo_root=repo_root,
+    )
+    if not summary_path.is_file():
+        return {}
+    return read_json_object(summary_path, label="pick/place scenario matrix summary")
+
+
+def selected_pick_place_scenario(matrix: dict[str, Any], matrix_summary: dict[str, Any]) -> dict[str, Any]:
+    scenarios = matrix_summary.get("scenarios")
+    scenario_rows = [row for row in scenarios if isinstance(row, dict)] if isinstance(scenarios, list) else []
+    for wanted_id in ("center_to_center", "near_gripper_lower_board"):
+        for scenario in scenario_rows:
+            if scenario.get("scenario_id") == wanted_id:
+                return scenario
+    if scenario_rows:
+        return scenario_rows[0]
+
+    selected = matrix.get("selected_frame_paths")
+    selected = selected if isinstance(selected, dict) else {}
+    for wanted_id in ("center_to_center", "near_gripper_lower_board"):
+        frame_paths = selected.get(wanted_id)
+        if isinstance(frame_paths, dict):
+            return {"scenario_id": wanted_id, "selected_frame_paths": frame_paths}
+    for scenario_id, frame_paths in sorted(selected.items()):
+        if isinstance(frame_paths, dict):
+            return {"scenario_id": str(scenario_id), "selected_frame_paths": frame_paths}
+    return {}
+
+
+def rows_by_capture_label(section: dict[str, Any], key: str) -> dict[str, dict[str, Any]]:
+    captures = section.get("captures") if isinstance(section, dict) else None
+    rows = captures if isinstance(captures, list) else []
+    indexed: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        label = row.get(key)
+        if isinstance(label, str) and label:
+            indexed[label] = row
+    return indexed
+
+
+def pick_place_sequence_rows(
+    matrix: dict[str, Any],
+    *,
+    suite_summary_path: Path,
+    suite_output_dir: Path,
+    repo_root: Path | None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    matrix_summary = load_pick_place_matrix_summary(
+        matrix,
+        suite_summary_path=suite_summary_path,
+        suite_output_dir=suite_output_dir,
+        repo_root=repo_root,
+    )
+    scenario = selected_pick_place_scenario(matrix, matrix_summary)
+    frame_paths = scenario.get("selected_frame_paths")
+    frame_paths = frame_paths if isinstance(frame_paths, dict) else {}
+    if not frame_paths:
+        raise ValueError("pick_place_scenario_matrix.selected_frame_paths is not populated.")
+
+    scenario_id = str(scenario.get("scenario_id") or "pick_place_sequence")
+    gripper_rows = rows_by_capture_label(
+        scenario.get("gripper_visibility") if isinstance(scenario.get("gripper_visibility"), dict) else {},
+        "label",
+    )
+    visibility_rows = rows_by_capture_label(
+        scenario.get("piece_visibility") if isinstance(scenario.get("piece_visibility"), dict) else {},
+        "label",
+    )
+
+    rows: list[dict[str, Any]] = []
+    for index, (path_key, stage, description) in enumerate(PICK_PLACE_SEQUENCE_STAGES, start=1):
+        path_value = frame_paths.get(path_key)
+        if not isinstance(path_value, str) or not path_value:
+            continue
+        capture_label = path_key.removesuffix("_path")
+        resolved = resolve_path(
+            path_value,
+            suite_summary_path=suite_summary_path,
+            output_dir=suite_output_dir,
+            repo_root=repo_root,
+        )
+        gripper = gripper_rows.get(capture_label, {})
+        visibility = visibility_rows.get(capture_label, {})
+        rows.append(
+            {
+                "id": f"{index:02d}_{capture_label}",
+                "path": resolved,
+                "path_value": path_value,
+                "capture_label": capture_label,
+                "stage": stage,
+                "description": description,
+                "scenario_id": scenario_id,
+                "source_square": scenario.get("source_square"),
+                "target_square": scenario.get("target_square"),
+                "gripper": gripper,
+                "piece_visibility": visibility,
+            }
+        )
+    if len(rows) < 6:
+        raise ValueError(f"Expected at least 6 pick/place sequence frames, found {len(rows)}.")
+
+    return rows, {
+        "scenario_id": scenario_id,
+        "source_square": scenario.get("source_square"),
+        "target_square": scenario.get("target_square"),
+        "matrix_summary_path": matrix_summary.get("summary_path") or matrix.get("summary_path"),
+        "source": "pick_place_scenario_matrix.selected_frame_paths",
+    }
+
+
+def short_text(value: Any, max_chars: int = 116) -> str:
+    text = "" if value is None else str(value)
+    if len(text) <= max_chars:
+        return text
+    return text[: max(0, max_chars - 3)] + "..."
+
+
+def annotate_pick_place_frame(image_bgr: np.ndarray, row: dict[str, Any]) -> np.ndarray:
+    header_height = 76
+    height, width = image_bgr.shape[:2]
+    out = np.zeros((height + header_height, width, 3), dtype=np.uint8)
+    out[:, :] = (18, 18, 18)
+    out[header_height:, :] = image_bgr
+
+    gripper = row.get("gripper")
+    gripper = gripper if isinstance(gripper, dict) else {}
+    visibility = row.get("piece_visibility")
+    visibility = visibility if isinstance(visibility, dict) else {}
+    title = f"{row.get('id')} | {row.get('stage')}: {row.get('description')}"
+    route = f"{row.get('scenario_id')} | {row.get('source_square')} -> {row.get('target_square')} | capture={row.get('capture_label')}"
+    metrics = (
+        f"gripper={gripper.get('tracked_gripper_percent')}% opening={gripper.get('current_gripper_opening_px')}px "
+        f"| visible={visibility.get('visible_fraction')} occlusion={visibility.get('occlusion_fraction')} "
+        f"| clearance={visibility.get('min_clearance_px')}"
+    )
+    cv2.putText(out, short_text(title), (10, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.56, (255, 255, 255), 1, cv2.LINE_AA)
+    cv2.putText(out, short_text(route), (10, 46), cv2.FONT_HERSHEY_SIMPLEX, 0.44, (205, 220, 255), 1, cv2.LINE_AA)
+    cv2.putText(out, short_text(metrics), (10, 67), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (205, 245, 205), 1, cv2.LINE_AA)
+    return out
+
+
+def render_pick_place_sequence_frames(
+    rows: list[dict[str, Any]],
+    *,
+    output_dir: Path,
+    suite_output_dir: Path,
+    sequence_metadata: dict[str, Any],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    frame_dir = output_dir / "pick_place_sequence_frames"
+    annotated_rows: list[dict[str, Any]] = []
+    frame_summaries: list[dict[str, Any]] = []
+    for row in rows:
+        source_path = Path(row["path"])
+        source = read_image(source_path)
+        annotated = annotate_pick_place_frame(source, row)
+        output_path = frame_dir / f"{row['id']}.png"
+        write_image(output_path, annotated)
+        annotated_row = {**row, "path": output_path, "source_path": source_path}
+        annotated_rows.append(annotated_row)
+        frame_summaries.append(
+            {
+                "id": row["id"],
+                "capture_label": row.get("capture_label"),
+                "stage": row.get("stage"),
+                "description": row.get("description"),
+                "path": str(output_path),
+                "relative_path": output_relative(output_path, suite_output_dir),
+                "source_path": str(source_path),
+                "source_relative_path": output_relative(source_path, suite_output_dir),
+                "output_dimensions": {
+                    "width_px": int(annotated.shape[1]),
+                    "height_px": int(annotated.shape[0]),
+                    "channels": int(annotated.shape[2]),
+                },
+                "gripper": row.get("gripper"),
+                "piece_visibility": row.get("piece_visibility"),
+            }
+        )
+    return (
+        {
+            "id": "pick_place_sequence",
+            "label": "Pick/Place Gripper-Camera Sequence",
+            **sequence_metadata,
+            "frame_count": len(frame_summaries),
+            "frames": frame_summaries,
+        },
+        annotated_rows,
+    )
 
 
 def make_contact_sheet(
@@ -410,6 +625,8 @@ def build_summary(
     pose_fixture = pose_fixture if isinstance(pose_fixture, dict) else {}
     pov = suite.get("gripper_camera_pov_review")
     pov = pov if isinstance(pov, dict) else {}
+    matrix = suite.get("pick_place_scenario_matrix")
+    matrix = matrix if isinstance(matrix, dict) else {}
     app_entrypoint = suite.get("app_entrypoint_metadata")
     app_entrypoint = app_entrypoint if isinstance(app_entrypoint, dict) else {}
 
@@ -481,6 +698,53 @@ def build_summary(
         )
         contact_sheets.append(sheet)
 
+    pick_place_source_rows, pick_place_metadata = pick_place_sequence_rows(
+        matrix,
+        suite_summary_path=suite_summary_path,
+        suite_output_dir=suite_output_dir,
+        repo_root=repo_root,
+    )
+    pick_place_sequence, pick_place_annotated_rows = render_pick_place_sequence_frames(
+        pick_place_source_rows,
+        output_dir=output_dir,
+        suite_output_dir=suite_output_dir,
+        sequence_metadata=pick_place_metadata,
+    )
+    for sheet_id, title, rows, output_name, source, collection in (
+        (
+            "pick_place_sequence_annotated",
+            "Pick/Place Sequence Annotated Contact Sheet",
+            pick_place_annotated_rows,
+            "pick_place_sequence_annotated_contact_sheet.png",
+            "visual_review.frame_sequences.pick_place_sequence.frames",
+            "annotated_frame_paths",
+        ),
+        (
+            "pick_place_sequence_raw",
+            "Pick/Place Sequence Raw Contact Sheet",
+            pick_place_source_rows,
+            "pick_place_sequence_raw_contact_sheet.png",
+            "pick_place_scenario_matrix.selected_frame_paths",
+            "selected_frame_paths",
+        ),
+    ):
+        sheet = make_contact_sheet(
+            rows,
+            title=title,
+            output_path=output_dir / output_name,
+            suite_output_dir=suite_output_dir,
+            cell_width=cell_width,
+        )
+        sheet.update(
+            {
+                "id": sheet_id,
+                "source": source,
+                "source_collection": collection,
+                "scenario_id": pick_place_metadata.get("scenario_id"),
+            }
+        )
+        contact_sheets.append(sheet)
+
     app_frame = copy_app_entrypoint_frame(
         app_entrypoint,
         output_path=output_dir / "app_entrypoint_frame.jpg",
@@ -491,6 +755,13 @@ def build_summary(
     recording = render_optional_video(
         gripper_annotated_rows,
         output_path=output_dir / "gripper_camera_pov_annotated_sequence.mp4",
+        fps=float(video_fps),
+        cell_width=int(cell_width),
+        try_video=bool(try_video),
+    )
+    pick_place_recording = render_optional_video(
+        pick_place_annotated_rows,
+        output_path=output_dir / "pick_place_sequence_annotated_sequence.mp4",
         fps=float(video_fps),
         cell_width=int(cell_width),
         try_video=bool(try_video),
@@ -514,11 +785,17 @@ def build_summary(
         },
         "contact_sheets": contact_sheets,
         "contact_sheet_paths": {str(sheet["id"]): str(sheet["path"]) for sheet in contact_sheets},
+        "frame_sequences": [pick_place_sequence],
         "app_entrypoint_frame": app_frame,
         "recording": recording,
+        "recordings": {
+            "gripper_camera_pov": recording,
+            "pick_place_sequence": pick_place_recording,
+        },
         "notes": [
             "Contact sheets are the stable review artifact and are generated from existing smoke frames.",
-            "The optional MP4 is best-effort only and is not required for the suite to pass.",
+            "The pick/place sequence is rendered from the existing simulator scenario matrix and shows approach, grasp/contact, lift/transfer, place/release, and retreat frames.",
+            "Optional MP4 recordings are best-effort only and are not required for the suite to pass.",
             "No simulator pixels, camera profiles, perception algorithms, UI behavior, or robot paths are changed by this helper.",
         ],
     }
@@ -535,6 +812,7 @@ def failure_summary(output_dir: Path, suite_summary_path: Path, error: str) -> d
         "error": error,
         "contact_sheets": [],
         "contact_sheet_paths": {},
+        "frame_sequences": [],
         "app_entrypoint_frame": None,
         "recording": {
             "attempted": False,
@@ -542,6 +820,7 @@ def failure_summary(output_dir: Path, suite_summary_path: Path, error: str) -> d
             "path": None,
             "skipped_reason": "visual review failed before optional video handling",
         },
+        "recordings": {},
     }
 
 

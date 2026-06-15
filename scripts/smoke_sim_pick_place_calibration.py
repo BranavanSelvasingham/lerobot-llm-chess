@@ -45,6 +45,13 @@ TARGET_HOVER_JOINTS = {
     "wrist_flex": -20.0,
     "wrist_roll": -6.0,
 }
+TARGET_RETREAT_JOINTS = {
+    "shoulder_pan": 0.0,
+    "shoulder_lift": -28.0,
+    "elbow_flex": 30.0,
+    "wrist_flex": -28.0,
+    "wrist_roll": 0.0,
+}
 PIECE_VISIBILITY_SCHEMA = "lerobot.sim.pick_place_piece_visibility.v1"
 PIECE_RADIUS_SCALE = 0.30
 
@@ -539,17 +546,37 @@ def main() -> int:
         )
         captures.append(release_capture)
 
+        retreat_move = run_tool(
+            tools,
+            "move_joints",
+            {**TARGET_RETREAT_JOINTS, "max_step_deg": 30.0},
+        )
+        tool_results.append({"tool": "move_joints_target_retreat", "result": retreat_move})
+        assert_joint_near(retreat_move, "shoulder_pan", TARGET_RETREAT_JOINTS["shoulder_pan"])
+        assert_joint_near(retreat_move, "wrist_roll", TARGET_RETREAT_JOINTS["wrist_roll"])
+        retreat_frame, retreat_capture = save_capture(
+            tools=tools,
+            camera=camera,
+            frame_dir=frame_dir,
+            index=7,
+            label="target_retreat_open",
+        )
+        captures.append(retreat_capture)
+
         open_meta = open_capture["metadata"]
         pinch_meta = pinch_capture["metadata"]
         closed_meta = closed_capture["metadata"]
         release_meta = release_capture["metadata"]
+        retreat_meta = retreat_capture["metadata"]
         for capture in (open_capture, source_hover_capture, pinch_capture, closed_capture):
             assert_capture_square(capture, source_square)
         assert_capture_square(release_capture, target_square)
+        assert_capture_square(retreat_capture, target_square)
 
         assert open_meta["tracked_gripper_percent"] == 95.0, open_meta
         assert closed_meta["tracked_gripper_percent"] == 0.0, closed_meta
         assert release_meta["tracked_gripper_percent"] == 95.0, release_meta
+        assert retreat_meta["tracked_gripper_percent"] == 95.0, retreat_meta
         assert open_meta["current_gripper_opening_px"] > pinch_meta["current_gripper_opening_px"], (
             open_meta,
             pinch_meta,
@@ -562,10 +589,15 @@ def main() -> int:
             release_meta,
             closed_meta,
         )
+        assert retreat_meta["current_gripper_opening_px"] > closed_meta["current_gripper_opening_px"], (
+            retreat_meta,
+            closed_meta,
+        )
 
         pinch_delta = gripper_frame_delta(open_frame, pinch_frame)
         close_delta = gripper_frame_delta(pinch_frame, closed_frame)
         release_delta = gripper_frame_delta(closed_frame, release_frame)
+        retreat_delta = gripper_frame_delta(release_frame, retreat_frame)
         min_changed_pixels = int(camera_cfg.width * camera_cfg.height * 0.005)
         assert pinch_delta["changed_pixels"] > min_changed_pixels, pinch_delta
         assert close_delta["changed_pixels"] > min_changed_pixels, close_delta
@@ -596,6 +628,8 @@ def main() -> int:
                 "source_square": source_square,
                 "release_capture_label": release_capture["label"],
                 "release_square": release_meta["piece_square"],
+                "retreat_capture_label": retreat_capture["label"],
+                "retreat_square": retreat_meta["piece_square"],
             },
             "frame_dir": str(frame_dir),
             "captures": captures,
@@ -605,11 +639,13 @@ def main() -> int:
                 "open_to_pinched": pinch_delta,
                 "pinched_to_closed": close_delta,
                 "closed_to_released": release_delta,
+                "released_to_retreat": retreat_delta,
             },
             "sim_status": sim_status,
             "notes": [
                 "Joint-state simulation does not model chess-piece contact; close_gripper should reach its target without reporting a gripped object.",
-                "Synthetic frames currently visualize board, piece, and gripper opening, while joint-space pick/place movement is asserted through tool readbacks and metadata.",
+                "Synthetic frames visualize approach, grasp/contact, lift/transfer, place/release, and retreat from the gripper-camera perspective.",
+                "Joint-space pick/place movement is asserted through tool readbacks and metadata.",
                 "piece_visibility is a synthetic geometry signal from capture metadata; it is evidence-only and not a real-camera segmentation score.",
             ],
         }

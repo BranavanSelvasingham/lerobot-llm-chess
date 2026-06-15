@@ -28,7 +28,7 @@ CATEGORY_ORDER = {
 CATEGORY_LABELS = {
     "real_reference_media": "Real Reference Media",
     "reference_capture_checklist": "Reference Capture Checklist",
-    "visual_review": "Visual Review Contact Sheets",
+    "visual_review": "Visual Review Artifacts",
     "real_reference_comparison": "Real Reference Comparisons",
     "ranked_candidate": "Ranked Candidate Captures",
     "perception_fixture": "Perception Fixture Evidence",
@@ -692,7 +692,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         for row in grouped.get("visual_review", [])
         if row.get("label") != "visual_review:summary"
     ]
-    lines.extend(["", "### Visual Review Contact Sheets"])
+    lines.extend(["", "### Visual Review Artifacts"])
     lines.extend(
         linked_table(
             [
@@ -710,6 +710,31 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         )
         if visual_review
         else ["_No visual-review artifacts indexed._"]
+    )
+
+    pick_place_sequence = [
+        row
+        for row in grouped.get("visual_review", [])
+        if str(row.get("label") or "").startswith("visual_review:pick_place_sequence")
+    ]
+    lines.extend(["", "### Pick/Place Visual Sequence"])
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Source Frames",
+                "Frame Labels",
+                "Dimensions",
+                "Codec",
+                "Duration Seconds",
+                "Status",
+            ],
+            [visual_review_row(row) for row in pick_place_sequence],
+        )
+        if pick_place_sequence
+        else ["_No pick/place visual sequence artifacts indexed._"]
     )
 
     comparison_images = [
@@ -869,6 +894,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "",
             "- This report is a deterministic Markdown view of existing JSON artifacts only.",
             "- Visual review contact sheets are generated PNGs from existing suite frames and are the stable first-pass visual evidence.",
+            "- The pick/place visual sequence is simulator-only evidence for approach, grasp/contact, lift/transfer, place/release, and retreat review.",
             "- SimCamera pose fixture intrinsics/extrinsics are simulator reference metadata, not physical calibration truth.",
             "- Gripper-camera POV visibility and clearance values are synthetic metadata evidence, not real-camera segmentation or physical contact proof.",
             "- It does not rerun child smokes, open GUI calibration flows, call OpenAI, or touch SO-101 hardware.",
