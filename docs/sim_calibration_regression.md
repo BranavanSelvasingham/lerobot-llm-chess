@@ -6,7 +6,7 @@ Run this hardware-free gate before changing simulator rendering, camera profiles
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_calibration_regression_suite.py --output-dir /private/tmp/lerobot_sim/calibration_regression_suite --python /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 --include-negative-check
 ```
 
-The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json` has `"ok": true` and `"status": "ok"`. It also writes a root `/private/tmp/lerobot_sim/calibration_regression_suite/README.md`, `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index_report.md`, and `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index.json`. For quick review, open `artifact_index_report.md` first; it is a deterministic Markdown view of the compact artifact index and links the highest-signal generated evidence, including the reference capture checklist, visual-review contact sheets, the gripper-camera POV review, the pose fixture, and the app-entrypoint frame. For image-first inspection, open `visual_review/gripper_camera_pov_annotated_contact_sheet.png` and `visual_review/sim_camera_pose_fixture_annotated_contact_sheet.png`. The root `README.md` repeats that entrypoint, the core JSON summaries, the hardware/gui/OpenAI skipped markers, and the current real-media gap.
+The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json` has `"ok": true` and `"status": "ok"`. It also writes a root `/private/tmp/lerobot_sim/calibration_regression_suite/README.md`, `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index_report.md`, and `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index.json`. For quick review, open `artifact_index_report.md` first; it is a deterministic Markdown view of the compact artifact index and links the highest-signal generated evidence, including the reference capture checklist, visual-review contact sheets, the gripper-camera POV review, the pose fixture, the pick/place gripper-camera sequence, the pick/place depth/distance JSON/CSV, and the app-entrypoint frame. For image-first inspection, open `visual_review/pick_place_sequence_distance_annotated_contact_sheet.png`, `visual_review/gripper_camera_pov_annotated_contact_sheet.png`, and `visual_review/sim_camera_pose_fixture_annotated_contact_sheet.png`; for metric review, inspect `visual_review/pick_place_depth_distance_metrics.json` or `.csv`. The root `README.md` repeats that entrypoint, the core JSON summaries, the hardware/gui/OpenAI skipped markers, and the current real-media gap.
 
 To exercise the same suite with declared reference-media metadata, pass an optional manifest:
 
@@ -38,7 +38,7 @@ See [docs/sim_reference_media_intake.md](sim_reference_media_intake.md) for the 
 
 The focused `Simulator Calibration Regression` workflow runs the same hardware-free suite for pull requests targeting `feat/telemetry-recording` when simulator, camera, chess perception, smoke-script, report-renderer, reference-image, or gate documentation paths change. It uses Python 3.12, installs only the Python modules needed by this suite, verifies the generated summary fields, writes a job summary naming the uploaded artifact, and uploads the suite output directory as a workflow artifact. After downloading the artifact, open `artifact_index_report.md` first, then follow its links to images, JSON summaries, and child logs.
 
-The workflow also treats `sim_camera_pose_fixture`, `gripper_camera_pov_review`, `visual_review`, `app_entrypoint_metadata`, `pick_place_scenario_matrix.piece_visibility`, and `artifact_index.json` as part of the artifact contract. The pose fixture must report deterministic nominal and perturbed case IDs, raw frames, annotated frames, per-case metadata JSON, projected board corners, and target/piece centers. The gripper-camera POV review must report a small open/approach/grasp/release state sequence with raw frames, annotated frames, per-state metadata JSON, target square center and projected square polygon, gripper opening/state, SimCamera metadata contract checks, and piece visibility/occlusion/clearance rows. The visual review must report stable PNG contact sheets for gripper POV and pose fixture frames, plus a copied app-entrypoint frame for convenient bundle browsing. The app-entrypoint smoke must report a synthetic frame, a metadata sidecar when requested, skipped hardware/gui/OpenAI markers, passing app-facing metadata contract checks, and the same compact `app_camera_status` readout shown by `chess_robot_ui_llm_v2.py --sim`. All four pick/place scenarios must report available visibility evidence, each target release frame path must exist, and each `target_release_open` row must include visible fraction, occlusion fraction, and gripper-clearance fields. The generated artifact index must exist, report `status: "ok"`, have a nonzero artifact count, have no missing artifacts, and include populated categories for visual-review contact sheets, real-reference comparisons, ranked candidates, perception fixture evidence, SimCamera pose fixture evidence, gripper-camera POV evidence, app-entrypoint evidence, pick/place scenario release frames, the negative check, and child logs. These are structural availability checks rather than exact metric-value thresholds.
+The workflow also treats `sim_camera_pose_fixture`, `gripper_camera_pov_review`, `visual_review`, `app_entrypoint_metadata`, `pick_place_scenario_matrix.piece_visibility`, and `artifact_index.json` as part of the artifact contract. The pose fixture must report deterministic nominal and perturbed case IDs, raw frames, annotated frames, per-case metadata JSON, projected board corners, and target/piece centers. The gripper-camera POV review must report a small open/approach/grasp/release state sequence with raw frames, annotated frames, per-state metadata JSON, target square center and projected square polygon, gripper opening/state, SimCamera metadata contract checks, and piece visibility/occlusion/clearance rows. The visual review must report stable PNG contact sheets for gripper POV, pose fixture, and pick/place sequence frames, plus distance-annotated pick/place sequence frames, pick/place depth/distance JSON/CSV metrics, and a copied app-entrypoint frame for convenient bundle browsing. The depth/distance metrics must label simulator ground truth separately from perceived depth, include camera-to-board/piece distances, target/piece world coordinates, projected pixel coordinates, projection residuals, and a clearly sourced gripper-to-piece proxy when true end-effector depth is unavailable. The app-entrypoint smoke must report a synthetic frame, a metadata sidecar when requested, skipped hardware/gui/OpenAI markers, passing app-facing metadata contract checks, and the same compact `app_camera_status` readout shown by `chess_robot_ui_llm_v2.py --sim`. All four pick/place scenarios must report available visibility evidence, each target release frame path must exist, and each `target_release_open` row must include visible fraction, occlusion fraction, and gripper-clearance fields. The generated artifact index must exist, report `status: "ok"`, have a nonzero artifact count, have no missing artifacts, and include populated categories for visual-review contact sheets, sequence frames, and depth/distance metrics, real-reference comparisons, ranked candidates, perception fixture evidence, SimCamera pose fixture evidence, gripper-camera POV evidence, app-entrypoint evidence, pick/place scenario release frames, the negative check, and child logs. These are structural availability checks rather than exact metric-value thresholds.
 
 This CI signal is still a simulator/perception regression gate only. It does not connect to SO-101 hardware, open GUI calibration flows, or replace later physical robot validation.
 
@@ -54,9 +54,11 @@ The suite orchestrates these existing smoke scripts as subprocesses and records 
 - `smoke_sim_gripper_camera_pov_review.py` renders deterministic gripper-camera POV frames for open, approach, grasp-window, closed, and release-style gripper states using existing SimCamera/KinematicsTools metadata and piece-visibility geometry.
 - `smoke_sim_pick_place_scenario_matrix.py` runs center, edge-file, back-rank, and near-gripper pick/place scenarios.
 - `smoke_sim_app_entrypoints.py` verifies simulator app/tool entrypoints and the app-facing SimCamera metadata contract.
-- `render_sim_calibration_visual_review.py` composes durable contact-sheet PNGs from those generated frames without changing simulator rendering.
+- `render_sim_calibration_visual_review.py` composes durable contact-sheet PNGs, distance-annotated pick/place sequence frames, and pick/place depth/distance JSON/CSV metrics from those generated frames without changing simulator rendering.
 - `smoke_sim_reference_capture_checklist.py` turns the current real-media gap into JSON/Markdown capture requirements without opening cameras or making real media mandatory.
 - With `--include-negative-check`, an empty-inventory comparison-set run must fail clearly while the aggregate suite still passes.
+
+The calibration session report passes when at least one rankable candidate has every child smoke passing; lower-ranked candidate failures remain visible as comparative calibration evidence instead of blocking the suite.
 
 A passing summary should show:
 
@@ -70,7 +72,7 @@ A passing summary should show:
 - `perception_fixture.status: "ok"` and fixture artifact paths populated
 - `sim_camera_pose_fixture.status: "ok"` with deterministic nominal and perturbed case IDs, frame paths, annotated-frame paths, and metadata paths populated
 - `gripper_camera_pov_review.status: "ok"` with open/approach/grasp/release state IDs, frame paths, annotated-frame paths, metadata paths, metadata contract checks, target center geometry, gripper state, and piece visibility rows populated
-- `visual_review.status: "ok"` with gripper POV and pose fixture contact-sheet PNG paths populated, and `recording.skipped_reason` populated when no optional video was requested or produced
+- `visual_review.status: "ok"` with gripper POV, pose fixture, and pick/place sequence contact-sheet PNG paths populated, distance-annotated pick/place sequence frames populated under `frame_sequences`, `distance_metrics.paths.json`/`.csv` populated with simulator-ground-truth depth/distance fields, and `recordings.*` populated with either a best-effort MP4 path or a skipped reason
 - `reference_capture_checklist.status: "action_required"` while only `archive/chess_test_images/current_view.jpg` is represented, with missing video, calibration-target, failure-mode, and post-pick capture requirements listed
 - `app_entrypoint_metadata.status: "ok"` with `ok: true`, `frame_path`, `metadata_path`, skipped hardware/gui/OpenAI markers, passing metadata contract checks, and `app_camera_status.ok: true`
 - `pick_place_scenario_matrix.aggregate_status.ok: true` with four scenario IDs and release-frame paths populated
@@ -89,7 +91,7 @@ The `piece_visibility` signal is a simulator-only geometry metric. Each pick/pla
 
 These values are evidence-only in this first pass. The suite reports them but does not fail on a visibility threshold until local and GitHub Actions runs prove the measured values are stable. They do not model physical chess-piece contact or real-camera segmentation.
 
-The `gripper_camera_pov_review` signal packages the same kind of synthetic metadata evidence for one camera-first review sequence. Each state writes a raw frame, an annotated frame, and `metadata.json` with the camera metadata contract, projected target square polygon, target/piece center, gripper opening, visible fraction, occlusion fraction, and minimum gripper clearance. It is meant to make pre-hardware pickup calibration review practical, not to claim physical contact or real-camera segmentation performance.
+The `gripper_camera_pov_review` signal packages the same kind of synthetic metadata evidence for one camera-first review sequence. Each state writes a raw frame, an annotated frame, and `metadata.json` with the camera metadata contract, projected target square polygon, target/piece center, gripper opening, visible fraction, occlusion fraction, and minimum gripper clearance. The visual review also turns the center-board pick/place matrix child into a gripper-camera sequence showing approach, grasp/contact, lift/transfer, place/release, and retreat. These artifacts are meant to make pre-hardware pickup calibration review practical, not to claim physical contact or real-camera segmentation performance.
 
 ## Outputs
 
@@ -125,6 +127,12 @@ Common artifact paths under the output directory:
 - `visual_review/gripper_camera_pov_raw_contact_sheet.png`
 - `visual_review/sim_camera_pose_fixture_annotated_contact_sheet.png`
 - `visual_review/sim_camera_pose_fixture_raw_contact_sheet.png`
+- `visual_review/pick_place_sequence_distance_annotated_contact_sheet.png`
+- `visual_review/pick_place_sequence_raw_contact_sheet.png`
+- `visual_review/pick_place_sequence_frames/*.png`
+- `visual_review/pick_place_depth_distance_metrics.json`
+- `visual_review/pick_place_depth_distance_metrics.csv`
+- `visual_review/pick_place_sequence_distance_annotated_sequence.mp4` when OpenCV MP4 writing is available
 - `visual_review/app_entrypoint_frame.jpg`
 - `reference_capture_checklist/reference_capture_checklist.json`
 - `reference_capture_checklist/reference_capture_checklist.md`
@@ -163,9 +171,9 @@ The visual review can be regenerated from an existing suite summary without reru
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/render_sim_calibration_visual_review.py /private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json --output-dir /private/tmp/lerobot_sim/calibration_regression_suite/visual_review
 ```
 
-By default, the visual review writes deterministic PNG contact sheets and records why no video was produced. A best-effort MP4 can be tried with `--try-video`, but it is not required for CI or review because codec availability varies by OpenCV build.
+By default, the standalone visual-review command writes deterministic PNG contact sheets, distance-annotated pick/place sequence frames, and `pick_place_depth_distance_metrics.json`/`.csv`, then records why no video was produced. The metric files use millimeters for the reviewer-facing fields and label camera-to-board/piece distances as simulator ground truth. The current gripper-to-piece value is a board-plane proxy from the rendered gripper overlay, and `perceived_depth_status` remains `not_implemented` until real camera/depth estimates are compared. A best-effort MP4 can be tried with `--try-video`, and the full regression suite now passes that flag so local/CI bundles include a recording when the OpenCV build supports MP4 writing. PNG contact sheets, frame sequences, and metric JSON/CSV remain the required review artifacts because codec availability varies.
 
-The report includes the category summary table, artifact and missing counts, hardware/gui/OpenAI skipped markers, the current real-media visibility gap, the reference capture checklist, visual-review contact sheets, real-reference comparison images, ranked candidate captures, perception fixture evidence, SimCamera pose fixture metadata, app-entrypoint metadata evidence, all pick/place release frames, negative-check status, and child stdout/stderr links.
+The report includes the category summary table, artifact and missing counts, hardware/gui/OpenAI skipped markers, the current real-media visibility gap, the reference capture checklist, visual-review contact sheets, pick/place sequence frames, pick/place depth/distance metric JSON/CSV, real-reference comparison images, ranked candidate captures, perception fixture evidence, SimCamera pose fixture metadata, app-entrypoint metadata evidence, all pick/place release frames, negative-check status, and child stdout/stderr links.
 
 ## Skipped Paths
 
@@ -218,7 +226,15 @@ print({
     "visual_review": {
         "status": summary["visual_review"]["status"],
         "contact_sheet_paths": summary["visual_review"]["contact_sheet_paths"],
-        "recording": summary["visual_review"]["recording"],
+        "frame_sequences": [
+            {key: seq[key] for key in ("id", "scenario_id", "frame_count")}
+            for seq in summary["visual_review"]["frame_sequences"]
+        ],
+        "distance_metrics": {
+            key: summary["visual_review"]["distance_metrics"].get(key)
+            for key in ("status", "frame_count", "paths", "perceived_depth_status")
+        },
+        "recordings": summary["visual_review"]["recordings"],
     },
     "app_entrypoint_metadata": {
         "ok": summary["app_entrypoint_metadata"]["ok"],

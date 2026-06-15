@@ -96,9 +96,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "",
         f"Open `{ARTIFACT_REPORT_NAME}` first. It is the review report for this artifact bundle.",
         "For image-first inspection, open `visual_review/gripper_camera_pov_annotated_contact_sheet.png` "
-        "and `visual_review/sim_camera_pose_fixture_annotated_contact_sheet.png`.",
+        "and `visual_review/pick_place_sequence_distance_annotated_contact_sheet.png`.",
         "",
-        "Core JSON summaries:",
+        "Core summaries and metric tables:",
         "",
         "- `calibration_regression_summary.json`",
         "- `artifact_index.json`",
@@ -112,6 +112,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `app_entrypoint/smoke_sim_app_entrypoints_summary.json`",
         "- `app_entrypoint/smoke_sim_app_metadata.json`",
         "- `visual_review/visual_review_summary.json`",
+        "- `visual_review/pick_place_depth_distance_metrics.json`",
+        "- `visual_review/pick_place_depth_distance_metrics.csv`",
         "- `reference_capture_checklist/reference_capture_checklist.json`",
         "- `reference_capture_checklist/reference_capture_checklist.md`",
         "- `negative_empty_inventory/comparison_set_summary.json`",
@@ -158,6 +160,16 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         (
             "- Visual review contact sheets are stable PNG evidence generated from existing "
             "suite frames under `visual_review/`."
+        ),
+        (
+            "- Pick/place sequence evidence shows approach, grasp/contact, lift/transfer, "
+            "place/release, and retreat using simulator gripper-camera frames."
+        ),
+        (
+            "- Pick/place depth/distance evidence records simulator-ground-truth camera-to-board, "
+            "camera-to-piece, target world/pixel coordinates, projection residuals, and a "
+            "labeled gripper-to-piece board-plane proxy; perceived depth is explicitly marked "
+            "`not_implemented`."
         ),
         (
             f"- Optional visual review recording produced: `{markdown_bool(recording.get('produced'))}`; "
@@ -661,6 +673,12 @@ def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Pa
     contact_sheets = contact_sheets if isinstance(contact_sheets, list) else []
     contact_sheet_paths = visual_review.get("contact_sheet_paths")
     contact_sheet_paths = contact_sheet_paths if isinstance(contact_sheet_paths, dict) else {}
+    frame_sequences = visual_review.get("frame_sequences")
+    frame_sequences = frame_sequences if isinstance(frame_sequences, list) else []
+    distance_metrics = visual_review.get("distance_metrics")
+    distance_metrics = distance_metrics if isinstance(distance_metrics, dict) else {}
+    recordings = visual_review.get("recordings")
+    recordings = recordings if isinstance(recordings, dict) else {}
     return {
         "summary_path": str(summary_path),
         "output_dir": str(summary_path.parent),
@@ -673,8 +691,11 @@ def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Pa
             if isinstance(value, str)
         },
         "contact_sheets": contact_sheets,
+        "frame_sequences": frame_sequences,
+        "distance_metrics": distance_metrics,
         "app_entrypoint_frame": visual_review.get("app_entrypoint_frame"),
         "recording": visual_review.get("recording"),
+        "recordings": recordings,
         "hardware_skipped": visual_review.get("hardware_skipped"),
         "gui_skipped": visual_review.get("gui_skipped"),
         "openai_skipped": visual_review.get("openai_skipped"),
@@ -1071,6 +1092,7 @@ def main() -> int:
             str(summary_path),
             "--output-dir",
             str(visual_review_dir),
+            "--try-video",
         ],
         output_dir=visual_review_dir,
         expected_json_path=visual_review_summary_path,

@@ -68,6 +68,8 @@ def path_kind(path: Path) -> str:
         return "video"
     if path.suffix.lower() == ".json":
         return "json"
+    if path.suffix.lower() == ".csv":
+        return "csv"
     if path.suffix.lower() in {".txt", ".log"}:
         return "log"
     if path.is_dir():
@@ -418,6 +420,49 @@ def collect_visual_review_artifacts(
         },
     )
 
+    distance_metrics = visual_review.get("distance_metrics")
+    distance_metrics = distance_metrics if isinstance(distance_metrics, dict) else {}
+    metric_paths = distance_metrics.get("paths")
+    metric_paths = metric_paths if isinstance(metric_paths, dict) else {}
+    metric_rows = distance_metrics.get("rows")
+    metric_rows = metric_rows if isinstance(metric_rows, list) else []
+    first_metric = next((row for row in metric_rows if isinstance(row, dict)), {})
+    first_fields = first_metric.get("distance_depth_fields") if isinstance(first_metric, dict) else {}
+    first_fields = first_fields if isinstance(first_fields, dict) else {}
+    metric_artifact_summary = {
+        "status": distance_metrics.get("status"),
+        "ok": distance_metrics.get("ok"),
+        "frame_count": distance_metrics.get("frame_count"),
+        "units": distance_metrics.get("units"),
+        "metric_sources": distance_metrics.get("metric_sources"),
+        "ground_truth_scope": distance_metrics.get("ground_truth_scope"),
+        "perceived_depth_status": distance_metrics.get("perceived_depth_status"),
+        "true_depth_estimation": distance_metrics.get("true_depth_estimation"),
+        "example_camera_to_piece_distance_mm": first_fields.get("camera_to_piece_distance_mm"),
+        "example_camera_to_board_plane_distance_mm": first_fields.get(
+            "camera_to_board_plane_distance_mm"
+        ),
+        "example_gripper_to_piece_distance_mm": first_fields.get("gripper_to_piece_distance_mm"),
+        "gripper_to_piece_distance_source": first_fields.get("gripper_to_piece_distance_source"),
+    }
+    for key, label_suffix in (("json", "json"), ("csv", "csv")):
+        add_path(
+            artifacts,
+            category="visual_review",
+            label=f"visual_review:pick_place_depth_distance_metrics:{label_suffix}",
+            value=metric_paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"visual_review.distance_metrics.paths.{key}",
+            metrics=metric_artifact_summary,
+            scenario_id=(
+                distance_metrics.get("scenario_id")
+                if isinstance(distance_metrics.get("scenario_id"), str)
+                else None
+            ),
+        )
+
     contact_sheets = visual_review.get("contact_sheets")
     contact_sheet_rows = contact_sheets if isinstance(contact_sheets, list) else []
     for sheet in contact_sheet_rows:
@@ -445,6 +490,44 @@ def collect_visual_review_artifacts(
             },
         )
 
+    frame_sequences = visual_review.get("frame_sequences")
+    sequence_rows = frame_sequences if isinstance(frame_sequences, list) else []
+    for sequence in sequence_rows:
+        if not isinstance(sequence, dict):
+            continue
+        sequence_id = str(sequence.get("id") or "frame_sequence")
+        frames = sequence.get("frames")
+        frame_rows = frames if isinstance(frames, list) else []
+        for frame in frame_rows:
+            if not isinstance(frame, dict):
+                continue
+            frame_id = str(frame.get("id") or "frame")
+            add_path(
+                artifacts,
+                category="visual_review",
+                label=f"visual_review:{sequence_id}:{frame_id}",
+                value=frame.get("path"),
+                suite_summary_path=suite_summary_path,
+                output_dir=output_dir,
+                repo_root=repo_root,
+                source="visual_review.frame_sequences.frames",
+                metrics={
+                    "label": sequence.get("label"),
+                    "sequence_id": sequence_id,
+                    "scenario_id": sequence.get("scenario_id"),
+                    "capture_label": frame.get("capture_label"),
+                    "stage": frame.get("stage"),
+                    "description": frame.get("description"),
+                    "source_path": frame.get("source_path"),
+                    "source_relative_path": frame.get("source_relative_path"),
+                    "output_dimensions": frame.get("output_dimensions"),
+                    "gripper": frame.get("gripper"),
+                    "piece_visibility": frame.get("piece_visibility"),
+                    "distance_depth_fields": frame.get("distance_depth_fields"),
+                },
+                scenario_id=sequence.get("scenario_id") if isinstance(sequence.get("scenario_id"), str) else None,
+            )
+
     app_frame = visual_review.get("app_entrypoint_frame")
     app_frame = app_frame if isinstance(app_frame, dict) else {}
     add_path(
@@ -463,18 +546,24 @@ def collect_visual_review_artifacts(
         },
     )
 
-    recording = visual_review.get("recording")
-    recording = recording if isinstance(recording, dict) else {}
-    if recording.get("produced") is True:
+    recordings = visual_review.get("recordings")
+    if isinstance(recordings, dict) and recordings:
+        recording_items = sorted(recordings.items())
+    else:
+        recording = visual_review.get("recording")
+        recording_items = [("gripper_camera_pov", recording)] if isinstance(recording, dict) else []
+    for recording_id, recording in recording_items:
+        if not isinstance(recording, dict) or recording.get("produced") is not True:
+            continue
         add_path(
             artifacts,
             category="visual_review",
-            label="visual_review:gripper_camera_pov_recording",
+            label=f"visual_review:{recording_id}_recording",
             value=recording.get("path"),
             suite_summary_path=suite_summary_path,
             output_dir=output_dir,
             repo_root=repo_root,
-            source="visual_review.recording.path",
+            source=f"visual_review.recordings.{recording_id}.path",
             metrics={
                 "codec": recording.get("codec"),
                 "fps": recording.get("fps"),
