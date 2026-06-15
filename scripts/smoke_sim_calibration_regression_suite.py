@@ -18,6 +18,7 @@ ARTIFACT_ENTRYPOINT_NAME = "README.md"
 ARTIFACT_REPORT_NAME = "artifact_index_report.md"
 VISUAL_REVIEW_SUMMARY_NAME = "visual_review_summary.json"
 REFERENCE_CAPTURE_CHECKLIST_NAME = "reference_capture_checklist.json"
+REAL_PROJECTION_INTAKE_NAME = "real_projection_intake.json"
 BASELINE_CORNERS = [[32, 338], [594, 340], [540, 20], [86, 12]]
 PERTURBED_CORNERS = [[34, 337], [592, 342], [538, 22], [88, 14]]
 
@@ -121,6 +122,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `visual_review/pick_place_metadata_native_depth_view.png`",
         "- `visual_review/pick_place_metadata_native_depth_view.json`",
         "- `visual_review/pick_place_metadata_native_depth_view.csv`",
+        "- `real_projection_intake/real_projection_intake.json`",
+        "- `real_projection_intake/real_projection_intake.csv`",
+        "- `real_projection_intake/real_projection_intake_contact_sheet.png`",
         "- `reference_capture_checklist/reference_capture_checklist.json`",
         "- `reference_capture_checklist/reference_capture_checklist.md`",
         "- `negative_empty_inventory/comparison_set_summary.json`",
@@ -193,6 +197,11 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             "points through SimCamera `camera_matrix_px` and `extrinsics.board_to_camera`, "
             "reports camera-frame z/depth/range in millimeters, and does not use rendered "
             "overlay corners as depth authority."
+        ),
+        (
+            "- Real projection intake links selected real reference media to the metadata-native "
+            "projection/depth view, writes JSON/CSV plus a contact-sheet PNG, and reports "
+            "`missing_real_calibration` until real intrinsics plus board pose/extrinsics are supplied."
         ),
         (
             f"- Optional visual review recording produced: `{markdown_bool(recording.get('produced'))}`; "
@@ -768,6 +777,35 @@ def reference_capture_checklist_section(checklist: dict[str, Any] | None, summar
     }
 
 
+def real_projection_intake_section(intake: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
+    intake = intake if isinstance(intake, dict) else {}
+    paths = intake.get("paths")
+    paths = paths if isinstance(paths, dict) else {}
+    return {
+        "summary_path": str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(intake.get("ok", False)),
+        "status": intake.get("status"),
+        "paths": paths,
+        "real_reference_media_count": intake.get("real_reference_media_count"),
+        "comparable_count": intake.get("comparable_count"),
+        "projection_comparable_count": intake.get("projection_comparable_count"),
+        "depth_comparable_count": intake.get("depth_comparable_count"),
+        "missing_input_count": intake.get("missing_input_count"),
+        "missing_inputs": intake.get("missing_inputs"),
+        "next_capture_requirements": intake.get("next_capture_requirements"),
+        "sim_metadata_native_depth_view_path": intake.get("sim_metadata_native_depth_view_path"),
+        "sim_metadata_native_depth_view_png_path": intake.get("sim_metadata_native_depth_view_png_path"),
+        "sim_metadata_native_depth_view_csv_path": intake.get("sim_metadata_native_depth_view_csv_path"),
+        "sim_expected_projected_point_count": intake.get("sim_expected_projected_point_count"),
+        "records": intake.get("records"),
+        "hardware_skipped": intake.get("hardware_skipped"),
+        "gui_skipped": intake.get("gui_skipped"),
+        "real_camera_capture_skipped": intake.get("real_camera_capture_skipped"),
+        "openai_skipped": intake.get("openai_skipped"),
+    }
+
+
 def run_negative_empty_inventory(
     *,
     args: argparse.Namespace,
@@ -1108,6 +1146,12 @@ def main() -> int:
             "represented_media_count": None,
             "missing_requirement_count": None,
         },
+        "real_projection_intake": {
+            "summary_path": str(output_dir / "real_projection_intake" / REAL_PROJECTION_INTAKE_NAME),
+            "status": None,
+            "real_reference_media_count": None,
+            "comparable_count": None,
+        },
         "artifact_index": {
             "path": str(artifact_index_path),
             "status": None,
@@ -1177,6 +1221,37 @@ def main() -> int:
     summary["reference_capture_checklist"] = reference_capture_checklist_section(
         checklist,
         checklist_summary_path,
+    )
+    write_json(summary_path, summary)
+
+    real_projection_intake_dir = output_dir / "real_projection_intake"
+    real_projection_intake_summary_path = real_projection_intake_dir / REAL_PROJECTION_INTAKE_NAME
+    real_projection_intake_record, real_projection_intake = run_child(
+        name="real_projection_intake",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_real_projection_intake.py"),
+            str(summary_path),
+            "--output-dir",
+            str(real_projection_intake_dir),
+        ],
+        output_dir=real_projection_intake_dir,
+        expected_json_path=real_projection_intake_summary_path,
+    )
+    child_records["real_projection_intake"] = real_projection_intake_record
+    required_ok = all(record["ok"] for record in child_records.values())
+    summary["ok"] = required_ok
+    summary["status"] = "ok" if required_ok else "validation_failed"
+    summary["aggregate_status"] = {
+        "ok": required_ok,
+        "failed_children": [
+            name for name, record in child_records.items() if not bool(record.get("ok"))
+        ],
+    }
+    summary["child_commands"] = child_records
+    summary["real_projection_intake"] = real_projection_intake_section(
+        real_projection_intake,
+        real_projection_intake_summary_path,
     )
     write_json(summary_path, summary)
 

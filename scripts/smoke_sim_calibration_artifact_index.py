@@ -14,14 +14,15 @@ CATEGORY_ORDER = {
     "reference_capture_checklist": 1,
     "visual_review": 2,
     "real_reference_comparison": 3,
-    "ranked_candidate": 4,
-    "perception_fixture": 5,
-    "sim_camera_pose_fixture": 6,
-    "gripper_camera_pov": 7,
-    "app_entrypoint": 8,
-    "pick_place_scenario": 9,
-    "negative_check": 10,
-    "logs": 11,
+    "real_projection_intake": 4,
+    "ranked_candidate": 5,
+    "perception_fixture": 6,
+    "sim_camera_pose_fixture": 7,
+    "gripper_camera_pov": 8,
+    "app_entrypoint": 9,
+    "pick_place_scenario": 10,
+    "negative_check": 11,
+    "logs": 12,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -298,6 +299,90 @@ def collect_comparison_artifacts(
                     source="comparison_set.artifacts.visual_artifact_paths",
                     reference_media=reference_media,
                 )
+
+
+def collect_real_projection_intake_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    intake = suite.get("real_projection_intake")
+    intake = intake if isinstance(intake, dict) else {}
+    paths = intake.get("paths")
+    paths = paths if isinstance(paths, dict) else {}
+    records = intake.get("records")
+    records = records if isinstance(records, list) else []
+    first_record = next((record for record in records if isinstance(record, dict)), {})
+    metrics = {
+        "status": intake.get("status"),
+        "ok": intake.get("ok"),
+        "real_reference_media_count": intake.get("real_reference_media_count"),
+        "comparable_count": intake.get("comparable_count"),
+        "projection_comparable_count": intake.get("projection_comparable_count"),
+        "depth_comparable_count": intake.get("depth_comparable_count"),
+        "missing_input_count": intake.get("missing_input_count"),
+        "missing_inputs": intake.get("missing_inputs"),
+        "sim_expected_projected_point_count": intake.get("sim_expected_projected_point_count"),
+        "sim_metadata_native_depth_view_path": intake.get("sim_metadata_native_depth_view_path"),
+        "example_real_reference_media_path": first_record.get("real_reference_media_path"),
+        "example_real_intrinsics_status": first_record.get("real_intrinsics_status"),
+        "example_real_board_pose_status": first_record.get("real_board_pose_status"),
+        "example_comparable": first_record.get("comparable"),
+        "real_camera_capture_skipped": intake.get("real_camera_capture_skipped"),
+    }
+    add_path(
+        artifacts,
+        category="real_projection_intake",
+        label="real_projection_intake:summary",
+        value=intake.get("summary_path") or paths.get("json"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="real_projection_intake.summary_path",
+        metrics=metrics,
+    )
+    add_path(
+        artifacts,
+        category="real_projection_intake",
+        label="real_projection_intake:csv",
+        value=paths.get("csv"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="real_projection_intake.paths.csv",
+        metrics=metrics,
+    )
+    add_path(
+        artifacts,
+        category="real_projection_intake",
+        label="real_projection_intake:contact_sheet",
+        value=paths.get("png"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="real_projection_intake.paths.png",
+        metrics=metrics,
+    )
+    return {
+        "status": intake.get("status"),
+        "ok": intake.get("ok"),
+        "summary_path": intake.get("summary_path") or paths.get("json"),
+        "csv_path": paths.get("csv"),
+        "contact_sheet_path": paths.get("png"),
+        "real_reference_media_count": intake.get("real_reference_media_count"),
+        "comparable_count": intake.get("comparable_count"),
+        "projection_comparable_count": intake.get("projection_comparable_count"),
+        "depth_comparable_count": intake.get("depth_comparable_count"),
+        "missing_inputs": intake.get("missing_inputs"),
+        "next_capture_requirements": intake.get("next_capture_requirements"),
+        "sim_metadata_native_depth_view_path": intake.get("sim_metadata_native_depth_view_path"),
+        "sim_expected_projected_point_count": intake.get("sim_expected_projected_point_count"),
+        "records": records,
+        "real_camera_capture_skipped": intake.get("real_camera_capture_skipped"),
+    }
 
 
 def collect_reference_capture_checklist_artifacts(
@@ -1301,6 +1386,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    real_projection_intake = collect_real_projection_intake_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
     collect_ranked_candidate_artifacts(
         suite=suite,
         artifacts=artifacts,
@@ -1399,6 +1491,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "reference_media_manifest": suite.get("reference_media_manifest"),
         "selected_real_reference_media": selected_media,
         "reference_capture_checklist": reference_capture_checklist,
+        "real_projection_intake": real_projection_intake,
         "visual_review": visual_review,
         "sim_camera_pose_fixture_metadata_contract": sim_camera_pose_metadata_contract,
         "gripper_camera_pov": gripper_camera_pov,
