@@ -79,6 +79,7 @@ from lerobot.sim import (
     SIM_CAMERA_CALIBRATION_PROFILES,
     SimCamera,
     SimCameraConfig,
+    load_sim_camera_profile_overrides,
     make_sim_camera_config_from_profile,
 )
 from llm_toolkit import AppConfig, KinematicsTools  # pyright: ignore[reportMissingImports]
@@ -1006,19 +1007,24 @@ class ChessRobotUILLMV2(QMainWindow):
     def _setup_camera(self) -> None:
         try:
             if self.cfg.sim:
+                camera_overrides = self.cfg.sim_camera_profile_overrides or {}
                 if self.cfg.sim_camera_profile:
-                    cfg = make_sim_camera_config_from_profile(str(self.cfg.sim_camera_profile))
-                else:
-                    cfg = SimCameraConfig(
-                        width=int(self.cfg.camera_width),
-                        height=int(self.cfg.camera_height),
-                        fps=int(self.cfg.camera_fps),
-                        color_mode=ColorMode.BGR,
-                        view="gripper",
+                    cfg = make_sim_camera_config_from_profile(
+                        str(self.cfg.sim_camera_profile), **camera_overrides
                     )
+                else:
+                    camera_values = {
+                        "width": int(self.cfg.camera_width),
+                        "height": int(self.cfg.camera_height),
+                        "fps": int(self.cfg.camera_fps),
+                        "color_mode": ColorMode.BGR,
+                        "view": "gripper",
+                    }
+                    cfg = SimCameraConfig(**{**camera_values, **camera_overrides})
                 self._camera = SimCamera(cfg)
                 profile_suffix = f" profile={self.cfg.sim_camera_profile}" if self.cfg.sim_camera_profile else ""
-                camera_label = f"Synthetic camera connected{profile_suffix}"
+                overrides_suffix = " profile_overrides=loaded" if camera_overrides else ""
+                camera_label = f"Synthetic camera connected{profile_suffix}{overrides_suffix}"
             else:
                 cfg = OpenCVCameraConfig(
                     index_or_path=int(self.cfg.camera_index),
@@ -1269,6 +1275,15 @@ def _parse_args() -> AppConfig:
         default=None,
         help="Named simulator camera calibration profile to use with --sim.",
     )
+    p.add_argument(
+        "--sim-camera-profile-overrides",
+        type=Path,
+        default=None,
+        help=(
+            "Simulator-only profile_candidate.json with sim_camera_profile_overrides. "
+            "Requires --sim and composes with --sim-camera-profile."
+        ),
+    )
     p.add_argument("--robot-id", default="so101_chess", help="Calibration id (default: so101_chess)")
     p.add_argument("--urdf", default=None, help="URDF path (or set SO101_URDF)")
     p.add_argument("--camera-index", type=int, default=0)
@@ -1283,6 +1298,15 @@ def _parse_args() -> AppConfig:
         p.error("--sim and --port are mutually exclusive")
     if a.sim_camera_profile and not a.sim:
         p.error("--sim-camera-profile requires --sim")
+    if a.sim_camera_profile_overrides and not a.sim:
+        p.error("--sim-camera-profile-overrides requires --sim")
+
+    sim_camera_profile_overrides = None
+    if a.sim_camera_profile_overrides:
+        try:
+            sim_camera_profile_overrides = load_sim_camera_profile_overrides(a.sim_camera_profile_overrides)
+        except ValueError as exc:
+            p.error(str(exc))
 
     return AppConfig(
         port=a.port,
@@ -1294,6 +1318,7 @@ def _parse_args() -> AppConfig:
         camera_height=int(a.camera_height),
         camera_fps=int(a.camera_fps),
         sim_camera_profile=str(a.sim_camera_profile) if a.sim_camera_profile else None,
+        sim_camera_profile_overrides=sim_camera_profile_overrides,
         model=str(a.model),
         api_key=str(a.api_key) if a.api_key else None,
     )
