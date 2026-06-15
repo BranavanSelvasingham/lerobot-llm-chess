@@ -313,6 +313,10 @@ def collect_real_projection_intake_artifacts(
     intake = intake if isinstance(intake, dict) else {}
     paths = intake.get("paths")
     paths = paths if isinstance(paths, dict) else {}
+    residual_artifacts = intake.get("residual_artifacts")
+    residual_artifacts = residual_artifacts if isinstance(residual_artifacts, dict) else {}
+    residual_aggregate = residual_artifacts.get("aggregate")
+    residual_aggregate = residual_aggregate if isinstance(residual_aggregate, dict) else {}
     records = intake.get("records")
     records = records if isinstance(records, list) else []
     first_record = next((record for record in records if isinstance(record, dict)), {})
@@ -334,6 +338,20 @@ def collect_real_projection_intake_artifacts(
         "example_real_intrinsics_status": first_record.get("real_intrinsics_status"),
         "example_real_board_pose_status": first_record.get("real_board_pose_status"),
         "example_comparable": first_record.get("comparable"),
+        "residual_status": residual_artifacts.get("status"),
+        "residual_available": residual_artifacts.get("available"),
+        "residual_projection_row_count": residual_aggregate.get("projection_row_count"),
+        "residual_board_corner_row_count": residual_aggregate.get("board_corner_row_count"),
+        "residual_depth_row_count": residual_aggregate.get("depth_row_count"),
+        "mean_real_vs_sim_projection_residual_px": residual_aggregate.get(
+            "mean_real_vs_sim_projection_residual_px"
+        ),
+        "mean_detected_corner_vs_sim_residual_px": residual_aggregate.get(
+            "mean_detected_corner_vs_sim_residual_px"
+        ),
+        "mean_abs_real_vs_sim_depth_residual_mm": residual_aggregate.get(
+            "mean_abs_real_vs_sim_depth_residual_mm"
+        ),
         "real_camera_capture_skipped": intake.get("real_camera_capture_skipped"),
     }
     add_path(
@@ -369,12 +387,48 @@ def collect_real_projection_intake_artifacts(
         source="real_projection_intake.paths.png",
         metrics=metrics,
     )
+    add_path(
+        artifacts,
+        category="real_projection_intake",
+        label="real_projection_intake:residual_json",
+        value=paths.get("residual_json"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="real_projection_intake.paths.residual_json",
+        metrics=metrics,
+    )
+    add_path(
+        artifacts,
+        category="real_projection_intake",
+        label="real_projection_intake:residual_csv",
+        value=paths.get("residual_csv"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="real_projection_intake.paths.residual_csv",
+        metrics=metrics,
+    )
+    add_path(
+        artifacts,
+        category="real_projection_intake",
+        label="real_projection_intake:residual_overlay",
+        value=paths.get("residual_png"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="real_projection_intake.paths.residual_png",
+        metrics=metrics,
+    )
     return {
         "status": intake.get("status"),
         "ok": intake.get("ok"),
         "summary_path": intake.get("summary_path") or paths.get("json"),
         "csv_path": paths.get("csv"),
         "contact_sheet_path": paths.get("png"),
+        "residual_json_path": paths.get("residual_json"),
+        "residual_csv_path": paths.get("residual_csv"),
+        "residual_overlay_path": paths.get("residual_png"),
         "real_reference_media_count": intake.get("real_reference_media_count"),
         "comparable_count": intake.get("comparable_count"),
         "projection_comparable_count": intake.get("projection_comparable_count"),
@@ -386,6 +440,7 @@ def collect_real_projection_intake_artifacts(
         "next_capture_requirements": intake.get("next_capture_requirements"),
         "sim_metadata_native_depth_view_path": intake.get("sim_metadata_native_depth_view_path"),
         "sim_expected_projected_point_count": intake.get("sim_expected_projected_point_count"),
+        "residual_artifacts": residual_artifacts,
         "records": records,
         "real_camera_capture_skipped": intake.get("real_camera_capture_skipped"),
     }

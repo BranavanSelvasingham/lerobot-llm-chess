@@ -20,6 +20,16 @@ SCHEMA = "lerobot.sim.real_projection_intake.v1"
 OUTPUT_JSON_NAME = "real_projection_intake.json"
 OUTPUT_CSV_NAME = "real_projection_intake.csv"
 OUTPUT_PNG_NAME = "real_projection_intake_contact_sheet.png"
+RESIDUAL_JSON_NAME = "real_projection_residuals.json"
+RESIDUAL_CSV_NAME = "real_projection_residuals.csv"
+RESIDUAL_PNG_NAME = "real_projection_residual_overlay_contact_sheet.png"
+BOARD_CORNER_LABELS = ("a1", "h1", "h8", "a8")
+SIM_BOARD_CORNER_LABELS = {
+    "a1": "board_corner_a1",
+    "h1": "board_corner_h1",
+    "h8": "board_corner_h8",
+    "a8": "board_corner_a8",
+}
 
 INTRINSICS_PATH_KEYS = (
     "real_intrinsics_path",
@@ -182,6 +192,7 @@ def expected_projected_points(metadata_native: dict[str, Any]) -> list[dict[str,
         "camera_z_depth_mm",
         "camera_range_mm",
         "board_plane_distance_mm",
+        "board_frame_xyz_mm",
         "source_model",
         "status",
     )
@@ -404,6 +415,452 @@ def image_read_status(path: Path | None) -> tuple[bool, dict[str, Any]]:
     }
 
 
+def finite_float(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(number):
+        return None
+    return number
+
+
+def vector_from_mm(value: Any, *, length: int) -> np.ndarray | None:
+    if not isinstance(value, list) or len(value) != length:
+        return None
+    numbers = [finite_float(item) for item in value]
+    if any(item is None for item in numbers):
+        return None
+    return np.asarray(numbers, dtype=float) / 1000.0
+
+
+def point_xy(value: Any) -> np.ndarray | None:
+    if not isinstance(value, list) or len(value) < 2:
+        return None
+    x = finite_float(value[0])
+    y = finite_float(value[1])
+    if x is None or y is None:
+        return None
+    return np.asarray([x, y], dtype=float)
+
+
+def sidecar_payload(sidecar: dict[str, Any], declared_metadata: dict[str, Any]) -> dict[str, Any] | None:
+    field = sidecar.get("field")
+    inline = declared_metadata.get(field) if isinstance(field, str) else None
+    if isinstance(inline, dict):
+        return inline
+    path_value = sidecar.get("path")
+    if not isinstance(path_value, str) or not path_value:
+        return None
+    path = Path(path_value).expanduser()
+    if not path.is_file():
+        return None
+    try:
+        return read_json_object(path, label="calibration sidecar")
+    except ValueError:
+        return None
+
+
+def camera_matrix(payload: dict[str, Any]) -> np.ndarray | None:
+    value = payload.get("camera_matrix_px")
+    if not isinstance(value, list):
+        return None
+    try:
+        matrix = np.asarray(value, dtype=float).reshape(3, 3)
+    except (TypeError, ValueError):
+        return None
+    if not np.all(np.isfinite(matrix)):
+        return None
+    return matrix
+
+
+def distortion_coefficients(payload: dict[str, Any]) -> np.ndarray:
+    value = payload.get("distortion_coefficients")
+    if not isinstance(value, list):
+        return np.zeros((5, 1), dtype=float)
+    try:
+        coeffs = np.asarray(value, dtype=float).reshape(-1, 1)
+    except (TypeError, ValueError):
+        return np.zeros((5, 1), dtype=float)
+    if not np.all(np.isfinite(coeffs)):
+        return np.zeros((5, 1), dtype=float)
+    return coeffs
+
+
+def transform_matrix(payload: dict[str, Any]) -> np.ndarray | None:
+    transform = payload.get("transform")
+    transform = transform if isinstance(transform, dict) else payload
+    matrix = transform.get("matrix_4x4")
+    if matrix is not None:
+        try:
+            result = np.asarray(matrix, dtype=float).reshape(4, 4)
+        except (TypeError, ValueError):
+            return None
+    else:
+        rotation = transform.get("rotation_matrix")
+        translation = transform.get("translation_m")
+        try:
+            rot = np.asarray(rotation, dtype=float).reshape(3, 3)
+            trans = np.asarray(translation, dtype=float).reshape(3)
+        except (TypeError, ValueError):
+            return None
+        result = np.eye(4, dtype=float)
+        result[:3, :3] = rot
+        result[:3, 3] = trans
+    if not np.all(np.isfinite(result)):
+        return None
+    convention = payload.get("transform_convention")
+    if convention == "camera_to_board":
+        try:
+            result = np.linalg.inv(result)
+        except np.linalg.LinAlgError:
+            return None
+    return result
+
+
+def project_board_point(
+    board_point_m: np.ndarray,
+    *,
+    intrinsics_payload: dict[str, Any],
+    extrinsics_payload: dict[str, Any],
+) -> tuple[np.ndarray, np.ndarray] | None:
+    k = camera_matrix(intrinsics_payload)
+    transform = transform_matrix(extrinsics_payload)
+    if k is None or transform is None:
+        return None
+    camera_point = transform[:3, :3] @ board_point_m.reshape(3) + transform[:3, 3]
+    z = float(camera_point[2])
+    if not np.isfinite(z) or abs(z) < 1e-9:
+        return None
+    normalized_x = float(camera_point[0]) / z
+    normalized_y = float(camera_point[1]) / z
+    coeffs = distortion_coefficients(intrinsics_payload).reshape(-1)
+    k1 = float(coeffs[0]) if coeffs.size > 0 else 0.0
+    k2 = float(coeffs[1]) if coeffs.size > 1 else 0.0
+    p1 = float(coeffs[2]) if coeffs.size > 2 else 0.0
+    p2 = float(coeffs[3]) if coeffs.size > 3 else 0.0
+    k3 = float(coeffs[4]) if coeffs.size > 4 else 0.0
+    r2 = normalized_x * normalized_x + normalized_y * normalized_y
+    radial = 1.0 + k1 * r2 + k2 * r2 * r2 + k3 * r2 * r2 * r2
+    distorted_x = normalized_x * radial + 2.0 * p1 * normalized_x * normalized_y + p2 * (
+        r2 + 2.0 * normalized_x * normalized_x
+    )
+    distorted_y = normalized_y * radial + p1 * (r2 + 2.0 * normalized_y * normalized_y) + 2.0 * p2 * normalized_x * normalized_y
+    image_xy = np.asarray(
+        [
+            float(k[0, 0]) * distorted_x + float(k[0, 1]) * distorted_y + float(k[0, 2]),
+            float(k[1, 1]) * distorted_y + float(k[1, 0]) * distorted_x + float(k[1, 2]),
+        ],
+        dtype=float,
+    )
+    if not np.all(np.isfinite(image_xy)):
+        return None
+    return camera_point, image_xy
+
+
+def rounded_float(value: Any, *, digits: int = 3) -> float | None:
+    number = finite_float(value)
+    return round(number, digits) if number is not None else None
+
+
+def rounded_list(values: np.ndarray | list[float] | None, *, digits: int = 3) -> list[float] | None:
+    if values is None:
+        return None
+    array = np.asarray(values, dtype=float).reshape(-1)
+    if not np.all(np.isfinite(array)):
+        return None
+    return [round(float(item), digits) for item in array]
+
+
+def residual_norm(a: np.ndarray | None, b: np.ndarray | None) -> float | None:
+    if a is None or b is None:
+        return None
+    return rounded_float(float(np.linalg.norm(a - b)))
+
+
+def board_corner_observations(board_pose_payload: dict[str, Any] | None) -> dict[str, np.ndarray]:
+    if board_pose_payload is None:
+        return {}
+    corners = board_pose_payload.get("corners")
+    if not isinstance(corners, list):
+        return {}
+    observed: dict[str, np.ndarray] = {}
+    for corner in corners:
+        if not isinstance(corner, dict):
+            continue
+        label = corner.get("label")
+        xy = point_xy(corner.get("pixel_xy"))
+        if isinstance(label, str) and xy is not None:
+            observed[label] = xy
+    return observed
+
+
+def depth_reference_rows(depth_payload: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if depth_payload is None:
+        return []
+    rows = depth_payload.get("metric_references")
+    return [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+
+
+def reference_depth_mm(reference: dict[str, Any]) -> float | None:
+    distance_m = finite_float(reference.get("distance_m"))
+    if distance_m is None:
+        return None
+    return round(distance_m * 1000.0, 3)
+
+
+def point_match_tokens(row: dict[str, Any]) -> set[str]:
+    values = [
+        row.get("point_label"),
+        row.get("point_role"),
+        row.get("square"),
+        row.get("id"),
+        row.get("stage"),
+    ]
+    tokens: set[str] = set()
+    for value in values:
+        if isinstance(value, str) and value:
+            tokens.add(value.lower())
+    return tokens
+
+
+def match_depth_reference(reference: dict[str, Any], sim_points: list[dict[str, Any]]) -> dict[str, Any] | None:
+    target = str(reference.get("target") or reference.get("id") or "").lower()
+    if not target:
+        return None
+    aliases = {
+        "board_center": {"board_center"},
+        "piece_top": {"piece_center"},
+        "piece_center": {"piece_center"},
+        "target_square": {"target_square_center"},
+        "target_square_center": {"target_square_center"},
+    }
+    wanted = aliases.get(target, {target})
+    for row in sim_points:
+        if not isinstance(row, dict):
+            continue
+        if point_match_tokens(row) & wanted:
+            return row
+    return None
+
+
+def board_plane_distance_from_extrinsics(extrinsics_payload: dict[str, Any] | None) -> float | None:
+    if extrinsics_payload is None:
+        return None
+    transform = transform_matrix(extrinsics_payload)
+    if transform is None:
+        return None
+    try:
+        camera_center_board = -transform[:3, :3].T @ transform[:3, 3]
+    except ValueError:
+        return None
+    return rounded_float(abs(float(camera_center_board[2])) * 1000.0)
+
+
+def compute_real_residuals(
+    *,
+    record_id: str,
+    declared_metadata: dict[str, Any],
+    sidecars: dict[str, dict[str, Any]],
+    sim_expected_points: list[dict[str, Any]],
+) -> dict[str, Any]:
+    payloads = {
+        name: sidecar_payload(sidecar, declared_metadata)
+        for name, sidecar in sidecars.items()
+        if isinstance(sidecar, dict) and sidecar.get("status") in {"available", "available_inline"}
+    }
+    intrinsics_payload = payloads.get("intrinsics")
+    extrinsics_payload = payloads.get("extrinsics")
+    board_pose_payload = payloads.get("board_pose")
+    depth_payload = payloads.get("depth")
+    projection_rows: list[dict[str, Any]] = []
+    corner_rows: list[dict[str, Any]] = []
+    depth_rows: list[dict[str, Any]] = []
+    real_projected_by_label: dict[str, np.ndarray] = {}
+    sim_projected_by_label: dict[str, np.ndarray] = {}
+
+    if intrinsics_payload is not None and extrinsics_payload is not None:
+        for point in sim_expected_points:
+            if not isinstance(point, dict):
+                continue
+            board_point_m = vector_from_mm(point.get("board_frame_xyz_mm"), length=3)
+            sim_xy = point_xy(point.get("metadata_projected_pixel_xy"))
+            if board_point_m is None or sim_xy is None:
+                continue
+            projected = project_board_point(
+                board_point_m,
+                intrinsics_payload=intrinsics_payload,
+                extrinsics_payload=extrinsics_payload,
+            )
+            if projected is None:
+                continue
+            real_camera_point, real_xy = projected
+            label = str(point.get("point_label") or point.get("id") or "")
+            if label:
+                real_projected_by_label[label] = real_xy
+                sim_projected_by_label[label] = sim_xy
+            camera_z_mm = float(real_camera_point[2]) * 1000.0
+            camera_range_mm = float(np.linalg.norm(real_camera_point)) * 1000.0
+            projection_rows.append(
+                {
+                    "record_id": record_id,
+                    "sim_point_id": point.get("id"),
+                    "stage": point.get("stage"),
+                    "point_role": point.get("point_role"),
+                    "point_label": point.get("point_label"),
+                    "square": point.get("square"),
+                    "real_projected_pixel_xy": rounded_list(real_xy),
+                    "sim_expected_pixel_xy": rounded_list(sim_xy),
+                    "real_vs_sim_projection_residual_px": residual_norm(real_xy, sim_xy),
+                    "real_camera_frame_xyz_mm": rounded_list(real_camera_point * 1000.0),
+                    "real_camera_z_depth_mm": rounded_float(camera_z_mm),
+                    "sim_camera_z_depth_mm": rounded_float(point.get("camera_z_depth_mm")),
+                    "real_vs_sim_camera_z_residual_mm": rounded_float(
+                        camera_z_mm - float(point.get("camera_z_depth_mm"))
+                    )
+                    if finite_float(point.get("camera_z_depth_mm")) is not None
+                    else None,
+                    "real_camera_range_mm": rounded_float(camera_range_mm),
+                    "sim_camera_range_mm": rounded_float(point.get("camera_range_mm")),
+                    "real_vs_sim_camera_range_residual_mm": rounded_float(
+                        camera_range_mm - float(point.get("camera_range_mm"))
+                    )
+                    if finite_float(point.get("camera_range_mm")) is not None
+                    else None,
+                    "status": "ok",
+                }
+            )
+
+    observed_corners = board_corner_observations(board_pose_payload)
+    for label in BOARD_CORNER_LABELS:
+        observed_xy = observed_corners.get(label)
+        sim_label = SIM_BOARD_CORNER_LABELS[label]
+        sim_xy = sim_projected_by_label.get(sim_label)
+        if sim_xy is None:
+            sim_point = next(
+                (
+                    point
+                    for point in sim_expected_points
+                    if isinstance(point, dict) and point.get("point_label") == sim_label
+                ),
+                {},
+            )
+            sim_xy = point_xy(sim_point.get("metadata_projected_pixel_xy"))
+        if observed_xy is None or sim_xy is None:
+            continue
+        real_projected_xy = real_projected_by_label.get(sim_label)
+        corner_rows.append(
+            {
+                "record_id": record_id,
+                "corner_label": label,
+                "real_detected_pixel_xy": rounded_list(observed_xy),
+                "real_projected_pixel_xy": rounded_list(real_projected_xy),
+                "sim_expected_pixel_xy": rounded_list(sim_xy),
+                "detected_vs_sim_projection_residual_px": residual_norm(observed_xy, sim_xy),
+                "detected_vs_real_projection_residual_px": residual_norm(observed_xy, real_projected_xy),
+                "status": "ok",
+            }
+        )
+
+    for reference in depth_reference_rows(depth_payload):
+        sim_point = match_depth_reference(reference, sim_expected_points)
+        measured_mm = reference_depth_mm(reference)
+        if sim_point is None or measured_mm is None:
+            continue
+        distance_type = str(reference.get("distance_type") or "camera_range")
+        sim_mm = (
+            finite_float(sim_point.get("camera_z_depth_mm"))
+            if distance_type in {"camera_z", "z_depth", "camera_z_depth"}
+            else finite_float(sim_point.get("camera_range_mm"))
+        )
+        if sim_mm is None:
+            continue
+        depth_rows.append(
+            {
+                "record_id": record_id,
+                "reference_id": reference.get("id"),
+                "target": reference.get("target"),
+                "distance_type": distance_type,
+                "measured_distance_mm": measured_mm,
+                "sim_point_id": sim_point.get("id"),
+                "sim_point_label": sim_point.get("point_label"),
+                "sim_distance_mm": rounded_float(sim_mm),
+                "real_vs_sim_depth_residual_mm": rounded_float(measured_mm - sim_mm),
+                "reference_pixel_xy": reference.get("pixel_xy"),
+                "status": "ok",
+            }
+        )
+
+    board_plane_real_mm = board_plane_distance_from_extrinsics(extrinsics_payload)
+    board_plane_sim_values = [
+        finite_float(point.get("board_plane_distance_mm"))
+        for point in sim_expected_points
+        if isinstance(point, dict) and finite_float(point.get("board_plane_distance_mm")) is not None
+    ]
+    board_plane_sim_mm = round(float(np.mean(board_plane_sim_values)), 3) if board_plane_sim_values else None
+    board_plane_residual = (
+        rounded_float(board_plane_real_mm - board_plane_sim_mm)
+        if board_plane_real_mm is not None and board_plane_sim_mm is not None
+        else None
+    )
+    all_projection_residuals = [
+        row["real_vs_sim_projection_residual_px"]
+        for row in projection_rows
+        if row.get("real_vs_sim_projection_residual_px") is not None
+    ]
+    detected_residuals = [
+        row["detected_vs_sim_projection_residual_px"]
+        for row in corner_rows
+        if row.get("detected_vs_sim_projection_residual_px") is not None
+    ]
+    depth_residuals = [
+        abs(float(row["real_vs_sim_depth_residual_mm"]))
+        for row in depth_rows
+        if row.get("real_vs_sim_depth_residual_mm") is not None
+    ]
+    return {
+        "available": bool(projection_rows or corner_rows or depth_rows or board_plane_residual is not None),
+        "status": "ok" if projection_rows or corner_rows or depth_rows else "no_residual_rows",
+        "projection_rows": projection_rows,
+        "board_corner_rows": corner_rows,
+        "depth_rows": depth_rows,
+        "board_plane": {
+            "real_camera_to_board_plane_mm": board_plane_real_mm,
+            "sim_camera_to_board_plane_mm": board_plane_sim_mm,
+            "real_vs_sim_board_plane_residual_mm": board_plane_residual,
+        },
+        "aggregate": {
+            "projected_point_count": len(projection_rows),
+            "board_corner_observation_count": len(corner_rows),
+            "depth_reference_count": len(depth_rows),
+            "mean_real_vs_sim_projection_residual_px": (
+                rounded_float(float(np.mean(all_projection_residuals))) if all_projection_residuals else None
+            ),
+            "max_real_vs_sim_projection_residual_px": (
+                rounded_float(float(np.max(all_projection_residuals))) if all_projection_residuals else None
+            ),
+            "mean_detected_corner_vs_sim_residual_px": (
+                rounded_float(float(np.mean(detected_residuals))) if detected_residuals else None
+            ),
+            "max_detected_corner_vs_sim_residual_px": (
+                rounded_float(float(np.max(detected_residuals))) if detected_residuals else None
+            ),
+            "mean_abs_real_vs_sim_depth_residual_mm": (
+                rounded_float(float(np.mean(depth_residuals))) if depth_residuals else None
+            ),
+            "max_abs_real_vs_sim_depth_residual_mm": (
+                rounded_float(float(np.max(depth_residuals))) if depth_residuals else None
+            ),
+        },
+        "sources": {
+            "real_intrinsics": sidecars.get("intrinsics", {}).get("repo_relative_path") or sidecars.get("intrinsics", {}).get("field"),
+            "real_extrinsics": sidecars.get("extrinsics", {}).get("repo_relative_path") or sidecars.get("extrinsics", {}).get("field"),
+            "real_board_pose": sidecars.get("board_pose", {}).get("repo_relative_path") or sidecars.get("board_pose", {}).get("field"),
+            "real_depth": sidecars.get("depth", {}).get("repo_relative_path") or sidecars.get("depth", {}).get("field"),
+        },
+    }
+
+
 def build_record(
     *,
     media: dict[str, Any],
@@ -481,6 +938,32 @@ def build_record(
     else:
         status = "projection_comparable"
 
+    record_id = f"real_reference_{index:03d}"
+    residuals = (
+        compute_real_residuals(
+            record_id=record_id,
+            declared_metadata=declared_metadata,
+            sidecars={
+                "intrinsics": intrinsics,
+                "extrinsics": extrinsics,
+                "board_pose": board_pose,
+                "depth": depth,
+            },
+            sim_expected_points=sim_expected_points,
+        )
+        if comparable
+        else {
+            "available": False,
+            "status": "not_comparable",
+            "projection_rows": [],
+            "board_corner_rows": [],
+            "depth_rows": [],
+            "board_plane": None,
+            "aggregate": {},
+            "sources": {},
+        }
+    )
+
     unavailable_fields = []
     if not comparable:
         unavailable_fields.extend(
@@ -500,7 +983,7 @@ def build_record(
         )
 
     return {
-        "id": f"real_reference_{index:03d}",
+        "id": record_id,
         "status": status,
         "ok": True,
         "real_reference_media_path": str(reference_path) if reference_path else None,
@@ -528,9 +1011,12 @@ def build_record(
         "comparison_fields": {
             "side_by_side_contact_sheet": reference_exists and bool(paths.get("png")),
             "projection_overlay": comparable,
-            "true_depth_comparison": depth_comparable,
+            "real_projection_residuals": bool(residuals.get("projection_rows")),
+            "real_board_corner_residuals": bool(residuals.get("board_corner_rows")),
+            "true_depth_comparison": bool(depth_comparable and residuals.get("depth_rows")),
             "unavailable": unavailable_fields,
         },
+        "residuals": residuals,
         "declared_metadata": declared_metadata or None,
         "manifest_validation": media.get("manifest_validation"),
         "notes": [
@@ -562,6 +1048,10 @@ def write_csv(path: Path, records: list[dict[str, Any]]) -> None:
         "comparable",
         "projection_comparable",
         "depth_comparable",
+        "residuals_available",
+        "residual_projection_row_count",
+        "residual_board_corner_row_count",
+        "residual_depth_row_count",
         "missing_inputs",
     ]
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -569,7 +1059,20 @@ def write_csv(path: Path, records: list[dict[str, Any]]) -> None:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         for record in records:
-            writer.writerow({key: csv_value(record.get(key)) for key in fieldnames})
+            residuals = record.get("residuals")
+            residuals = residuals if isinstance(residuals, dict) else {}
+            aggregate = residuals.get("aggregate")
+            aggregate = aggregate if isinstance(aggregate, dict) else {}
+            row = {key: record.get(key) for key in fieldnames}
+            row.update(
+                {
+                    "residuals_available": residuals.get("available"),
+                    "residual_projection_row_count": aggregate.get("projected_point_count"),
+                    "residual_board_corner_row_count": aggregate.get("board_corner_observation_count"),
+                    "residual_depth_row_count": aggregate.get("depth_reference_count"),
+                }
+            )
+            writer.writerow({key: csv_value(row.get(key)) for key in fieldnames})
 
 
 def put_wrapped_text(
@@ -771,6 +1274,306 @@ def render_contact_sheet(
     }
 
 
+def residual_rows(records: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    projection: list[dict[str, Any]] = []
+    corners: list[dict[str, Any]] = []
+    depth: list[dict[str, Any]] = []
+    board_plane: list[dict[str, Any]] = []
+    for record in records:
+        residuals = record.get("residuals")
+        residuals = residuals if isinstance(residuals, dict) else {}
+        if residuals.get("available") is not True:
+            continue
+        projection.extend(
+            row for row in residuals.get("projection_rows", []) if isinstance(row, dict)
+        )
+        corners.extend(row for row in residuals.get("board_corner_rows", []) if isinstance(row, dict))
+        depth.extend(row for row in residuals.get("depth_rows", []) if isinstance(row, dict))
+        plane = residuals.get("board_plane")
+        if isinstance(plane, dict):
+            board_plane.append({"record_id": record.get("id"), **plane})
+    return {
+        "projection": projection,
+        "board_corners": corners,
+        "depth": depth,
+        "board_plane": board_plane,
+    }
+
+
+def aggregate_residuals(rows: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+    def numeric_values(collection: list[dict[str, Any]], key: str, *, absolute: bool = False) -> list[float]:
+        values: list[float] = []
+        for row in collection:
+            value = finite_float(row.get(key))
+            if value is None:
+                continue
+            values.append(abs(value) if absolute else value)
+        return values
+
+    def mean_value(values: list[float]) -> float | None:
+        return rounded_float(float(np.mean(values))) if values else None
+
+    def max_value(values: list[float]) -> float | None:
+        return rounded_float(float(np.max(values))) if values else None
+
+    projection_values = numeric_values(rows["projection"], "real_vs_sim_projection_residual_px")
+    corner_values = numeric_values(rows["board_corners"], "detected_vs_sim_projection_residual_px")
+    depth_values = numeric_values(rows["depth"], "real_vs_sim_depth_residual_mm", absolute=True)
+    z_values = numeric_values(rows["projection"], "real_vs_sim_camera_z_residual_mm", absolute=True)
+    range_values = numeric_values(rows["projection"], "real_vs_sim_camera_range_residual_mm", absolute=True)
+    board_plane_values = numeric_values(rows["board_plane"], "real_vs_sim_board_plane_residual_mm", absolute=True)
+    return {
+        "projection_row_count": len(rows["projection"]),
+        "board_corner_row_count": len(rows["board_corners"]),
+        "depth_row_count": len(rows["depth"]),
+        "board_plane_row_count": len(rows["board_plane"]),
+        "mean_real_vs_sim_projection_residual_px": mean_value(projection_values),
+        "max_real_vs_sim_projection_residual_px": max_value(projection_values),
+        "mean_detected_corner_vs_sim_residual_px": mean_value(corner_values),
+        "max_detected_corner_vs_sim_residual_px": max_value(corner_values),
+        "mean_abs_real_vs_sim_depth_residual_mm": mean_value(depth_values),
+        "max_abs_real_vs_sim_depth_residual_mm": max_value(depth_values),
+        "mean_abs_real_vs_sim_camera_z_residual_mm": mean_value(z_values),
+        "max_abs_real_vs_sim_camera_z_residual_mm": max_value(z_values),
+        "mean_abs_real_vs_sim_camera_range_residual_mm": mean_value(range_values),
+        "max_abs_real_vs_sim_camera_range_residual_mm": max_value(range_values),
+        "mean_abs_real_vs_sim_board_plane_residual_mm": mean_value(board_plane_values),
+        "max_abs_real_vs_sim_board_plane_residual_mm": max_value(board_plane_values),
+    }
+
+
+def write_residual_csv(path: Path, rows: dict[str, list[dict[str, Any]]]) -> None:
+    fieldnames = [
+        "row_type",
+        "record_id",
+        "sim_point_id",
+        "stage",
+        "point_role",
+        "point_label",
+        "square",
+        "corner_label",
+        "reference_id",
+        "target",
+        "real_projected_pixel_xy",
+        "real_detected_pixel_xy",
+        "sim_expected_pixel_xy",
+        "real_vs_sim_projection_residual_px",
+        "detected_vs_sim_projection_residual_px",
+        "detected_vs_real_projection_residual_px",
+        "real_camera_z_depth_mm",
+        "sim_camera_z_depth_mm",
+        "real_vs_sim_camera_z_residual_mm",
+        "real_camera_range_mm",
+        "sim_camera_range_mm",
+        "real_vs_sim_camera_range_residual_mm",
+        "measured_distance_mm",
+        "sim_distance_mm",
+        "real_vs_sim_depth_residual_mm",
+        "real_camera_to_board_plane_mm",
+        "sim_camera_to_board_plane_mm",
+        "real_vs_sim_board_plane_residual_mm",
+        "status",
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    typed_rows: list[dict[str, Any]] = []
+    for row_type, collection in rows.items():
+        for row in collection:
+            typed_rows.append({"row_type": row_type, **row})
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in typed_rows:
+            writer.writerow({key: csv_value(row.get(key)) for key in fieldnames})
+
+
+def draw_labeled_point(
+    image: np.ndarray,
+    xy_value: Any,
+    *,
+    color: tuple[int, int, int],
+    label: str,
+    marker: str = "circle",
+) -> None:
+    xy = point_xy(xy_value)
+    if xy is None:
+        return
+    x = int(round(float(xy[0])))
+    y = int(round(float(xy[1])))
+    if x < -50 or y < -50 or x > image.shape[1] + 50 or y > image.shape[0] + 50:
+        return
+    if marker == "diamond":
+        cv2.drawMarker(image, (x, y), color, markerType=cv2.MARKER_DIAMOND, markerSize=15, thickness=2)
+    elif marker == "cross":
+        cv2.drawMarker(image, (x, y), color, markerType=cv2.MARKER_CROSS, markerSize=14, thickness=2)
+    else:
+        cv2.circle(image, (x, y), 5, color, thickness=2, lineType=cv2.LINE_AA)
+    cv2.putText(image, label[:24], (x + 7, y - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.36, color, 1, cv2.LINE_AA)
+
+
+def residual_overlay_tile(record: dict[str, Any], *, suite_output_dir: Path, repo_root: Path) -> np.ndarray | None:
+    real_path = resolve_path(record.get("real_reference_media_path"), base_dir=suite_output_dir, repo_root=repo_root)
+    image = cv2.imread(str(real_path), cv2.IMREAD_COLOR) if real_path and real_path.is_file() else None
+    if image is None:
+        return None
+    overlay = image.copy()
+    residuals = record.get("residuals")
+    residuals = residuals if isinstance(residuals, dict) else {}
+    projection_rows = residuals.get("projection_rows")
+    projection_rows = projection_rows if isinstance(projection_rows, list) else []
+    for row in projection_rows:
+        if not isinstance(row, dict):
+            continue
+        label = str(row.get("point_label") or row.get("sim_point_id") or "")
+        draw_labeled_point(overlay, row.get("sim_expected_pixel_xy"), color=(70, 170, 255), label=f"sim {label}", marker="cross")
+        draw_labeled_point(overlay, row.get("real_projected_pixel_xy"), color=(80, 230, 130), label=f"real {label}", marker="circle")
+    board_corner_rows = residuals.get("board_corner_rows")
+    board_corner_rows = board_corner_rows if isinstance(board_corner_rows, list) else []
+    for row in board_corner_rows:
+        if not isinstance(row, dict):
+            continue
+        label = str(row.get("corner_label") or "")
+        draw_labeled_point(overlay, row.get("real_detected_pixel_xy"), color=(245, 115, 95), label=f"det {label}", marker="diamond")
+    cv2.rectangle(overlay, (0, 0), (overlay.shape[1] - 1, 54), (18, 27, 42), -1)
+    cv2.putText(
+        overlay,
+        "Real-vs-Sim Residual Overlay",
+        (12, 22),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.58,
+        (255, 255, 255),
+        1,
+        cv2.LINE_AA,
+    )
+    aggregate = residuals.get("aggregate")
+    aggregate = aggregate if isinstance(aggregate, dict) else {}
+    detail = (
+        f"mean proj px={aggregate.get('mean_real_vs_sim_projection_residual_px')} "
+        f"mean corner px={aggregate.get('mean_detected_corner_vs_sim_residual_px')} "
+        f"mean depth mm={aggregate.get('mean_abs_real_vs_sim_depth_residual_mm')}"
+    )
+    cv2.putText(overlay, detail[:110], (12, 43), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (210, 230, 255), 1, cv2.LINE_AA)
+    return overlay
+
+
+def render_residual_overlay_contact_sheet(
+    *,
+    path: Path,
+    records: list[dict[str, Any]],
+    suite_output_dir: Path,
+    repo_root: Path,
+) -> dict[str, Any] | None:
+    tiles: list[np.ndarray] = []
+    for record in records:
+        residuals = record.get("residuals")
+        if not isinstance(residuals, dict) or residuals.get("available") is not True:
+            continue
+        overlay = residual_overlay_tile(record, suite_output_dir=suite_output_dir, repo_root=repo_root)
+        if overlay is None:
+            continue
+        tiles.append(
+            tile_with_label(
+                overlay,
+                width=640,
+                height=480,
+                label=str(record.get("id") or "real residual overlay"),
+                detail=str(record.get("real_reference_media_relative_path") or ""),
+                placeholder="Residual overlay unavailable.",
+            )
+        )
+    if not tiles:
+        return None
+    gap = 12
+    header_h = 58
+    width = 640
+    height = header_h + len(tiles) * 480 + max(0, len(tiles) - 1) * gap
+    sheet = np.full((height, width, 3), (235, 238, 243), dtype=np.uint8)
+    cv2.rectangle(sheet, (0, 0), (width, header_h), (15, 23, 42), -1)
+    cv2.putText(
+        sheet,
+        "Real-Capture Projection / Depth Residuals",
+        (18, 27),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.68,
+        (255, 255, 255),
+        1,
+        cv2.LINE_AA,
+    )
+    cv2.putText(
+        sheet,
+        "Generated only for sidecars gated as real_capture=true, not for example_only fixtures.",
+        (18, 49),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.42,
+        (204, 221, 246),
+        1,
+        cv2.LINE_AA,
+    )
+    y = header_h
+    for tile in tiles:
+        sheet[y : y + 480, 0:640] = tile
+        y += 480 + gap
+    path.parent.mkdir(parents=True, exist_ok=True)
+    ok = cv2.imwrite(str(path), sheet)
+    if not ok:
+        raise ValueError(f"cv2 failed to write residual contact sheet {path}")
+    return {
+        "path": str(path),
+        "width_px": int(sheet.shape[1]),
+        "height_px": int(sheet.shape[0]),
+        "row_count": len(tiles),
+    }
+
+
+def write_residual_artifacts(
+    *,
+    output_dir: Path,
+    records: list[dict[str, Any]],
+    suite_output_dir: Path,
+    repo_root: Path,
+) -> dict[str, Any]:
+    rows = residual_rows(records)
+    if not any(rows.values()):
+        return {
+            "available": False,
+            "status": "not_available",
+            "paths": {"json": None, "csv": None, "png": None},
+            "aggregate": aggregate_residuals(rows),
+            "rows": rows,
+        }
+    json_path = output_dir / RESIDUAL_JSON_NAME
+    csv_path = output_dir / RESIDUAL_CSV_NAME
+    png_path = output_dir / RESIDUAL_PNG_NAME
+    visual = render_residual_overlay_contact_sheet(
+        path=png_path,
+        records=records,
+        suite_output_dir=suite_output_dir,
+        repo_root=repo_root,
+    )
+    summary = {
+        "schema": "lerobot.sim.real_projection_residuals.v1",
+        "available": True,
+        "status": "ok",
+        "paths": {
+            "json": str(json_path),
+            "csv": str(csv_path),
+            "png": str(png_path) if visual is not None else None,
+            "json_relative_path": output_relative(json_path, suite_output_dir),
+            "csv_relative_path": output_relative(csv_path, suite_output_dir),
+            "png_relative_path": output_relative(png_path, suite_output_dir) if visual is not None else None,
+        },
+        "aggregate": aggregate_residuals(rows),
+        "visual": visual,
+        "rows": rows,
+        "notes": [
+            "Residual artifacts are generated only from sidecars validated as real_capture=true.",
+            "Synthetic test-only positive fixtures can exercise this path but do not prove physical SO-101 calibration.",
+        ],
+    }
+    write_json(json_path, summary)
+    write_residual_csv(csv_path, rows)
+    return summary
+
+
 def build_summary(args: argparse.Namespace) -> dict[str, Any]:
     suite_summary_path = args.suite_summary.expanduser().resolve()
     suite = read_json_object(suite_summary_path, label="suite summary")
@@ -813,6 +1616,12 @@ def build_summary(args: argparse.Namespace) -> dict[str, Any]:
     png_path = output_dir / OUTPUT_PNG_NAME
     write_csv(csv_path, records)
     visual = render_contact_sheet(path=png_path, records=records, suite_output_dir=suite_output_dir, repo_root=repo_root)
+    residual_artifacts = write_residual_artifacts(
+        output_dir=output_dir,
+        records=records,
+        suite_output_dir=suite_output_dir,
+        repo_root=repo_root,
+    )
 
     comparable_count = sum(1 for record in records if record.get("comparable") is True)
     if not sim_expected_points:
@@ -869,9 +1678,15 @@ def build_summary(args: argparse.Namespace) -> dict[str, Any]:
             "json": str(json_path),
             "csv": str(csv_path),
             "png": str(png_path),
+            "residual_json": residual_artifacts.get("paths", {}).get("json"),
+            "residual_csv": residual_artifacts.get("paths", {}).get("csv"),
+            "residual_png": residual_artifacts.get("paths", {}).get("png"),
             "json_relative_path": output_relative(json_path, suite_output_dir),
             "csv_relative_path": output_relative(csv_path, suite_output_dir),
             "png_relative_path": output_relative(png_path, suite_output_dir),
+            "residual_json_relative_path": residual_artifacts.get("paths", {}).get("json_relative_path"),
+            "residual_csv_relative_path": residual_artifacts.get("paths", {}).get("csv_relative_path"),
+            "residual_png_relative_path": residual_artifacts.get("paths", {}).get("png_relative_path"),
         },
         "real_reference_media_count": len(records),
         "comparable_count": comparable_count,
@@ -889,11 +1704,19 @@ def build_summary(args: argparse.Namespace) -> dict[str, Any]:
         "sim_expected_projected_point_count": len(sim_expected_points),
         "sim_expected_projected_points": sim_expected_points,
         "visual": visual,
+        "residual_artifacts": {
+            "available": residual_artifacts.get("available"),
+            "status": residual_artifacts.get("status"),
+            "paths": residual_artifacts.get("paths"),
+            "aggregate": residual_artifacts.get("aggregate"),
+            "visual": residual_artifacts.get("visual"),
+        },
         "records": records,
         "notes": [
             "This is a hardware-free intake artifact. It does not open a camera, connect motors, or infer real depth.",
             "status=missing_real_calibration is expected until real intrinsics plus board pose/extrinsics are supplied.",
             "The PNG is a side-by-side contact sheet, not a calibrated overlay, when calibration inputs are missing.",
+            "Residual JSON/CSV/overlay files are emitted only when non-example real_capture sidecars pass the gate.",
         ],
     }
     write_json(json_path, summary)
