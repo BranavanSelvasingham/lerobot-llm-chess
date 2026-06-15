@@ -1,0 +1,19 @@
+{
+  "schema": "lerobot.sim.real_calibration_sidecar.board_pose.v1",
+  "sidecar_type": "board_pose",
+  "example_only": true,
+  "real_capture": false,
+  "image_size_px": [640, 480],
+  "corner_order": ["a1", "h1", "h8", "a8"],
+  "corners": [
+    {"label": "a1", "pixel_xy": [82.0, 356.0], "confidence": 0.99},
+    {"label": "h1", "pixel_xy": [562.0, 350.0], "confidence": 0.98},
+    {"label": "h8", "pixel_xy": [536.0, 44.0], "confidence": 0.98},
+    {"label": "a8", "pixel_xy": [112.0, 38.0], "confidence": 0.97}
+  ],
+  "board_size_m": 0.28,
+  "detection_source": "synthetic example corner detections for validator smoke tests only",
+  "notes": [
+    "Synthetic fixture only. Corner order is a1,h1,h8,a8 for downstream PnP compatibility."
+  ]
+}

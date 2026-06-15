@@ -686,6 +686,9 @@ def real_projection_intake_artifact_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("real_reference_media_count", ""),
         metrics.get("comparable_count", ""),
         metrics.get("depth_comparable_count", ""),
+        metrics.get("sidecar_valid_count", ""),
+        metrics.get("sidecar_invalid_count", ""),
+        metrics.get("sidecar_missing_count", ""),
         metrics.get("missing_inputs", ""),
         metrics.get("sim_expected_projected_point_count", ""),
         metrics.get("real_camera_capture_skipped", ""),
@@ -727,6 +730,12 @@ def real_projection_intake_record_rows(intake: dict[str, Any]) -> list[list[Any]
                 record.get("real_extrinsics_status", ""),
                 record.get("real_board_pose_status", ""),
                 record.get("real_depth_status", ""),
+                record.get("sidecar_validation", {}).get("valid_count", "")
+                if isinstance(record.get("sidecar_validation"), dict)
+                else "",
+                record.get("sidecar_validation", {}).get("invalid_count", "")
+                if isinstance(record.get("sidecar_validation"), dict)
+                else "",
                 record.get("sim_expected_projected_point_count", ""),
                 record.get("comparable", ""),
                 record.get("missing_inputs", ""),
@@ -1138,6 +1147,9 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Real Refs",
                 "Comparable",
                 "Depth Comparable",
+                "Sidecars Valid",
+                "Sidecars Invalid",
+                "Sidecars Missing",
                 "Missing Inputs",
                 "Sim Points",
                 "Real Camera Skipped",
@@ -1158,6 +1170,8 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Extrinsics",
                 "Board Pose",
                 "Real Depth",
+                "Sidecars Valid",
+                "Sidecars Invalid",
                 "Sim Points",
                 "Comparable",
                 "Missing Inputs",

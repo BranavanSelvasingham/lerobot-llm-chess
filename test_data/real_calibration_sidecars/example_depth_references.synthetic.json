@@ -1,0 +1,28 @@
+{
+  "schema": "lerobot.sim.real_calibration_sidecar.depth.v1",
+  "sidecar_type": "depth",
+  "example_only": true,
+  "real_capture": false,
+  "depth_units": "m",
+  "depth_scale_to_m": 1.0,
+  "reference_frame": "OpenCV camera frame, distances measured along camera range unless noted per reference.",
+  "metric_references": [
+    {
+      "id": "board_center_range",
+      "target": "board_center",
+      "pixel_xy": [320.0, 207.0],
+      "distance_m": 0.506,
+      "distance_type": "camera_range"
+    },
+    {
+      "id": "e4_piece_top_range",
+      "target": "piece_top",
+      "pixel_xy": [318.0, 238.0],
+      "distance_m": 0.458,
+      "distance_type": "camera_range"
+    }
+  ],
+  "notes": [
+    "Synthetic fixture only. These distances are validation examples, not measured real depth."
+  ]
+}
