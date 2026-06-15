@@ -6,7 +6,7 @@ Run this hardware-free gate before changing simulator rendering, camera profiles
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_calibration_regression_suite.py --output-dir /private/tmp/lerobot_sim/calibration_regression_suite --python /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 --include-negative-check
 ```
 
-The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json` has `"ok": true` and `"status": "ok"`.
+The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json` has `"ok": true` and `"status": "ok"`. It also writes `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index.json`, a compact review index for the real-reference images, ranked candidate artifacts, perception fixture evidence, pick/place release frames, visibility metrics, negative-check summary, and child logs.
 
 ## GitHub Actions Signal
 
@@ -73,8 +73,15 @@ Common artifact paths under the output directory:
 - `pick_place_scenario_matrix/scenarios/*/summary.json`
 - `pick_place_scenario_matrix/scenarios/*/06_target_release_open.jpg`
 - `negative_empty_inventory/comparison_set_summary.json`
+- `artifact_index.json`
 
 Each child also writes captured stdout/stderr text files in its own output directory.
+
+The artifact index can be regenerated from an existing suite summary without rerunning smokes:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_calibration_artifact_index.py /private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json --output-json /private/tmp/lerobot_sim/calibration_regression_suite/artifact_index.json
+```
 
 ## Skipped Paths
 

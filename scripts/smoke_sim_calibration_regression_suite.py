@@ -484,6 +484,7 @@ def main() -> int:
     required_ok = all(record["ok"] for record in child_records.values())
     selected_candidate = selected_from_session(session, int(args.select_rank))
     summary_path = output_dir / "calibration_regression_summary.json"
+    artifact_index_path = output_dir / "artifact_index.json"
     summary = {
         "schema": SCHEMA,
         "ok": required_ok,
@@ -547,10 +548,48 @@ def main() -> int:
             "summary_path": negative_summary.get("comparison_set_summary_path") if negative_summary else None,
             "status": negative_summary.get("status") if negative_summary else None,
         },
+        "artifact_index": {
+            "path": str(artifact_index_path),
+            "status": None,
+            "artifact_count": None,
+            "missing_artifact_count": None,
+        },
         "notes": [
             "This suite intentionally calls existing smoke scripts as subprocesses instead of duplicating their internals.",
             "It does not mutate simulator rendering, camera profiles, perception algorithms, robot execution, dependencies, or canonical calibration constants.",
         ],
+    }
+    write_json(summary_path, summary)
+
+    artifact_index_record, artifact_index = run_child(
+        name="artifact_index",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_calibration_artifact_index.py"),
+            str(summary_path),
+            "--output-json",
+            str(artifact_index_path),
+        ],
+        output_dir=output_dir,
+        expected_json_path=artifact_index_path,
+    )
+    child_records["artifact_index"] = artifact_index_record
+    required_ok = all(record["ok"] for record in child_records.values())
+    summary["ok"] = required_ok
+    summary["status"] = "ok" if required_ok else "validation_failed"
+    summary["aggregate_status"] = {
+        "ok": required_ok,
+        "failed_children": [
+            name for name, record in child_records.items() if not bool(record.get("ok"))
+        ],
+    }
+    summary["child_commands"] = child_records
+    summary["artifact_index"] = {
+        "path": str(artifact_index_path),
+        "status": artifact_index.get("status") if artifact_index else None,
+        "artifact_count": len(artifact_index.get("artifacts", [])) if artifact_index else None,
+        "missing_artifact_count": len(artifact_index.get("missing_artifacts", [])) if artifact_index else None,
+        "categories": artifact_index.get("categories") if artifact_index else None,
     }
     write_json(summary_path, summary)
     print(json.dumps(summary, indent=2))
