@@ -257,15 +257,28 @@ def selected_media_rows(index: dict[str, Any]) -> list[list[Any]]:
     for media in selected:
         if not isinstance(media, dict):
             continue
+        validation = media.get("manifest_validation")
+        validation = validation if isinstance(validation, dict) else {}
         rows.append(
             [
                 media.get("relative_path", ""),
                 media.get("media_type", ""),
                 media.get("dimensions", ""),
                 media.get("currently_wired_into_simulator_tooling", ""),
+                validation.get("status", ""),
+                media.get("capture_id", ""),
+                media.get("declared_target_categories", ""),
+                media.get("failure_mode", ""),
             ]
         )
     return rows
+
+
+def manifest_signal(index: dict[str, Any], suite: dict[str, Any] | None) -> dict[str, Any]:
+    if suite is not None and isinstance(suite.get("reference_media_manifest"), dict):
+        return suite["reference_media_manifest"]
+    manifest = index.get("reference_media_manifest")
+    return manifest if isinstance(manifest, dict) else {}
 
 
 def gap_rows(gaps: list[dict[str, Any]]) -> list[list[Any]]:
@@ -485,9 +498,38 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
     lines.extend(table(["Path", "Skipped", "Marker"], skipped_marker_rows(index, suite)))
 
     lines.extend(["", "## Real Reference Media Gap"])
+    manifest = manifest_signal(index, suite)
+    lines.extend(
+        table(
+            ["Field", "Value"],
+            [
+                ["manifest_supplied", manifest.get("supplied", "")],
+                ["manifest_status", manifest.get("status", "")],
+                ["manifest_path", manifest.get("path", "")],
+                ["declared_media_count", manifest.get("declared_media_count", "")],
+                ["matched_media_count", manifest.get("matched_media_count", "")],
+                ["selected_declared_media_count", manifest.get("selected_declared_media_count", "")],
+            ],
+        )
+    )
+    lines.append("")
     media_rows = selected_media_rows(index)
     if media_rows:
-        lines.extend(table(["Media", "Type", "Dimensions", "Wired"], media_rows))
+        lines.extend(
+            table(
+                [
+                    "Media",
+                    "Type",
+                    "Dimensions",
+                    "Wired",
+                    "Manifest",
+                    "Capture",
+                    "Declared Targets",
+                    "Failure Mode",
+                ],
+                media_rows,
+            )
+        )
     else:
         lines.append("_No real reference media selected in the artifact index._")
     gaps = suite_inventory_gaps(suite)

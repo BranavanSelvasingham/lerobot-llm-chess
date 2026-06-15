@@ -36,6 +36,15 @@ def parse_args() -> argparse.Namespace:
         help="Python executable used for child smoke scripts.",
     )
     parser.add_argument("--reference-image", type=Path, default=DEFAULT_REFERENCE_IMAGE)
+    parser.add_argument(
+        "--reference-media-manifest",
+        type=Path,
+        default=None,
+        help=(
+            "Optional repo-local reference-media manifest passed only to the inventory child. "
+            "Default suite and CI behavior remain manifest-free."
+        ),
+    )
     parser.add_argument("--base-profile", default=DEFAULT_BASE_PROFILE)
     parser.add_argument("--source-square", default="e4")
     parser.add_argument("--target-square", default="e5")
@@ -72,6 +81,9 @@ def markdown_bool(value: Any) -> str:
 def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) -> Path:
     markers = summary.get("skipped_markers")
     markers = markers if isinstance(markers, dict) else {}
+    manifest = summary.get("reference_media_manifest")
+    manifest = manifest if isinstance(manifest, dict) else {}
+    manifest_supplied = bool(manifest.get("supplied"))
     readme_path = output_dir / ARTIFACT_ENTRYPOINT_NAME
     lines = [
         "# Simulator Calibration Regression Artifacts",
@@ -106,6 +118,14 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         (
             f"- `openai_skipped: {markdown_bool(summary.get('openai_skipped'))}`: "
             f"{markers.get('openai', '')}"
+        ),
+        (
+            f"- `reference_media_manifest.supplied: {markdown_bool(manifest_supplied)}`"
+            f"; status: `{manifest.get('status')}`; path: `{manifest.get('path')}`."
+        ),
+        (
+            f"- Manifest-declared media selected for comparison: "
+            f"`{manifest.get('selected_declared_media_count')}`."
         ),
         "- Real-media gap: the current inventory is limited to `archive/chess_test_images/current_view.jpg`.",
         "- No real-world videos are present for motion, recovery, or timing references.",
@@ -263,6 +283,64 @@ def comparison_artifacts(summary: dict[str, Any] | None) -> list[dict[str, Any]]
             }
         )
     return rows
+
+
+def manifest_status_section(
+    *,
+    requested_manifest: Path | None,
+    inventory: dict[str, Any] | None,
+    comparison: dict[str, Any] | None,
+) -> dict[str, Any]:
+    manifest_summary = inventory.get("manifest_summary") if inventory else None
+    manifest_summary = manifest_summary if isinstance(manifest_summary, dict) else {}
+    inventory_summary = inventory.get("summary") if inventory else None
+    inventory_summary = inventory_summary if isinstance(inventory_summary, dict) else {}
+    selected_media = comparison.get("selected_media") if comparison else None
+    selected_rows = selected_media if isinstance(selected_media, list) else []
+    declared_selected = [
+        row
+        for row in selected_rows
+        if isinstance(row, dict)
+        and isinstance(row.get("manifest_validation"), dict)
+        and row["manifest_validation"].get("declared") is True
+    ]
+    requested_path = str(requested_manifest) if requested_manifest is not None else None
+    return {
+        "supplied": bool(manifest_summary.get("supplied", requested_manifest is not None)),
+        "requested_path": requested_path,
+        "path": manifest_summary.get("path", requested_path),
+        "ok": manifest_summary.get("ok"),
+        "status": manifest_summary.get("status"),
+        "declared_media_count": manifest_summary.get("declared_media_count"),
+        "valid_media_count": manifest_summary.get("valid_media_count"),
+        "matched_media_count": manifest_summary.get("matched_media_count"),
+        "manifest_declared_media_count": inventory_summary.get("manifest_declared_media_count"),
+        "selected_declared_media_count": len(declared_selected),
+        "selected_declared_media": [
+            {
+                "relative_path": row.get("relative_path"),
+                "capture_id": (
+                    row.get("declared_metadata", {}).get("capture_id")
+                    if isinstance(row.get("declared_metadata"), dict)
+                    else None
+                ),
+                "declared_target_categories": (
+                    row.get("declared_metadata", {}).get("declared_target_categories")
+                    if isinstance(row.get("declared_metadata"), dict)
+                    else None
+                ),
+                "failure_mode": (
+                    row.get("declared_metadata", {}).get("failure_mode")
+                    if isinstance(row.get("declared_metadata"), dict)
+                    else None
+                ),
+                "manifest_validation": row.get("manifest_validation"),
+            }
+            for row in declared_selected
+        ],
+        "issue_count": manifest_summary.get("issue_count"),
+        "issues": manifest_summary.get("issues"),
+    }
 
 
 def ranking_summary(session: dict[str, Any] | None) -> list[dict[str, Any]]:
@@ -617,14 +695,17 @@ def main() -> int:
 
     inventory_dir = output_dir / "inventory"
     inventory_json_path = inventory_dir / "reference_media_inventory.json"
+    inventory_command = [
+        python,
+        str(REPO_ROOT / "scripts" / "smoke_sim_reference_media_inventory.py"),
+        "--output-dir",
+        str(inventory_dir),
+    ]
+    if args.reference_media_manifest is not None:
+        inventory_command.extend(["--manifest", str(args.reference_media_manifest.expanduser())])
     inventory_record, inventory = run_child(
         name="inventory",
-        command=[
-            python,
-            str(REPO_ROOT / "scripts" / "smoke_sim_reference_media_inventory.py"),
-            "--output-dir",
-            str(inventory_dir),
-        ],
+        command=inventory_command,
         output_dir=inventory_dir,
         expected_json_path=inventory_json_path,
     )
@@ -826,9 +907,15 @@ def main() -> int:
         },
         "candidate_inputs": candidate_paths,
         "child_commands": child_records,
+        "reference_media_manifest": manifest_status_section(
+            requested_manifest=args.reference_media_manifest,
+            inventory=inventory,
+            comparison=comparison,
+        ),
         "inventory": {
             "summary_path": str(inventory_json_path),
             "summary": inventory.get("summary") if inventory else None,
+            "manifest_summary": inventory.get("manifest_summary") if inventory else None,
             "next_recommended_reference_fixture_inputs": (
                 inventory.get("next_recommended_reference_fixture_inputs") if inventory else None
             ),
