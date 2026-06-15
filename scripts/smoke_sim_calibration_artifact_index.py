@@ -355,9 +355,13 @@ def collect_sim_camera_pose_fixture_artifacts(
     suite_summary_path: Path,
     output_dir: Path,
     repo_root: Path | None,
-) -> None:
+) -> dict[str, Any]:
     fixture = suite.get("sim_camera_pose_fixture")
     fixture = fixture if isinstance(fixture, dict) else {}
+    metadata_contract = fixture.get("metadata_contract")
+    metadata_contract = metadata_contract if isinstance(metadata_contract, dict) else {}
+    required_keys = metadata_contract.get("required_keys")
+    required_keys = required_keys if isinstance(required_keys, list) else []
     add_path(
         artifacts,
         category="sim_camera_pose_fixture",
@@ -371,17 +375,30 @@ def collect_sim_camera_pose_fixture_artifacts(
     )
     cases = fixture.get("cases")
     case_rows = cases if isinstance(cases, list) else []
-    case_metrics = {
-        str(case.get("case_id")): {
+    case_metrics: dict[str, dict[str, Any]] = {}
+    for case in case_rows:
+        if not isinstance(case, dict) or not isinstance(case.get("case_id"), str):
+            continue
+        checks = case.get("metadata_contract_checks")
+        checks = checks if isinstance(checks, dict) else {}
+        case_metrics[str(case.get("case_id"))] = {
             "view": case.get("view"),
             "profile": case.get("profile"),
             "target_square": case.get("target_square"),
             "piece_square": case.get("piece_square"),
             "unique_colors": case.get("unique_colors"),
+            "metadata_contract_ok": (
+                all(bool(checks.get(str(key))) for key in required_keys)
+                if required_keys
+                else None
+            ),
+            "metadata_image_size": bool(checks.get("image_size_px")),
+            "metadata_intrinsics": bool(checks.get("camera_matrix_px") and checks.get("intrinsics")),
+            "metadata_distortion": bool(checks.get("distortion_coefficients")),
+            "metadata_extrinsics_board_to_camera": bool(checks.get("extrinsics.board_to_camera")),
+            "metadata_coordinate_frames": bool(checks.get("coordinate_frame_convention")),
+            "metadata_scope": checks.get("coordinate_frame_scope"),
         }
-        for case in case_rows
-        if isinstance(case, dict) and isinstance(case.get("case_id"), str)
-    }
     for collection_key, label_suffix in (
         ("frame_paths", "frame"),
         ("annotated_frame_paths", "annotated_frame"),
@@ -404,6 +421,7 @@ def collect_sim_camera_pose_fixture_artifacts(
                 metrics=case_metrics.get(case_id_str),
                 scenario_id=case_id_str,
             )
+    return metadata_contract
 
 
 def collect_pick_place_artifacts(
@@ -596,7 +614,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
-    collect_sim_camera_pose_fixture_artifacts(
+    sim_camera_pose_metadata_contract = collect_sim_camera_pose_fixture_artifacts(
         suite=suite,
         artifacts=artifacts,
         suite_summary_path=suite_summary_path,
@@ -663,6 +681,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
             "aggregate_status": suite.get("aggregate_status"),
         },
         "selected_real_reference_media": selected_media,
+        "sim_camera_pose_fixture_metadata_contract": sim_camera_pose_metadata_contract,
         "pick_place_release_frame_count": sum(
             1 for row in sorted_rows if row["category"] == "pick_place_scenario" and row.get("scenario_id")
         ),

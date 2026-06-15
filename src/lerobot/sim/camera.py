@@ -14,9 +14,15 @@ from lerobot.utils.errors import DeviceAlreadyConnectedError, DeviceNotConnected
 from .config import (
     OVERVIEW_BOARD_CORNERS,
     REFERENCE_GRIPPER_BOARD_CORNERS,
+    SIM_CAMERA_CALIBRATION_METADATA_SCOPE,
+    SIM_CAMERA_DISTORTION_COEFFICIENT_ORDER,
+    SIM_CAMERA_DISTORTION_MODEL,
+    SIM_CAMERA_INTRINSICS_MODEL,
+    SIM_CAMERA_INTRINSICS_SCHEMA,
     SIM_CAMERA_REFERENCE_HEIGHT,
     SIM_CAMERA_REFERENCE_WIDTH,
     SimCameraConfig,
+    sim_camera_coordinate_frame_convention,
 )
 
 
@@ -87,10 +93,36 @@ class SimCamera(Camera):
         self._robot_joints = {str(name): float(value) for name, value in joints.items()}
 
     def calibration_metadata(self) -> dict[str, Any]:
+        width = int(self.width or 640)
+        height = int(self.height or 480)
+        camera_matrix = self._camera_matrix_px()
+        distortion_coefficients = [
+            float(value) for value in (self.config.distortion_coefficients or ())
+        ]
         gripper_percent = self._robot_joints.get("gripper")
         return {
+            "calibration_metadata_scope": SIM_CAMERA_CALIBRATION_METADATA_SCOPE,
+            "image_size_px": {"width": width, "height": height},
+            "camera_matrix_px": camera_matrix,
+            "intrinsics": {
+                "schema": SIM_CAMERA_INTRINSICS_SCHEMA,
+                "model": SIM_CAMERA_INTRINSICS_MODEL,
+                "fx_px": camera_matrix[0][0],
+                "fy_px": camera_matrix[1][1],
+                "cx_px": camera_matrix[0][2],
+                "cy_px": camera_matrix[1][2],
+                "skew_px": camera_matrix[0][1],
+                "camera_matrix_px": camera_matrix,
+            },
+            "distortion_model": SIM_CAMERA_DISTORTION_MODEL,
+            "distortion_coefficients": distortion_coefficients,
+            "distortion_coefficient_order": list(SIM_CAMERA_DISTORTION_COEFFICIENT_ORDER),
+            "extrinsics": {
+                "board_to_camera": self._board_to_camera_extrinsics(),
+            },
+            "coordinate_frame_convention": sim_camera_coordinate_frame_convention(),
             "view": self.config.view,
-            "board_corners_xy": self._board_corners(int(self.width or 640), int(self.height or 480)).tolist(),
+            "board_corners_xy": self._board_corners(width, height).tolist(),
             "piece_layout": self.config.piece_layout,
             "piece_square": self.config.piece_square,
             "gripper_visible": self.config.gripper_visible,
@@ -102,6 +134,29 @@ class SimCamera(Camera):
                 str(self.config.reference_image_path) if self.config.reference_image_path else None
             ),
         }
+
+    def _camera_matrix_px(self) -> list[list[float]]:
+        matrix = self.config.camera_matrix_px
+        return [[float(value) for value in row] for row in (matrix or ())]
+
+    def _board_to_camera_extrinsics(self) -> dict[str, Any]:
+        extrinsics = self.config.board_to_camera_extrinsics or {}
+        return {
+            str(key): self._jsonable_metadata_value(value)
+            for key, value in extrinsics.items()
+        }
+
+    def _jsonable_metadata_value(self, value: Any) -> Any:
+        if isinstance(value, tuple):
+            return [self._jsonable_metadata_value(item) for item in value]
+        if isinstance(value, list):
+            return [self._jsonable_metadata_value(item) for item in value]
+        if isinstance(value, dict):
+            return {
+                str(key): self._jsonable_metadata_value(item)
+                for key, item in value.items()
+            }
+        return value
 
     def _render_bgr_frame(self) -> np.ndarray:
         height = int(self.height or 480)

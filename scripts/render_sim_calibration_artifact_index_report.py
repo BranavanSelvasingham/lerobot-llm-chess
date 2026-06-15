@@ -333,6 +333,10 @@ def pose_fixture_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("view", ""),
         metrics.get("target_square", ""),
         metrics.get("piece_square", ""),
+        "ok" if metrics.get("metadata_intrinsics") is True else "",
+        "ok" if metrics.get("metadata_distortion") is True else "",
+        "ok" if metrics.get("metadata_extrinsics_board_to_camera") is True else "",
+        "ok" if metrics.get("metadata_coordinate_frames") is True else "",
         "ok" if artifact.get("exists") is True else "missing",
     ]
 
@@ -487,7 +491,19 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
     lines.extend(["", "### SimCamera Pose Fixture"])
     lines.extend(
         linked_table(
-            ["Case", "Kind", "Path", "View", "Target Square", "Piece Square", "Status"],
+            [
+                "Case",
+                "Kind",
+                "Path",
+                "View",
+                "Target Square",
+                "Piece Square",
+                "Intrinsics",
+                "Distortion",
+                "Board->Camera",
+                "Frame Notes",
+                "Status",
+            ],
             [pose_fixture_row(row) for row in pose_fixture],
         )
         if pose_fixture
@@ -540,6 +556,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "## Notes",
             "",
             "- This report is a deterministic Markdown view of existing JSON artifacts only.",
+            "- SimCamera pose fixture intrinsics/extrinsics are simulator reference metadata, not physical calibration truth.",
             "- It does not rerun child smokes, open GUI calibration flows, or touch SO-101 hardware.",
             "",
         ]
