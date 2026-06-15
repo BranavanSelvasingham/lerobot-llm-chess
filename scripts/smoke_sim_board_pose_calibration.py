@@ -20,7 +20,13 @@ from lerobot.cameras.configs import ColorMode
 from lerobot.configs.chessboard import ChessBoardParams
 from lerobot.perception.chess.board_model import BoardModel
 from lerobot.perception.chess.board_pose_estimator import BoardPoseEstimator
-from lerobot.sim import SimCamera, SimCameraConfig
+from lerobot.sim import (
+    SIM_CAMERA_CALIBRATION_PROFILES,
+    SimCamera,
+    SimCameraConfig,
+    load_sim_camera_profile_overrides,
+    make_sim_camera_config_from_profile,
+)
 
 CORNER_LABELS = ("a1", "h1", "h8", "a8")
 
@@ -41,6 +47,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--height", type=int, default=240)
     parser.add_argument("--fps", type=int, default=15)
     parser.add_argument("--square-size-mm", type=float, default=50.0)
+    parser.add_argument(
+        "--sim-camera-profile",
+        choices=sorted(SIM_CAMERA_CALIBRATION_PROFILES),
+        default=None,
+        help="Named simulator camera calibration profile. When set, profile dimensions and metadata are used.",
+    )
+    parser.add_argument(
+        "--sim-camera-profile-overrides",
+        type=Path,
+        default=None,
+        help=(
+            "Simulator-only profile_candidate.json with sim_camera_profile_overrides. "
+            "Composes with --sim-camera-profile."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -121,16 +142,38 @@ def main() -> int:
     frame_dir = args.frame_dir.expanduser().resolve()
     frame_dir.mkdir(parents=True, exist_ok=True)
 
-    camera_cfg = SimCameraConfig(
-        width=int(args.width),
-        height=int(args.height),
-        fps=int(args.fps),
-        color_mode=ColorMode.BGR,
-        view=str(args.view),
-        piece_layout="single_pawn",
-        piece_square=str(args.piece_square),
-        track_robot_gripper=True,
-    )
+    try:
+        camera_overrides = (
+            load_sim_camera_profile_overrides(args.sim_camera_profile_overrides)
+            if args.sim_camera_profile_overrides
+            else {}
+        )
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+
+    if args.sim_camera_profile:
+        camera_cfg = make_sim_camera_config_from_profile(
+            str(args.sim_camera_profile),
+            color_mode=ColorMode.BGR,
+            view=str(args.view),
+            piece_layout="single_pawn",
+            piece_square=str(args.piece_square),
+            track_robot_gripper=True,
+            **camera_overrides,
+        )
+    else:
+        camera_values = {
+            "width": int(args.width),
+            "height": int(args.height),
+            "fps": int(args.fps),
+            "color_mode": ColorMode.BGR,
+            "view": str(args.view),
+            "piece_layout": "single_pawn",
+            "piece_square": str(args.piece_square),
+            "track_robot_gripper": True,
+        }
+        camera_cfg = SimCameraConfig(**{**camera_values, **camera_overrides})
     camera = SimCamera(camera_cfg)
 
     try:
@@ -141,7 +184,7 @@ def main() -> int:
         if camera.is_connected:
             camera.disconnect()
 
-    expected_shape = (int(args.height), int(args.width), 3)
+    expected_shape = (int(camera_cfg.height), int(camera_cfg.width), 3)
     assert frame.shape == expected_shape, frame.shape
     assert frame.dtype == np.uint8, frame.dtype
     unique_colors = int(len(np.unique(frame.reshape(-1, 3), axis=0)))
@@ -150,7 +193,7 @@ def main() -> int:
     assert metadata["piece_square"] == str(args.piece_square), metadata
 
     corners_xy = np.asarray(metadata["board_corners_xy"], dtype=float)
-    corner_checks = assert_corners_valid(corners_xy, int(args.width), int(args.height))
+    corner_checks = assert_corners_valid(corners_xy, int(camera_cfg.width), int(camera_cfg.height))
 
     estimator = BoardPoseEstimator(square_size_mm=float(args.square_size_mm))
     board_pose = estimator.estimate_from_corners(corners_xy)
@@ -206,9 +249,16 @@ def main() -> int:
         "frame_path": str(frame_path),
         "annotated_frame_path": str(annotated_path),
         "board_model_path": str(board_model_path),
+        "sim_camera_profile": args.sim_camera_profile,
+        "sim_camera_profile_overrides": (
+            str(args.sim_camera_profile_overrides.expanduser().resolve())
+            if args.sim_camera_profile_overrides
+            else None
+        ),
+        "profile_overrides": camera_overrides,
         "image": {
-            "width": int(args.width),
-            "height": int(args.height),
+            "width": int(camera_cfg.width),
+            "height": int(camera_cfg.height),
             "shape": list(frame.shape),
             "dtype": str(frame.dtype),
             "unique_colors": unique_colors,

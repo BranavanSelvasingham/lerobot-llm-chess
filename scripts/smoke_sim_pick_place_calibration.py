@@ -20,7 +20,13 @@ if str(LLM_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(LLM_TOOLS_DIR))
 
 from lerobot.cameras.configs import ColorMode
-from lerobot.sim import SimCamera, SimCameraConfig
+from lerobot.sim import (
+    SIM_CAMERA_CALIBRATION_PROFILES,
+    SimCamera,
+    SimCameraConfig,
+    load_sim_camera_profile_overrides,
+    make_sim_camera_config_from_profile,
+)
 from llm_toolkit import AppConfig, KinematicsTools
 
 
@@ -56,6 +62,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--width", type=int, default=320)
     parser.add_argument("--height", type=int, default=240)
     parser.add_argument("--fps", type=int, default=15)
+    parser.add_argument(
+        "--sim-camera-profile",
+        choices=sorted(SIM_CAMERA_CALIBRATION_PROFILES),
+        default=None,
+        help="Named simulator camera calibration profile. When set, profile dimensions and metadata are used.",
+    )
+    parser.add_argument(
+        "--sim-camera-profile-overrides",
+        type=Path,
+        default=None,
+        help=(
+            "Simulator-only profile_candidate.json with sim_camera_profile_overrides. "
+            "Composes with --sim-camera-profile."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -139,23 +160,46 @@ def main() -> int:
     frame_dir = args.frame_dir.expanduser().resolve()
     frame_dir.mkdir(parents=True, exist_ok=True)
 
+    try:
+        camera_overrides = (
+            load_sim_camera_profile_overrides(args.sim_camera_profile_overrides)
+            if args.sim_camera_profile_overrides
+            else {}
+        )
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+
+    if args.sim_camera_profile:
+        camera_cfg = make_sim_camera_config_from_profile(
+            str(args.sim_camera_profile),
+            color_mode=ColorMode.BGR,
+            view="gripper",
+            piece_layout="single_pawn",
+            piece_square=source_square,
+            track_robot_gripper=True,
+            **camera_overrides,
+        )
+    else:
+        camera_values = {
+            "width": int(args.width),
+            "height": int(args.height),
+            "fps": int(args.fps),
+            "color_mode": ColorMode.BGR,
+            "view": "gripper",
+            "piece_layout": "single_pawn",
+            "piece_square": source_square,
+            "track_robot_gripper": True,
+        }
+        camera_cfg = SimCameraConfig(**{**camera_values, **camera_overrides})
+
     cfg = AppConfig(
         port=None,
         robot_id="so101_sim_pick_place_calibration",
         sim=True,
-        camera_width=int(args.width),
-        camera_height=int(args.height),
-        camera_fps=int(args.fps),
-    )
-    camera_cfg = SimCameraConfig(
-        width=int(args.width),
-        height=int(args.height),
-        fps=int(args.fps),
-        color_mode=ColorMode.BGR,
-        view="gripper",
-        piece_layout="single_pawn",
-        piece_square=source_square,
-        track_robot_gripper=True,
+        camera_width=int(camera_cfg.width),
+        camera_height=int(camera_cfg.height),
+        camera_fps=int(camera_cfg.fps),
     )
 
     tools = KinematicsTools(cfg)
@@ -275,17 +319,26 @@ def main() -> int:
         pinch_delta = gripper_frame_delta(open_frame, pinch_frame)
         close_delta = gripper_frame_delta(pinch_frame, closed_frame)
         release_delta = gripper_frame_delta(closed_frame, release_frame)
-        min_changed_pixels = int(args.width * args.height * 0.005)
+        min_changed_pixels = int(camera_cfg.width * camera_cfg.height * 0.005)
         assert pinch_delta["changed_pixels"] > min_changed_pixels, pinch_delta
         assert close_delta["changed_pixels"] > min_changed_pixels, close_delta
         assert release_delta["changed_pixels"] > min_changed_pixels, release_delta
 
         sim_status = tools.robot.sim_status() if hasattr(tools.robot, "sim_status") else {}
+        summary_path = frame_dir / "summary.json"
         summary = {
             "ok": True,
             "scenario": "sim_pick_place_calibration",
             "source_square": source_square,
             "target_square": target_square,
+            "sim_camera_profile": args.sim_camera_profile,
+            "sim_camera_profile_overrides": (
+                str(args.sim_camera_profile_overrides.expanduser().resolve())
+                if args.sim_camera_profile_overrides
+                else None
+            ),
+            "profile_overrides": camera_overrides,
+            "summary_path": str(summary_path),
             "piece_square_transition": {
                 "source_capture_labels": [
                     open_capture["label"],
@@ -311,9 +364,7 @@ def main() -> int:
                 "Synthetic frames currently visualize board, piece, and gripper opening, while joint-space pick/place movement is asserted through tool readbacks and metadata.",
             ],
         }
-        summary_path = frame_dir / "summary.json"
         summary_path.write_text(json.dumps(summary, indent=2))
-        summary["summary_path"] = str(summary_path)
     finally:
         if camera.is_connected:
             camera.disconnect()
