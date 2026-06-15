@@ -78,7 +78,7 @@ python chess_robot_ui_llm_v2.py --port /dev/tty.usbmodemXXXX
 
 ### Simulator Calibration Regression
 
-Before simulator, camera profile, or perception calibration changes, run the hardware-free local regression gate documented in [docs/sim_calibration_regression.md](docs/sim_calibration_regression.md). A focused GitHub Actions workflow runs the same gate for relevant pull requests into `feat/telemetry-recording`. The suite records its summary and artifacts under `/private/tmp/lerobot_sim/calibration_regression_suite` locally and skips robot hardware and GUI display paths.
+Before simulator, camera profile, or perception calibration changes, run the hardware-free local regression gate documented in [docs/sim_calibration_regression.md](docs/sim_calibration_regression.md). A focused GitHub Actions workflow runs the same gate for relevant pull requests into `feat/telemetry-recording`. The suite records its summary and artifacts under `/private/tmp/lerobot_sim/calibration_regression_suite` locally, includes deterministic SimCamera pose-fixture frames for nominal and perturbed board/camera views, and skips robot hardware and GUI display paths.
 
 ## 🏗️ Architecture
 

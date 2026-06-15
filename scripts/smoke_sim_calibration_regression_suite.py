@@ -25,7 +25,7 @@ def parse_args() -> argparse.Namespace:
         description=(
             "Run the hardware-free simulator calibration regression suite: reference media "
             "inventory, real-reference comparison set, ranked calibration session report, "
-            "and perception regression fixture manifest."
+            "perception regression fixture manifest, and SimCamera pose fixture."
         )
     )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
@@ -86,6 +86,7 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `comparison_set/comparison_set_summary.json`",
         "- `session/session_summary.json`",
         "- `fixture/fixture_summary.json`",
+        "- `sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json`",
         "- `pick_place_scenario_matrix/scenario_matrix_summary.json`",
         "- `negative_empty_inventory/comparison_set_summary.json`",
         "",
@@ -297,6 +298,52 @@ def selected_fixture_artifacts(fixture: dict[str, Any] | None) -> dict[str, str]
     }
 
 
+def sim_camera_pose_fixture_section(pose_fixture: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
+    artifacts = pose_fixture.get("artifacts") if pose_fixture else None
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    frame_paths = artifacts.get("frame_paths")
+    annotated_frame_paths = artifacts.get("annotated_frame_paths")
+    metadata_paths = artifacts.get("metadata_paths")
+    cases = pose_fixture.get("cases") if pose_fixture else None
+    case_rows = cases if isinstance(cases, list) else []
+    return {
+        "summary_path": str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(pose_fixture.get("ok", False)) if pose_fixture else False,
+        "status": pose_fixture.get("status") if pose_fixture else None,
+        "case_count": pose_fixture.get("case_count") if pose_fixture else None,
+        "case_ids": pose_fixture.get("case_ids") if pose_fixture else None,
+        "frame_paths": frame_paths if isinstance(frame_paths, dict) else {},
+        "annotated_frame_paths": annotated_frame_paths if isinstance(annotated_frame_paths, dict) else {},
+        "metadata_paths": metadata_paths if isinstance(metadata_paths, dict) else {},
+        "hardware_skipped": pose_fixture.get("hardware_skipped") if pose_fixture else None,
+        "gui_skipped": pose_fixture.get("gui_skipped") if pose_fixture else None,
+        "comparisons_to_nominal": pose_fixture.get("comparisons_to_nominal") if pose_fixture else None,
+        "cases": [
+            {
+                "case_id": case.get("case_id"),
+                "view": case.get("view"),
+                "profile": case.get("profile"),
+                "target_square": (
+                    case.get("projection", {}).get("target_square", {}).get("square")
+                    if isinstance(case.get("projection"), dict)
+                    else None
+                ),
+                "piece_square": (
+                    case.get("projection", {}).get("piece_square", {}).get("square")
+                    if isinstance(case.get("projection"), dict)
+                    else None
+                ),
+                "unique_colors": (
+                    case.get("image", {}).get("unique_colors") if isinstance(case.get("image"), dict) else None
+                ),
+            }
+            for case in case_rows
+            if isinstance(case, dict)
+        ],
+    }
+
+
 def matrix_summary_section(matrix: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
     scenarios = matrix.get("scenarios") if matrix else None
     scenario_rows = scenarios if isinstance(scenarios, list) else []
@@ -504,6 +551,26 @@ def main() -> int:
         )
         fixture = None
 
+    pose_fixture_dir = output_dir / "sim_camera_pose_fixture"
+    pose_fixture_summary_path = pose_fixture_dir / "sim_camera_pose_fixture_summary.json"
+    pose_fixture_record, pose_fixture = run_child(
+        name="sim_camera_pose_fixture",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_camera_pose_fixture.py"),
+            "--output-dir",
+            str(pose_fixture_dir),
+            "--profile",
+            str(args.base_profile),
+            "--target-square",
+            str(args.source_square),
+            "--closed-gripper-square",
+            str(args.target_square),
+        ],
+        output_dir=pose_fixture_dir,
+        expected_json_path=pose_fixture_summary_path,
+    )
+
     matrix_dir = output_dir / "pick_place_scenario_matrix"
     matrix_summary_path = matrix_dir / "scenario_matrix_summary.json"
     matrix_record, matrix = run_child(
@@ -532,6 +599,7 @@ def main() -> int:
         "comparison_set": comparison_record,
         "calibration_session_report": session_record,
         "perception_regression_fixture": fixture_record,
+        "sim_camera_pose_fixture": pose_fixture_record,
         "pick_place_scenario_matrix": matrix_record,
     }
     if negative_record is not None:
@@ -590,6 +658,10 @@ def main() -> int:
             "selected_candidate": fixture.get("selected_candidate") if fixture else None,
             "artifact_paths": selected_fixture_artifacts(fixture),
         },
+        "sim_camera_pose_fixture": sim_camera_pose_fixture_section(
+            pose_fixture,
+            pose_fixture_summary_path,
+        ),
         "pick_place_scenario_matrix": matrix_summary_section(matrix, matrix_summary_path),
         "selected_candidate": {
             "requested_rank": int(args.select_rank),

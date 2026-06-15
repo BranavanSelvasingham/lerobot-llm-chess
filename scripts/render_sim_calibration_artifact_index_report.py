@@ -16,15 +16,17 @@ CATEGORY_ORDER = {
     "real_reference_comparison": 1,
     "ranked_candidate": 2,
     "perception_fixture": 3,
-    "pick_place_scenario": 4,
-    "negative_check": 5,
-    "logs": 6,
+    "sim_camera_pose_fixture": 4,
+    "pick_place_scenario": 5,
+    "negative_check": 6,
+    "logs": 7,
 }
 CATEGORY_LABELS = {
     "real_reference_media": "Real Reference Media",
     "real_reference_comparison": "Real Reference Comparisons",
     "ranked_candidate": "Ranked Candidate Captures",
     "perception_fixture": "Perception Fixture Evidence",
+    "sim_camera_pose_fixture": "SimCamera Pose Fixture",
     "pick_place_scenario": "Pick/Place Release Frames",
     "negative_check": "Negative Check",
     "logs": "Child Logs",
@@ -320,6 +322,21 @@ def release_row(artifact: dict[str, Any]) -> list[Any]:
     ]
 
 
+def pose_fixture_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("scenario_id", ""),
+        artifact.get("kind", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("view", ""),
+        metrics.get("target_square", ""),
+        metrics.get("piece_square", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
 def negative_status(index: dict[str, Any], suite: dict[str, Any] | None) -> Any:
     if suite is not None:
         negative = suite.get("negative_check")
@@ -460,6 +477,21 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         linked_table(["Kind", "Label", "Path", "Status"], [evidence_row(row) for row in fixture])
         if fixture
         else ["_No perception fixture artifacts indexed._"]
+    )
+
+    pose_fixture = [
+        row
+        for row in grouped.get("sim_camera_pose_fixture", [])
+        if row.get("label") != "sim_camera_pose_fixture:summary"
+    ]
+    lines.extend(["", "### SimCamera Pose Fixture"])
+    lines.extend(
+        linked_table(
+            ["Case", "Kind", "Path", "View", "Target Square", "Piece Square", "Status"],
+            [pose_fixture_row(row) for row in pose_fixture],
+        )
+        if pose_fixture
+        else ["_No SimCamera pose fixture artifacts indexed._"]
     )
 
     releases = [

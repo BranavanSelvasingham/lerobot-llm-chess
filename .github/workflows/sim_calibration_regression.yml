@@ -125,6 +125,21 @@ jobs:
           assert summary["comparison_set"]["artifacts"], summary["comparison_set"]
           assert summary["perception_fixture"]["status"] == "ok", summary["perception_fixture"]
           assert summary["perception_fixture"]["artifact_paths"], summary["perception_fixture"]
+          pose_fixture = summary["sim_camera_pose_fixture"]
+          assert pose_fixture["ok"] is True, pose_fixture
+          assert pose_fixture["status"] == "ok", pose_fixture
+          assert pose_fixture["case_count"] >= 2, pose_fixture
+          assert "nominal_gripper_open_e4" in pose_fixture["case_ids"], pose_fixture["case_ids"]
+          assert "perturbed_board_pose_open_e4" in pose_fixture["case_ids"], pose_fixture["case_ids"]
+          assert pose_fixture["frame_paths"], pose_fixture
+          assert pose_fixture["annotated_frame_paths"], pose_fixture
+          assert pose_fixture["metadata_paths"], pose_fixture
+          for case_id in pose_fixture["case_ids"]:
+              assert Path(pose_fixture["frame_paths"][case_id]).is_file(), (case_id, pose_fixture)
+              assert Path(pose_fixture["annotated_frame_paths"][case_id]).is_file(), (case_id, pose_fixture)
+              assert Path(pose_fixture["metadata_paths"][case_id]).is_file(), (case_id, pose_fixture)
+          assert pose_fixture["hardware_skipped"] is True, pose_fixture
+          assert pose_fixture["gui_skipped"] is True, pose_fixture
           matrix = summary["pick_place_scenario_matrix"]
           assert matrix["ok"] is True, matrix
           assert matrix["aggregate_status"]["ok"] is True, matrix["aggregate_status"]
@@ -200,6 +215,7 @@ jobs:
               "real_reference_comparison",
               "ranked_candidate",
               "perception_fixture",
+              "sim_camera_pose_fixture",
               "pick_place_scenario",
               "negative_check",
               "logs",
@@ -241,6 +257,18 @@ jobs:
               row.get("exists") is True and row.get("kind") in {"json", "image"}
               for row in artifacts_by_category["perception_fixture"]
           ), artifacts_by_category["perception_fixture"]
+          assert any(
+              row.get("kind") == "image"
+              and row.get("exists") is True
+              and row.get("scenario_id") == "nominal_gripper_open_e4"
+              for row in artifacts_by_category["sim_camera_pose_fixture"]
+          ), artifacts_by_category["sim_camera_pose_fixture"]
+          assert any(
+              row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("scenario_id") == "perturbed_board_pose_open_e4"
+              for row in artifacts_by_category["sim_camera_pose_fixture"]
+          ), artifacts_by_category["sim_camera_pose_fixture"]
           indexed_release_scenarios = {
               row.get("scenario_id")
               for row in artifacts_by_category["pick_place_scenario"]
@@ -297,6 +325,11 @@ jobs:
                           "release_frame_paths": matrix["release_frame_paths"],
                           "piece_visibility": matrix["piece_visibility"],
                       },
+                      "sim_camera_pose_fixture": {
+                          "summary_path": pose_fixture["summary_path"],
+                          "case_ids": pose_fixture["case_ids"],
+                          "frame_paths": pose_fixture["frame_paths"],
+                      },
                       "negative_check": summary["negative_check"]["status"],
                       "artifact_index": {
                           "path": str(artifact_index_path),
@@ -330,6 +363,7 @@ jobs:
               "comparison_set/comparison_set_summary.json",
               "session/session_summary.json",
               "fixture/fixture_summary.json",
+              "sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json",
               "pick_place_scenario_matrix/scenario_matrix_summary.json",
               "negative_empty_inventory/comparison_set_summary.json",
           ]

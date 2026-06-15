@@ -8,11 +8,19 @@ Run this hardware-free gate before changing simulator rendering, camera profiles
 
 The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json` has `"ok": true` and `"status": "ok"`. It also writes a root `/private/tmp/lerobot_sim/calibration_regression_suite/README.md`, `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index_report.md`, and `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index.json`. For quick review, open `artifact_index_report.md` first; it is a deterministic Markdown view of the compact artifact index and links the highest-signal generated evidence. The root `README.md` repeats that entrypoint, the core JSON summaries, the hardware/gui skipped markers, and the current real-media gap.
 
+For a narrower camera/board pose check without running the full suite:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_camera_pose_fixture.py --output-dir /private/tmp/lerobot_sim/sim_camera_pose_fixture
+```
+
+That writes `/private/tmp/lerobot_sim/sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json` plus one raw frame, annotated frame, and `camera_metadata.json` per deterministic case.
+
 ## GitHub Actions Signal
 
 The focused `Simulator Calibration Regression` workflow runs the same hardware-free suite for pull requests targeting `feat/telemetry-recording` when simulator, camera, chess perception, smoke-script, report-renderer, reference-image, or gate documentation paths change. It uses Python 3.12, installs only the Python modules needed by this suite, verifies the generated summary fields, writes a job summary naming the uploaded artifact, and uploads the suite output directory as a workflow artifact. After downloading the artifact, open `artifact_index_report.md` first, then follow its links to images, JSON summaries, and child logs.
 
-The workflow also treats `pick_place_scenario_matrix.piece_visibility` and `artifact_index.json` as part of the artifact contract. All four scenarios must report available visibility evidence, each target release frame path must exist, and each `target_release_open` row must include visible fraction, occlusion fraction, and gripper-clearance fields. The generated artifact index must exist, report `status: "ok"`, have a nonzero artifact count, have no missing artifacts, and include populated categories for real-reference comparisons, ranked candidates, perception fixture evidence, pick/place scenario release frames, the negative check, and child logs. These are structural availability checks rather than exact metric-value thresholds.
+The workflow also treats `sim_camera_pose_fixture`, `pick_place_scenario_matrix.piece_visibility`, and `artifact_index.json` as part of the artifact contract. The pose fixture must report deterministic nominal and perturbed case IDs, raw frames, annotated frames, per-case metadata JSON, projected board corners, and target/piece centers. All four pick/place scenarios must report available visibility evidence, each target release frame path must exist, and each `target_release_open` row must include visible fraction, occlusion fraction, and gripper-clearance fields. The generated artifact index must exist, report `status: "ok"`, have a nonzero artifact count, have no missing artifacts, and include populated categories for real-reference comparisons, ranked candidates, perception fixture evidence, SimCamera pose fixture evidence, pick/place scenario release frames, the negative check, and child logs. These are structural availability checks rather than exact metric-value thresholds.
 
 This CI signal is still a simulator/perception regression gate only. It does not connect to SO-101 hardware, open GUI calibration flows, or replace later physical robot validation.
 
@@ -24,6 +32,7 @@ The suite orchestrates these existing smoke scripts as subprocesses and records 
 - `smoke_sim_reference_media_comparison_set.py` runs real-reference comparison artifacts for selected images.
 - `smoke_sim_calibration_session_report.py` ranks baseline and perturbed local SimCamera candidates.
 - `smoke_sim_perception_regression_fixture.py` packages the selected ranked candidate into perception fixture evidence.
+- `smoke_sim_camera_pose_fixture.py` renders deterministic nominal, perturbed, overview, and gripper-state SimCamera pose review frames plus per-case metadata.
 - `smoke_sim_pick_place_scenario_matrix.py` runs center, edge-file, back-rank, and near-gripper pick/place scenarios.
 - With `--include-negative-check`, an empty-inventory comparison-set run must fail clearly while the aggregate suite still passes.
 
@@ -35,10 +44,13 @@ A passing summary should show:
 - `comparison_set.status: "ok"`
 - `calibration_session.selected_candidate` populated with the rank-1 candidate
 - `perception_fixture.status: "ok"` and fixture artifact paths populated
+- `sim_camera_pose_fixture.status: "ok"` with deterministic nominal and perturbed case IDs, frame paths, annotated-frame paths, and metadata paths populated
 - `pick_place_scenario_matrix.aggregate_status.ok: true` with four scenario IDs and release-frame paths populated
 - `pick_place_scenario_matrix.piece_visibility.all_scenarios_available: true` with per-scenario visible fraction, occlusion fraction, and gripper clearance values
 - `negative_check.status: "no_reference_media_selected"` when `--include-negative-check` is used
-- `artifact_index.status: "ok"` with `artifact_count > 0`, `missing_artifact_count: 0`, an existing `path`, and categories covering real-reference comparison, ranked candidate, perception fixture, pick/place scenario, negative check, and logs
+- `artifact_index.status: "ok"` with `artifact_count > 0`, `missing_artifact_count: 0`, an existing `path`, and categories covering real-reference comparison, ranked candidate, perception fixture, SimCamera pose fixture, pick/place scenario, negative check, and logs
+
+The `sim_camera_pose_fixture` signal is a simulator-only pose artifact. It freezes the synthetic camera marker clock inside the smoke process, renders a small deterministic set of SimCamera frames, and writes one `camera_metadata.json` per case with view/profile data, board corners, target square center, piece square center, gripper state, and image hashes. It compares perturbed and alternate views against the nominal gripper-open case for review, but does not use pixel deltas as thresholds.
 
 The `piece_visibility` signal is a simulator-only geometry metric. Each pick/place capture reconstructs the active piece disc and visible gripper finger polygons from synthetic capture metadata, then reports:
 
@@ -70,6 +82,10 @@ Common artifact paths under the output directory:
 - `session/candidates/*/board_pose/frame_annotated.jpg`
 - `session/candidates/*/pick_place/06_target_release_open.jpg`
 - `fixture/fixture_summary.json`
+- `sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json`
+- `sim_camera_pose_fixture/cases/*/frame.png`
+- `sim_camera_pose_fixture/cases/*/frame_annotated.png`
+- `sim_camera_pose_fixture/cases/*/camera_metadata.json`
 - `pick_place_scenario_matrix/scenario_matrix_summary.json`
 - `pick_place_scenario_matrix/scenarios/*/summary.json`
 - `pick_place_scenario_matrix/scenarios/*/06_target_release_open.jpg`
@@ -140,6 +156,8 @@ print({
     "hardware_skipped": summary["hardware_skipped"],
     "gui_skipped": summary["gui_skipped"],
     "selected_candidate": summary["selected_candidate"]["candidate_id"],
+    "pose_fixture_cases": summary["sim_camera_pose_fixture"]["case_ids"],
+    "pose_fixture_frames": summary["sim_camera_pose_fixture"]["frame_paths"],
     "matrix_scenarios": summary["pick_place_scenario_matrix"]["scenario_ids"],
     "matrix_release_frames": summary["pick_place_scenario_matrix"]["release_frame_paths"],
     "matrix_piece_visibility": summary["pick_place_scenario_matrix"]["piece_visibility"],
