@@ -104,10 +104,14 @@ jobs:
           python - <<'PY'
           import json
           import os
+          from numbers import Real
           from pathlib import Path
 
           summary_path = Path(os.environ["CALIBRATION_REGRESSION_OUTPUT_DIR"]) / "calibration_regression_summary.json"
           summary = json.loads(summary_path.read_text())
+
+          def assert_json_number(value, label):
+              assert isinstance(value, Real) and not isinstance(value, bool), (label, value)
 
           assert summary["ok"] is True, summary["aggregate_status"]
           assert summary["status"] == "ok", summary["status"]
@@ -129,6 +133,42 @@ jobs:
               "near_gripper_lower_board",
           ], matrix["scenario_ids"]
           assert matrix["release_frame_paths"], matrix
+          expected_scenario_ids = matrix["scenario_ids"]
+          for scenario_id in expected_scenario_ids:
+              release_path = matrix["release_frame_paths"].get(scenario_id)
+              assert isinstance(release_path, str) and Path(release_path).is_file(), (
+                  scenario_id,
+                  release_path,
+              )
+
+          visibility = matrix["piece_visibility"]
+          assert visibility["all_scenarios_available"] is True, visibility
+          assert visibility["available_scenario_count"] == 4, visibility
+          assert visibility["scenario_count"] == 4, visibility
+          visibility_rows = {
+              row["scenario_id"]: row
+              for row in visibility["scenarios"]
+              if isinstance(row, dict) and isinstance(row.get("scenario_id"), str)
+          }
+          assert list(visibility_rows) == expected_scenario_ids, visibility_rows
+
+          visibility_by_scenario = matrix["piece_visibility_by_scenario"]
+          assert list(visibility_by_scenario) == expected_scenario_ids, visibility_by_scenario
+          for scenario_id in expected_scenario_ids:
+              row = visibility_rows[scenario_id]
+              assert row["available"] is True, row
+              release = row["target_release_open"]
+              assert isinstance(release, dict), row
+              assert release["label"] == "target_release_open", release
+              assert release["path"] == matrix["release_frame_paths"][scenario_id], release
+              assert_json_number(release["visible_fraction"], f"{scenario_id}.visible_fraction")
+              assert_json_number(release["occlusion_fraction"], f"{scenario_id}.occlusion_fraction")
+              assert "min_clearance_px" in release, release
+              assert "clear_of_gripper" in release, release
+
+              scenario_release = visibility_by_scenario[scenario_id]["target_release_open"]
+              assert scenario_release == release, (scenario_id, scenario_release, release)
+
           assert summary["negative_check"]["status"] == "no_reference_media_selected", summary["negative_check"]
 
           print(
@@ -142,6 +182,7 @@ jobs:
                           "summary_path": matrix["summary_path"],
                           "scenario_ids": matrix["scenario_ids"],
                           "release_frame_paths": matrix["release_frame_paths"],
+                          "piece_visibility": matrix["piece_visibility"],
                       },
                       "negative_check": summary["negative_check"]["status"],
                   },

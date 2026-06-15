@@ -12,6 +12,8 @@ The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/cal
 
 The focused `Simulator Calibration Regression` workflow runs the same hardware-free suite for pull requests targeting `feat/telemetry-recording` when simulator, camera, chess perception, smoke-script, reference-image, or gate documentation paths change. It uses Python 3.12, installs only the Python modules needed by this suite, verifies the generated summary fields, and uploads the suite output directory as a workflow artifact.
 
+The workflow also treats `pick_place_scenario_matrix.piece_visibility` as part of the artifact contract: all four scenarios must report available visibility evidence, each target release frame path must exist, and each `target_release_open` row must include visible fraction, occlusion fraction, and gripper-clearance fields. These are structural availability checks rather than exact metric-value thresholds.
+
 This CI signal is still a simulator/perception regression gate only. It does not connect to SO-101 hardware, open GUI calibration flows, or replace later physical robot validation.
 
 ## What This Proves
