@@ -796,6 +796,72 @@ def collect_visual_review_artifacts(
             ),
         )
 
+    scorecard = visual_review.get("depth_distance_scorecard")
+    scorecard = scorecard if isinstance(scorecard, dict) else {}
+    scorecard_paths = scorecard.get("paths")
+    scorecard_paths = scorecard_paths if isinstance(scorecard_paths, dict) else {}
+    scorecard_baseline = scorecard.get("metadata_derived_baseline")
+    scorecard_baseline = scorecard_baseline if isinstance(scorecard_baseline, dict) else {}
+    scorecard_pnp = scorecard.get("pnp_residuals")
+    scorecard_pnp = scorecard_pnp if isinstance(scorecard_pnp, dict) else {}
+    scorecard_gap = scorecard.get("real_camera_depth_gap")
+    scorecard_gap = scorecard_gap if isinstance(scorecard_gap, dict) else {}
+    scorecard_visual = scorecard.get("visual")
+    scorecard_visual = scorecard_visual if isinstance(scorecard_visual, dict) else {}
+    scorecard_artifact_summary = {
+        "status": scorecard.get("status"),
+        "ok": scorecard.get("ok"),
+        "review_status": scorecard.get("review_status"),
+        "at_a_glance": scorecard.get("at_a_glance"),
+        "frame_count": scorecard.get("frame_count"),
+        "status_labels": scorecard.get("status_labels"),
+        "baseline_quality": scorecard_baseline.get("quality"),
+        "baseline_quality_status": scorecard_baseline.get("quality_status"),
+        "worst_mean_abs_depth_error_mm": scorecard_baseline.get(
+            "worst_mean_abs_depth_error_mm"
+        ),
+        "mean_abs_camera_to_piece_error_mm": scorecard_baseline.get(
+            "mean_abs_camera_to_piece_error_mm"
+        ),
+        "mean_abs_camera_to_board_error_mm": scorecard_baseline.get(
+            "mean_abs_camera_to_board_error_mm"
+        ),
+        "mean_abs_camera_to_target_square_error_mm": scorecard_baseline.get(
+            "mean_abs_camera_to_target_square_error_mm"
+        ),
+        "mean_board_corner_reprojection_residual_px": scorecard_baseline.get(
+            "mean_board_corner_reprojection_residual_px"
+        ),
+        "metadata_corner_quality": scorecard_pnp.get("quality"),
+        "mean_metadata_projected_corner_residual_px": scorecard_pnp.get(
+            "mean_metadata_projected_corner_residual_px"
+        ),
+        "not_geometrically_comparable_row_count": scorecard_pnp.get(
+            "not_geometrically_comparable_row_count"
+        ),
+        "real_camera_depth_status": scorecard_gap.get("status"),
+        "needs_real_depth_reference": scorecard_gap.get("needs_real_depth_reference"),
+        "source_artifacts": scorecard.get("source_artifacts"),
+        "output_dimensions": scorecard_visual.get("output_dimensions"),
+    }
+    for key, label_suffix in (("png", "png"), ("json", "json")):
+        add_path(
+            artifacts,
+            category="visual_review",
+            label=f"visual_review:pick_place_depth_distance_scorecard:{label_suffix}",
+            value=scorecard_paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"visual_review.depth_distance_scorecard.paths.{key}",
+            metrics=scorecard_artifact_summary,
+            scenario_id=(
+                scorecard.get("scenario_id")
+                if isinstance(scorecard.get("scenario_id"), str)
+                else None
+            ),
+        )
+
     contact_sheets = visual_review.get("contact_sheets")
     contact_sheet_rows = contact_sheets if isinstance(contact_sheets, list) else []
     for sheet in contact_sheet_rows:

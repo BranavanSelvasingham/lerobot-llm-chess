@@ -9,6 +9,7 @@ import json
 import math
 import shutil
 import sys
+import textwrap
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ SCHEMA = "lerobot.sim.calibration_visual_review.v1"
 PERCEIVED_DEPTH_COMPARISON_SCHEMA = "lerobot.sim.pick_place_perceived_depth_comparison.v1"
 PNP_RESIDUAL_DIAGNOSTIC_SCHEMA = "lerobot.sim.pick_place_pnp_residual_diagnostics.v1"
 METADATA_NATIVE_DEPTH_VIEW_SCHEMA = "lerobot.sim.pick_place_metadata_native_depth_view.v1"
+DEPTH_DISTANCE_SCORECARD_SCHEMA = "lerobot.sim.pick_place_depth_distance_scorecard.v1"
 DEFAULT_CONTACT_SHEET_CELL_WIDTH = 360
 DEFAULT_VIDEO_FPS = 1.0
 VIDEO_CODEC = "mp4v"
@@ -2187,6 +2189,815 @@ def write_perceived_depth_comparison(
     return summary
 
 
+def finite_float(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number):
+        return None
+    return number
+
+
+def numeric_stats(values: list[Any], *, digits: int = 3) -> dict[str, Any]:
+    finite = [value for value in (finite_float(value) for value in values) if value is not None]
+    if not finite:
+        return {"count": 0, "mean": None, "min": None, "max": None}
+    return {
+        "count": len(finite),
+        "mean": round(float(np.mean(finite)), digits),
+        "min": round(float(np.min(finite)), digits),
+        "max": round(float(np.max(finite)), digits),
+    }
+
+
+def scorecard_flat_metric_values(rows: list[dict[str, Any]], key: str) -> list[Any]:
+    values: list[Any] = []
+    for row in rows:
+        flat = row.get("distance_depth_fields")
+        flat = flat if isinstance(flat, dict) else {}
+        values.append(flat.get(key))
+    return values
+
+
+def quality_label(value: Any, *, good_at_most: float, warning_at_most: float) -> str:
+    number = finite_float(value)
+    if number is None:
+        return "unknown"
+    if number <= good_at_most:
+        return "good"
+    if number <= warning_at_most:
+        return "warning"
+    return "bad"
+
+
+def scorecard_quality_status(label: str, *, metric: str) -> str:
+    if label == "unknown":
+        return f"{metric}_unknown"
+    return f"{metric}_{label}_vs_sim"
+
+
+def first_row_by_id(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {
+        str(row.get("id")): row
+        for row in rows
+        if isinstance(row, dict) and row.get("id") is not None
+    }
+
+
+def pnp_vs_ground_truth_status(row: dict[str, Any]) -> str | None:
+    comparability = row.get("source_comparability")
+    comparability = comparability if isinstance(comparability, dict) else {}
+    pnp_vs_gt = comparability.get("rendered_board_corner_pnp_vs_sim_ground_truth")
+    pnp_vs_gt = pnp_vs_gt if isinstance(pnp_vs_gt, dict) else {}
+    status = pnp_vs_gt.get("status")
+    return str(status) if isinstance(status, str) and status else None
+
+
+def build_depth_distance_scorecard_payload(
+    *,
+    output_dir: Path,
+    suite_output_dir: Path,
+    sequence_metadata: dict[str, Any],
+    distance_metrics: dict[str, Any],
+    perceived_depth_comparison: dict[str, Any],
+    pnp_residual_diagnostics: dict[str, Any],
+    metadata_native_depth_view: dict[str, Any],
+) -> dict[str, Any]:
+    distance_rows = [
+        row for row in distance_metrics.get("rows", []) if isinstance(row, dict)
+    ] if isinstance(distance_metrics.get("rows"), list) else []
+    comparison_rows = [
+        row for row in perceived_depth_comparison.get("rows", []) if isinstance(row, dict)
+    ] if isinstance(perceived_depth_comparison.get("rows"), list) else []
+    pnp_rows = [
+        row for row in pnp_residual_diagnostics.get("rows", []) if isinstance(row, dict)
+    ] if isinstance(pnp_residual_diagnostics.get("rows"), list) else []
+    pnp_by_id = first_row_by_id(pnp_rows)
+    distance_by_id = first_row_by_id(distance_rows)
+
+    comparison_aggregate = perceived_depth_comparison.get("aggregate")
+    comparison_aggregate = comparison_aggregate if isinstance(comparison_aggregate, dict) else {}
+    pnp_aggregate = pnp_residual_diagnostics.get("aggregate")
+    pnp_aggregate = pnp_aggregate if isinstance(pnp_aggregate, dict) else {}
+    estimator = perceived_depth_comparison.get("estimator")
+    estimator = estimator if isinstance(estimator, dict) else {}
+    true_depth = distance_metrics.get("true_depth_estimation")
+    true_depth = true_depth if isinstance(true_depth, dict) else {}
+
+    depth_error_means = [
+        comparison_aggregate.get("mean_abs_camera_to_piece_error_mm"),
+        comparison_aggregate.get("mean_abs_camera_to_board_error_mm"),
+        comparison_aggregate.get("mean_abs_camera_to_target_square_error_mm"),
+    ]
+    worst_mean_depth_error_mm = max(
+        (value for value in (finite_float(value) for value in depth_error_means) if value is not None),
+        default=None,
+    )
+    baseline_depth_quality = quality_label(
+        worst_mean_depth_error_mm,
+        good_at_most=25.0,
+        warning_at_most=75.0,
+    )
+    pnp_reprojection_quality = quality_label(
+        comparison_aggregate.get("mean_board_corner_reprojection_residual_px"),
+        good_at_most=2.0,
+        warning_at_most=5.0,
+    )
+    metadata_corner_quality = quality_label(
+        pnp_aggregate.get("mean_metadata_projected_corner_residual_px"),
+        good_at_most=2.0,
+        warning_at_most=5.0,
+    )
+    not_comparable_count = int(pnp_aggregate.get("not_geometrically_comparable_row_count") or 0)
+    if not_comparable_count:
+        baseline_depth_quality = "bad"
+
+    if baseline_depth_quality == "bad" or metadata_corner_quality == "bad":
+        at_a_glance = "bad_metadata_baseline_alignment"
+    elif baseline_depth_quality == "warning" or metadata_corner_quality == "warning":
+        at_a_glance = "warning_metadata_baseline_alignment"
+    elif baseline_depth_quality == "good" and metadata_corner_quality == "good":
+        at_a_glance = "good_metadata_baseline_alignment"
+    else:
+        at_a_glance = "unknown_metadata_baseline_alignment"
+    review_status = "needs_real_depth_reference"
+
+    pnp_status_counts: dict[str, int] = {}
+    for row in pnp_rows:
+        status = pnp_vs_ground_truth_status(row) or "unknown"
+        pnp_status_counts[status] = pnp_status_counts.get(status, 0) + 1
+
+    stage_rows: list[dict[str, Any]] = []
+    for comparison in comparison_rows:
+        row_id = str(comparison.get("id"))
+        pnp_row = pnp_by_id.get(row_id, {})
+        distance_row = distance_by_id.get(row_id, {})
+        flat = distance_row.get("distance_depth_fields")
+        flat = flat if isinstance(flat, dict) else {}
+        stage_rows.append(
+            {
+                "id": comparison.get("id"),
+                "stage": comparison.get("stage"),
+                "capture_label": comparison.get("capture_label"),
+                "status": comparison.get("status"),
+                "sim_ground_truth": {
+                    "camera_to_piece_distance_mm": comparison.get(
+                        "ground_truth_camera_to_piece_distance_mm"
+                    ),
+                    "camera_to_board_plane_distance_mm": comparison.get(
+                        "ground_truth_camera_to_board_plane_distance_mm"
+                    ),
+                    "camera_to_target_square_distance_mm": comparison.get(
+                        "ground_truth_camera_to_target_square_distance_mm"
+                    ),
+                    "piece_projected_pixel_xy": flat.get("piece_projected_pixel_xy"),
+                    "piece_rendered_pixel_xy": flat.get("piece_rendered_pixel_xy"),
+                    "piece_projection_residual_px": flat.get("piece_projection_residual_px"),
+                },
+                "metadata_derived_baseline": {
+                    "estimated_camera_to_piece_distance_mm": comparison.get(
+                        "estimated_camera_to_piece_distance_mm"
+                    ),
+                    "estimated_camera_to_board_plane_distance_mm": comparison.get(
+                        "estimated_camera_to_board_plane_distance_mm"
+                    ),
+                    "estimated_camera_to_target_square_distance_mm": comparison.get(
+                        "estimated_camera_to_target_square_distance_mm"
+                    ),
+                    "camera_to_piece_error_mm": comparison.get("camera_to_piece_error_mm"),
+                    "camera_to_piece_abs_error_mm": comparison.get(
+                        "camera_to_piece_abs_error_mm"
+                    ),
+                    "camera_to_board_error_mm": comparison.get("camera_to_board_error_mm"),
+                    "camera_to_board_abs_error_mm": comparison.get(
+                        "camera_to_board_abs_error_mm"
+                    ),
+                    "camera_to_target_square_error_mm": comparison.get(
+                        "camera_to_target_square_error_mm"
+                    ),
+                    "camera_to_target_square_abs_error_mm": comparison.get(
+                        "camera_to_target_square_abs_error_mm"
+                    ),
+                    "board_corner_reprojection_mean_residual_px": comparison.get(
+                        "board_corner_reprojection_mean_residual_px"
+                    ),
+                    "board_corner_reprojection_max_residual_px": comparison.get(
+                        "board_corner_reprojection_max_residual_px"
+                    ),
+                    "pnp_vs_sim_ground_truth_status": pnp_vs_ground_truth_status(pnp_row),
+                    "reason_labels": pnp_row.get("reason_labels"),
+                },
+            }
+        )
+
+    json_path = output_dir / "pick_place_depth_distance_scorecard.json"
+    png_path = output_dir / "pick_place_depth_distance_scorecard.png"
+    return {
+        "schema": DEPTH_DISTANCE_SCORECARD_SCHEMA,
+        "ok": bool(distance_rows and comparison_rows),
+        "status": "ok" if distance_rows and comparison_rows else "validation_failed",
+        "review_status": review_status,
+        "at_a_glance": at_a_glance,
+        "scenario_id": sequence_metadata.get("scenario_id"),
+        "source_square": sequence_metadata.get("source_square"),
+        "target_square": sequence_metadata.get("target_square"),
+        "frame_count": len(comparison_rows),
+        "paths": {
+            "png": str(png_path),
+            "json": str(json_path),
+            "png_relative_path": output_relative(png_path, suite_output_dir),
+            "json_relative_path": output_relative(json_path, suite_output_dir),
+        },
+        "status_labels": [
+            {
+                "label": "sim_ground_truth",
+                "status": "available" if distance_rows else "missing",
+                "source": "pick_place_depth_distance_metrics",
+            },
+            {
+                "label": "metadata_derived_baseline",
+                "status": scorecard_quality_status(
+                    baseline_depth_quality,
+                    metric="metadata_derived_baseline",
+                ),
+                "source": PERCEIVED_DEPTH_ESTIMATOR_SOURCE,
+            },
+            {
+                "label": "not_real_camera_depth",
+                "status": "not_implemented",
+                "source": "no real camera pixels or depth sensor are consumed",
+            },
+            {
+                "label": "needs_real_depth_reference",
+                "status": "blocked_until_real_capture_sidecars_exist",
+                "source": "real SO-101 capture sidecars are required for real-vs-sim residuals",
+            },
+        ],
+        "quality_thresholds": {
+            "mean_abs_depth_error_mm": {
+                "good_at_most": 25.0,
+                "warning_at_most": 75.0,
+                "bad_above": 75.0,
+            },
+            "corner_reprojection_residual_px": {
+                "good_at_most": 2.0,
+                "warning_at_most": 5.0,
+                "bad_above": 5.0,
+            },
+        },
+        "sim_ground_truth": {
+            "source": "camera_metadata.extrinsics.board_to_camera + SimCamera intrinsics",
+            "status": "sim_ground_truth",
+            "camera_to_piece_distance_mm": numeric_stats(
+                scorecard_flat_metric_values(distance_rows, "camera_to_piece_distance_mm"),
+                digits=1,
+            ),
+            "camera_to_board_plane_distance_mm": numeric_stats(
+                scorecard_flat_metric_values(distance_rows, "camera_to_board_plane_distance_mm"),
+                digits=1,
+            ),
+            "camera_to_target_square_distance_mm": numeric_stats(
+                scorecard_flat_metric_values(
+                    distance_rows,
+                    "camera_to_target_square_distance_mm",
+                ),
+                digits=1,
+            ),
+            "piece_projection_residual_px": numeric_stats(
+                scorecard_flat_metric_values(distance_rows, "piece_projection_residual_px"),
+                digits=3,
+            ),
+            "target_square_projection_residual_px": numeric_stats(
+                scorecard_flat_metric_values(
+                    distance_rows,
+                    "target_square_projection_residual_px",
+                ),
+                digits=3,
+            ),
+        },
+        "metadata_derived_baseline": {
+            "estimator": estimator.get("name") or PERCEIVED_DEPTH_ESTIMATOR_NAME,
+            "status": estimator.get("status") or PERCEIVED_DEPTH_ESTIMATOR_STATUS,
+            "quality": baseline_depth_quality,
+            "quality_status": scorecard_quality_status(
+                baseline_depth_quality,
+                metric="metadata_derived_baseline",
+            ),
+            "worst_mean_abs_depth_error_mm": rounded_float(
+                worst_mean_depth_error_mm,
+                digits=3,
+            ),
+            "uses_sim_metadata": estimator.get("uses_sim_metadata"),
+            "uses_real_camera_pixels": estimator.get("uses_real_camera_pixels"),
+            "uses_depth_sensor": estimator.get("uses_depth_sensor"),
+            "mean_abs_camera_to_piece_error_mm": comparison_aggregate.get(
+                "mean_abs_camera_to_piece_error_mm"
+            ),
+            "max_abs_camera_to_piece_error_mm": comparison_aggregate.get(
+                "max_abs_camera_to_piece_error_mm"
+            ),
+            "mean_abs_camera_to_board_error_mm": comparison_aggregate.get(
+                "mean_abs_camera_to_board_error_mm"
+            ),
+            "max_abs_camera_to_board_error_mm": comparison_aggregate.get(
+                "max_abs_camera_to_board_error_mm"
+            ),
+            "mean_abs_camera_to_target_square_error_mm": comparison_aggregate.get(
+                "mean_abs_camera_to_target_square_error_mm"
+            ),
+            "max_abs_camera_to_target_square_error_mm": comparison_aggregate.get(
+                "max_abs_camera_to_target_square_error_mm"
+            ),
+            "mean_board_corner_reprojection_residual_px": comparison_aggregate.get(
+                "mean_board_corner_reprojection_residual_px"
+            ),
+            "max_board_corner_reprojection_residual_px": comparison_aggregate.get(
+                "max_board_corner_reprojection_residual_px"
+            ),
+            "reprojection_quality": pnp_reprojection_quality,
+        },
+        "pnp_residuals": {
+            "quality": metadata_corner_quality,
+            "quality_status": scorecard_quality_status(
+                metadata_corner_quality,
+                metric="metadata_corner_projection",
+            ),
+            "mean_metadata_projected_corner_residual_px": pnp_aggregate.get(
+                "mean_metadata_projected_corner_residual_px"
+            ),
+            "max_metadata_projected_corner_residual_px": pnp_aggregate.get(
+                "max_metadata_projected_corner_residual_px"
+            ),
+            "mean_rendered_corner_pnp_reprojection_residual_px": pnp_aggregate.get(
+                "mean_rendered_corner_pnp_reprojection_residual_px"
+            ),
+            "mean_rendered_corner_pnp_camera_center_delta_norm_mm": pnp_aggregate.get(
+                "mean_rendered_corner_pnp_camera_center_delta_norm_mm"
+            ),
+            "not_geometrically_comparable_row_count": not_comparable_count,
+            "pnp_vs_sim_ground_truth_status_counts": dict(sorted(pnp_status_counts.items())),
+            "reason_label_counts": pnp_aggregate.get("reason_label_counts"),
+        },
+        "metadata_native_depth_view": {
+            "status": metadata_native_depth_view.get("status"),
+            "source_model": metadata_native_depth_view.get("source_model"),
+            "source_projection_model": metadata_native_depth_view.get(
+                "source_projection_model"
+            ),
+            "uses_rendered_overlay_corners": metadata_native_depth_view.get(
+                "uses_rendered_overlay_corners"
+            ),
+            "row_count": metadata_native_depth_view.get("row_count"),
+            "point_roles": metadata_native_depth_view.get("point_roles"),
+            "paths": metadata_native_depth_view.get("paths"),
+        },
+        "real_camera_depth_gap": {
+            "implemented": False,
+            "status": "not_real_camera_depth",
+            "needs_real_depth_reference": True,
+            "gap": true_depth.get("gap") or (
+                "No true real-camera or depth-sensor estimate is implemented in this "
+                "hardware-free scorecard."
+            ),
+            "next_follow_up": (
+                "Use actual SO-101 capture sidecars to compare real camera/depth measurements "
+                "against this simulator scorecard and produce real-vs-sim residual overlays."
+            ),
+        },
+        "source_artifacts": {
+            "pick_place_depth_distance_metrics": distance_metrics.get("paths"),
+            "pick_place_perceived_depth_comparison": perceived_depth_comparison.get("paths"),
+            "pick_place_pnp_residual_diagnostics": pnp_residual_diagnostics.get("paths"),
+            "pick_place_metadata_native_depth_view": metadata_native_depth_view.get("paths"),
+        },
+        "units": {
+            "distance": "millimeters",
+            "image_residual": "pixels",
+        },
+        "stage_rows": stage_rows,
+        "review_note": (
+            "This scorecard is hardware-free. It is good for simulator evidence and for "
+            "spotting rendered-corner PnP baseline errors at a glance, but it explicitly "
+            "does not claim real robot/camera depth judgment until real capture sidecars "
+            "supply comparable depth or calibrated camera measurements."
+        ),
+    }
+
+
+SCORECARD_COLORS: dict[str, tuple[int, int, int]] = {
+    "good": (90, 150, 70),
+    "warning": (0, 165, 220),
+    "bad": (60, 70, 220),
+    "blocked": (105, 90, 170),
+    "unknown": (120, 120, 120),
+    "text": (34, 34, 34),
+    "muted": (105, 112, 120),
+    "border": (205, 211, 218),
+    "panel": (255, 255, 255),
+    "background": (245, 247, 250),
+    "header": (42, 49, 57),
+}
+
+
+def scorecard_color_for_status(status: Any) -> tuple[int, int, int]:
+    value = str(status or "").lower()
+    if "good" in value or value == "available":
+        return SCORECARD_COLORS["good"]
+    if "warning" in value:
+        return SCORECARD_COLORS["warning"]
+    if "bad" in value or "not_geometrically_comparable" in value:
+        return SCORECARD_COLORS["bad"]
+    if "not_real_camera_depth" in value or "needs_real_depth_reference" in value or "blocked" in value:
+        return SCORECARD_COLORS["blocked"]
+    return SCORECARD_COLORS["unknown"]
+
+
+def scorecard_display_status(status: Any) -> str:
+    value = str(status or "")
+    display = {
+        "metadata_derived_baseline_good_vs_sim": "good vs sim",
+        "metadata_derived_baseline_warning_vs_sim": "warning vs sim",
+        "metadata_derived_baseline_bad_vs_sim": "bad vs sim",
+        "metadata_derived_baseline_unknown": "unknown",
+        "metadata_corner_projection_good_vs_sim": "good projection",
+        "metadata_corner_projection_warning_vs_sim": "warning projection",
+        "metadata_corner_projection_bad_vs_sim": "bad projection",
+        "not_geometrically_comparable": "not comparable",
+        "not_implemented": "not implemented",
+        "blocked_until_real_capture_sidecars_exist": "needs real depth reference",
+    }.get(value)
+    return display or value.replace("_", " ")
+
+
+def scorecard_text(
+    canvas: np.ndarray,
+    text: Any,
+    x: int,
+    y: int,
+    *,
+    scale: float = 0.55,
+    color: tuple[int, int, int] | None = None,
+    thickness: int = 1,
+) -> None:
+    cv2.putText(
+        canvas,
+        "" if text is None else str(text),
+        (int(x), int(y)),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        float(scale),
+        color or SCORECARD_COLORS["text"],
+        int(thickness),
+        cv2.LINE_AA,
+    )
+
+
+def scorecard_wrapped_text(
+    canvas: np.ndarray,
+    text: Any,
+    x: int,
+    y: int,
+    *,
+    max_chars: int,
+    scale: float = 0.47,
+    color: tuple[int, int, int] | None = None,
+    line_height: int = 22,
+    max_lines: int | None = None,
+) -> int:
+    lines = textwrap.wrap(str(text or ""), width=max_chars) or [""]
+    if max_lines is not None:
+        lines = lines[:max_lines]
+    for index, line in enumerate(lines):
+        scorecard_text(
+            canvas,
+            line,
+            x,
+            y + index * line_height,
+            scale=scale,
+            color=color or SCORECARD_COLORS["text"],
+        )
+    return y + len(lines) * line_height
+
+
+def scorecard_badge(
+    canvas: np.ndarray,
+    label: str,
+    status: str,
+    x: int,
+    y: int,
+    *,
+    width: int,
+) -> None:
+    color = scorecard_color_for_status(status)
+    cv2.rectangle(canvas, (x, y), (x + width, y + 54), color, -1)
+    cv2.rectangle(canvas, (x, y), (x + width, y + 54), (255, 255, 255), 1)
+    scorecard_text(canvas, label.upper(), x + 12, y + 20, scale=0.42, color=(255, 255, 255))
+    scorecard_wrapped_text(
+        canvas,
+        scorecard_display_status(status),
+        x + 12,
+        y + 40,
+        max_chars=max(14, width // 12),
+        scale=0.38,
+        color=(255, 255, 255),
+        line_height=17,
+        max_lines=1,
+    )
+
+
+def scorecard_format_number(value: Any, suffix: str = "") -> str:
+    number = finite_float(value)
+    if number is None:
+        return "n/a"
+    if abs(number) >= 100:
+        text = f"{number:.1f}"
+    elif abs(number) >= 10:
+        text = f"{number:.2f}"
+    else:
+        text = f"{number:.3f}"
+    return f"{text}{suffix}"
+
+
+def scorecard_metric_card(
+    canvas: np.ndarray,
+    title: str,
+    value: str,
+    detail: str,
+    x: int,
+    y: int,
+    *,
+    width: int,
+    height: int,
+    status: str = "unknown",
+) -> None:
+    cv2.rectangle(canvas, (x, y), (x + width, y + height), SCORECARD_COLORS["panel"], -1)
+    cv2.rectangle(canvas, (x, y), (x + width, y + height), SCORECARD_COLORS["border"], 1)
+    cv2.rectangle(canvas, (x, y), (x + 8, y + height), scorecard_color_for_status(status), -1)
+    scorecard_wrapped_text(
+        canvas,
+        title,
+        x + 20,
+        y + 24,
+        max_chars=max(12, (width - 30) // 11),
+        scale=0.42,
+        color=SCORECARD_COLORS["muted"],
+        line_height=18,
+        max_lines=2,
+    )
+    scorecard_text(canvas, value, x + 20, y + 72, scale=0.72, thickness=2)
+    scorecard_wrapped_text(
+        canvas,
+        detail,
+        x + 20,
+        y + height - 30,
+        max_chars=max(14, (width - 30) // 9),
+        scale=0.38,
+        color=SCORECARD_COLORS["muted"],
+        line_height=16,
+        max_lines=2,
+    )
+
+
+def render_depth_distance_scorecard_png(path: Path, scorecard: dict[str, Any]) -> dict[str, Any]:
+    width = 1500
+    height = 1100
+    canvas = np.full((height, width, 3), SCORECARD_COLORS["background"], dtype=np.uint8)
+    cv2.rectangle(canvas, (0, 0), (width, 106), SCORECARD_COLORS["header"], -1)
+    scorecard_text(
+        canvas,
+        "Pick/Place Depth-Distance Scorecard",
+        34,
+        44,
+        scale=1.0,
+        color=(255, 255, 255),
+        thickness=2,
+    )
+    subtitle = (
+        f"Scenario {scorecard.get('scenario_id') or 'n/a'} | "
+        f"{scorecard.get('source_square') or '?'} -> {scorecard.get('target_square') or '?'} | "
+        f"review_status={scorecard.get('review_status')}"
+    )
+    scorecard_text(canvas, subtitle, 36, 78, scale=0.52, color=(218, 226, 235))
+
+    labels = scorecard.get("status_labels")
+    labels = labels if isinstance(labels, list) else []
+    badge_width = 340
+    for index, label in enumerate(labels[:4]):
+        label = label if isinstance(label, dict) else {}
+        scorecard_badge(
+            canvas,
+            str(label.get("label") or "status"),
+            str(label.get("status") or "unknown"),
+            34 + index * (badge_width + 18),
+            126,
+            width=badge_width,
+        )
+
+    sim = scorecard.get("sim_ground_truth")
+    sim = sim if isinstance(sim, dict) else {}
+    baseline = scorecard.get("metadata_derived_baseline")
+    baseline = baseline if isinstance(baseline, dict) else {}
+    pnp = scorecard.get("pnp_residuals")
+    pnp = pnp if isinstance(pnp, dict) else {}
+    gap = scorecard.get("real_camera_depth_gap")
+    gap = gap if isinstance(gap, dict) else {}
+    cards = [
+        (
+            "GT camera-to-piece mean",
+            scorecard_format_number(
+                sim.get("camera_to_piece_distance_mm", {}).get("mean")
+                if isinstance(sim.get("camera_to_piece_distance_mm"), dict)
+                else None,
+                " mm",
+            ),
+            "SimCamera metadata ground truth",
+            "good",
+        ),
+        (
+            "GT camera-to-board mean",
+            scorecard_format_number(
+                sim.get("camera_to_board_plane_distance_mm", {}).get("mean")
+                if isinstance(sim.get("camera_to_board_plane_distance_mm"), dict)
+                else None,
+                " mm",
+            ),
+            "Board plane distance",
+            "good",
+        ),
+        (
+            "PnP piece abs error mean",
+            scorecard_format_number(baseline.get("mean_abs_camera_to_piece_error_mm"), " mm"),
+            "Metadata-derived baseline vs sim",
+            str(baseline.get("quality")),
+        ),
+        (
+            "PnP board abs error mean",
+            scorecard_format_number(baseline.get("mean_abs_camera_to_board_error_mm"), " mm"),
+            "Metadata-derived baseline vs sim",
+            str(baseline.get("quality")),
+        ),
+        (
+            "PnP reprojection mean",
+            scorecard_format_number(baseline.get("mean_board_corner_reprojection_residual_px"), " px"),
+            "Rendered-corner PnP fit",
+            str(baseline.get("reprojection_quality")),
+        ),
+        (
+            "Metadata corner residual mean",
+            scorecard_format_number(pnp.get("mean_metadata_projected_corner_residual_px"), " px"),
+            "SimCamera projection vs rendered corners",
+            str(pnp.get("quality")),
+        ),
+        (
+            "PnP not comparable rows",
+            str(pnp.get("not_geometrically_comparable_row_count") or 0),
+            "Rendered-corner PnP vs sim GT",
+            "bad" if pnp.get("not_geometrically_comparable_row_count") else "good",
+        ),
+        (
+            "Real camera/depth estimate",
+            "not implemented",
+            "Needs real capture sidecars",
+            "blocked",
+        ),
+    ]
+    card_w = 340
+    card_h = 124
+    for index, (title, value, detail, status) in enumerate(cards):
+        col = index % 4
+        row = index // 4
+        scorecard_metric_card(
+            canvas,
+            title,
+            value,
+            detail,
+            34 + col * (card_w + 18),
+            212 + row * (card_h + 18),
+            width=card_w,
+            height=card_h,
+            status=status,
+        )
+
+    table_x = 34
+    table_y = 508
+    table_w = width - 68
+    row_h = 44
+    cv2.rectangle(canvas, (table_x, table_y), (table_x + table_w, table_y + 42), SCORECARD_COLORS["header"], -1)
+    scorecard_text(canvas, "Per-stage residuals", table_x + 14, table_y + 27, scale=0.55, color=(255, 255, 255), thickness=2)
+    headers = [
+        ("Stage", 16),
+        ("GT piece", 250),
+        ("Est piece", 385),
+        ("Abs err", 520),
+        ("GT board", 650),
+        ("Est board", 785),
+        ("Abs err", 920),
+        ("Reproj", 1040),
+        ("PnP vs GT", 1160),
+    ]
+    header_y = table_y + 76
+    cv2.rectangle(canvas, (table_x, table_y + 42), (table_x + table_w, table_y + 86), (230, 235, 241), -1)
+    for label, x_offset in headers:
+        scorecard_text(canvas, label, table_x + x_offset, header_y, scale=0.42, color=SCORECARD_COLORS["muted"], thickness=1)
+
+    stage_rows = scorecard.get("stage_rows")
+    stage_rows = stage_rows if isinstance(stage_rows, list) else []
+    for index, row in enumerate(stage_rows[:7]):
+        row = row if isinstance(row, dict) else {}
+        y0 = table_y + 86 + index * row_h
+        fill = (255, 255, 255) if index % 2 == 0 else (245, 248, 252)
+        cv2.rectangle(canvas, (table_x, y0), (table_x + table_w, y0 + row_h), fill, -1)
+        cv2.line(canvas, (table_x, y0 + row_h), (table_x + table_w, y0 + row_h), (222, 226, 232), 1)
+        gt = row.get("sim_ground_truth")
+        gt = gt if isinstance(gt, dict) else {}
+        estimate = row.get("metadata_derived_baseline")
+        estimate = estimate if isinstance(estimate, dict) else {}
+        pnp_status = str(estimate.get("pnp_vs_sim_ground_truth_status") or "unknown")
+        values = [
+            str(row.get("stage") or row.get("id") or ""),
+            scorecard_format_number(gt.get("camera_to_piece_distance_mm"), ""),
+            scorecard_format_number(estimate.get("estimated_camera_to_piece_distance_mm"), ""),
+            scorecard_format_number(estimate.get("camera_to_piece_abs_error_mm"), ""),
+            scorecard_format_number(gt.get("camera_to_board_plane_distance_mm"), ""),
+            scorecard_format_number(estimate.get("estimated_camera_to_board_plane_distance_mm"), ""),
+            scorecard_format_number(estimate.get("camera_to_board_abs_error_mm"), ""),
+            scorecard_format_number(estimate.get("board_corner_reprojection_mean_residual_px"), ""),
+            scorecard_display_status(pnp_status),
+        ]
+        for (header, x_offset), value in zip(headers, values):
+            max_chars = 24 if header == "Stage" else 18
+            if len(value) > max_chars:
+                value = value[: max_chars - 1] + "."
+            color = scorecard_color_for_status(value) if header == "PnP vs GT" else SCORECARD_COLORS["text"]
+            scorecard_text(canvas, value, table_x + x_offset, y0 + 27, scale=0.38, color=color)
+
+    gap_y = 930
+    cv2.rectangle(canvas, (34, gap_y), (width - 34, height - 34), (255, 255, 255), -1)
+    cv2.rectangle(canvas, (34, gap_y), (width - 34, height - 34), SCORECARD_COLORS["border"], 1)
+    scorecard_text(canvas, "Explicit gap", 54, gap_y + 32, scale=0.58, thickness=2)
+    scorecard_wrapped_text(
+        canvas,
+        gap.get("gap"),
+        54,
+        gap_y + 62,
+        max_chars=160,
+        scale=0.43,
+        color=SCORECARD_COLORS["text"],
+        line_height=21,
+        max_lines=2,
+    )
+    scorecard_wrapped_text(
+        canvas,
+        gap.get("next_follow_up"),
+        54,
+        gap_y + 106,
+        max_chars=160,
+        scale=0.41,
+        color=SCORECARD_COLORS["muted"],
+        line_height=19,
+        max_lines=2,
+    )
+
+    write_image(path, canvas)
+    return {
+        "path": str(path),
+        "output_dimensions": {
+            "width_px": int(width),
+            "height_px": int(height),
+        },
+        "status": "ok",
+    }
+
+
+def write_depth_distance_scorecard(
+    *,
+    output_dir: Path,
+    suite_output_dir: Path,
+    sequence_metadata: dict[str, Any],
+    distance_metrics: dict[str, Any],
+    perceived_depth_comparison: dict[str, Any],
+    pnp_residual_diagnostics: dict[str, Any],
+    metadata_native_depth_view: dict[str, Any],
+) -> dict[str, Any]:
+    summary = build_depth_distance_scorecard_payload(
+        output_dir=output_dir,
+        suite_output_dir=suite_output_dir,
+        sequence_metadata=sequence_metadata,
+        distance_metrics=distance_metrics,
+        perceived_depth_comparison=perceived_depth_comparison,
+        pnp_residual_diagnostics=pnp_residual_diagnostics,
+        metadata_native_depth_view=metadata_native_depth_view,
+    )
+    paths = summary.get("paths")
+    paths = paths if isinstance(paths, dict) else {}
+    png_path = Path(str(paths.get("png")))
+    json_path = Path(str(paths.get("json")))
+    visual = render_depth_distance_scorecard_png(png_path, summary)
+    summary["visual"] = visual
+    write_json(json_path, summary)
+    return summary
+
+
 def csv_value(value: Any) -> Any:
     if isinstance(value, (list, dict)):
         return json.dumps(value, sort_keys=True)
@@ -2905,6 +3716,15 @@ def build_summary(
         distance_metrics=distance_metrics,
         pnp_residual_diagnostics=pnp_residual_diagnostics,
     )
+    depth_distance_scorecard = write_depth_distance_scorecard(
+        output_dir=output_dir,
+        suite_output_dir=suite_output_dir,
+        sequence_metadata=pick_place_metadata,
+        distance_metrics=distance_metrics,
+        perceived_depth_comparison=perceived_depth_comparison,
+        pnp_residual_diagnostics=pnp_residual_diagnostics,
+        metadata_native_depth_view=metadata_native_depth_view,
+    )
     metrics_by_id = {
         str(metric.get("id")): metric
         for metric in metric_rows
@@ -3004,6 +3824,7 @@ def build_summary(
         "perceived_depth_comparison": perceived_depth_comparison,
         "pnp_residual_diagnostics": pnp_residual_diagnostics,
         "metadata_native_depth_view": metadata_native_depth_view,
+        "depth_distance_scorecard": depth_distance_scorecard,
         "app_entrypoint_frame": app_frame,
         "recording": recording,
         "recordings": {
@@ -3017,6 +3838,7 @@ def build_summary(
             "Pick/place perceived-depth comparison artifacts add a metadata-derived rendered-board-corner PnP baseline and residuals against simulator ground truth; this is not a real-camera depth estimator.",
             "Pick/place PnP residual diagnostics compare metadata-projected board corners, rendered-corner PnP, and simulator ground-truth extrinsics so source mismatches are visible.",
             "Pick/place metadata-native depth artifacts project board, piece, and target points directly through SimCamera metadata and do not use rendered overlay corners as depth authority.",
+            "Pick/place depth-distance scorecard artifacts summarize simulator ground truth, the metadata-derived PnP baseline, residual severity, and the missing true real-camera/depth-sensor reference in one visual PNG plus JSON.",
             "Optional MP4 recordings are best-effort only and are not required for the suite to pass.",
             "No simulator pixels, camera profiles, perception algorithms, UI behavior, or robot paths are changed by this helper.",
         ],
@@ -3039,6 +3861,7 @@ def failure_summary(output_dir: Path, suite_summary_path: Path, error: str) -> d
         "perceived_depth_comparison": {},
         "pnp_residual_diagnostics": {},
         "metadata_native_depth_view": {},
+        "depth_distance_scorecard": {},
         "app_entrypoint_frame": None,
         "recording": {
             "attempted": False,
