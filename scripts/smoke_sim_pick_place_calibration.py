@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any
@@ -44,6 +45,8 @@ TARGET_HOVER_JOINTS = {
     "wrist_flex": -20.0,
     "wrist_roll": -6.0,
 }
+PIECE_VISIBILITY_SCHEMA = "lerobot.sim.pick_place_piece_visibility.v1"
+PIECE_RADIUS_SCALE = 0.30
 
 
 def parse_args() -> argparse.Namespace:
@@ -101,6 +104,232 @@ def sync_camera_to_tool_state(tools: KinematicsTools, camera: SimCamera) -> dict
     return joints
 
 
+def square_file_rank(square: str) -> tuple[int, int]:
+    value = square.strip().lower()
+    if len(value) != 2 or not ("a" <= value[0] <= "h") or not ("1" <= value[1] <= "8"):
+        raise ValueError(f"Invalid chess square: {square!r}")
+    return ord(value[0]) - ord("a"), int(value[1]) - 1
+
+
+def board_point(corners: np.ndarray, u: float, v: float) -> np.ndarray:
+    a1, h1, h8, a8 = corners
+    bottom = a1 * (1.0 - u) + h1 * u
+    top = a8 * (1.0 - u) + h8 * u
+    return bottom * (1.0 - v) + top * v
+
+
+def point_to_segment_distance(point: np.ndarray, start: np.ndarray, end: np.ndarray) -> float:
+    segment = end - start
+    segment_len_sq = float(np.dot(segment, segment))
+    if segment_len_sq <= 1e-12:
+        return float(np.linalg.norm(point - start))
+    t = float(np.clip(np.dot(point - start, segment) / segment_len_sq, 0.0, 1.0))
+    projection = start + segment * t
+    return float(np.linalg.norm(point - projection))
+
+
+def circle_to_quad_clearance(center: np.ndarray, radius: float, quad: np.ndarray) -> float:
+    signed_distance = float(cv2.pointPolygonTest(quad.astype(np.float32), tuple(center), measureDist=True))
+    if signed_distance >= 0.0:
+        return -float(radius)
+    edge_distance = min(
+        point_to_segment_distance(center, quad[index], quad[(index + 1) % len(quad)])
+        for index in range(len(quad))
+    )
+    return float(edge_distance - radius)
+
+
+def gripper_finger_quads(camera: SimCamera, metadata: dict[str, Any]) -> list[np.ndarray]:
+    if not bool(metadata.get("gripper_visible")) or metadata.get("view") != "gripper":
+        return []
+    height = int(camera.height or 480)
+    width = int(camera.width or 640)
+    center_x = int(camera.config.gripper_center_x_px or (width // 2))
+    y_base = int(camera.config.gripper_y_px or int(height * 0.78))
+    opening = int(metadata.get("current_gripper_opening_px") or camera.config.gripper_opening_px)
+    finger_w = max(12, int(camera.config.gripper_finger_width_px))
+    length = max(40, int(camera.config.gripper_length_px))
+    left = np.array(
+        [
+            [center_x - opening // 2 - finger_w, height],
+            [center_x - opening // 2 - max(8, finger_w // 5), y_base],
+            [center_x - opening // 2 + max(4, finger_w // 8), y_base - length // 5],
+            [center_x - opening // 2 - finger_w // 2, height],
+        ],
+        dtype=float,
+    )
+    right = left.copy()
+    right[:, 0] = 2 * center_x - left[:, 0]
+    return [left, right]
+
+
+def unavailable_piece_visibility(reason: str) -> dict[str, Any]:
+    return {
+        "schema": PIECE_VISIBILITY_SCHEMA,
+        "method": "synthetic_geometry_from_capture_metadata_v1",
+        "available": False,
+        "status": "unavailable",
+        "reason": reason,
+        "limitations": [
+            "Synthetic-frame geometry only; this does not model physical chess-piece contact or real camera segmentation.",
+        ],
+    }
+
+
+def piece_visibility_metric(camera: SimCamera, metadata: dict[str, Any]) -> dict[str, Any]:
+    if metadata.get("piece_layout") != "single_pawn":
+        return unavailable_piece_visibility("piece_layout is not single_pawn")
+    if not bool(camera.config.draw_pieces):
+        return unavailable_piece_visibility("draw_pieces is disabled")
+
+    try:
+        file_idx, rank_idx = square_file_rank(str(metadata.get("piece_square") or ""))
+        corners = np.asarray(metadata.get("board_corners_xy"), dtype=float)
+    except (TypeError, ValueError) as exc:
+        return unavailable_piece_visibility(str(exc))
+
+    if corners.shape != (4, 2) or not np.all(np.isfinite(corners)):
+        return unavailable_piece_visibility("board_corners_xy is missing or invalid")
+
+    center = board_point(corners, (file_idx + 0.5) / 8.0, (rank_idx + 0.5) / 8.0)
+    next_file = board_point(corners, min(1.0, (file_idx + 1.5) / 8.0), (rank_idx + 0.5) / 8.0)
+    next_rank = board_point(corners, (file_idx + 0.5) / 8.0, min(1.0, (rank_idx + 1.5) / 8.0))
+    square_px = max(8.0, float(min(np.linalg.norm(next_file - center), np.linalg.norm(next_rank - center))))
+    radius = max(3, int(square_px * PIECE_RADIUS_SCALE))
+
+    quads = gripper_finger_quads(camera, metadata)
+    if not quads:
+        return {
+            "schema": PIECE_VISIBILITY_SCHEMA,
+            "method": "synthetic_geometry_from_capture_metadata_v1",
+            "available": True,
+            "status": "no_visible_gripper",
+            "piece": {
+                "square": metadata.get("piece_square"),
+                "center_xy": [round(float(center[0]), 3), round(float(center[1]), 3)],
+                "radius_px": int(radius),
+            },
+            "gripper_clearance": {
+                "available": False,
+                "reason": "gripper is not visible in this capture metadata",
+            },
+            "occlusion": {
+                "available": True,
+                "overlap_piece_pixels": 0,
+                "piece_area_pixels": int(round(math.pi * radius * radius)),
+                "occlusion_fraction": 0.0,
+                "visible_fraction": 1.0,
+            },
+            "limitations": [
+                "Synthetic-frame geometry only; this does not model physical chess-piece contact or real camera segmentation.",
+            ],
+        }
+
+    height = int(camera.height or 480)
+    width = int(camera.width or 640)
+    x_min = max(0, int(math.floor(center[0] - radius - 2)))
+    x_max = min(width, int(math.ceil(center[0] + radius + 3)))
+    y_min = max(0, int(math.floor(center[1] - radius - 2)))
+    y_max = min(height, int(math.ceil(center[1] + radius + 3)))
+    if x_min >= x_max or y_min >= y_max:
+        return unavailable_piece_visibility("piece disc falls outside the frame")
+
+    yy, xx = np.ogrid[y_min:y_max, x_min:x_max]
+    piece_mask = (xx - float(center[0])) ** 2 + (yy - float(center[1])) ** 2 <= float(radius * radius)
+    gripper_mask = np.zeros((y_max - y_min, x_max - x_min), dtype=np.uint8)
+    shifted_quads = [np.round(quad - np.array([x_min, y_min], dtype=float)).astype(np.int32) for quad in quads]
+    cv2.fillPoly(gripper_mask, shifted_quads, 1)
+    piece_area = int(np.count_nonzero(piece_mask))
+    overlap_pixels = int(np.count_nonzero(piece_mask & (gripper_mask > 0)))
+    occlusion_fraction = float(overlap_pixels / piece_area) if piece_area else 0.0
+    visible_fraction = max(0.0, 1.0 - occlusion_fraction)
+    clearances = [circle_to_quad_clearance(center, float(radius), quad) for quad in quads]
+    min_clearance = min(clearances) if clearances else None
+    clear_of_gripper = overlap_pixels == 0 and (min_clearance is None or min_clearance > 0.0)
+
+    return {
+        "schema": PIECE_VISIBILITY_SCHEMA,
+        "method": "synthetic_geometry_from_capture_metadata_v1",
+        "available": True,
+        "status": "clear" if clear_of_gripper else "gripper_overlap",
+        "piece": {
+            "square": metadata.get("piece_square"),
+            "center_xy": [round(float(center[0]), 3), round(float(center[1]), 3)],
+            "radius_px": int(radius),
+            "area_pixels": piece_area,
+        },
+        "gripper_clearance": {
+            "available": True,
+            "clear_of_gripper": bool(clear_of_gripper),
+            "min_clearance_px": round(float(min_clearance), 3) if min_clearance is not None else None,
+            "current_gripper_opening_px": metadata.get("current_gripper_opening_px"),
+            "tracked_gripper_percent": metadata.get("tracked_gripper_percent"),
+            "finger_quad_count": len(quads),
+        },
+        "occlusion": {
+            "available": True,
+            "overlap_piece_pixels": overlap_pixels,
+            "piece_area_pixels": piece_area,
+            "occlusion_fraction": round(occlusion_fraction, 6),
+            "visible_fraction": round(visible_fraction, 6),
+        },
+        "limitations": [
+            "Synthetic-frame geometry only; this does not model physical chess-piece contact or real camera segmentation.",
+        ],
+    }
+
+
+def summarize_piece_visibility(captures: list[dict[str, Any]]) -> dict[str, Any]:
+    rows = []
+    for capture in captures:
+        metric = capture.get("piece_visibility")
+        if not isinstance(metric, dict) or not metric.get("available"):
+            continue
+        occlusion = metric.get("occlusion") if isinstance(metric.get("occlusion"), dict) else {}
+        clearance = metric.get("gripper_clearance") if isinstance(metric.get("gripper_clearance"), dict) else {}
+        rows.append(
+            {
+                "label": capture.get("label"),
+                "path": capture.get("path"),
+                "visible_fraction": occlusion.get("visible_fraction"),
+                "occlusion_fraction": occlusion.get("occlusion_fraction"),
+                "min_clearance_px": clearance.get("min_clearance_px"),
+                "clear_of_gripper": clearance.get("clear_of_gripper"),
+                "status": metric.get("status"),
+            }
+        )
+
+    visible_values = [float(row["visible_fraction"]) for row in rows if row.get("visible_fraction") is not None]
+    occlusion_values = [float(row["occlusion_fraction"]) for row in rows if row.get("occlusion_fraction") is not None]
+    clearance_values = [float(row["min_clearance_px"]) for row in rows if row.get("min_clearance_px") is not None]
+    worst = min(
+        (row for row in rows if row.get("visible_fraction") is not None),
+        key=lambda row: float(row["visible_fraction"]),
+        default=None,
+    )
+    release = next((row for row in rows if row.get("label") == "target_release_open"), None)
+    return {
+        "schema": PIECE_VISIBILITY_SCHEMA,
+        "method": "synthetic_geometry_from_capture_metadata_v1",
+        "available": bool(rows),
+        "capture_count": len(captures),
+        "available_capture_count": len(rows),
+        "all_captures_available": len(rows) == len(captures),
+        "all_captures_clear_of_gripper": (
+            all(bool(row.get("clear_of_gripper")) for row in rows) if rows else None
+        ),
+        "min_visible_fraction": min(visible_values) if visible_values else None,
+        "max_occlusion_fraction": max(occlusion_values) if occlusion_values else None,
+        "min_clearance_px": min(clearance_values) if clearance_values else None,
+        "worst_capture_label": worst.get("label") if worst else None,
+        "target_release_open": release,
+        "captures": rows,
+        "limitations": [
+            "Synthetic-frame geometry only; this does not model physical chess-piece contact or real camera segmentation.",
+        ],
+    }
+
+
 def save_capture(
     *,
     tools: KinematicsTools,
@@ -116,6 +345,7 @@ def save_capture(
     assert len(np.unique(frame.reshape(-1, 3), axis=0)) >= 12
 
     metadata = camera.calibration_metadata()
+    visibility = piece_visibility_metric(camera, metadata)
     frame_path = frame_dir / f"{index:02d}_{label}.jpg"
     ok = cv2.imwrite(str(frame_path), frame)
     assert ok, f"cv2 failed to write {frame_path}"
@@ -125,6 +355,7 @@ def save_capture(
         "path": str(frame_path),
         "joints": joints,
         "metadata": metadata,
+        "piece_visibility": visibility,
         "mean_bgr": [float(x) for x in frame.mean(axis=(0, 1))],
         "unique_colors": int(len(np.unique(frame.reshape(-1, 3), axis=0))),
     }
@@ -352,6 +583,7 @@ def main() -> int:
             },
             "frame_dir": str(frame_dir),
             "captures": captures,
+            "piece_visibility": summarize_piece_visibility(captures),
             "tool_results": tool_results,
             "frame_deltas": {
                 "open_to_pinched": pinch_delta,
@@ -362,6 +594,7 @@ def main() -> int:
             "notes": [
                 "Joint-state simulation does not model chess-piece contact; close_gripper should reach its target without reporting a gripped object.",
                 "Synthetic frames currently visualize board, piece, and gripper opening, while joint-space pick/place movement is asserted through tool readbacks and metadata.",
+                "piece_visibility is a synthetic geometry signal from capture metadata; it is evidence-only and not a real-camera segmentation score.",
             ],
         }
         summary_path.write_text(json.dumps(summary, indent=2))

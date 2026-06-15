@@ -248,6 +248,7 @@ def matrix_summary_section(matrix: dict[str, Any] | None, summary_path: Path) ->
     aggregate_status = aggregate_status if isinstance(aggregate_status, dict) else {}
     selected_frame_paths: dict[str, dict[str, str]] = {}
     release_frame_paths: dict[str, str] = {}
+    piece_visibility_by_scenario: dict[str, dict[str, Any]] = {}
     scenario_ids: list[str] = []
     limitations: list[str] = []
 
@@ -268,6 +269,18 @@ def matrix_summary_section(matrix: dict[str, Any] | None, summary_path: Path) ->
             release_path = frames.get("target_release_open_path")
             if isinstance(release_path, str):
                 release_frame_paths[scenario_id] = release_path
+        visibility = scenario.get("piece_visibility")
+        aggregate = visibility.get("aggregate") if isinstance(visibility, dict) else None
+        if isinstance(aggregate, dict):
+            piece_visibility_by_scenario[scenario_id] = {
+                "available": aggregate.get("available"),
+                "all_captures_clear_of_gripper": aggregate.get("all_captures_clear_of_gripper"),
+                "min_visible_fraction": aggregate.get("min_visible_fraction"),
+                "max_occlusion_fraction": aggregate.get("max_occlusion_fraction"),
+                "min_clearance_px": aggregate.get("min_clearance_px"),
+                "worst_capture_label": aggregate.get("worst_capture_label"),
+                "target_release_open": aggregate.get("target_release_open"),
+            }
         for limitation in scenario.get("limitations", []):
             if isinstance(limitation, str) and limitation not in limitations:
                 limitations.append(limitation)
@@ -283,6 +296,8 @@ def matrix_summary_section(matrix: dict[str, Any] | None, summary_path: Path) ->
         "failed_scenario_ids": aggregate_status.get("failed_scenario_ids", []),
         "selected_frame_paths": selected_frame_paths,
         "release_frame_paths": release_frame_paths,
+        "piece_visibility": matrix.get("piece_visibility") if matrix else None,
+        "piece_visibility_by_scenario": piece_visibility_by_scenario,
         "limitations": limitations,
     }
 

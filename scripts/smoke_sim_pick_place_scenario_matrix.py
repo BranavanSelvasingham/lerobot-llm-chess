@@ -182,10 +182,44 @@ def extract_gripper_visibility(summary: dict[str, Any] | None) -> dict[str, Any]
         "available": bool(rows),
         "all_captures_mark_gripper_visible": all(bool(value) for value in visible_values) if visible_values else None,
         "captures": rows,
-        "occlusion": {
-            "available": False,
-            "reason": "Existing pick/place smoke exposes gripper visibility and opening metadata, not explicit occlusion scoring.",
-        },
+    }
+
+
+def extract_piece_visibility(summary: dict[str, Any] | None) -> dict[str, Any]:
+    aggregate = summary.get("piece_visibility") if summary else None
+    captures = summary.get("captures") if summary else None
+    rows: list[dict[str, Any]] = []
+    if isinstance(captures, list):
+        for capture in captures:
+            if not isinstance(capture, dict):
+                continue
+            metric = capture.get("piece_visibility")
+            if not isinstance(metric, dict):
+                continue
+            occlusion = metric.get("occlusion") if isinstance(metric.get("occlusion"), dict) else {}
+            clearance = metric.get("gripper_clearance") if isinstance(metric.get("gripper_clearance"), dict) else {}
+            piece = metric.get("piece") if isinstance(metric.get("piece"), dict) else {}
+            rows.append(
+                {
+                    "label": capture.get("label"),
+                    "path": capture.get("path"),
+                    "available": metric.get("available"),
+                    "status": metric.get("status"),
+                    "piece_square": piece.get("square"),
+                    "visible_fraction": occlusion.get("visible_fraction"),
+                    "occlusion_fraction": occlusion.get("occlusion_fraction"),
+                    "overlap_piece_pixels": occlusion.get("overlap_piece_pixels"),
+                    "min_clearance_px": clearance.get("min_clearance_px"),
+                    "clear_of_gripper": clearance.get("clear_of_gripper"),
+                }
+            )
+    return {
+        "available": bool(aggregate.get("available")) if isinstance(aggregate, dict) else bool(rows),
+        "aggregate": aggregate if isinstance(aggregate, dict) else None,
+        "captures": rows,
+        "limitations": [
+            "Synthetic geometry only; this does not model physical chess-piece contact or real camera segmentation.",
+        ],
     }
 
 
@@ -277,10 +311,52 @@ def run_scenario(
         "selected_frame_paths": extract_selected_frames(artifacts),
         "missing_artifact_paths": missing,
         "gripper_visibility": extract_gripper_visibility(child_summary),
+        "piece_visibility": extract_piece_visibility(child_summary),
         "frame_deltas": child_summary.get("frame_deltas") if child_summary else None,
         "limitations": [
             "This matrix reuses the existing joint-state simulator smoke; it does not model physical chess-piece contact.",
-            "Occlusion is not scored separately by the current simulator metadata.",
+            "piece_visibility is a synthetic-frame geometry signal and is evidence-only until values prove stable across local and CI runs.",
+        ],
+    }
+
+
+def aggregate_piece_visibility(scenarios: list[dict[str, Any]]) -> dict[str, Any]:
+    scenario_rows: list[dict[str, Any]] = []
+    for scenario in scenarios:
+        metric = scenario.get("piece_visibility")
+        aggregate = metric.get("aggregate") if isinstance(metric, dict) else None
+        if not isinstance(aggregate, dict):
+            scenario_rows.append(
+                {
+                    "scenario_id": scenario.get("scenario_id"),
+                    "available": False,
+                    "status": "unavailable",
+                }
+            )
+            continue
+        scenario_rows.append(
+            {
+                "scenario_id": scenario.get("scenario_id"),
+                "available": aggregate.get("available"),
+                "all_captures_clear_of_gripper": aggregate.get("all_captures_clear_of_gripper"),
+                "min_visible_fraction": aggregate.get("min_visible_fraction"),
+                "max_occlusion_fraction": aggregate.get("max_occlusion_fraction"),
+                "min_clearance_px": aggregate.get("min_clearance_px"),
+                "worst_capture_label": aggregate.get("worst_capture_label"),
+                "target_release_open": aggregate.get("target_release_open"),
+            }
+        )
+
+    available = [row for row in scenario_rows if row.get("available")]
+    return {
+        "available": bool(available),
+        "scenario_count": len(scenario_rows),
+        "available_scenario_count": len(available),
+        "all_scenarios_available": len(available) == len(scenario_rows),
+        "scenarios": scenario_rows,
+        "limitations": [
+            "Synthetic geometry only; this does not model physical chess-piece contact or real camera segmentation.",
+            "The matrix reports measured visibility/clearance evidence but does not fail scenarios on a visibility threshold yet.",
         ],
     }
 
@@ -322,10 +398,12 @@ def main() -> int:
                 str(record["scenario_id"]) for record in scenario_records if not bool(record["ok"])
             ],
         },
+        "piece_visibility": aggregate_piece_visibility(scenario_records),
         "scenarios": scenario_records,
         "notes": [
             "The canonical calibration regression suite invokes this matrix as a hardware-free child gate.",
             "The matrix broadens pick/place coverage only; it does not change simulator rendering, camera profiles, perception, robot execution, dependencies, UI behavior, or calibration constants.",
+            "piece_visibility is derived from synthetic capture metadata and gripper geometry, not from real-image segmentation.",
         ],
     }
     write_json(summary_path, summary)
