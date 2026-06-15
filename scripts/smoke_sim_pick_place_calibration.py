@@ -146,7 +146,8 @@ def gripper_finger_quads(camera: SimCamera, metadata: dict[str, Any]) -> list[np
     width = int(camera.width or 640)
     center_x = int(camera.config.gripper_center_x_px or (width // 2))
     y_base = int(camera.config.gripper_y_px or int(height * 0.78))
-    opening = int(metadata.get("current_gripper_opening_px") or camera.config.gripper_opening_px)
+    metadata_opening = metadata.get("current_gripper_opening_px")
+    opening = int(camera.config.gripper_opening_px if metadata_opening is None else metadata_opening)
     finger_w = max(12, int(camera.config.gripper_finger_width_px))
     length = max(40, int(camera.config.gripper_length_px))
     left = np.array(
@@ -384,6 +385,20 @@ def assert_capture_square(capture: dict[str, Any], expected_square: str) -> None
     assert metadata["piece_square"] == expected_square, (capture["label"], metadata, expected_square)
 
 
+def assert_zero_opening_is_preserved(camera: SimCamera) -> None:
+    metadata = camera.calibration_metadata()
+    metadata["current_gripper_opening_px"] = 0
+    metric = piece_visibility_metric(camera, metadata)
+    assert metric["gripper_clearance"]["current_gripper_opening_px"] == 0, metric
+
+    none_metadata = dict(metadata)
+    none_metadata["current_gripper_opening_px"] = None
+    zero_quads = gripper_finger_quads(camera, metadata)
+    fallback_quads = gripper_finger_quads(camera, none_metadata)
+    assert zero_quads and fallback_quads, (zero_quads, fallback_quads)
+    assert not np.array_equal(zero_quads[0], fallback_quads[0]), (zero_quads[0], fallback_quads[0])
+
+
 def main() -> int:
     args = parse_args()
     source_square = str(args.source_square)
@@ -442,6 +457,7 @@ def main() -> int:
         assert tools.robot is not None, "sim robot was not created"
         assert tools.robot.is_connected, "sim robot did not connect"
         camera.connect(warmup=True)
+        assert_zero_opening_is_preserved(camera)
 
         tool_results.append({"tool": "open_gripper", "result": run_tool(tools, "open_gripper")})
         open_frame, open_capture = save_capture(
