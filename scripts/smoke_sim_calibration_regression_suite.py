@@ -14,6 +14,8 @@ DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "calibration_regress
 DEFAULT_REFERENCE_IMAGE = REPO_ROOT / "archive" / "chess_test_images" / "current_view.jpg"
 DEFAULT_BASE_PROFILE = "current_gripper_reference"
 SCHEMA = "lerobot.sim.calibration_regression_suite.v1"
+ARTIFACT_ENTRYPOINT_NAME = "README.md"
+ARTIFACT_REPORT_NAME = "artifact_index_report.md"
 BASELINE_CORNERS = [[32, 338], [594, 340], [540, 20], [86, 12]]
 PERTURBED_CORNERS = [[34, 337], [592, 342], [538, 22], [88, 14]]
 
@@ -57,6 +59,55 @@ def parse_args() -> argparse.Namespace:
 def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n")
+
+
+def markdown_bool(value: Any) -> str:
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    return str(value)
+
+
+def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) -> Path:
+    markers = summary.get("skipped_markers")
+    markers = markers if isinstance(markers, dict) else {}
+    readme_path = output_dir / ARTIFACT_ENTRYPOINT_NAME
+    lines = [
+        "# Simulator Calibration Regression Artifacts",
+        "",
+        f"Open `{ARTIFACT_REPORT_NAME}` first. It is the review report for this artifact bundle.",
+        "",
+        "Core JSON summaries:",
+        "",
+        "- `calibration_regression_summary.json`",
+        "- `artifact_index.json`",
+        "- `inventory/reference_media_inventory.json`",
+        "- `comparison_set/comparison_set_summary.json`",
+        "- `session/session_summary.json`",
+        "- `fixture/fixture_summary.json`",
+        "- `pick_place_scenario_matrix/scenario_matrix_summary.json`",
+        "- `negative_empty_inventory/comparison_set_summary.json`",
+        "",
+        "Review markers:",
+        "",
+        (
+            f"- `hardware_skipped: {markdown_bool(summary.get('hardware_skipped'))}`: "
+            f"{markers.get('hardware', '')}"
+        ),
+        (
+            f"- `gui_skipped: {markdown_bool(summary.get('gui_skipped'))}`: "
+            f"{markers.get('gui', '')}"
+        ),
+        "- Real-media gap: the current inventory is limited to `archive/chess_test_images/current_view.jpg`.",
+        "- No real-world videos are present for motion, recovery, or timing references.",
+        "- No reference media currently documents failure modes.",
+        "",
+        "This bundle does not replace later physical SO-101 validation.",
+        "",
+    ]
+    readme_path.write_text("\n".join(lines))
+    return readme_path
 
 
 def read_json_object(path: Path) -> tuple[dict[str, Any] | None, str | None]:
@@ -599,13 +650,14 @@ def main() -> int:
     write_json(summary_path, summary)
 
     if not args.skip_artifact_index_report:
+        report_path = output_dir / ARTIFACT_REPORT_NAME
         report_result = subprocess.run(
             [
                 python,
                 str(REPO_ROOT / "scripts" / "render_sim_calibration_artifact_index_report.py"),
                 str(artifact_index_path),
                 "--output-md",
-                str(output_dir / "artifact_index_report.md"),
+                str(report_path),
             ],
             cwd=REPO_ROOT,
             text=True,
@@ -627,6 +679,21 @@ def main() -> int:
                 "failed_children": failed_children,
             }
             write_json(summary_path, summary)
+        else:
+            try:
+                write_artifact_entrypoint_readme(output_dir, summary)
+            except OSError as exc:
+                print(f"ERROR: Could not write artifact entrypoint README: {exc}", file=sys.stderr)
+                required_ok = False
+                summary["ok"] = False
+                summary["status"] = "validation_failed"
+                failed_children = list(summary["aggregate_status"].get("failed_children", []))
+                failed_children.append("artifact_entrypoint_readme")
+                summary["aggregate_status"] = {
+                    "ok": False,
+                    "failed_children": failed_children,
+                }
+                write_json(summary_path, summary)
 
     print(json.dumps(summary, indent=2))
     return 0 if required_ok else 1

@@ -6,11 +6,11 @@ Run this hardware-free gate before changing simulator rendering, camera profiles
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_calibration_regression_suite.py --output-dir /private/tmp/lerobot_sim/calibration_regression_suite --python /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 --include-negative-check
 ```
 
-The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json` has `"ok": true` and `"status": "ok"`. It also writes `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index.json`, a compact review index for the real-reference images, ranked candidate artifacts, perception fixture evidence, pick/place release frames, visibility metrics, negative-check summary, and child logs. For quick review, open `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index_report.md` first; it is a deterministic Markdown view of that index and links the highest-signal generated evidence.
+The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json` has `"ok": true` and `"status": "ok"`. It also writes a root `/private/tmp/lerobot_sim/calibration_regression_suite/README.md`, `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index_report.md`, and `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index.json`. For quick review, open `artifact_index_report.md` first; it is a deterministic Markdown view of the compact artifact index and links the highest-signal generated evidence. The root `README.md` repeats that entrypoint, the core JSON summaries, the hardware/gui skipped markers, and the current real-media gap.
 
 ## GitHub Actions Signal
 
-The focused `Simulator Calibration Regression` workflow runs the same hardware-free suite for pull requests targeting `feat/telemetry-recording` when simulator, camera, chess perception, smoke-script, report-renderer, reference-image, or gate documentation paths change. It uses Python 3.12, installs only the Python modules needed by this suite, verifies the generated summary fields, and uploads the suite output directory as a workflow artifact. After downloading the artifact, open `artifact_index_report.md` first, then follow its links to images, JSON summaries, and child logs.
+The focused `Simulator Calibration Regression` workflow runs the same hardware-free suite for pull requests targeting `feat/telemetry-recording` when simulator, camera, chess perception, smoke-script, report-renderer, reference-image, or gate documentation paths change. It uses Python 3.12, installs only the Python modules needed by this suite, verifies the generated summary fields, writes a job summary naming the uploaded artifact, and uploads the suite output directory as a workflow artifact. After downloading the artifact, open `artifact_index_report.md` first, then follow its links to images, JSON summaries, and child logs.
 
 The workflow also treats `pick_place_scenario_matrix.piece_visibility` and `artifact_index.json` as part of the artifact contract. All four scenarios must report available visibility evidence, each target release frame path must exist, and each `target_release_open` row must include visible fraction, occlusion fraction, and gripper-clearance fields. The generated artifact index must exist, report `status: "ok"`, have a nonzero artifact count, have no missing artifacts, and include populated categories for real-reference comparisons, ranked candidates, perception fixture evidence, pick/place scenario release frames, the negative check, and child logs. These are structural availability checks rather than exact metric-value thresholds.
 
@@ -74,8 +74,9 @@ Common artifact paths under the output directory:
 - `pick_place_scenario_matrix/scenarios/*/summary.json`
 - `pick_place_scenario_matrix/scenarios/*/06_target_release_open.jpg`
 - `negative_empty_inventory/comparison_set_summary.json`
-- `artifact_index.json`
+- `README.md`
 - `artifact_index_report.md`
+- `artifact_index.json`
 
 Each child also writes captured stdout/stderr text files in its own output directory.
 
