@@ -463,6 +463,72 @@ def collect_visual_review_artifacts(
             ),
         )
 
+    perceived_comparison = visual_review.get("perceived_depth_comparison")
+    perceived_comparison = perceived_comparison if isinstance(perceived_comparison, dict) else {}
+    comparison_paths = perceived_comparison.get("paths")
+    comparison_paths = comparison_paths if isinstance(comparison_paths, dict) else {}
+    comparison_rows = perceived_comparison.get("rows")
+    comparison_rows = comparison_rows if isinstance(comparison_rows, list) else []
+    first_comparison = next((row for row in comparison_rows if isinstance(row, dict)), {})
+    comparison_aggregate = perceived_comparison.get("aggregate")
+    comparison_aggregate = comparison_aggregate if isinstance(comparison_aggregate, dict) else {}
+    comparison_estimator = perceived_comparison.get("estimator")
+    comparison_estimator = comparison_estimator if isinstance(comparison_estimator, dict) else {}
+    comparison_artifact_summary = {
+        "status": perceived_comparison.get("status"),
+        "ok": perceived_comparison.get("ok"),
+        "frame_count": perceived_comparison.get("frame_count"),
+        "estimator": comparison_estimator.get("name"),
+        "estimator_status": comparison_estimator.get("status"),
+        "estimator_source": comparison_estimator.get("source"),
+        "uses_sim_metadata": comparison_estimator.get("uses_sim_metadata"),
+        "uses_real_camera_pixels": comparison_estimator.get("uses_real_camera_pixels"),
+        "uses_depth_sensor": comparison_estimator.get("uses_depth_sensor"),
+        "mean_abs_camera_to_piece_error_mm": comparison_aggregate.get(
+            "mean_abs_camera_to_piece_error_mm"
+        ),
+        "max_abs_camera_to_piece_error_mm": comparison_aggregate.get(
+            "max_abs_camera_to_piece_error_mm"
+        ),
+        "mean_abs_camera_to_board_error_mm": comparison_aggregate.get(
+            "mean_abs_camera_to_board_error_mm"
+        ),
+        "max_abs_camera_to_board_error_mm": comparison_aggregate.get(
+            "max_abs_camera_to_board_error_mm"
+        ),
+        "example_estimated_camera_to_piece_distance_mm": first_comparison.get(
+            "estimated_camera_to_piece_distance_mm"
+        ),
+        "example_ground_truth_camera_to_piece_distance_mm": first_comparison.get(
+            "ground_truth_camera_to_piece_distance_mm"
+        ),
+        "example_camera_to_piece_error_mm": first_comparison.get("camera_to_piece_error_mm"),
+        "example_estimated_camera_to_board_plane_distance_mm": first_comparison.get(
+            "estimated_camera_to_board_plane_distance_mm"
+        ),
+        "example_ground_truth_camera_to_board_plane_distance_mm": first_comparison.get(
+            "ground_truth_camera_to_board_plane_distance_mm"
+        ),
+        "example_camera_to_board_error_mm": first_comparison.get("camera_to_board_error_mm"),
+    }
+    for key, label_suffix in (("json", "json"), ("csv", "csv")):
+        add_path(
+            artifacts,
+            category="visual_review",
+            label=f"visual_review:pick_place_perceived_depth_comparison:{label_suffix}",
+            value=comparison_paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"visual_review.perceived_depth_comparison.paths.{key}",
+            metrics=comparison_artifact_summary,
+            scenario_id=(
+                perceived_comparison.get("scenario_id")
+                if isinstance(perceived_comparison.get("scenario_id"), str)
+                else None
+            ),
+        )
+
     contact_sheets = visual_review.get("contact_sheets")
     contact_sheet_rows = contact_sheets if isinstance(contact_sheets, list) else []
     for sheet in contact_sheet_rows:

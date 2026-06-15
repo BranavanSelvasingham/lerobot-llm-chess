@@ -15,10 +15,16 @@ import cv2
 import numpy as np
 
 SCHEMA = "lerobot.sim.calibration_visual_review.v1"
+PERCEIVED_DEPTH_COMPARISON_SCHEMA = "lerobot.sim.pick_place_perceived_depth_comparison.v1"
 DEFAULT_CONTACT_SHEET_CELL_WIDTH = 360
 DEFAULT_VIDEO_FPS = 1.0
 VIDEO_CODEC = "mp4v"
 SIM_BOARD_SIZE_M = 0.4
+PERCEIVED_DEPTH_ESTIMATOR_NAME = "rendered_board_corner_planar_pnp"
+PERCEIVED_DEPTH_ESTIMATOR_STATUS = "metadata_derived_baseline"
+PERCEIVED_DEPTH_ESTIMATOR_SOURCE = (
+    "metadata_derived_from_rendered_board_corners_camera_intrinsics_and_known_board_size"
+)
 PICK_PLACE_SEQUENCE_STAGES = (
     ("source_open_path", "Ready/open", "open gripper with piece at source"),
     ("source_hover_open_path", "Approach", "approach source square with gripper open"),
@@ -456,6 +462,134 @@ def board_corner_projection_residuals(metadata: dict[str, Any]) -> dict[str, Any
     }
 
 
+def board_corner_object_points_m() -> np.ndarray:
+    return np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [SIM_BOARD_SIZE_M, 0.0, 0.0],
+            [SIM_BOARD_SIZE_M, SIM_BOARD_SIZE_M, 0.0],
+            [0.0, SIM_BOARD_SIZE_M, 0.0],
+        ],
+        dtype=np.float64,
+    )
+
+
+def camera_distortion_coefficients(metadata: dict[str, Any]) -> np.ndarray:
+    try:
+        distortion = np.asarray(metadata.get("distortion_coefficients"), dtype=np.float64)
+    except (TypeError, ValueError):
+        distortion = np.zeros((5, 1), dtype=np.float64)
+    if distortion.size == 0 or not np.isfinite(distortion).all():
+        return np.zeros((5, 1), dtype=np.float64)
+    return distortion.reshape(-1, 1)
+
+
+def solve_rendered_board_corner_pnp(metadata: dict[str, Any]) -> dict[str, Any]:
+    try:
+        camera_matrix = np.asarray(metadata.get("camera_matrix_px"), dtype=np.float64)
+        image_points = np.asarray(metadata.get("board_corners_xy"), dtype=np.float64)
+    except (TypeError, ValueError):
+        return {"status": "estimator_unavailable", "reason": "camera matrix or board corners are invalid"}
+    if camera_matrix.shape != (3, 3):
+        return {"status": "estimator_unavailable", "reason": "camera_matrix_px must be 3x3"}
+    if image_points.shape != (4, 2):
+        return {"status": "estimator_unavailable", "reason": "board_corners_xy must contain four 2D corners"}
+    if not np.isfinite(camera_matrix).all() or not np.isfinite(image_points).all():
+        return {"status": "estimator_unavailable", "reason": "camera matrix or board corners are non-finite"}
+
+    object_points = board_corner_object_points_m()
+    distortion = camera_distortion_coefficients(metadata)
+    candidate_flags = [
+        getattr(cv2, "SOLVEPNP_IPPE", cv2.SOLVEPNP_ITERATIVE),
+        cv2.SOLVEPNP_ITERATIVE,
+    ]
+    last_error: str | None = None
+    for flag in dict.fromkeys(candidate_flags):
+        try:
+            ok, rvec, tvec = cv2.solvePnP(
+                object_points,
+                image_points,
+                camera_matrix,
+                distortion,
+                flags=int(flag),
+            )
+        except cv2.error as exc:
+            last_error = str(exc)
+            continue
+        if not ok:
+            last_error = "cv2.solvePnP returned false"
+            continue
+        rotation, _ = cv2.Rodrigues(rvec)
+        translation = tvec.reshape(3).astype(float)
+        projected, _ = cv2.projectPoints(object_points, rvec, tvec, camera_matrix, distortion)
+        projected_points = projected.reshape(-1, 2)
+        residuals = np.linalg.norm(projected_points - image_points, axis=1)
+        if not (
+            np.isfinite(rotation).all()
+            and np.isfinite(translation).all()
+            and np.isfinite(residuals).all()
+        ):
+            last_error = "estimated pose or reprojection residuals are non-finite"
+            continue
+        return {
+            "status": "ok",
+            "rotation_matrix": rotation,
+            "translation_m": translation,
+            "projected_corners_xy": projected_points,
+            "rendered_corners_xy": image_points,
+            "corner_reprojection_residuals_px": residuals,
+            "solve_pnp_flag": int(flag),
+        }
+    return {
+        "status": "estimator_unavailable",
+        "reason": last_error or "cv2.solvePnP could not estimate a board pose",
+    }
+
+
+def estimate_depth_from_rendered_board_geometry(
+    metadata: dict[str, Any],
+    *,
+    piece_square: str,
+    target_square: str,
+) -> dict[str, Any]:
+    pnp = solve_rendered_board_corner_pnp(metadata)
+    if pnp.get("status") != "ok":
+        return pnp
+    try:
+        piece_board_m = board_square_center_m(piece_square)
+        target_board_m = board_square_center_m(target_square)
+    except ValueError as exc:
+        return {"status": "estimator_unavailable", "reason": str(exc)}
+
+    rotation = np.asarray(pnp["rotation_matrix"], dtype=float)
+    translation = np.asarray(pnp["translation_m"], dtype=float)
+    camera_center_board_m = -(rotation.T @ translation)
+    piece_camera_m = rotation @ piece_board_m + translation
+    target_camera_m = rotation @ target_board_m + translation
+    residuals = np.asarray(pnp["corner_reprojection_residuals_px"], dtype=float)
+    return {
+        "status": "ok",
+        "estimated_camera_to_piece_distance_mm": meters_to_mm(float(np.linalg.norm(piece_camera_m))),
+        "estimated_camera_to_board_plane_distance_mm": meters_to_mm(abs(float(camera_center_board_m[2]))),
+        "estimated_camera_to_target_square_distance_mm": meters_to_mm(float(np.linalg.norm(target_camera_m))),
+        "estimated_camera_center_board_mm": vector_m_to_mm(camera_center_board_m),
+        "estimated_piece_camera_xyz_mm": vector_m_to_mm(piece_camera_m),
+        "estimated_target_square_camera_xyz_mm": vector_m_to_mm(target_camera_m),
+        "board_corner_reprojection_mean_residual_px": rounded_float(float(np.mean(residuals)), digits=3),
+        "board_corner_reprojection_max_residual_px": rounded_float(float(np.max(residuals)), digits=3),
+        "board_corner_reprojection_residuals_px": [rounded_float(value, digits=3) for value in residuals],
+        "estimated_projected_corners_xy": rounded_list(
+            np.asarray(pnp["projected_corners_xy"], dtype=float).reshape(-1),
+            digits=3,
+        ),
+        "rendered_corners_xy": rounded_list(
+            np.asarray(pnp["rendered_corners_xy"], dtype=float).reshape(-1),
+            digits=3,
+        ),
+        "solve_pnp_flag": pnp.get("solve_pnp_flag"),
+    }
+
+
 def compute_depth_distance_metric(row: dict[str, Any]) -> dict[str, Any]:
     capture = row.get("capture")
     capture = capture if isinstance(capture, dict) else {}
@@ -638,6 +772,261 @@ def compute_depth_distance_metric(row: dict[str, Any]) -> dict[str, Any]:
         },
         "source": depth_source,
     }
+
+
+def subtract_or_none(left: Any, right: Any, digits: int = 1) -> float | None:
+    if left is None or right is None:
+        return None
+    try:
+        left_float = float(left)
+        right_float = float(right)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(left_float) or not math.isfinite(right_float):
+        return None
+    return round(left_float - right_float, digits)
+
+
+def abs_or_none(value: float | None, digits: int = 1) -> float | None:
+    if value is None:
+        return None
+    return round(abs(float(value)), digits)
+
+
+def compute_perceived_depth_comparison_row(
+    metric: dict[str, Any],
+    source_row: dict[str, Any],
+) -> dict[str, Any]:
+    capture = source_row.get("capture")
+    capture = capture if isinstance(capture, dict) else {}
+    metadata = capture.get("metadata")
+    metadata = metadata if isinstance(metadata, dict) else {}
+    flat = metric.get("distance_depth_fields")
+    flat = flat if isinstance(flat, dict) else {}
+    piece_square = str(metric.get("piece_square") or source_row.get("source_square") or "")
+    target_square = str(metric.get("target_square") or source_row.get("target_square") or piece_square)
+    estimate = estimate_depth_from_rendered_board_geometry(
+        metadata,
+        piece_square=piece_square,
+        target_square=target_square,
+    )
+
+    row: dict[str, Any] = {
+        "id": metric.get("id") or source_row.get("id"),
+        "capture_label": metric.get("capture_label") or source_row.get("capture_label"),
+        "stage": metric.get("stage") or source_row.get("stage"),
+        "description": metric.get("description") or source_row.get("description"),
+        "scenario_id": metric.get("scenario_id") or source_row.get("scenario_id"),
+        "source_square": metric.get("source_square") or source_row.get("source_square"),
+        "target_square": target_square,
+        "piece_square": piece_square,
+        "estimator": PERCEIVED_DEPTH_ESTIMATOR_NAME,
+        "estimator_source": PERCEIVED_DEPTH_ESTIMATOR_SOURCE,
+        "perceived_depth_status": PERCEIVED_DEPTH_ESTIMATOR_STATUS,
+        "uses_sim_metadata": True,
+        "uses_real_camera_pixels": False,
+        "uses_depth_sensor": False,
+        "status": estimate.get("status"),
+        "ok": estimate.get("status") == "ok",
+        "ground_truth_camera_to_piece_distance_mm": flat.get("camera_to_piece_distance_mm"),
+        "ground_truth_camera_to_board_plane_distance_mm": flat.get("camera_to_board_plane_distance_mm"),
+        "ground_truth_camera_to_target_square_distance_mm": flat.get("camera_to_target_square_distance_mm"),
+        "ground_truth_source_metric_id": metric.get("id"),
+        "ground_truth_source": "pick_place_depth_distance_metrics.distance_depth_fields",
+        "ground_truth_frame": flat.get("ground_truth_frame"),
+        "source_depth_metric_status": flat.get("metric_status"),
+        "limitations": (
+            "This is a metadata-derived planar-PnP baseline from rendered board corners and "
+            "SimCamera intrinsics, not an independent real-camera depth or segmentation estimate."
+        ),
+        "future_real_camera_perception_gap": (
+            "Replace or compare this baseline with real reference media, calibrated camera "
+            "intrinsics/extrinsics, and an image/depth estimator when physical captures are available."
+        ),
+    }
+    if estimate.get("status") != "ok":
+        row.update(
+            {
+                "estimated_camera_to_piece_distance_mm": None,
+                "estimated_camera_to_board_plane_distance_mm": None,
+                "estimated_camera_to_target_square_distance_mm": None,
+                "camera_to_piece_error_mm": None,
+                "camera_to_piece_abs_error_mm": None,
+                "camera_to_board_error_mm": None,
+                "camera_to_board_abs_error_mm": None,
+                "camera_to_target_square_error_mm": None,
+                "camera_to_target_square_abs_error_mm": None,
+                "reason": estimate.get("reason"),
+            }
+        )
+        return row
+
+    row.update(estimate)
+    piece_error = subtract_or_none(
+        row.get("estimated_camera_to_piece_distance_mm"),
+        row.get("ground_truth_camera_to_piece_distance_mm"),
+    )
+    board_error = subtract_or_none(
+        row.get("estimated_camera_to_board_plane_distance_mm"),
+        row.get("ground_truth_camera_to_board_plane_distance_mm"),
+    )
+    target_error = subtract_or_none(
+        row.get("estimated_camera_to_target_square_distance_mm"),
+        row.get("ground_truth_camera_to_target_square_distance_mm"),
+    )
+    row.update(
+        {
+            "camera_to_piece_error_mm": piece_error,
+            "camera_to_piece_abs_error_mm": abs_or_none(piece_error),
+            "camera_to_board_error_mm": board_error,
+            "camera_to_board_abs_error_mm": abs_or_none(board_error),
+            "camera_to_target_square_error_mm": target_error,
+            "camera_to_target_square_abs_error_mm": abs_or_none(target_error),
+        }
+    )
+    return row
+
+
+def aggregate_comparison_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    aggregate: dict[str, Any] = {
+        "row_count": len(rows),
+        "ok_row_count": sum(1 for row in rows if row.get("ok") is True),
+    }
+    for prefix, key in (
+        ("camera_to_piece", "camera_to_piece_abs_error_mm"),
+        ("camera_to_board", "camera_to_board_abs_error_mm"),
+        ("camera_to_target_square", "camera_to_target_square_abs_error_mm"),
+    ):
+        values = [float(row[key]) for row in rows if row.get(key) is not None]
+        if values:
+            aggregate[f"mean_abs_{prefix}_error_mm"] = round(float(np.mean(values)), 3)
+            aggregate[f"max_abs_{prefix}_error_mm"] = round(float(np.max(values)), 3)
+        else:
+            aggregate[f"mean_abs_{prefix}_error_mm"] = None
+            aggregate[f"max_abs_{prefix}_error_mm"] = None
+    residuals = [
+        float(row["board_corner_reprojection_mean_residual_px"])
+        for row in rows
+        if row.get("board_corner_reprojection_mean_residual_px") is not None
+    ]
+    aggregate["mean_board_corner_reprojection_residual_px"] = (
+        round(float(np.mean(residuals)), 3) if residuals else None
+    )
+    aggregate["max_board_corner_reprojection_residual_px"] = (
+        round(float(np.max(residuals)), 3) if residuals else None
+    )
+    return aggregate
+
+
+def write_perceived_depth_comparison_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    fieldnames = [
+        "id",
+        "stage",
+        "capture_label",
+        "scenario_id",
+        "source_square",
+        "target_square",
+        "piece_square",
+        "estimator",
+        "estimator_source",
+        "perceived_depth_status",
+        "status",
+        "estimated_camera_to_piece_distance_mm",
+        "ground_truth_camera_to_piece_distance_mm",
+        "camera_to_piece_error_mm",
+        "camera_to_piece_abs_error_mm",
+        "estimated_camera_to_board_plane_distance_mm",
+        "ground_truth_camera_to_board_plane_distance_mm",
+        "camera_to_board_error_mm",
+        "camera_to_board_abs_error_mm",
+        "estimated_camera_to_target_square_distance_mm",
+        "ground_truth_camera_to_target_square_distance_mm",
+        "camera_to_target_square_error_mm",
+        "camera_to_target_square_abs_error_mm",
+        "board_corner_reprojection_mean_residual_px",
+        "board_corner_reprojection_max_residual_px",
+        "uses_sim_metadata",
+        "uses_real_camera_pixels",
+        "uses_depth_sensor",
+        "ground_truth_source_metric_id",
+        "limitations",
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({key: csv_value(row.get(key)) for key in fieldnames})
+
+
+def write_perceived_depth_comparison(
+    *,
+    metric_rows: list[dict[str, Any]],
+    source_rows: list[dict[str, Any]],
+    output_dir: Path,
+    suite_output_dir: Path,
+    sequence_metadata: dict[str, Any],
+    distance_metrics: dict[str, Any],
+) -> dict[str, Any]:
+    source_by_id = {
+        str(row.get("id")): row
+        for row in source_rows
+        if isinstance(row, dict) and row.get("id") is not None
+    }
+    rows = [
+        compute_perceived_depth_comparison_row(metric, source_by_id.get(str(metric.get("id")), {}))
+        for metric in metric_rows
+        if isinstance(metric, dict)
+    ]
+    json_path = output_dir / "pick_place_perceived_depth_comparison.json"
+    csv_path = output_dir / "pick_place_perceived_depth_comparison.csv"
+    aggregate = aggregate_comparison_rows(rows)
+    ok = bool(rows) and all(row.get("ok") is True for row in rows)
+    summary = {
+        "schema": PERCEIVED_DEPTH_COMPARISON_SCHEMA,
+        "ok": ok,
+        "status": "ok" if ok else "validation_failed",
+        "scenario_id": sequence_metadata.get("scenario_id"),
+        "source_square": sequence_metadata.get("source_square"),
+        "target_square": sequence_metadata.get("target_square"),
+        "frame_count": len(rows),
+        "paths": {
+            "json": str(json_path),
+            "csv": str(csv_path),
+            "json_relative_path": output_relative(json_path, suite_output_dir),
+            "csv_relative_path": output_relative(csv_path, suite_output_dir),
+        },
+        "source_depth_distance_metrics": distance_metrics.get("paths"),
+        "ground_truth_source": "pick_place_depth_distance_metrics",
+        "estimator": {
+            "name": PERCEIVED_DEPTH_ESTIMATOR_NAME,
+            "status": PERCEIVED_DEPTH_ESTIMATOR_STATUS,
+            "source": PERCEIVED_DEPTH_ESTIMATOR_SOURCE,
+            "uses_sim_metadata": True,
+            "uses_real_camera_pixels": False,
+            "uses_depth_sensor": False,
+            "inputs": [
+                "camera_metadata.camera_matrix_px",
+                "camera_metadata.board_corners_xy",
+                f"known_sim_board_size_m={SIM_BOARD_SIZE_M}",
+                "metric row source/target square centers",
+            ],
+            "honesty_note": (
+                "The baseline estimates camera pose from rendered board-corner geometry and "
+                "known intrinsics. It is useful for artifact plumbing and residual accounting, "
+                "but it is not independent real-camera perception."
+            ),
+        },
+        "units": {
+            "distance": "millimeters",
+            "image_residual": "pixels",
+        },
+        "aggregate": aggregate,
+        "rows": rows,
+    }
+    write_json(json_path, summary)
+    write_perceived_depth_comparison_csv(csv_path, rows)
+    return summary
 
 
 def csv_value(value: Any) -> Any:
@@ -872,6 +1261,11 @@ def metric_dict(row: dict[str, Any]) -> dict[str, Any]:
     return flat if isinstance(flat, dict) else {}
 
 
+def comparison_dict(row: dict[str, Any]) -> dict[str, Any]:
+    comparison = row.get("perceived_depth_comparison")
+    return comparison if isinstance(comparison, dict) else {}
+
+
 def fmt_mm(value: Any) -> str:
     return "n/a" if value is None else f"{float(value):.1f}mm"
 
@@ -887,7 +1281,7 @@ def fmt_xy(value: Any) -> str:
 
 
 def annotate_pick_place_frame(image_bgr: np.ndarray, row: dict[str, Any]) -> np.ndarray:
-    header_height = 120
+    header_height = 142
     height, width = image_bgr.shape[:2]
     out = np.zeros((height + header_height, width, 3), dtype=np.uint8)
     out[:, :] = (18, 18, 18)
@@ -928,12 +1322,21 @@ def annotate_pick_place_frame(image_bgr: np.ndarray, row: dict[str, Any]) -> np.
         f"({gripper_source or 'n/a'}) "
         f"| perceived depth={perceived_status or 'n/a'}"
     )
+    comparison = comparison_dict(row)
+    comparison_metrics = (
+        f"PnP est/GT cam-piece={fmt_mm(comparison.get('estimated_camera_to_piece_distance_mm'))}/"
+        f"{fmt_mm(comparison.get('ground_truth_camera_to_piece_distance_mm'))} "
+        f"err={fmt_mm(comparison.get('camera_to_piece_error_mm'))} "
+        f"| cam-board err={fmt_mm(comparison.get('camera_to_board_error_mm'))} "
+        f"| {comparison.get('perceived_depth_status') or 'n/a'}"
+    )
     cv2.putText(out, short_text(title), (10, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.56, (255, 255, 255), 1, cv2.LINE_AA)
     cv2.putText(out, short_text(route), (10, 46), cv2.FONT_HERSHEY_SIMPLEX, 0.44, (205, 220, 255), 1, cv2.LINE_AA)
     cv2.putText(out, short_text(distance_metrics, 138), (10, 67), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (205, 245, 205), 1, cv2.LINE_AA)
     cv2.putText(out, short_text(target_metrics, 138), (10, 88), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (255, 230, 175), 1, cv2.LINE_AA)
-    cv2.putText(out, short_text(gripper_metrics, 138), (10, 108), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (255, 210, 210), 1, cv2.LINE_AA)
-    cv2.putText(out, short_text(visibility_metrics, 138), (10, 116), cv2.FONT_HERSHEY_SIMPLEX, 0.36, (190, 220, 255), 1, cv2.LINE_AA)
+    cv2.putText(out, short_text(comparison_metrics, 138), (10, 109), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (255, 210, 210), 1, cv2.LINE_AA)
+    cv2.putText(out, short_text(gripper_metrics, 138), (10, 128), cv2.FONT_HERSHEY_SIMPLEX, 0.36, (220, 220, 255), 1, cv2.LINE_AA)
+    cv2.putText(out, short_text(visibility_metrics, 138), (10, 139), cv2.FONT_HERSHEY_SIMPLEX, 0.30, (190, 220, 255), 1, cv2.LINE_AA)
     return out
 
 
@@ -974,6 +1377,7 @@ def render_pick_place_sequence_frames(
                 "gripper": row.get("gripper"),
                 "piece_visibility": row.get("piece_visibility"),
                 "distance_depth_fields": depth_fields,
+                "perceived_depth_comparison": comparison_dict(row),
             }
         )
     return (
@@ -1312,13 +1716,32 @@ def build_summary(
         suite_output_dir=suite_output_dir,
         sequence_metadata=pick_place_metadata,
     )
+    metric_rows = [
+        metric
+        for metric in distance_metrics.get("rows", [])
+        if isinstance(metric, dict)
+    ]
+    perceived_depth_comparison = write_perceived_depth_comparison(
+        metric_rows=metric_rows,
+        source_rows=pick_place_source_rows,
+        output_dir=output_dir,
+        suite_output_dir=suite_output_dir,
+        sequence_metadata=pick_place_metadata,
+        distance_metrics=distance_metrics,
+    )
     metrics_by_id = {
         str(metric.get("id")): metric
-        for metric in distance_metrics.get("rows", [])
-        if isinstance(metric, dict) and metric.get("id") is not None
+        for metric in metric_rows
+        if metric.get("id") is not None
+    }
+    comparisons_by_id = {
+        str(comparison.get("id")): comparison
+        for comparison in perceived_depth_comparison.get("rows", [])
+        if isinstance(comparison, dict) and comparison.get("id") is not None
     }
     for row in pick_place_source_rows:
         row["depth_distance_metric"] = metrics_by_id.get(str(row.get("id")))
+        row["perceived_depth_comparison"] = comparisons_by_id.get(str(row.get("id")))
     pick_place_sequence, pick_place_annotated_rows = render_pick_place_sequence_frames(
         pick_place_source_rows,
         output_dir=output_dir,
@@ -1402,6 +1825,7 @@ def build_summary(
         "contact_sheet_paths": {str(sheet["id"]): str(sheet["path"]) for sheet in contact_sheets},
         "frame_sequences": [pick_place_sequence],
         "distance_metrics": distance_metrics,
+        "perceived_depth_comparison": perceived_depth_comparison,
         "app_entrypoint_frame": app_frame,
         "recording": recording,
         "recordings": {
@@ -1412,6 +1836,7 @@ def build_summary(
             "Contact sheets are the stable review artifact and are generated from existing smoke frames.",
             "The pick/place sequence is rendered from the existing simulator scenario matrix and shows approach, grasp/contact, lift/transfer, place/release, and retreat frames with simulator ground-truth camera/board/piece distances.",
             "Pick/place depth artifacts label simulator ground truth separately from the unimplemented perceived-depth estimate; gripper-to-piece distance is currently a board-plane proxy from the rendered gripper overlay.",
+            "Pick/place perceived-depth comparison artifacts add a metadata-derived rendered-board-corner PnP baseline and residuals against simulator ground truth; this is not a real-camera depth estimator.",
             "Optional MP4 recordings are best-effort only and are not required for the suite to pass.",
             "No simulator pixels, camera profiles, perception algorithms, UI behavior, or robot paths are changed by this helper.",
         ],
@@ -1431,6 +1856,7 @@ def failure_summary(output_dir: Path, suite_summary_path: Path, error: str) -> d
         "contact_sheet_paths": {},
         "frame_sequences": [],
         "distance_metrics": {},
+        "perceived_depth_comparison": {},
         "app_entrypoint_frame": None,
         "recording": {
             "attempted": False,

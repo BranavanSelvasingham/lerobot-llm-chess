@@ -488,6 +488,67 @@ def depth_distance_row(artifact: dict[str, Any]) -> list[Any]:
     ]
 
 
+def perceived_depth_artifact_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("frame_count", ""),
+        metrics.get("estimator", ""),
+        metrics.get("estimator_status", ""),
+        metrics.get("example_estimated_camera_to_piece_distance_mm", ""),
+        metrics.get("example_ground_truth_camera_to_piece_distance_mm", ""),
+        metrics.get("example_camera_to_piece_error_mm", ""),
+        metrics.get("mean_abs_camera_to_piece_error_mm", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def perceived_depth_comparison_signal(
+    index: dict[str, Any],
+    suite: dict[str, Any] | None,
+) -> dict[str, Any]:
+    candidates: list[dict[str, Any]] = []
+    visual_review = index.get("visual_review")
+    if isinstance(visual_review, dict):
+        candidates.append(visual_review)
+    if suite is not None and isinstance(suite.get("visual_review"), dict):
+        candidates.append(suite["visual_review"])
+    for candidate in candidates:
+        comparison = candidate.get("perceived_depth_comparison")
+        if isinstance(comparison, dict) and comparison:
+            return comparison
+    return {}
+
+
+def perceived_depth_stage_rows(comparison: dict[str, Any]) -> list[list[Any]]:
+    rows = comparison.get("rows")
+    rows = rows if isinstance(rows, list) else []
+    out: list[list[Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        out.append(
+            [
+                row.get("stage", ""),
+                row.get("estimator", ""),
+                row.get("perceived_depth_status", ""),
+                row.get("estimated_camera_to_piece_distance_mm", ""),
+                row.get("ground_truth_camera_to_piece_distance_mm", ""),
+                row.get("camera_to_piece_error_mm", ""),
+                row.get("estimated_camera_to_board_plane_distance_mm", ""),
+                row.get("ground_truth_camera_to_board_plane_distance_mm", ""),
+                row.get("camera_to_board_error_mm", ""),
+                row.get("board_corner_reprojection_mean_residual_px", ""),
+                row.get("status", ""),
+            ]
+        )
+    return out
+
+
 def app_entrypoint_row(artifact: dict[str, Any]) -> list[Any]:
     metrics = artifact.get("metrics")
     metrics = metrics if isinstance(metrics, dict) else {}
@@ -761,6 +822,59 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         )
         if pick_place_depth_metrics
         else ["_No pick/place depth-distance metric artifacts indexed._"]
+    )
+
+    perceived_depth_artifacts = [
+        row
+        for row in grouped.get("visual_review", [])
+        if str(row.get("label") or "").startswith("visual_review:pick_place_perceived_depth_comparison")
+    ]
+    perceived_comparison = perceived_depth_comparison_signal(index, suite)
+    lines.extend(["", "### Pick/Place Perceived Depth Comparison"])
+    lines.append(
+        "This compact table compares a metadata-derived rendered-board-corner PnP baseline "
+        "against simulator ground truth. It is not an independent real-camera depth estimate."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Frames",
+                "Estimator",
+                "Estimator Status",
+                "Example Est Cam-Piece mm",
+                "Example GT Cam-Piece mm",
+                "Example Cam-Piece Error mm",
+                "Mean Abs Cam-Piece Error mm",
+                "Status",
+            ],
+            [perceived_depth_artifact_row(row) for row in perceived_depth_artifacts],
+        )
+        if perceived_depth_artifacts
+        else ["_No perceived-depth comparison artifacts indexed._"]
+    )
+    stage_rows = perceived_depth_stage_rows(perceived_comparison)
+    lines.extend(
+        table(
+            [
+                "Stage",
+                "Estimator",
+                "Source Status",
+                "Est Cam-Piece mm",
+                "GT Cam-Piece mm",
+                "Cam-Piece Error mm",
+                "Est Cam-Board mm",
+                "GT Cam-Board mm",
+                "Cam-Board Error mm",
+                "Reproj Mean px",
+                "Status",
+            ],
+            stage_rows,
+        )
+        if stage_rows
+        else ["_No per-stage perceived-depth comparison rows were available._"]
     )
 
     pick_place_sequence = [

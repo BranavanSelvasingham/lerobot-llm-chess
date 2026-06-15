@@ -114,6 +114,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `visual_review/visual_review_summary.json`",
         "- `visual_review/pick_place_depth_distance_metrics.json`",
         "- `visual_review/pick_place_depth_distance_metrics.csv`",
+        "- `visual_review/pick_place_perceived_depth_comparison.json`",
+        "- `visual_review/pick_place_perceived_depth_comparison.csv`",
         "- `reference_capture_checklist/reference_capture_checklist.json`",
         "- `reference_capture_checklist/reference_capture_checklist.md`",
         "- `negative_empty_inventory/comparison_set_summary.json`",
@@ -170,6 +172,11 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             "camera-to-piece, target world/pixel coordinates, projection residuals, and a "
             "labeled gripper-to-piece board-plane proxy; perceived depth is explicitly marked "
             "`not_implemented`."
+        ),
+        (
+            "- Pick/place perceived-depth comparison evidence records a metadata-derived "
+            "rendered-board-corner PnP baseline beside the simulator ground truth, including "
+            "estimated camera-to-piece/board distances and residuals."
         ),
         (
             f"- Optional visual review recording produced: `{markdown_bool(recording.get('produced'))}`; "
@@ -677,6 +684,10 @@ def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Pa
     frame_sequences = frame_sequences if isinstance(frame_sequences, list) else []
     distance_metrics = visual_review.get("distance_metrics")
     distance_metrics = distance_metrics if isinstance(distance_metrics, dict) else {}
+    perceived_depth_comparison = visual_review.get("perceived_depth_comparison")
+    perceived_depth_comparison = (
+        perceived_depth_comparison if isinstance(perceived_depth_comparison, dict) else {}
+    )
     recordings = visual_review.get("recordings")
     recordings = recordings if isinstance(recordings, dict) else {}
     return {
@@ -693,6 +704,7 @@ def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Pa
         "contact_sheets": contact_sheets,
         "frame_sequences": frame_sequences,
         "distance_metrics": distance_metrics,
+        "perceived_depth_comparison": perceived_depth_comparison,
         "app_entrypoint_frame": visual_review.get("app_entrypoint_frame"),
         "recording": visual_review.get("recording"),
         "recordings": recordings,
