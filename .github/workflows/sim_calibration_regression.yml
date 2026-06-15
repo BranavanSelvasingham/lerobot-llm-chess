@@ -59,6 +59,7 @@ permissions:
 env:
   PYTHON_VERSION: "3.12"
   CALIBRATION_REGRESSION_OUTPUT_DIR: "/tmp/lerobot_sim/calibration_regression_suite"
+  CALIBRATION_REGRESSION_ARTIFACT_NAME: "sim-calibration-regression-${{ github.run_id }}"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -267,10 +268,26 @@ jobs:
               for row in artifacts_by_category["logs"]
           ), artifacts_by_category["logs"]
 
+          report_path = summary_path.parent / "artifact_index_report.md"
+          entrypoint_path = summary_path.parent / "README.md"
+          assert report_path.is_file(), report_path
+          assert entrypoint_path.is_file(), entrypoint_path
+          entrypoint_text = entrypoint_path.read_text()
+          assert "Open `artifact_index_report.md` first." in entrypoint_text, entrypoint_text
+          assert "`calibration_regression_summary.json`" in entrypoint_text, entrypoint_text
+          assert "`artifact_index.json`" in entrypoint_text, entrypoint_text
+          assert "`hardware_skipped: true`" in entrypoint_text, entrypoint_text
+          assert "`gui_skipped: true`" in entrypoint_text, entrypoint_text
+          assert "Real-media gap:" in entrypoint_text, entrypoint_text
+          assert "No real-world videos are present for motion, recovery, or timing references." in entrypoint_text, entrypoint_text
+          assert "No reference media currently documents failure modes." in entrypoint_text, entrypoint_text
+
           print(
               json.dumps(
                   {
                       "summary_path": str(summary_path),
+                      "artifact_entrypoint": str(entrypoint_path),
+                      "artifact_index_report": str(report_path),
                       "selected_candidate": summary["selected_candidate"]["candidate_id"],
                       "hardware_skipped": summary["hardware_skipped"],
                       "gui_skipped": summary["gui_skipped"],
@@ -294,10 +311,62 @@ jobs:
           )
           PY
 
+      - name: Write artifact review summary
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          output_dir = Path(os.environ["CALIBRATION_REGRESSION_OUTPUT_DIR"])
+          artifact_name = os.environ["CALIBRATION_REGRESSION_ARTIFACT_NAME"]
+          summary_path = output_dir / "calibration_regression_summary.json"
+          summary = json.loads(summary_path.read_text())
+
+          core_json_paths = [
+              "calibration_regression_summary.json",
+              "artifact_index.json",
+              "inventory/reference_media_inventory.json",
+              "comparison_set/comparison_set_summary.json",
+              "session/session_summary.json",
+              "fixture/fixture_summary.json",
+              "pick_place_scenario_matrix/scenario_matrix_summary.json",
+              "negative_empty_inventory/comparison_set_summary.json",
+          ]
+          for relative_path in ["README.md", "artifact_index_report.md", *core_json_paths]:
+              assert (output_dir / relative_path).is_file(), relative_path
+
+          def markdown_bool(value):
+              if isinstance(value, bool):
+                  return str(value).lower()
+              return str(value)
+
+          lines = [
+              "## Simulator Calibration Regression Artifacts",
+              "",
+              f"Download `{artifact_name}` and open `artifact_index_report.md` first.",
+              "`README.md` at the artifact root repeats the entrypoint and review markers.",
+              "",
+              "Core JSON summaries:",
+              *[f"- `{path}`" for path in core_json_paths],
+              "",
+              "Review markers:",
+              f"- `hardware_skipped`: `{markdown_bool(summary['hardware_skipped'])}`",
+              f"- `gui_skipped`: `{markdown_bool(summary['gui_skipped'])}`",
+              f"- `negative_check`: `{summary['negative_check']['status']}`",
+              "- Real-media gap: no real-world videos or failure-mode reference media are present.",
+              "",
+          ]
+          rendered = "\n".join(lines) + "\n"
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as step_summary:
+              step_summary.write(rendered)
+          print(rendered)
+          PY
+
       - name: Upload calibration regression artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sim-calibration-regression-${{ github.run_id }}
+          name: ${{ env.CALIBRATION_REGRESSION_ARTIFACT_NAME }}
           path: ${{ env.CALIBRATION_REGRESSION_OUTPUT_DIR }}
           if-no-files-found: warn
