@@ -75,7 +75,12 @@ import cv2
 from lerobot.cameras.camera import Camera
 from lerobot.cameras.opencv.configuration_opencv import ColorMode, OpenCVCameraConfig
 from lerobot.cameras.opencv.camera_opencv import OpenCVCamera
-from lerobot.sim import SimCamera, SimCameraConfig
+from lerobot.sim import (
+    SIM_CAMERA_CALIBRATION_PROFILES,
+    SimCamera,
+    SimCameraConfig,
+    make_sim_camera_config_from_profile,
+)
 from llm_toolkit import AppConfig, KinematicsTools  # pyright: ignore[reportMissingImports]
 
 
@@ -1001,15 +1006,19 @@ class ChessRobotUILLMV2(QMainWindow):
     def _setup_camera(self) -> None:
         try:
             if self.cfg.sim:
-                cfg = SimCameraConfig(
-                    width=int(self.cfg.camera_width),
-                    height=int(self.cfg.camera_height),
-                    fps=int(self.cfg.camera_fps),
-                    color_mode=ColorMode.BGR,
-                    view="gripper",
-                )
+                if self.cfg.sim_camera_profile:
+                    cfg = make_sim_camera_config_from_profile(str(self.cfg.sim_camera_profile))
+                else:
+                    cfg = SimCameraConfig(
+                        width=int(self.cfg.camera_width),
+                        height=int(self.cfg.camera_height),
+                        fps=int(self.cfg.camera_fps),
+                        color_mode=ColorMode.BGR,
+                        view="gripper",
+                    )
                 self._camera = SimCamera(cfg)
-                camera_label = "Synthetic camera connected"
+                profile_suffix = f" profile={self.cfg.sim_camera_profile}" if self.cfg.sim_camera_profile else ""
+                camera_label = f"Synthetic camera connected{profile_suffix}"
             else:
                 cfg = OpenCVCameraConfig(
                     index_or_path=int(self.cfg.camera_index),
@@ -1254,6 +1263,12 @@ def _parse_args() -> AppConfig:
     p = argparse.ArgumentParser(description="Chess Robot UI (LLM v2): camera + tool calls")
     p.add_argument("--port", required=False, help="Robot serial port (SO-101)")
     p.add_argument("--sim", action="store_true", help="Use the synthetic SO-101 robot and calibration camera")
+    p.add_argument(
+        "--sim-camera-profile",
+        choices=sorted(SIM_CAMERA_CALIBRATION_PROFILES),
+        default=None,
+        help="Named simulator camera calibration profile to use with --sim.",
+    )
     p.add_argument("--robot-id", default="so101_chess", help="Calibration id (default: so101_chess)")
     p.add_argument("--urdf", default=None, help="URDF path (or set SO101_URDF)")
     p.add_argument("--camera-index", type=int, default=0)
@@ -1266,6 +1281,8 @@ def _parse_args() -> AppConfig:
     a = p.parse_args()
     if a.sim and a.port:
         p.error("--sim and --port are mutually exclusive")
+    if a.sim_camera_profile and not a.sim:
+        p.error("--sim-camera-profile requires --sim")
 
     return AppConfig(
         port=a.port,
@@ -1276,6 +1293,7 @@ def _parse_args() -> AppConfig:
         camera_width=int(a.camera_width),
         camera_height=int(a.camera_height),
         camera_fps=int(a.camera_fps),
+        sim_camera_profile=str(a.sim_camera_profile) if a.sim_camera_profile else None,
         model=str(a.model),
         api_key=str(a.api_key) if a.api_key else None,
     )
