@@ -8,6 +8,14 @@ Run this hardware-free gate before changing simulator rendering, camera profiles
 
 The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json` has `"ok": true` and `"status": "ok"`. It also writes a root `/private/tmp/lerobot_sim/calibration_regression_suite/README.md`, `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index_report.md`, and `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index.json`. For quick review, open `artifact_index_report.md` first; it is a deterministic Markdown view of the compact artifact index and links the highest-signal generated evidence, including the gripper-camera POV review. The root `README.md` repeats that entrypoint, the core JSON summaries, the hardware/gui/OpenAI skipped markers, and the current real-media gap.
 
+To exercise the same suite with declared reference-media metadata, pass an optional manifest:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_calibration_regression_suite.py --output-dir /private/tmp/lerobot_sim/calibration_regression_suite_manifest --python /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 --include-negative-check --reference-media-manifest archive/reference_media_manifest.example.json
+```
+
+That manifest-backed run remains hardware-free and is not the default CI path. It records `reference_media_manifest` in `calibration_regression_summary.json`, keeps `inventory.summary.manifest_validation_status`, carries selected media `declared_metadata`/`manifest_validation` through `comparison_set/comparison_set_summary.json`, and exposes the manifest status plus declared media fields in `artifact_index.json` and `artifact_index_report.md`.
+
 For a narrower camera/board pose check without running the full suite:
 
 ```bash
@@ -53,6 +61,7 @@ A passing summary should show:
 - `hardware_skipped: true`
 - `gui_skipped: true`
 - `openai_skipped: true`
+- `reference_media_manifest.status: "ok"` and selected declared-media rows when `--reference-media-manifest` is supplied
 - `child_commands.*.ok: true`
 - `comparison_set.status: "ok"`
 - `calibration_session.selected_candidate` populated with the rank-1 candidate

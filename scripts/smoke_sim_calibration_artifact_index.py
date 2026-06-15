@@ -212,6 +212,18 @@ def collect_real_reference_media(
         relative_path = record.get("relative_path")
         if not isinstance(relative_path, str):
             continue
+        declared_metadata = record.get("declared_metadata")
+        declared_metadata = declared_metadata if isinstance(declared_metadata, dict) else {}
+        manifest_validation = record.get("manifest_validation")
+        manifest_validation = manifest_validation if isinstance(manifest_validation, dict) else {}
+        manifest_metrics = {
+            "manifest_declared": manifest_validation.get("declared"),
+            "manifest_validation_status": manifest_validation.get("status"),
+            "capture_id": declared_metadata.get("capture_id"),
+            "declared_target_categories": declared_metadata.get("declared_target_categories"),
+            "failure_mode": declared_metadata.get("failure_mode"),
+            "sim_profiles": declared_metadata.get("sim_profiles"),
+        }
         add_path(
             artifacts,
             category="real_reference_media",
@@ -221,6 +233,7 @@ def collect_real_reference_media(
             output_dir=output_dir,
             repo_root=repo_root,
             source="comparison_set.selected_media",
+            metrics=manifest_metrics,
             reference_media=relative_path,
         )
         rows.append(
@@ -230,6 +243,11 @@ def collect_real_reference_media(
                 "dimensions": record.get("dimensions"),
                 "selection_reasons": record.get("selection_reasons"),
                 "currently_wired_into_simulator_tooling": record.get("currently_wired_into_simulator_tooling"),
+                "manifest_validation": manifest_validation,
+                "declared_metadata": declared_metadata or None,
+                "capture_id": declared_metadata.get("capture_id"),
+                "declared_target_categories": declared_metadata.get("declared_target_categories"),
+                "failure_mode": declared_metadata.get("failure_mode"),
             }
         )
     return sorted(rows, key=lambda row: str(row.get("relative_path") or ""))
@@ -895,6 +913,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
             "status": suite.get("status"),
             "aggregate_status": suite.get("aggregate_status"),
         },
+        "reference_media_manifest": suite.get("reference_media_manifest"),
         "selected_real_reference_media": selected_media,
         "sim_camera_pose_fixture_metadata_contract": sim_camera_pose_metadata_contract,
         "gripper_camera_pov": gripper_camera_pov,
