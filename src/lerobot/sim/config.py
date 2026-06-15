@@ -55,6 +55,7 @@ SIM_CAMERA_CALIBRATION_PROFILES: dict[str, dict[str, Any]] = {
         "gripper_finger_width_px": 72,
         "gripper_length_px": 170,
         "track_robot_gripper": True,
+        "metadata_projected_board_geometry": True,
         "reference_image_path": CURRENT_GRIPPER_REFERENCE_IMAGE,
     }
 }
@@ -140,6 +141,7 @@ class SimCameraConfig(CameraConfig):
     camera_matrix_px: CameraMatrix | None = None
     distortion_coefficients: DistortionCoefficients | None = None
     board_to_camera_extrinsics: dict[str, Any] | None = None
+    metadata_projected_board_geometry: bool = False
 
     def __post_init__(self) -> None:
         if self.width is None or self.height is None:
@@ -185,7 +187,12 @@ def make_sim_camera_config_from_profile(profile_name: str, **overrides: Any) -> 
         known_profiles = ", ".join(sorted(SIM_CAMERA_CALIBRATION_PROFILES))
         raise ValueError(f"Unknown SimCamera calibration profile {profile_name!r}. Known profiles: {known_profiles}") from exc
 
-    return SimCameraConfig(**{**profile_values, **overrides})
+    values = {**profile_values, **overrides}
+    if "board_corners_xy" in overrides:
+        values.setdefault("metadata_projected_board_geometry", False)
+        if "metadata_projected_board_geometry" not in overrides:
+            values["metadata_projected_board_geometry"] = False
+    return SimCameraConfig(**values)
 
 
 def select_ranked_sim_camera_profile_overrides(
