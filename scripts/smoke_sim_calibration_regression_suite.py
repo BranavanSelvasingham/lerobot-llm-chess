@@ -116,6 +116,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `visual_review/pick_place_depth_distance_metrics.csv`",
         "- `visual_review/pick_place_perceived_depth_comparison.json`",
         "- `visual_review/pick_place_perceived_depth_comparison.csv`",
+        "- `visual_review/pick_place_pnp_residual_diagnostics.json`",
+        "- `visual_review/pick_place_pnp_residual_diagnostics.csv`",
         "- `reference_capture_checklist/reference_capture_checklist.json`",
         "- `reference_capture_checklist/reference_capture_checklist.md`",
         "- `negative_empty_inventory/comparison_set_summary.json`",
@@ -177,6 +179,11 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             "- Pick/place perceived-depth comparison evidence records a metadata-derived "
             "rendered-board-corner PnP baseline beside the simulator ground truth, including "
             "estimated camera-to-piece/board distances and residuals."
+        ),
+        (
+            "- Pick/place PnP residual diagnostics compare simulator ground-truth "
+            "extrinsics, rendered-board-corner PnP, and metadata-projected 3D board corners "
+            "with source comparability labels."
         ),
         (
             f"- Optional visual review recording produced: `{markdown_bool(recording.get('produced'))}`; "
@@ -688,6 +695,10 @@ def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Pa
     perceived_depth_comparison = (
         perceived_depth_comparison if isinstance(perceived_depth_comparison, dict) else {}
     )
+    pnp_residual_diagnostics = visual_review.get("pnp_residual_diagnostics")
+    pnp_residual_diagnostics = (
+        pnp_residual_diagnostics if isinstance(pnp_residual_diagnostics, dict) else {}
+    )
     recordings = visual_review.get("recordings")
     recordings = recordings if isinstance(recordings, dict) else {}
     return {
@@ -705,6 +716,7 @@ def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Pa
         "frame_sequences": frame_sequences,
         "distance_metrics": distance_metrics,
         "perceived_depth_comparison": perceived_depth_comparison,
+        "pnp_residual_diagnostics": pnp_residual_diagnostics,
         "app_entrypoint_frame": visual_review.get("app_entrypoint_frame"),
         "recording": visual_review.get("recording"),
         "recordings": recordings,
