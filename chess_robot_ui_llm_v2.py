@@ -79,6 +79,7 @@ from lerobot.sim import (
     SIM_CAMERA_CALIBRATION_PROFILES,
     SimCamera,
     SimCameraConfig,
+    load_ranked_sim_calibration_session,
     load_sim_camera_profile_overrides,
     make_sim_camera_config_from_profile,
     select_ranked_sim_camera_profile_overrides,
@@ -521,6 +522,21 @@ class ChessRobotUILLMV2(QMainWindow):
 
         self._camera: Camera | None = None
         self._last_frame_bgr: np.ndarray | None = None
+        self._calibration_session: Any | None = None
+        self._calibration_load_error: str | None = None
+        self._active_calibration_candidate_id: str | None = None
+
+        selection = cfg.sim_camera_profile_selection if cfg.sim else None
+        if isinstance(selection, dict):
+            self._active_calibration_candidate_id = (
+                str(selection.get("candidate_id")) if selection.get("candidate_id") else None
+            )
+            summary_path = selection.get("summary_path")
+            if isinstance(summary_path, str) and summary_path:
+                try:
+                    self._calibration_session = load_ranked_sim_calibration_session(summary_path)
+                except ValueError as exc:
+                    self._calibration_load_error = str(exc)
 
         self._llm_init_error: str | None = None
         self._llm_client: Any | None = None
@@ -654,6 +670,8 @@ class ChessRobotUILLMV2(QMainWindow):
         self.status_label.setWordWrap(True)
         self.status_label.setStyleSheet("color: #c9d1d9;")
         tools_layout.addWidget(self.status_label)
+
+        self._add_calibration_session_section(tools_layout)
 
         # Torque + diagnostics row
         torque_row = QHBoxLayout()
@@ -926,6 +944,77 @@ class ChessRobotUILLMV2(QMainWindow):
             f" | LLM: {llm_status}"
             f" | Torque: {'OFF' if bool(getattr(self.tools, 'torque_disabled', False)) else 'ON'}"
         )
+
+    def _add_calibration_session_section(self, parent_layout: QVBoxLayout) -> None:
+        selection = self.cfg.sim_camera_profile_selection if self.cfg.sim else None
+        if not isinstance(selection, dict) and self._calibration_session is None and self._calibration_load_error is None:
+            return
+
+        group = QGroupBox("Calibration Session")
+        layout = QVBoxLayout(group)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(6)
+
+        if self._calibration_load_error:
+            error_label = QLabel(f"Session load failed: {self._calibration_load_error}")
+            error_label.setWordWrap(True)
+            error_label.setStyleSheet("color: #f85149;")
+            layout.addWidget(error_label)
+        elif self._calibration_session is not None:
+            summary_label = QLabel(f"Summary: {self._calibration_session.summary_path}")
+            summary_label.setWordWrap(True)
+            summary_label.setStyleSheet("color: #8b949e;")
+            layout.addWidget(summary_label)
+
+            self.calibration_candidate_combo = QComboBox()
+            for candidate in self._calibration_session.candidates:
+                score = "n/a" if candidate.rank_score is None else f"{candidate.rank_score:.3f}"
+                penalty = "n/a" if candidate.total_penalty is None else f"{candidate.total_penalty:.3f}"
+                self.calibration_candidate_combo.addItem(
+                    f"Rank {candidate.rank}: {candidate.candidate_id} | score {score} | penalty {penalty}",
+                    candidate.candidate_id,
+                )
+            if self._active_calibration_candidate_id:
+                active_index = self.calibration_candidate_combo.findData(self._active_calibration_candidate_id)
+                if active_index >= 0:
+                    self.calibration_candidate_combo.setCurrentIndex(active_index)
+            self.calibration_candidate_combo.currentIndexChanged.connect(self._on_calibration_candidate_changed)
+            layout.addWidget(self.calibration_candidate_combo)
+
+            self.calibration_details = QPlainTextEdit()
+            self.calibration_details.setReadOnly(True)
+            self.calibration_details.setMaximumHeight(150)
+            self.calibration_details.setStyleSheet("font-family: Menlo, Monaco, Consolas, monospace; font-size: 9pt;")
+            layout.addWidget(self.calibration_details)
+            self._on_calibration_candidate_changed(self.calibration_candidate_combo.currentIndex())
+        else:
+            self.calibration_details = QPlainTextEdit()
+            self.calibration_details.setReadOnly(True)
+            self.calibration_details.setMaximumHeight(120)
+            self.calibration_details.setPlainText(json.dumps(selection or {}, indent=2))
+            layout.addWidget(self.calibration_details)
+
+        parent_layout.addWidget(group)
+
+    def _on_calibration_candidate_changed(self, index: int) -> None:
+        if self._calibration_session is None or not hasattr(self, "calibration_candidate_combo"):
+            return
+        candidate_id = self.calibration_candidate_combo.itemData(index)
+        candidate = None
+        try:
+            candidate = self._calibration_session.select(candidate_id=str(candidate_id))
+        except ValueError:
+            return
+
+        active = candidate.candidate_id == self._active_calibration_candidate_id
+        details = candidate.to_jsonable()
+        details["active_camera_candidate"] = active
+        if active:
+            details["active_camera_note"] = "This candidate was applied at launch."
+        else:
+            details["active_camera_note"] = "Listed for inspection; restart with this rank/id to apply it."
+        if hasattr(self, "calibration_details"):
+            self.calibration_details.setPlainText(json.dumps(details, indent=2))
 
     # -----------------------------
     # File watcher for code changes
@@ -1350,6 +1439,11 @@ def _parse_args() -> AppConfig:
                 rank=int(a.sim_calibration_rank),
                 candidate_id=str(a.sim_calibration_candidate_id) if a.sim_calibration_candidate_id else None,
             )
+            session = load_ranked_sim_calibration_session(a.sim_calibration_session_summary)
+            candidate_row = session.select(
+                rank=int(a.sim_calibration_rank),
+                candidate_id=str(a.sim_calibration_candidate_id) if a.sim_calibration_candidate_id else None,
+            )
         except ValueError as exc:
             p.error(str(exc))
         if sim_camera_profile is not None and sim_camera_profile != selection.base_profile:
@@ -1365,6 +1459,14 @@ def _parse_args() -> AppConfig:
             "candidate_id": selection.candidate_id,
             "candidate_path": str(selection.candidate_path),
             "candidate_artifact_dir": selection.candidate_artifact_dir,
+            "rank_score": candidate_row.rank_score,
+            "total_penalty": candidate_row.total_penalty,
+            "all_smokes_ok": candidate_row.all_smokes_ok,
+            "smoke_failures": list(candidate_row.smoke_failures),
+            "artifact_paths": {key: str(path) for key, path in candidate_row.artifact_paths.items()},
+            "board_corners_xy": [[float(x), float(y)] for x, y in candidate_row.board_corners_xy],
+            "base_profile": candidate_row.base_profile,
+            "reference_image_path": str(candidate_row.reference_image_path) if candidate_row.reference_image_path else None,
         }
 
     return AppConfig(
