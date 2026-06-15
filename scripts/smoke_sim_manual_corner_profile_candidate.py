@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -33,7 +34,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Render and summarize a reviewable SimCamera profile override candidate from manually supplied "
-            "real-reference board corners. Corner order is a1, h1, h8, a8 in image pixels."
+            "real-reference board corners. Corner order is a1, h1, h8, a8 in image pixels. "
+            "Corners can be supplied explicitly, loaded from JSON, replayed from click JSON, or picked "
+            "interactively with OpenCV."
         )
     )
     source = parser.add_argument_group("corner input")
@@ -43,13 +46,31 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "JSON file with {'corner_labels':['a1','h1','h8','a8'], "
-            "'board_corners_xy':[[x,y],...]}. Mutually exclusive with --a1/--h1/--h8/--a8."
+            "'board_corners_xy':[[x,y],...]}. Mutually exclusive with other corner input sources."
         ),
     )
     source.add_argument("--a1", type=float, nargs=2, metavar=("X", "Y"), default=None)
     source.add_argument("--h1", type=float, nargs=2, metavar=("X", "Y"), default=None)
     source.add_argument("--h8", type=float, nargs=2, metavar=("X", "Y"), default=None)
     source.add_argument("--a8", type=float, nargs=2, metavar=("X", "Y"), default=None)
+    source.add_argument(
+        "--click-corners",
+        action="store_true",
+        help=(
+            "Open an interactive OpenCV picker on --reference-image. Click corners in order a1, h1, h8, a8; "
+            "Enter/c confirms, u/backspace undoes, r resets, q/Esc cancels."
+        ),
+    )
+    source.add_argument(
+        "--replay-clicks-json",
+        type=Path,
+        default=None,
+        help=(
+            "Replay a non-interactive click capture JSON. Accepted shapes include "
+            "{'click_labels':['a1','h1','h8','a8'],'click_points_xy':[[x,y],...]} or "
+            "{'clicks':[{'label':'a1','xy':[x,y]},...]}."
+        ),
+    )
     parser.add_argument(
         "--output-dir",
         "--frame-dir",
@@ -122,28 +143,196 @@ def load_json(path: Path) -> dict[str, Any]:
     return loaded
 
 
+def coerce_corners_array(value: Any, *, source: str) -> np.ndarray:
+    try:
+        corners = np.asarray(value, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{source} must contain numeric corner coordinates: {exc}") from exc
+    return corners
+
+
+def validate_corner_labels(labels: Any, *, source: str) -> None:
+    if not isinstance(labels, list):
+        raise ValueError(f"{source} must contain corner labels {list(CORNER_LABELS)}, got {labels!r}")
+    if labels != list(CORNER_LABELS):
+        raise ValueError(f"{source} must be {list(CORNER_LABELS)}, got {labels!r}")
+
+
 def corners_from_json(path: Path) -> np.ndarray:
     loaded = load_json(path.expanduser().resolve())
     labels = loaded.get("corner_labels")
-    if labels is not None and list(labels) != list(CORNER_LABELS):
-        raise ValueError(f"corner_labels must be {list(CORNER_LABELS)}, got {labels!r}")
+    if labels is not None:
+        validate_corner_labels(labels, source="corner_labels")
     if "board_corners_xy" not in loaded:
         raise ValueError("Corner JSON must contain board_corners_xy.")
-    return np.asarray(loaded["board_corners_xy"], dtype=float)
+    return coerce_corners_array(loaded["board_corners_xy"], source=f"board_corners_xy in {path}")
 
 
-def corners_from_cli(args: argparse.Namespace) -> np.ndarray:
+def click_point_from_mapping(click: dict[str, Any], *, index: int, source: Path) -> list[Any]:
+    if "xy" in click:
+        xy = click["xy"]
+    elif "point_xy" in click:
+        xy = click["point_xy"]
+    elif "x" in click and "y" in click:
+        xy = [click["x"], click["y"]]
+    else:
+        raise ValueError(f"clicks[{index}] in {source} must contain xy, point_xy, or x/y coordinates.")
+    if not isinstance(xy, (list, tuple)) or len(xy) != 2:
+        raise ValueError(f"clicks[{index}] in {source} must be an [x, y] pair, got {xy!r}.")
+    return [xy[0], xy[1]]
+
+
+def corners_from_replay_clicks_json(path: Path) -> np.ndarray:
+    replay_path = path.expanduser().resolve()
+    loaded = load_json(replay_path)
+    labels: Any
+    points: Any
+
+    if "clicks" in loaded:
+        clicks = loaded["clicks"]
+        if not isinstance(clicks, list):
+            raise ValueError(f"clicks in {replay_path} must be a list.")
+        labels = []
+        points = []
+        for index, click in enumerate(clicks):
+            if not isinstance(click, dict):
+                raise ValueError(f"clicks[{index}] in {replay_path} must be an object.")
+            labels.append(click.get("label", CORNER_LABELS[index] if index < len(CORNER_LABELS) else None))
+            points.append(click_point_from_mapping(click, index=index, source=replay_path))
+    elif "click_labels" in loaded or "click_points_xy" in loaded:
+        if "click_labels" not in loaded or "click_points_xy" not in loaded:
+            raise ValueError(f"Replay click JSON {replay_path} must contain both click_labels and click_points_xy.")
+        labels = loaded.get("click_labels")
+        points = loaded.get("click_points_xy")
+    elif "corner_labels" in loaded and "board_corners_xy" in loaded:
+        labels = loaded.get("corner_labels")
+        points = loaded.get("board_corners_xy")
+    else:
+        raise ValueError(
+            f"Replay click JSON {replay_path} must contain clicks, click_labels/click_points_xy, "
+            "or corner_labels/board_corners_xy."
+        )
+
+    validate_corner_labels(labels, source="Replay click labels")
+    return coerce_corners_array(points, source=f"replayed click points in {replay_path}")
+
+
+def draw_picker_state(image_bgr: np.ndarray, clicks_xy: list[tuple[float, float]]) -> np.ndarray:
+    out = image_bgr.copy()
+    next_label = CORNER_LABELS[len(clicks_xy)] if len(clicks_xy) < len(CORNER_LABELS) else "ready to confirm"
+    lines = [
+        "Click board corners in order: a1, h1, h8, a8",
+        f"Next: {next_label}",
+        "Enter/c: confirm  u/backspace: undo  r: reset  q/Esc: cancel",
+    ]
+    out = add_label(out, lines, height_px=70)
+    if not clicks_xy:
+        return out
+
+    pts = np.round(np.asarray(clicks_xy, dtype=float)).astype(int)
+    if len(pts) > 1:
+        cv2.polylines(out, [pts], isClosed=len(pts) == len(CORNER_LABELS), color=(255, 0, 255), thickness=2)
+    for label, pt in zip(CORNER_LABELS, pts, strict=False):
+        xy = tuple(int(value) for value in pt)
+        cv2.circle(out, xy, 6, (255, 0, 255), -1)
+        cv2.putText(out, label, (xy[0] + 8, xy[1] - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 3)
+        cv2.putText(out, label, (xy[0] + 8, xy[1] - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
+    return out
+
+
+def pick_corners_interactive(reference_bgr: np.ndarray) -> np.ndarray:
+    if sys.platform.startswith("linux") and not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        raise ValueError(
+            "OpenCV interactive display is unavailable because neither DISPLAY nor WAYLAND_DISPLAY is set. "
+            "Use --replay-clicks-json for headless validation."
+        )
+
+    window_name = "Sim manual corner picker"
+    clicks_xy: list[tuple[float, float]] = []
+    confirmed = False
+    cancelled = False
+
+    def on_mouse(event: int, x: int, y: int, _flags: int, _userdata: Any) -> None:
+        if event == cv2.EVENT_LBUTTONDOWN and len(clicks_xy) < len(CORNER_LABELS):
+            clicks_xy.append((float(x), float(y)))
+
+    try:
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+        cv2.setMouseCallback(window_name, on_mouse)
+        while True:
+            cv2.imshow(window_name, draw_picker_state(reference_bgr, clicks_xy))
+            key = cv2.waitKey(50)
+            if key == -1:
+                try:
+                    if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
+                        raise ValueError("OpenCV corner picker window was closed before confirmation.")
+                except cv2.error:
+                    pass
+                continue
+
+            key_code = key & 0xFF
+            if key_code in (27, ord("q")):
+                cancelled = True
+                break
+            if key_code in (8, 127, ord("u")):
+                if clicks_xy:
+                    clicks_xy.pop()
+                continue
+            if key_code == ord("r"):
+                clicks_xy.clear()
+                continue
+            if key_code in (10, 13, ord("c")) and len(clicks_xy) == len(CORNER_LABELS):
+                confirmed = True
+                break
+    except cv2.error as exc:
+        raise ValueError(
+            f"OpenCV interactive display failed: {exc}. Use --replay-clicks-json for headless validation."
+        ) from exc
+    finally:
+        try:
+            cv2.destroyWindow(window_name)
+        except cv2.error:
+            pass
+
+    if cancelled:
+        raise ValueError("OpenCV corner picker cancelled before confirmation.")
+    if not confirmed:
+        raise ValueError("OpenCV corner picker exited before four corners were confirmed.")
+    return np.asarray(clicks_xy, dtype=float)
+
+
+def corners_from_args(args: argparse.Namespace, reference_bgr: np.ndarray) -> tuple[np.ndarray, dict[str, Any]]:
     cli_values = [args.a1, args.h1, args.h8, args.a8]
     provided_count = sum(value is not None for value in cli_values)
-    if args.corners_json is not None and provided_count:
-        raise ValueError("Use either --corners-json or the explicit --a1/--h1/--h8/--a8 values, not both.")
-    if args.corners_json is not None:
-        return corners_from_json(args.corners_json)
-    if provided_count != len(CORNER_LABELS):
+    if provided_count not in (0, len(CORNER_LABELS)):
         raise ValueError(
             "Provide all explicit corner arguments in label order: --a1 X Y --h1 X Y --h8 X Y --a8 X Y."
         )
-    return np.asarray(cli_values, dtype=float)
+
+    sources = []
+    if args.corners_json is not None:
+        sources.append("corners-json")
+    if provided_count:
+        sources.append("cli")
+    if args.click_corners:
+        sources.append("click-corners")
+    if args.replay_clicks_json is not None:
+        sources.append("replay-clicks-json")
+    if len(sources) != 1:
+        raise ValueError(
+            "Choose exactly one corner input source: --corners-json, all explicit --a1/--h1/--h8/--a8 "
+            "values, --click-corners, or --replay-clicks-json."
+        )
+
+    if args.corners_json is not None:
+        path = args.corners_json.expanduser().resolve()
+        return corners_from_json(path), {"kind": "corners-json", "path": str(path)}
+    if provided_count:
+        return coerce_corners_array(cli_values, source="explicit CLI corners"), {"kind": "cli"}
+    if args.replay_clicks_json is not None:
+        path = args.replay_clicks_json.expanduser().resolve()
+        return corners_from_replay_clicks_json(path), {"kind": "replay-clicks-json", "path": str(path)}
+    return pick_corners_interactive(reference_bgr), {"kind": "click-corners"}
 
 
 def polygon_area_xy(points_xy: np.ndarray) -> float:
@@ -399,7 +588,7 @@ def main() -> int:
     reference_path = args.reference_image.expanduser().resolve()
     reference_bgr = read_reference_image(reference_path)
     height, width = reference_bgr.shape[:2]
-    candidate_corners = corners_from_cli(args)
+    candidate_corners, corner_input = corners_from_args(args, reference_bgr)
     validation = validate_candidate_corners(
         candidate_corners,
         width=width,
@@ -487,7 +676,7 @@ def main() -> int:
         "profile_values": jsonable(profile_values),
         "reference_image_path": str(reference_path),
         "output_dir": str(output_dir),
-        "corner_input": str(args.corners_json.expanduser().resolve()) if args.corners_json is not None else "cli",
+        "corner_input": corner_input,
         "artifacts": {name: str(path) for name, path in artifacts.items()},
         "candidate": profile_candidate,
         "image": {
