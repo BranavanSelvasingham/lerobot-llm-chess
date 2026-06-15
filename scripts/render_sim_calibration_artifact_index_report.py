@@ -691,6 +691,10 @@ def real_projection_intake_artifact_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("sidecar_missing_count", ""),
         metrics.get("missing_inputs", ""),
         metrics.get("sim_expected_projected_point_count", ""),
+        metrics.get("residual_available", ""),
+        metrics.get("residual_projection_row_count", ""),
+        metrics.get("mean_real_vs_sim_projection_residual_px", ""),
+        metrics.get("mean_abs_real_vs_sim_depth_residual_mm", ""),
         metrics.get("real_camera_capture_skipped", ""),
         "ok" if artifact.get("exists") is True else "missing",
     ]
@@ -722,6 +726,10 @@ def real_projection_intake_record_rows(intake: dict[str, Any]) -> list[list[Any]
             for item in next_requirements
             if isinstance(item, dict) and isinstance(item.get("id"), str)
         ] if isinstance(next_requirements, list) else []
+        residuals = record.get("residuals")
+        residuals = residuals if isinstance(residuals, dict) else {}
+        residual_aggregate = residuals.get("aggregate")
+        residual_aggregate = residual_aggregate if isinstance(residual_aggregate, dict) else {}
         rows.append(
             [
                 record.get("real_reference_media_relative_path") or record.get("real_reference_media_path", ""),
@@ -738,6 +746,10 @@ def real_projection_intake_record_rows(intake: dict[str, Any]) -> list[list[Any]
                 else "",
                 record.get("sim_expected_projected_point_count", ""),
                 record.get("comparable", ""),
+                residuals.get("available", ""),
+                residual_aggregate.get("projected_point_count", ""),
+                residual_aggregate.get("board_corner_observation_count", ""),
+                residual_aggregate.get("depth_reference_count", ""),
                 record.get("missing_inputs", ""),
                 requirement_ids,
             ]
@@ -1152,6 +1164,10 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Sidecars Missing",
                 "Missing Inputs",
                 "Sim Points",
+                "Residuals",
+                "Residual Rows",
+                "Mean Proj px",
+                "Mean Abs Depth mm",
                 "Real Camera Skipped",
                 "Artifact Status",
             ],
@@ -1174,6 +1190,10 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Sidecars Invalid",
                 "Sim Points",
                 "Comparable",
+                "Residuals",
+                "Proj Rows",
+                "Corner Rows",
+                "Depth Rows",
                 "Missing Inputs",
                 "Next Requirements",
             ],

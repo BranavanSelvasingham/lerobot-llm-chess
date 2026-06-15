@@ -85,6 +85,15 @@ sidecar JSON shape and reports `sidecar_validation`, `sidecar_valid_count`,
 schemas from missing or malformed inputs. Valid `example_only` sidecars are reported as
 `valid_example`; they do not satisfy real calibration availability.
 
+When a selected media row declares sidecars that validate with `real_capture: true`, the
+intake additionally writes `real_projection_residuals.json`,
+`real_projection_residuals.csv`, and
+`real_projection_residual_overlay_contact_sheet.png`. Those files compare real-sidecar
+projection/depth data against the metadata-native SimCamera expectation: projected-point
+pixel residuals, ordered board-corner detection residuals, camera z/range residuals,
+metric depth-reference residuals, and camera-to-board-plane residuals. These residual
+artifacts are not emitted for `example_only: true` fixtures.
+
 To turn the current gap into a capture plan without adding hardware requirements, generate the reference capture checklist from an existing inventory or suite summary:
 
 ```bash
