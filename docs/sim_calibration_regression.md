@@ -16,6 +16,19 @@ To exercise the same suite with declared reference-media metadata, pass an optio
 
 That manifest-backed run remains hardware-free and is not the default CI path. It records `reference_media_manifest` in `calibration_regression_summary.json`, keeps `inventory.summary.manifest_validation_status`, carries selected media `declared_metadata`/`manifest_validation` through `comparison_set/comparison_set_summary.json`, and exposes the manifest status plus declared media fields in `artifact_index.json` and `artifact_index_report.md`. Future manifests can also declare repo-local `real_intrinsics_path`, `real_extrinsics_path`, `real_board_pose_path`, `board_corner_detections_path`, `real_depth_path`, or `depth_reference_path` for the real projection intake. The intake validates declared sidecar schemas and reports `sidecar_validation`, `sidecar_valid_count`, `sidecar_invalid_count`, and `sidecar_missing_count`; `example_only` fixtures stay `valid_example` and do not unlock real comparability, so these signals are scaffolding, not proof that physical calibration exists. When sidecars pass the stricter `real_capture: true` gate, the intake also emits `real_projection_residuals.json`, `.csv`, and `real_projection_residual_overlay_contact_sheet.png` with projected-point pixel residuals, ordered board-corner detection residuals, camera z/range residuals, metric depth-reference residuals, and camera-to-board-plane residuals.
 
+To prepare the real sidecar inputs without adding hardware requirements to CI, use the
+capture workflow helper:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/prepare_real_calibration_capture_sidecars.py --capture-spec test_data/real_calibration_sidecars/capture_workflow_example_spec.synthetic.json --example-only --require intrinsics --require extrinsics --require board_pose --require depth --output-dir /private/tmp/lerobot_sim/capture_workflow_smoke
+```
+
+It writes validator-compatible sidecars from supplied files/manual measurements plus a
+`capture_plan.md` that lists the physical capture steps still needed. It does not open a
+camera, move motors, or claim real SO-101 calibration; generated sidecars are
+`example_only` unless the operator explicitly passes `--real-capture` with user-supplied
+physical camera/board/depth measurements.
+
 For a narrower camera/board pose check without running the full suite:
 
 ```bash
