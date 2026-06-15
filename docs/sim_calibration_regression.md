@@ -6,7 +6,7 @@ Run this hardware-free gate before changing simulator rendering, camera profiles
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_calibration_regression_suite.py --output-dir /private/tmp/lerobot_sim/calibration_regression_suite --python /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 --include-negative-check
 ```
 
-The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json` has `"ok": true` and `"status": "ok"`. It also writes a root `/private/tmp/lerobot_sim/calibration_regression_suite/README.md`, `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index_report.md`, and `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index.json`. For quick review, open `artifact_index_report.md` first; it is a deterministic Markdown view of the compact artifact index and links the highest-signal generated evidence, including visual-review contact sheets, the gripper-camera POV review, the pose fixture, and the app-entrypoint frame. For image-first inspection, open `visual_review/gripper_camera_pov_annotated_contact_sheet.png` and `visual_review/sim_camera_pose_fixture_annotated_contact_sheet.png`. The root `README.md` repeats that entrypoint, the core JSON summaries, the hardware/gui/OpenAI skipped markers, and the current real-media gap.
+The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json` has `"ok": true` and `"status": "ok"`. It also writes a root `/private/tmp/lerobot_sim/calibration_regression_suite/README.md`, `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index_report.md`, and `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index.json`. For quick review, open `artifact_index_report.md` first; it is a deterministic Markdown view of the compact artifact index and links the highest-signal generated evidence, including the reference capture checklist, visual-review contact sheets, the gripper-camera POV review, the pose fixture, and the app-entrypoint frame. For image-first inspection, open `visual_review/gripper_camera_pov_annotated_contact_sheet.png` and `visual_review/sim_camera_pose_fixture_annotated_contact_sheet.png`. The root `README.md` repeats that entrypoint, the core JSON summaries, the hardware/gui/OpenAI skipped markers, and the current real-media gap.
 
 To exercise the same suite with declared reference-media metadata, pass an optional manifest:
 
@@ -55,6 +55,7 @@ The suite orchestrates these existing smoke scripts as subprocesses and records 
 - `smoke_sim_pick_place_scenario_matrix.py` runs center, edge-file, back-rank, and near-gripper pick/place scenarios.
 - `smoke_sim_app_entrypoints.py` verifies simulator app/tool entrypoints and the app-facing SimCamera metadata contract.
 - `render_sim_calibration_visual_review.py` composes durable contact-sheet PNGs from those generated frames without changing simulator rendering.
+- `smoke_sim_reference_capture_checklist.py` turns the current real-media gap into JSON/Markdown capture requirements without opening cameras or making real media mandatory.
 - With `--include-negative-check`, an empty-inventory comparison-set run must fail clearly while the aggregate suite still passes.
 
 A passing summary should show:
@@ -70,6 +71,7 @@ A passing summary should show:
 - `sim_camera_pose_fixture.status: "ok"` with deterministic nominal and perturbed case IDs, frame paths, annotated-frame paths, and metadata paths populated
 - `gripper_camera_pov_review.status: "ok"` with open/approach/grasp/release state IDs, frame paths, annotated-frame paths, metadata paths, metadata contract checks, target center geometry, gripper state, and piece visibility rows populated
 - `visual_review.status: "ok"` with gripper POV and pose fixture contact-sheet PNG paths populated, and `recording.skipped_reason` populated when no optional video was requested or produced
+- `reference_capture_checklist.status: "action_required"` while only `archive/chess_test_images/current_view.jpg` is represented, with missing video, calibration-target, failure-mode, and post-pick capture requirements listed
 - `app_entrypoint_metadata.status: "ok"` with `ok: true`, `frame_path`, `metadata_path`, skipped hardware/gui/OpenAI markers, passing metadata contract checks, and `app_camera_status.ok: true`
 - `pick_place_scenario_matrix.aggregate_status.ok: true` with four scenario IDs and release-frame paths populated
 - `pick_place_scenario_matrix.piece_visibility.all_scenarios_available: true` with per-scenario visible fraction, occlusion fraction, and gripper clearance values
@@ -124,6 +126,8 @@ Common artifact paths under the output directory:
 - `visual_review/sim_camera_pose_fixture_annotated_contact_sheet.png`
 - `visual_review/sim_camera_pose_fixture_raw_contact_sheet.png`
 - `visual_review/app_entrypoint_frame.jpg`
+- `reference_capture_checklist/reference_capture_checklist.json`
+- `reference_capture_checklist/reference_capture_checklist.md`
 - `app_entrypoint/smoke_sim_app_entrypoints_summary.json`
 - `app_entrypoint/smoke_sim_app_frame.jpg`
 - `app_entrypoint/smoke_sim_app_metadata.json`
@@ -161,7 +165,7 @@ The visual review can be regenerated from an existing suite summary without reru
 
 By default, the visual review writes deterministic PNG contact sheets and records why no video was produced. A best-effort MP4 can be tried with `--try-video`, but it is not required for CI or review because codec availability varies by OpenCV build.
 
-The report includes the category summary table, artifact and missing counts, hardware/gui/OpenAI skipped markers, the current real-media visibility gap, visual-review contact sheets, real-reference comparison images, ranked candidate captures, perception fixture evidence, SimCamera pose fixture metadata, app-entrypoint metadata evidence, all pick/place release frames, negative-check status, and child stdout/stderr links.
+The report includes the category summary table, artifact and missing counts, hardware/gui/OpenAI skipped markers, the current real-media visibility gap, the reference capture checklist, visual-review contact sheets, real-reference comparison images, ranked candidate captures, perception fixture evidence, SimCamera pose fixture metadata, app-entrypoint metadata evidence, all pick/place release frames, negative-check status, and child stdout/stderr links.
 
 ## Skipped Paths
 

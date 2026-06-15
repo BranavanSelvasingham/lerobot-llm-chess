@@ -13,19 +13,21 @@ SUITE_SCHEMA = "lerobot.sim.calibration_regression_suite.v1"
 DEFAULT_REPORT_NAME = "artifact_index_report.md"
 CATEGORY_ORDER = {
     "real_reference_media": 0,
-    "visual_review": 1,
-    "real_reference_comparison": 2,
-    "ranked_candidate": 3,
-    "perception_fixture": 4,
-    "sim_camera_pose_fixture": 5,
-    "gripper_camera_pov": 6,
-    "app_entrypoint": 7,
-    "pick_place_scenario": 8,
-    "negative_check": 9,
-    "logs": 10,
+    "reference_capture_checklist": 1,
+    "visual_review": 2,
+    "real_reference_comparison": 3,
+    "ranked_candidate": 4,
+    "perception_fixture": 5,
+    "sim_camera_pose_fixture": 6,
+    "gripper_camera_pov": 7,
+    "app_entrypoint": 8,
+    "pick_place_scenario": 9,
+    "negative_check": 10,
+    "logs": 11,
 }
 CATEGORY_LABELS = {
     "real_reference_media": "Real Reference Media",
+    "reference_capture_checklist": "Reference Capture Checklist",
     "visual_review": "Visual Review Contact Sheets",
     "real_reference_comparison": "Real Reference Comparisons",
     "ranked_candidate": "Ranked Candidate Captures",
@@ -291,6 +293,62 @@ def gap_rows(gaps: list[dict[str, Any]]) -> list[list[Any]]:
                 gap.get("category", ""),
                 gap.get("status", ""),
                 gap.get("note", ""),
+            ]
+        )
+    return rows
+
+
+def reference_capture_checklist_signal(index: dict[str, Any], suite: dict[str, Any] | None) -> dict[str, Any]:
+    checklist = index.get("reference_capture_checklist")
+    if isinstance(checklist, dict) and checklist:
+        return checklist
+    if suite is not None and isinstance(suite.get("reference_capture_checklist"), dict):
+        return suite["reference_capture_checklist"]
+    return {}
+
+
+def checklist_artifact_rows(artifacts: list[dict[str, Any]]) -> list[list[Any]]:
+    rows: list[list[Any]] = []
+    for artifact in artifacts:
+        metrics = artifact.get("metrics")
+        metrics = metrics if isinstance(metrics, dict) else {}
+        path = display_path(artifact)
+        rows.append(
+            [
+                artifact.get("kind", ""),
+                artifact.get("label", ""),
+                markdown_link(path, link_path(artifact)) if path else "",
+                metrics.get("status", ""),
+                metrics.get("represented_media_count", ""),
+                metrics.get("missing_requirement_count", ""),
+                metrics.get("action_item_count", ""),
+                metrics.get("real_camera_skipped", ""),
+                "ok" if artifact.get("exists") is True else "missing",
+            ]
+        )
+    return rows
+
+
+def checklist_requirement_rows(checklist: dict[str, Any]) -> list[list[Any]]:
+    requirements = checklist.get("capture_requirements")
+    requirements = requirements if isinstance(requirements, list) else []
+    rows: list[list[Any]] = []
+    for item in requirements:
+        if not isinstance(item, dict):
+            continue
+        template = item.get("manifest_template")
+        template = template if isinstance(template, dict) else {}
+        rows.append(
+            [
+                item.get("id", ""),
+                item.get("status", ""),
+                item.get("media_type", ""),
+                item.get("represented_by") or item.get("partial_represented_by") or "",
+                item.get("missing_evidence", ""),
+                item.get("suggested_filenames", ""),
+                template.get("calibration_targets", ""),
+                template.get("failure_mode", ""),
+                template.get("sim_profiles", ""),
             ]
         )
     return rows
@@ -566,6 +624,67 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
     else:
         lines.append("")
         lines.append("_No inventory visibility gaps were available from the suite summary._")
+
+    lines.extend(["", "## Reference Capture Checklist"])
+    checklist = reference_capture_checklist_signal(index, suite)
+    checklist_artifacts = grouped.get("reference_capture_checklist", [])
+    if checklist:
+        lines.extend(
+            table(
+                ["Field", "Value"],
+                [
+                    ["status", checklist.get("status", "")],
+                    ["represented_media_count", checklist.get("represented_media_count", "")],
+                    ["missing_requirement_count", checklist.get("missing_requirement_count", "")],
+                    ["partial_requirement_count", checklist.get("partial_requirement_count", "")],
+                    ["action_item_count", checklist.get("action_item_count", "")],
+                    ["hardware_skipped", checklist.get("hardware_skipped", "")],
+                    ["gui_skipped", checklist.get("gui_skipped", "")],
+                    ["real_camera_skipped", checklist.get("real_camera_skipped", "")],
+                    ["openai_skipped", checklist.get("openai_skipped", "")],
+                ],
+            )
+        )
+    else:
+        lines.append("_No reference capture checklist metadata was available._")
+    lines.append("")
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Checklist Status",
+                "Represented Media",
+                "Missing Requirements",
+                "Action Items",
+                "Real Camera Skipped",
+                "Artifact Status",
+            ],
+            checklist_artifact_rows(checklist_artifacts),
+        )
+        if checklist_artifacts
+        else ["_No checklist artifacts indexed._"]
+    )
+    requirement_rows = checklist_requirement_rows(checklist)
+    if requirement_rows:
+        lines.extend(["", "### Capture Requirement Status"])
+        lines.extend(
+            table(
+                [
+                    "Requirement",
+                    "Status",
+                    "Media Type",
+                    "Represented/Partial By",
+                    "Missing Evidence",
+                    "Suggested Filename",
+                    "Manifest Targets",
+                    "Failure Mode",
+                    "Sim Profiles",
+                ],
+                requirement_rows,
+            )
+        )
 
     lines.extend(["", "## Important Evidence"])
     visual_review = [

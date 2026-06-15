@@ -17,6 +17,7 @@ SCHEMA = "lerobot.sim.calibration_regression_suite.v1"
 ARTIFACT_ENTRYPOINT_NAME = "README.md"
 ARTIFACT_REPORT_NAME = "artifact_index_report.md"
 VISUAL_REVIEW_SUMMARY_NAME = "visual_review_summary.json"
+REFERENCE_CAPTURE_CHECKLIST_NAME = "reference_capture_checklist.json"
 BASELINE_CORNERS = [[32, 338], [594, 340], [540, 20], [86, 12]]
 PERTURBED_CORNERS = [[34, 337], [592, 342], [538, 22], [88, 14]]
 
@@ -111,6 +112,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `app_entrypoint/smoke_sim_app_entrypoints_summary.json`",
         "- `app_entrypoint/smoke_sim_app_metadata.json`",
         "- `visual_review/visual_review_summary.json`",
+        "- `reference_capture_checklist/reference_capture_checklist.json`",
+        "- `reference_capture_checklist/reference_capture_checklist.md`",
         "- `negative_empty_inventory/comparison_set_summary.json`",
         "",
         "Review markers:",
@@ -136,6 +139,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             f"`{manifest.get('selected_declared_media_count')}`."
         ),
         "- Real-media gap: the current inventory is limited to `archive/chess_test_images/current_view.jpg`.",
+        "- Reference capture checklist status: "
+        f"`{summary.get('reference_capture_checklist', {}).get('status')}`.",
         "- No real-world videos are present for motion, recovery, or timing references.",
         "- No reference media currently documents failure modes.",
         (
@@ -677,6 +682,33 @@ def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Pa
     }
 
 
+def reference_capture_checklist_section(checklist: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
+    checklist = checklist if isinstance(checklist, dict) else {}
+    counts = checklist.get("counts")
+    counts = counts if isinstance(counts, dict) else {}
+    media_summary = checklist.get("media_summary")
+    media_summary = media_summary if isinstance(media_summary, dict) else {}
+    return {
+        "summary_path": str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(checklist.get("ok", False)),
+        "status": checklist.get("status"),
+        "markdown_path": checklist.get("markdown_path"),
+        "represented_media_count": media_summary.get("represented_media_count"),
+        "represented_media": media_summary.get("represented_media"),
+        "video_count": media_summary.get("video_count"),
+        "requirement_count": counts.get("requirement_count"),
+        "represented_requirement_count": counts.get("represented_requirement_count"),
+        "partial_requirement_count": counts.get("partial_requirement_count"),
+        "missing_requirement_count": counts.get("missing_requirement_count"),
+        "action_item_count": counts.get("action_item_count"),
+        "hardware_skipped": checklist.get("hardware_skipped"),
+        "gui_skipped": checklist.get("gui_skipped"),
+        "real_camera_skipped": checklist.get("real_camera_skipped"),
+        "openai_skipped": checklist.get("openai_skipped"),
+    }
+
+
 def run_negative_empty_inventory(
     *,
     args: argparse.Namespace,
@@ -1011,6 +1043,12 @@ def main() -> int:
             "summary_path": negative_summary.get("comparison_set_summary_path") if negative_summary else None,
             "status": negative_summary.get("status") if negative_summary else None,
         },
+        "reference_capture_checklist": {
+            "summary_path": str(output_dir / "reference_capture_checklist" / REFERENCE_CAPTURE_CHECKLIST_NAME),
+            "status": None,
+            "represented_media_count": None,
+            "missing_requirement_count": None,
+        },
         "artifact_index": {
             "path": str(artifact_index_path),
             "status": None,
@@ -1049,6 +1087,37 @@ def main() -> int:
     }
     summary["child_commands"] = child_records
     summary["visual_review"] = visual_review_section(visual_review, visual_review_summary_path)
+    write_json(summary_path, summary)
+
+    checklist_dir = output_dir / "reference_capture_checklist"
+    checklist_summary_path = checklist_dir / REFERENCE_CAPTURE_CHECKLIST_NAME
+    checklist_record, checklist = run_child(
+        name="reference_capture_checklist",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_reference_capture_checklist.py"),
+            str(summary_path),
+            "--output-dir",
+            str(checklist_dir),
+        ],
+        output_dir=checklist_dir,
+        expected_json_path=checklist_summary_path,
+    )
+    child_records["reference_capture_checklist"] = checklist_record
+    required_ok = all(record["ok"] for record in child_records.values())
+    summary["ok"] = required_ok
+    summary["status"] = "ok" if required_ok else "validation_failed"
+    summary["aggregate_status"] = {
+        "ok": required_ok,
+        "failed_children": [
+            name for name, record in child_records.items() if not bool(record.get("ok"))
+        ],
+    }
+    summary["child_commands"] = child_records
+    summary["reference_capture_checklist"] = reference_capture_checklist_section(
+        checklist,
+        checklist_summary_path,
+    )
     write_json(summary_path, summary)
 
     artifact_index_record, artifact_index = run_child(
