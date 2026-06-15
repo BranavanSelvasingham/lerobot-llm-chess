@@ -23,9 +23,11 @@ from lerobot.sim import (  # noqa: E402
     CURRENT_GRIPPER_REFERENCE_PROFILE,
     SIM_CAMERA_CALIBRATION_PROFILES,
     SimCamera,
+    SimCameraConfig,
     make_sim_camera_config_from_profile,
 )
 import lerobot.sim.camera as sim_camera_module  # noqa: E402
+from lerobot.sim.config import SIM_CAMERA_DISTORTION_COEFFICIENT_ORDER  # noqa: E402
 
 SCHEMA = "lerobot.sim.camera_pose_fixture.v1"
 CORNER_LABELS = ("a1", "h1", "h8", "a8")
@@ -296,6 +298,32 @@ def assert_camera_metadata_contract(metadata: dict[str, Any], *, width: int, hei
         "extrinsics_translation_m": [float(value) for value in translation.tolist()],
         "coordinate_frame_convention": True,
         "coordinate_frame_scope": str(convention.get("scope")),
+    }
+
+
+def assert_distortion_config_contract() -> dict[str, Any]:
+    expected_length = len(SIM_CAMERA_DISTORTION_COEFFICIENT_ORDER)
+    default_cfg = SimCameraConfig()
+    default_coefficients = default_cfg.distortion_coefficients or ()
+    if len(default_coefficients) != expected_length:
+        raise AssertionError(
+            "Default SimCameraConfig distortion_coefficients must match "
+            f"distortion_coefficient_order length {expected_length}; got {len(default_coefficients)}."
+        )
+
+    mismatched_error: str | None = None
+    try:
+        SimCameraConfig(distortion_coefficients=(0.0, 0.0, 0.0, 0.0))
+    except ValueError as exc:
+        mismatched_error = str(exc)
+    if not mismatched_error or "distortion_coefficients" not in mismatched_error:
+        raise AssertionError("Mismatched distortion_coefficients vector did not fail with a clear ValueError.")
+
+    return {
+        "default_coefficients_match_order": True,
+        "mismatched_coefficients_rejected": True,
+        "distortion_coefficient_order": list(SIM_CAMERA_DISTORTION_COEFFICIENT_ORDER),
+        "mismatched_error": mismatched_error,
     }
 
 
@@ -610,6 +638,7 @@ def main() -> int:
     args = parse_args()
     output_dir = args.output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    config_contract_checks = assert_distortion_config_contract()
 
     rendered = [
         render_case(profile_name=str(args.profile), case=case, output_dir=output_dir)
@@ -650,6 +679,7 @@ def main() -> int:
             "warmup": False,
             "reads_per_case": 1,
         },
+        "config_contract_checks": config_contract_checks,
         "artifacts": {
             "summary_path": str(summary_path),
             "case_dir": str(output_dir / "cases"),

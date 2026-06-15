@@ -445,7 +445,16 @@ def _camera_matrix_px_value(value: Any, *, width: int, height: int) -> CameraMat
 def _distortion_coefficients_value(value: Any) -> DistortionCoefficients:
     if value is None:
         return SIM_CAMERA_DEFAULT_DISTORTION_COEFFICIENTS
-    return _float_vector(value, length=None, key="distortion_coefficients")
+    expected_length = len(SIM_CAMERA_DISTORTION_COEFFICIENT_ORDER)
+    coefficients = _float_vector(value, length=None, key="distortion_coefficients")
+    if len(coefficients) != expected_length:
+        expected_order = ", ".join(SIM_CAMERA_DISTORTION_COEFFICIENT_ORDER)
+        raise ValueError(
+            "distortion_coefficients must contain "
+            f"{expected_length} values matching distortion_coefficient_order "
+            f"({expected_order}); got {len(coefficients)}."
+        )
+    return coefficients
 
 
 def _board_to_camera_extrinsics_value(value: Any) -> dict[str, Any]:
