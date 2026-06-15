@@ -11,17 +11,19 @@ from typing import Any
 SCHEMA = "lerobot.sim.calibration_artifact_index.v1"
 CATEGORY_ORDER = {
     "real_reference_media": 0,
-    "real_reference_comparison": 1,
-    "ranked_candidate": 2,
-    "perception_fixture": 3,
-    "sim_camera_pose_fixture": 4,
-    "gripper_camera_pov": 5,
-    "app_entrypoint": 6,
-    "pick_place_scenario": 7,
-    "negative_check": 8,
-    "logs": 9,
+    "visual_review": 1,
+    "real_reference_comparison": 2,
+    "ranked_candidate": 3,
+    "perception_fixture": 4,
+    "sim_camera_pose_fixture": 5,
+    "gripper_camera_pov": 6,
+    "app_entrypoint": 7,
+    "pick_place_scenario": 8,
+    "negative_check": 9,
+    "logs": 10,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -61,6 +63,8 @@ def read_json_object(path: Path, *, label: str) -> dict[str, Any]:
 def path_kind(path: Path) -> str:
     if path.suffix.lower() in IMAGE_SUFFIXES:
         return "image"
+    if path.suffix.lower() in VIDEO_SUFFIXES:
+        return "video"
     if path.suffix.lower() == ".json":
         return "json"
     if path.suffix.lower() in {".txt", ".log"}:
@@ -291,6 +295,100 @@ def collect_comparison_artifacts(
                     source="comparison_set.artifacts.visual_artifact_paths",
                     reference_media=reference_media,
                 )
+
+
+def collect_visual_review_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    visual_review = suite.get("visual_review")
+    visual_review = visual_review if isinstance(visual_review, dict) else {}
+    add_path(
+        artifacts,
+        category="visual_review",
+        label="visual_review:summary",
+        value=visual_review.get("summary_path"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="visual_review.summary_path",
+        metrics={
+            "status": visual_review.get("status"),
+            "ok": visual_review.get("ok"),
+            "contact_sheet_count": visual_review.get("contact_sheet_count"),
+        },
+    )
+
+    contact_sheets = visual_review.get("contact_sheets")
+    contact_sheet_rows = contact_sheets if isinstance(contact_sheets, list) else []
+    for sheet in contact_sheet_rows:
+        if not isinstance(sheet, dict):
+            continue
+        sheet_id = sheet.get("id")
+        if not isinstance(sheet_id, str) or not sheet_id:
+            sheet_id = "contact_sheet"
+        add_path(
+            artifacts,
+            category="visual_review",
+            label=f"visual_review:{sheet_id}",
+            value=sheet.get("path"),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source="visual_review.contact_sheets",
+            metrics={
+                "label": sheet.get("label"),
+                "source": sheet.get("source"),
+                "source_collection": sheet.get("source_collection"),
+                "source_frame_count": sheet.get("source_frame_count"),
+                "source_frame_labels": sheet.get("source_frame_labels"),
+                "output_dimensions": sheet.get("output_dimensions"),
+            },
+        )
+
+    app_frame = visual_review.get("app_entrypoint_frame")
+    app_frame = app_frame if isinstance(app_frame, dict) else {}
+    add_path(
+        artifacts,
+        category="visual_review",
+        label="visual_review:app_entrypoint_frame",
+        value=app_frame.get("review_copy_path"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="visual_review.app_entrypoint_frame.review_copy_path",
+        metrics={
+            "status": app_frame.get("status"),
+            "source_path": app_frame.get("source_path"),
+            "output_dimensions": app_frame.get("output_dimensions"),
+        },
+    )
+
+    recording = visual_review.get("recording")
+    recording = recording if isinstance(recording, dict) else {}
+    if recording.get("produced") is True:
+        add_path(
+            artifacts,
+            category="visual_review",
+            label="visual_review:gripper_camera_pov_recording",
+            value=recording.get("path"),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source="visual_review.recording.path",
+            metrics={
+                "codec": recording.get("codec"),
+                "fps": recording.get("fps"),
+                "frame_count": recording.get("frame_count"),
+                "duration_seconds": recording.get("duration_seconds"),
+                "dimensions": recording.get("dimensions"),
+            },
+        )
+    return visual_review
 
 
 def collect_ranked_candidate_artifacts(
@@ -811,6 +909,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    visual_review = collect_visual_review_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
     collect_comparison_artifacts(
         suite=suite,
         artifacts=artifacts,
@@ -915,6 +1020,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         },
         "reference_media_manifest": suite.get("reference_media_manifest"),
         "selected_real_reference_media": selected_media,
+        "visual_review": visual_review,
         "sim_camera_pose_fixture_metadata_contract": sim_camera_pose_metadata_contract,
         "gripper_camera_pov": gripper_camera_pov,
         "app_entrypoint_metadata_contract": app_entrypoint_metadata_contract,

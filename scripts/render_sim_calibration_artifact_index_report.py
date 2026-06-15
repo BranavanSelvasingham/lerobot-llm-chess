@@ -13,18 +13,20 @@ SUITE_SCHEMA = "lerobot.sim.calibration_regression_suite.v1"
 DEFAULT_REPORT_NAME = "artifact_index_report.md"
 CATEGORY_ORDER = {
     "real_reference_media": 0,
-    "real_reference_comparison": 1,
-    "ranked_candidate": 2,
-    "perception_fixture": 3,
-    "sim_camera_pose_fixture": 4,
-    "gripper_camera_pov": 5,
-    "app_entrypoint": 6,
-    "pick_place_scenario": 7,
-    "negative_check": 8,
-    "logs": 9,
+    "visual_review": 1,
+    "real_reference_comparison": 2,
+    "ranked_candidate": 3,
+    "perception_fixture": 4,
+    "sim_camera_pose_fixture": 5,
+    "gripper_camera_pov": 6,
+    "app_entrypoint": 7,
+    "pick_place_scenario": 8,
+    "negative_check": 9,
+    "logs": 10,
 }
 CATEGORY_LABELS = {
     "real_reference_media": "Real Reference Media",
+    "visual_review": "Visual Review Contact Sheets",
     "real_reference_comparison": "Real Reference Comparisons",
     "ranked_candidate": "Ranked Candidate Captures",
     "perception_fixture": "Perception Fixture Evidence",
@@ -383,6 +385,31 @@ def gripper_camera_pov_row(artifact: dict[str, Any]) -> list[Any]:
     ]
 
 
+def visual_review_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    dimensions = metrics.get("output_dimensions")
+    if not isinstance(dimensions, dict):
+        dimensions = metrics.get("dimensions")
+    dimensions = dimensions if isinstance(dimensions, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("source_frame_count", ""),
+        metrics.get("source_frame_labels", ""),
+        (
+            f"{dimensions.get('width_px')}x{dimensions.get('height_px')}"
+            if dimensions.get("width_px") and dimensions.get("height_px")
+            else ""
+        ),
+        metrics.get("codec", ""),
+        metrics.get("duration_seconds", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
 def app_entrypoint_row(artifact: dict[str, Any]) -> list[Any]:
     metrics = artifact.get("metrics")
     metrics = metrics if isinstance(metrics, dict) else {}
@@ -541,6 +568,31 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         lines.append("_No inventory visibility gaps were available from the suite summary._")
 
     lines.extend(["", "## Important Evidence"])
+    visual_review = [
+        row
+        for row in grouped.get("visual_review", [])
+        if row.get("label") != "visual_review:summary"
+    ]
+    lines.extend(["", "### Visual Review Contact Sheets"])
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Source Frames",
+                "Frame Labels",
+                "Dimensions",
+                "Codec",
+                "Duration Seconds",
+                "Status",
+            ],
+            [visual_review_row(row) for row in visual_review],
+        )
+        if visual_review
+        else ["_No visual-review artifacts indexed._"]
+    )
+
     comparison_images = [
         row for row in grouped.get("real_reference_comparison", []) if row.get("kind") == "image"
     ]
@@ -697,6 +749,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "## Notes",
             "",
             "- This report is a deterministic Markdown view of existing JSON artifacts only.",
+            "- Visual review contact sheets are generated PNGs from existing suite frames and are the stable first-pass visual evidence.",
             "- SimCamera pose fixture intrinsics/extrinsics are simulator reference metadata, not physical calibration truth.",
             "- Gripper-camera POV visibility and clearance values are synthetic metadata evidence, not real-camera segmentation or physical contact proof.",
             "- It does not rerun child smokes, open GUI calibration flows, call OpenAI, or touch SO-101 hardware.",
