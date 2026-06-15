@@ -241,6 +241,52 @@ def selected_fixture_artifacts(fixture: dict[str, Any] | None) -> dict[str, str]
     }
 
 
+def matrix_summary_section(matrix: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
+    scenarios = matrix.get("scenarios") if matrix else None
+    scenario_rows = scenarios if isinstance(scenarios, list) else []
+    aggregate_status = matrix.get("aggregate_status") if matrix else None
+    aggregate_status = aggregate_status if isinstance(aggregate_status, dict) else {}
+    selected_frame_paths: dict[str, dict[str, str]] = {}
+    release_frame_paths: dict[str, str] = {}
+    scenario_ids: list[str] = []
+    limitations: list[str] = []
+
+    for scenario in scenario_rows:
+        if not isinstance(scenario, dict):
+            continue
+        scenario_id = scenario.get("scenario_id")
+        if not isinstance(scenario_id, str):
+            continue
+        scenario_ids.append(scenario_id)
+        frames = scenario.get("selected_frame_paths")
+        if isinstance(frames, dict):
+            selected_frame_paths[scenario_id] = {
+                str(key): str(value)
+                for key, value in sorted(frames.items())
+                if isinstance(value, str)
+            }
+            release_path = frames.get("target_release_open_path")
+            if isinstance(release_path, str):
+                release_frame_paths[scenario_id] = release_path
+        for limitation in scenario.get("limitations", []):
+            if isinstance(limitation, str) and limitation not in limitations:
+                limitations.append(limitation)
+
+    return {
+        "summary_path": str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(matrix.get("ok", False)) if matrix else False,
+        "status": matrix.get("status") if matrix else None,
+        "aggregate_status": aggregate_status,
+        "scenario_count": aggregate_status.get("scenario_count", len(scenario_ids)),
+        "scenario_ids": scenario_ids,
+        "failed_scenario_ids": aggregate_status.get("failed_scenario_ids", []),
+        "selected_frame_paths": selected_frame_paths,
+        "release_frame_paths": release_frame_paths,
+        "limitations": limitations,
+    }
+
+
 def run_negative_empty_inventory(
     *,
     args: argparse.Namespace,
@@ -387,6 +433,24 @@ def main() -> int:
         )
         fixture = None
 
+    matrix_dir = output_dir / "pick_place_scenario_matrix"
+    matrix_summary_path = matrix_dir / "scenario_matrix_summary.json"
+    matrix_record, matrix = run_child(
+        name="pick_place_scenario_matrix",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_pick_place_scenario_matrix.py"),
+            "--output-dir",
+            str(matrix_dir),
+            "--python",
+            python,
+            "--sim-camera-profile",
+            str(args.base_profile),
+        ],
+        output_dir=matrix_dir,
+        expected_json_path=matrix_summary_path,
+    )
+
     negative_record: dict[str, Any] | None = None
     negative_summary: dict[str, Any] | None = None
     if args.include_negative_check:
@@ -397,6 +461,7 @@ def main() -> int:
         "comparison_set": comparison_record,
         "calibration_session_report": session_record,
         "perception_regression_fixture": fixture_record,
+        "pick_place_scenario_matrix": matrix_record,
     }
     if negative_record is not None:
         child_records["negative_empty_inventory_comparison_set"] = negative_record
@@ -453,6 +518,7 @@ def main() -> int:
             "selected_candidate": fixture.get("selected_candidate") if fixture else None,
             "artifact_paths": selected_fixture_artifacts(fixture),
         },
+        "pick_place_scenario_matrix": matrix_summary_section(matrix, matrix_summary_path),
         "selected_candidate": {
             "requested_rank": int(args.select_rank),
             "candidate_id": selected_candidate.get("candidate_id") if selected_candidate else None,
