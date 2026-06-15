@@ -6,7 +6,7 @@ Run this hardware-free gate before changing simulator rendering, camera profiles
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_calibration_regression_suite.py --output-dir /private/tmp/lerobot_sim/calibration_regression_suite --python /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 --include-negative-check
 ```
 
-The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json` has `"ok": true` and `"status": "ok"`. It also writes a root `/private/tmp/lerobot_sim/calibration_regression_suite/README.md`, `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index_report.md`, and `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index.json`. For quick review, open `artifact_index_report.md` first; it is a deterministic Markdown view of the compact artifact index and links the highest-signal generated evidence. The root `README.md` repeats that entrypoint, the core JSON summaries, the hardware/gui/OpenAI skipped markers, and the current real-media gap.
+The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json` has `"ok": true` and `"status": "ok"`. It also writes a root `/private/tmp/lerobot_sim/calibration_regression_suite/README.md`, `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index_report.md`, and `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index.json`. For quick review, open `artifact_index_report.md` first; it is a deterministic Markdown view of the compact artifact index and links the highest-signal generated evidence, including the gripper-camera POV review. The root `README.md` repeats that entrypoint, the core JSON summaries, the hardware/gui/OpenAI skipped markers, and the current real-media gap.
 
 For a narrower camera/board pose check without running the full suite:
 
@@ -22,7 +22,7 @@ Each per-case `camera_metadata.json` contains `camera_metadata.image_size_px`, `
 
 The focused `Simulator Calibration Regression` workflow runs the same hardware-free suite for pull requests targeting `feat/telemetry-recording` when simulator, camera, chess perception, smoke-script, report-renderer, reference-image, or gate documentation paths change. It uses Python 3.12, installs only the Python modules needed by this suite, verifies the generated summary fields, writes a job summary naming the uploaded artifact, and uploads the suite output directory as a workflow artifact. After downloading the artifact, open `artifact_index_report.md` first, then follow its links to images, JSON summaries, and child logs.
 
-The workflow also treats `sim_camera_pose_fixture`, `app_entrypoint_metadata`, `pick_place_scenario_matrix.piece_visibility`, and `artifact_index.json` as part of the artifact contract. The pose fixture must report deterministic nominal and perturbed case IDs, raw frames, annotated frames, per-case metadata JSON, projected board corners, and target/piece centers. The app-entrypoint smoke must report a synthetic frame, a metadata sidecar when requested, skipped hardware/gui/OpenAI markers, and passing app-facing metadata contract checks. All four pick/place scenarios must report available visibility evidence, each target release frame path must exist, and each `target_release_open` row must include visible fraction, occlusion fraction, and gripper-clearance fields. The generated artifact index must exist, report `status: "ok"`, have a nonzero artifact count, have no missing artifacts, and include populated categories for real-reference comparisons, ranked candidates, perception fixture evidence, SimCamera pose fixture evidence, app-entrypoint evidence, pick/place scenario release frames, the negative check, and child logs. These are structural availability checks rather than exact metric-value thresholds.
+The workflow also treats `sim_camera_pose_fixture`, `gripper_camera_pov_review`, `app_entrypoint_metadata`, `pick_place_scenario_matrix.piece_visibility`, and `artifact_index.json` as part of the artifact contract. The pose fixture must report deterministic nominal and perturbed case IDs, raw frames, annotated frames, per-case metadata JSON, projected board corners, and target/piece centers. The gripper-camera POV review must report a small open/approach/grasp/release state sequence with raw frames, annotated frames, per-state metadata JSON, target square center and projected square polygon, gripper opening/state, SimCamera metadata contract checks, and piece visibility/occlusion/clearance rows. The app-entrypoint smoke must report a synthetic frame, a metadata sidecar when requested, skipped hardware/gui/OpenAI markers, and passing app-facing metadata contract checks. All four pick/place scenarios must report available visibility evidence, each target release frame path must exist, and each `target_release_open` row must include visible fraction, occlusion fraction, and gripper-clearance fields. The generated artifact index must exist, report `status: "ok"`, have a nonzero artifact count, have no missing artifacts, and include populated categories for real-reference comparisons, ranked candidates, perception fixture evidence, SimCamera pose fixture evidence, gripper-camera POV evidence, app-entrypoint evidence, pick/place scenario release frames, the negative check, and child logs. These are structural availability checks rather than exact metric-value thresholds.
 
 This CI signal is still a simulator/perception regression gate only. It does not connect to SO-101 hardware, open GUI calibration flows, or replace later physical robot validation.
 
@@ -35,6 +35,7 @@ The suite orchestrates these existing smoke scripts as subprocesses and records 
 - `smoke_sim_calibration_session_report.py` ranks baseline and perturbed local SimCamera candidates.
 - `smoke_sim_perception_regression_fixture.py` packages the selected ranked candidate into perception fixture evidence.
 - `smoke_sim_camera_pose_fixture.py` renders deterministic nominal, perturbed, overview, and gripper-state SimCamera pose review frames plus per-case metadata.
+- `smoke_sim_gripper_camera_pov_review.py` renders deterministic gripper-camera POV frames for open, approach, grasp-window, closed, and release-style gripper states using existing SimCamera/KinematicsTools metadata and piece-visibility geometry.
 - `smoke_sim_pick_place_scenario_matrix.py` runs center, edge-file, back-rank, and near-gripper pick/place scenarios.
 - `smoke_sim_app_entrypoints.py` verifies simulator app/tool entrypoints and the app-facing SimCamera metadata contract.
 - With `--include-negative-check`, an empty-inventory comparison-set run must fail clearly while the aggregate suite still passes.
@@ -49,6 +50,7 @@ A passing summary should show:
 - `calibration_session.selected_candidate` populated with the rank-1 candidate
 - `perception_fixture.status: "ok"` and fixture artifact paths populated
 - `sim_camera_pose_fixture.status: "ok"` with deterministic nominal and perturbed case IDs, frame paths, annotated-frame paths, and metadata paths populated
+- `gripper_camera_pov_review.status: "ok"` with open/approach/grasp/release state IDs, frame paths, annotated-frame paths, metadata paths, metadata contract checks, target center geometry, gripper state, and piece visibility rows populated
 - `app_entrypoint_metadata.status: "ok"` with `ok: true`, `frame_path`, `metadata_path`, skipped hardware/gui/OpenAI markers, and passing metadata contract checks
 - `pick_place_scenario_matrix.aggregate_status.ok: true` with four scenario IDs and release-frame paths populated
 - `pick_place_scenario_matrix.piece_visibility.all_scenarios_available: true` with per-scenario visible fraction, occlusion fraction, and gripper clearance values
@@ -65,6 +67,8 @@ The `piece_visibility` signal is a simulator-only geometry metric. Each pick/pla
 - `status`, usually `clear` or `gripper_overlap`
 
 These values are evidence-only in this first pass. The suite reports them but does not fail on a visibility threshold until local and GitHub Actions runs prove the measured values are stable. They do not model physical chess-piece contact or real-camera segmentation.
+
+The `gripper_camera_pov_review` signal packages the same kind of synthetic metadata evidence for one camera-first review sequence. Each state writes a raw frame, an annotated frame, and `metadata.json` with the camera metadata contract, projected target square polygon, target/piece center, gripper opening, visible fraction, occlusion fraction, and minimum gripper clearance. It is meant to make pre-hardware pickup calibration review practical, not to claim physical contact or real-camera segmentation performance.
 
 ## Outputs
 
@@ -91,6 +95,10 @@ Common artifact paths under the output directory:
 - `sim_camera_pose_fixture/cases/*/frame.png`
 - `sim_camera_pose_fixture/cases/*/frame_annotated.png`
 - `sim_camera_pose_fixture/cases/*/camera_metadata.json`
+- `gripper_camera_pov_review/gripper_camera_pov_review_summary.json`
+- `gripper_camera_pov_review/states/*/frame.png`
+- `gripper_camera_pov_review/states/*/frame_annotated.png`
+- `gripper_camera_pov_review/states/*/metadata.json`
 - `app_entrypoint/smoke_sim_app_entrypoints_summary.json`
 - `app_entrypoint/smoke_sim_app_frame.jpg`
 - `app_entrypoint/smoke_sim_app_metadata.json`

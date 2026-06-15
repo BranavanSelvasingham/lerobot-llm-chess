@@ -15,10 +15,11 @@ CATEGORY_ORDER = {
     "ranked_candidate": 2,
     "perception_fixture": 3,
     "sim_camera_pose_fixture": 4,
-    "app_entrypoint": 5,
-    "pick_place_scenario": 6,
-    "negative_check": 7,
-    "logs": 8,
+    "gripper_camera_pov": 5,
+    "app_entrypoint": 6,
+    "pick_place_scenario": 7,
+    "negative_check": 8,
+    "logs": 9,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 
@@ -487,6 +488,131 @@ def collect_app_entrypoint_artifacts(
     return metadata_contract
 
 
+def collect_gripper_camera_pov_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    pov = suite.get("gripper_camera_pov_review")
+    pov = pov if isinstance(pov, dict) else {}
+    metadata_contract = pov.get("metadata_contract")
+    metadata_contract = metadata_contract if isinstance(metadata_contract, dict) else {}
+    contract_by_state = metadata_contract.get("by_state")
+    contract_by_state = contract_by_state if isinstance(contract_by_state, dict) else {}
+    visibility_by_state = pov.get("visibility_by_state")
+    visibility_by_state = visibility_by_state if isinstance(visibility_by_state, dict) else {}
+    projection_by_state = pov.get("projection_by_state")
+    projection_by_state = projection_by_state if isinstance(projection_by_state, dict) else {}
+    gripper_by_state = pov.get("gripper_by_state")
+    gripper_by_state = gripper_by_state if isinstance(gripper_by_state, dict) else {}
+    required_keys = metadata_contract.get("required_keys")
+    required_keys = required_keys if isinstance(required_keys, list) else []
+
+    add_path(
+        artifacts,
+        category="gripper_camera_pov",
+        label="gripper_camera_pov:summary",
+        value=pov.get("summary_path"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="gripper_camera_pov_review.summary_path",
+        metrics={
+            "status": pov.get("status"),
+            "ok": pov.get("ok"),
+            "target_square": pov.get("target_square"),
+            "state_count": pov.get("state_count"),
+            "metadata_contract_ok": metadata_contract.get("all_states_include_required_metadata"),
+            "min_visible_fraction": (
+                pov.get("piece_visibility", {}).get("min_visible_fraction")
+                if isinstance(pov.get("piece_visibility"), dict)
+                else None
+            ),
+            "max_occlusion_fraction": (
+                pov.get("piece_visibility", {}).get("max_occlusion_fraction")
+                if isinstance(pov.get("piece_visibility"), dict)
+                else None
+            ),
+        },
+    )
+
+    state_metrics: dict[str, dict[str, Any]] = {}
+    state_ids = pov.get("state_ids")
+    iterable_state_ids = (
+        state_ids
+        if isinstance(state_ids, list)
+        else sorted(set(visibility_by_state) | set(projection_by_state) | set(gripper_by_state))
+    )
+    for state_id_value in iterable_state_ids:
+        state_id = str(state_id_value)
+        visibility = visibility_by_state.get(state_id)
+        visibility = visibility if isinstance(visibility, dict) else {}
+        projection = projection_by_state.get(state_id)
+        projection = projection if isinstance(projection, dict) else {}
+        target_projection = projection.get("target_square")
+        target_projection = target_projection if isinstance(target_projection, dict) else {}
+        piece_projection = projection.get("piece_square")
+        piece_projection = piece_projection if isinstance(piece_projection, dict) else {}
+        gripper = gripper_by_state.get(state_id)
+        gripper = gripper if isinstance(gripper, dict) else {}
+        contract_checks = contract_by_state.get(state_id)
+        contract_checks = contract_checks if isinstance(contract_checks, dict) else {}
+        metrics = {
+            "target_square": target_projection.get("square"),
+            "target_center_xy": target_projection.get("center_image_xy"),
+            "piece_square": piece_projection.get("square"),
+            "piece_center_xy": piece_projection.get("center_image_xy") or visibility.get("piece_center_xy"),
+            "visibility_status": visibility.get("status"),
+            "visible_fraction": visibility.get("visible_fraction"),
+            "occlusion_fraction": visibility.get("occlusion_fraction"),
+            "min_clearance_px": visibility.get("min_clearance_px"),
+            "clear_of_gripper": visibility.get("clear_of_gripper"),
+            "tracked_gripper_percent": gripper.get("tracked_gripper_percent"),
+            "current_gripper_opening_px": gripper.get("current_gripper_opening_px"),
+            "metadata_contract_ok": (
+                all(bool(contract_checks.get(str(key))) for key in required_keys)
+                if required_keys
+                else None
+            ),
+            "metadata_intrinsics": bool(contract_checks.get("camera_matrix_px") and contract_checks.get("intrinsics")),
+            "metadata_distortion": bool(contract_checks.get("distortion_coefficients")),
+            "metadata_extrinsics_board_to_camera": bool(contract_checks.get("extrinsics.board_to_camera")),
+            "metadata_coordinate_frames": bool(contract_checks.get("coordinate_frame_convention")),
+            "piece_visibility": bool(contract_checks.get("piece_visibility")),
+        }
+        state_metrics[state_id] = metrics
+
+    for collection_key, label_suffix in (
+        ("frame_paths", "frame"),
+        ("annotated_frame_paths", "annotated_frame"),
+        ("metadata_paths", "metadata"),
+    ):
+        paths = pov.get(collection_key)
+        if not isinstance(paths, dict):
+            continue
+        for state_id, value in sorted(paths.items()):
+            state_id_str = str(state_id)
+            add_path(
+                artifacts,
+                category="gripper_camera_pov",
+                label=f"gripper_camera_pov:{state_id_str}:{label_suffix}",
+                value=value,
+                suite_summary_path=suite_summary_path,
+                output_dir=output_dir,
+                repo_root=repo_root,
+                source=f"gripper_camera_pov_review.{collection_key}",
+                metrics=state_metrics.get(state_id_str),
+                scenario_id=state_id_str,
+            )
+    return {
+        "metadata_contract": metadata_contract,
+        "piece_visibility": pov.get("piece_visibility"),
+    }
+
+
 def collect_pick_place_artifacts(
     *,
     suite: dict[str, Any],
@@ -684,6 +810,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    gripper_camera_pov = collect_gripper_camera_pov_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
     app_entrypoint_metadata_contract = collect_app_entrypoint_artifacts(
         suite=suite,
         artifacts=artifacts,
@@ -753,6 +886,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         },
         "selected_real_reference_media": selected_media,
         "sim_camera_pose_fixture_metadata_contract": sim_camera_pose_metadata_contract,
+        "gripper_camera_pov": gripper_camera_pov,
         "app_entrypoint_metadata_contract": app_entrypoint_metadata_contract,
         "pick_place_release_frame_count": sum(
             1 for row in sorted_rows if row["category"] == "pick_place_scenario" and row.get("scenario_id")

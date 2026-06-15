@@ -17,10 +17,11 @@ CATEGORY_ORDER = {
     "ranked_candidate": 2,
     "perception_fixture": 3,
     "sim_camera_pose_fixture": 4,
-    "app_entrypoint": 5,
-    "pick_place_scenario": 6,
-    "negative_check": 7,
-    "logs": 8,
+    "gripper_camera_pov": 5,
+    "app_entrypoint": 6,
+    "pick_place_scenario": 7,
+    "negative_check": 8,
+    "logs": 9,
 }
 CATEGORY_LABELS = {
     "real_reference_media": "Real Reference Media",
@@ -28,6 +29,7 @@ CATEGORY_LABELS = {
     "ranked_candidate": "Ranked Candidate Captures",
     "perception_fixture": "Perception Fixture Evidence",
     "sim_camera_pose_fixture": "SimCamera Pose Fixture",
+    "gripper_camera_pov": "Gripper-Camera POV Review",
     "app_entrypoint": "App Entrypoint Metadata",
     "pick_place_scenario": "Pick/Place Release Frames",
     "negative_check": "Negative Check",
@@ -348,6 +350,26 @@ def pose_fixture_row(artifact: dict[str, Any]) -> list[Any]:
     ]
 
 
+def gripper_camera_pov_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("scenario_id", ""),
+        artifact.get("kind", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("target_square", ""),
+        metrics.get("target_center_xy", ""),
+        metrics.get("visible_fraction", ""),
+        metrics.get("occlusion_fraction", ""),
+        metrics.get("min_clearance_px", ""),
+        metrics.get("tracked_gripper_percent", ""),
+        metrics.get("current_gripper_opening_px", ""),
+        "ok" if metrics.get("metadata_contract_ok") is True else "",
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
 def app_entrypoint_row(artifact: dict[str, Any]) -> list[Any]:
     metrics = artifact.get("metrics")
     metrics = metrics if isinstance(metrics, dict) else {}
@@ -536,6 +558,34 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         else ["_No SimCamera pose fixture artifacts indexed._"]
     )
 
+    pov = [
+        row
+        for row in grouped.get("gripper_camera_pov", [])
+        if row.get("label") != "gripper_camera_pov:summary"
+    ]
+    lines.extend(["", "### Gripper-Camera POV Review"])
+    lines.extend(
+        linked_table(
+            [
+                "State",
+                "Kind",
+                "Path",
+                "Target Square",
+                "Target Center",
+                "Visible Fraction",
+                "Occlusion Fraction",
+                "Min Clearance Px",
+                "Gripper %",
+                "Opening Px",
+                "Metadata Contract",
+                "Status",
+            ],
+            [gripper_camera_pov_row(row) for row in pov],
+        )
+        if pov
+        else ["_No gripper-camera POV artifacts indexed._"]
+    )
+
     app_entrypoint = grouped.get("app_entrypoint", [])
     lines.extend(["", "### App Entrypoint Metadata"])
     lines.extend(
@@ -606,6 +656,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "",
             "- This report is a deterministic Markdown view of existing JSON artifacts only.",
             "- SimCamera pose fixture intrinsics/extrinsics are simulator reference metadata, not physical calibration truth.",
+            "- Gripper-camera POV visibility and clearance values are synthetic metadata evidence, not real-camera segmentation or physical contact proof.",
             "- It does not rerun child smokes, open GUI calibration flows, call OpenAI, or touch SO-101 hardware.",
             "",
         ]
