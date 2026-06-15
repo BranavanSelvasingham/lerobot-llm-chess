@@ -13,6 +13,8 @@ from lerobot.cameras import CameraConfig, ColorMode
 from lerobot.robots.config import RobotConfig
 
 BoardCorners = tuple[tuple[float, float], tuple[float, float], tuple[float, float], tuple[float, float]]
+CameraMatrix = tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]]
+DistortionCoefficients = tuple[float, ...]
 
 SIM_CAMERA_REFERENCE_WIDTH = 640.0
 SIM_CAMERA_REFERENCE_HEIGHT = 480.0
@@ -20,6 +22,15 @@ REFERENCE_GRIPPER_BOARD_CORNERS: BoardCorners = ((32.0, 338.0), (594.0, 340.0), 
 OVERVIEW_BOARD_CORNERS: BoardCorners = ((94.0, 420.0), (546.0, 420.0), (546.0, 48.0), (94.0, 48.0))
 CURRENT_GRIPPER_REFERENCE_PROFILE = "current_gripper_reference"
 CURRENT_GRIPPER_REFERENCE_IMAGE = Path("archive/chess_test_images/current_view.jpg")
+SIM_CAMERA_INTRINSICS_SCHEMA = "lerobot.sim.camera_intrinsics.v1"
+SIM_CAMERA_EXTRINSICS_SCHEMA = "lerobot.sim.camera_extrinsics.v1"
+SIM_CAMERA_CALIBRATION_METADATA_SCOPE = "simulator_reference_metadata_not_physical_calibration_truth"
+SIM_CAMERA_INTRINSICS_MODEL = "pinhole"
+SIM_CAMERA_DISTORTION_MODEL = "opencv_radial_tangential"
+SIM_CAMERA_DISTORTION_COEFFICIENT_ORDER = ("k1", "k2", "p1", "p2", "k3")
+SIM_CAMERA_DEFAULT_DISTORTION_COEFFICIENTS: DistortionCoefficients = (0.0, 0.0, 0.0, 0.0, 0.0)
+SIM_CAMERA_REFERENCE_BOARD_SIZE_M = 0.4
+SIM_CAMERA_REFERENCE_BOARD_DISTANCE_M = 0.72
 SIM_CAMERA_PROFILE_OVERRIDES_SCHEMA = "lerobot.sim.manual_corner_profile_candidate.v1"
 SIM_CAMERA_PROFILE_OVERRIDES_STATUS = "candidate_only_not_canonical"
 SIM_CAMERA_PROFILE_OVERRIDE_KEYS = frozenset(
@@ -49,6 +60,57 @@ SIM_CAMERA_CALIBRATION_PROFILES: dict[str, dict[str, Any]] = {
 }
 
 
+def default_sim_camera_matrix_px(width: int, height: int) -> CameraMatrix:
+    """Return a conservative pinhole camera matrix for synthetic frames."""
+
+    focal_px = float(max(width, height))
+    return (
+        (focal_px, 0.0, (float(width) - 1.0) / 2.0),
+        (0.0, focal_px, (float(height) - 1.0) / 2.0),
+        (0.0, 0.0, 1.0),
+    )
+
+
+def default_sim_board_to_camera_extrinsics() -> dict[str, Any]:
+    """Return a stable simulator reference pose, not a physical calibration result."""
+
+    half_board_m = SIM_CAMERA_REFERENCE_BOARD_SIZE_M / 2.0
+    return {
+        "schema": SIM_CAMERA_EXTRINSICS_SCHEMA,
+        "name": "sim_board_to_camera_reference",
+        "source": SIM_CAMERA_CALIBRATION_METADATA_SCOPE,
+        "from_frame": "sim_board_a1_h1_h8_a8",
+        "to_frame": "sim_camera_opencv",
+        "rotation_matrix": [
+            [1.0, 0.0, 0.0],
+            [0.0, -1.0, 0.0],
+            [0.0, 0.0, -1.0],
+        ],
+        "translation_m": [-half_board_m, half_board_m, SIM_CAMERA_REFERENCE_BOARD_DISTANCE_M],
+        "units": {
+            "rotation_matrix": "unitless",
+            "translation_m": "meters",
+        },
+    }
+
+
+def sim_camera_coordinate_frame_convention() -> dict[str, Any]:
+    return {
+        "image_frame": "Pixel coordinates with origin at top-left, +x right, +y down.",
+        "camera_frame": "OpenCV pinhole camera frame with +x right, +y down, +z forward.",
+        "board_frame": (
+            "Board origin is the a1 outer corner, +x points from a1 to h1, "
+            "+y points from a1 to a8, and +z follows the right-hand rule."
+        ),
+        "board_corners_xy_order": ["a1", "h1", "h8", "a8"],
+        "extrinsics": (
+            "extrinsics.board_to_camera maps homogeneous board-frame meters into "
+            "camera-frame meters."
+        ),
+        "scope": SIM_CAMERA_CALIBRATION_METADATA_SCOPE,
+    }
+
+
 @CameraConfig.register_subclass("sim_camera")
 @dataclass(kw_only=True)
 class SimCameraConfig(CameraConfig):
@@ -75,6 +137,9 @@ class SimCameraConfig(CameraConfig):
     gripper_length_px: int = 170
     track_robot_gripper: bool = True
     reference_image_path: str | Path | None = None
+    camera_matrix_px: CameraMatrix | None = None
+    distortion_coefficients: DistortionCoefficients | None = None
+    board_to_camera_extrinsics: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if self.width is None or self.height is None:
@@ -89,6 +154,15 @@ class SimCameraConfig(CameraConfig):
             raise ValueError("SimCameraConfig.piece_layout must be one of: single_pawn, starting, empty.")
         if self.board_corners_xy is not None and len(self.board_corners_xy) != 4:
             raise ValueError("board_corners_xy must contain four (x, y) image corners.")
+        self.camera_matrix_px = _camera_matrix_px_value(
+            self.camera_matrix_px,
+            width=int(self.width),
+            height=int(self.height),
+        )
+        self.distortion_coefficients = _distortion_coefficients_value(self.distortion_coefficients)
+        self.board_to_camera_extrinsics = _board_to_camera_extrinsics_value(
+            self.board_to_camera_extrinsics
+        )
 
 
 @dataclass(frozen=True)
@@ -360,6 +434,90 @@ def _board_corners_override(value: Any, *, source: Path) -> BoardCorners:
             raise ValueError(f"board_corners_xy[{index}] in {source} must contain finite x/y values.")
         corners.append((x_float, y_float))
     return tuple(corners)  # type: ignore[return-value]
+
+
+def _camera_matrix_px_value(value: Any, *, width: int, height: int) -> CameraMatrix:
+    if value is None:
+        return default_sim_camera_matrix_px(width, height)
+    return _float_matrix(value, rows=3, columns=3, key="camera_matrix_px")  # type: ignore[return-value]
+
+
+def _distortion_coefficients_value(value: Any) -> DistortionCoefficients:
+    if value is None:
+        return SIM_CAMERA_DEFAULT_DISTORTION_COEFFICIENTS
+    expected_length = len(SIM_CAMERA_DISTORTION_COEFFICIENT_ORDER)
+    coefficients = _float_vector(value, length=None, key="distortion_coefficients")
+    if len(coefficients) != expected_length:
+        expected_order = ", ".join(SIM_CAMERA_DISTORTION_COEFFICIENT_ORDER)
+        raise ValueError(
+            "distortion_coefficients must contain "
+            f"{expected_length} values matching distortion_coefficient_order "
+            f"({expected_order}); got {len(coefficients)}."
+        )
+    return coefficients
+
+
+def _board_to_camera_extrinsics_value(value: Any) -> dict[str, Any]:
+    if value is None:
+        return default_sim_board_to_camera_extrinsics()
+    if not isinstance(value, dict):
+        raise ValueError("board_to_camera_extrinsics must be a JSON-like object.")
+    normalized = dict(value)
+    normalized["rotation_matrix"] = [
+        list(row)
+        for row in _float_matrix(
+            normalized.get("rotation_matrix"),
+            rows=3,
+            columns=3,
+            key="board_to_camera_extrinsics.rotation_matrix",
+        )
+    ]
+    normalized["translation_m"] = list(
+        _float_vector(
+            normalized.get("translation_m"),
+            length=3,
+            key="board_to_camera_extrinsics.translation_m",
+        )
+    )
+    default = default_sim_board_to_camera_extrinsics()
+    for key in ("schema", "name", "source", "from_frame", "to_frame", "units"):
+        normalized.setdefault(key, default[key])
+    return normalized
+
+
+def _float_matrix(value: Any, *, rows: int, columns: int, key: str) -> tuple[tuple[float, ...], ...]:
+    if not isinstance(value, (list, tuple)) or len(value) != rows:
+        raise ValueError(f"{key} must be a {rows}x{columns} numeric matrix.")
+    matrix: list[tuple[float, ...]] = []
+    for row_index, row in enumerate(value):
+        if not isinstance(row, (list, tuple)) or len(row) != columns:
+            raise ValueError(f"{key}[{row_index}] must contain {columns} numeric values.")
+        matrix.append(
+            tuple(
+                _finite_float(item, key=f"{key}[{row_index}][{column_index}]")
+                for column_index, item in enumerate(row)
+            )
+        )
+    return tuple(matrix)
+
+
+def _float_vector(value: Any, *, length: int | None, key: str) -> tuple[float, ...]:
+    if not isinstance(value, (list, tuple)):
+        raise ValueError(f"{key} must be a numeric vector.")
+    if length is not None and len(value) != length:
+        raise ValueError(f"{key} must contain {length} numeric values.")
+    if not value:
+        raise ValueError(f"{key} must contain at least one numeric value.")
+    return tuple(_finite_float(item, key=f"{key}[{index}]") for index, item in enumerate(value))
+
+
+def _finite_float(value: Any, *, key: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{key} must be numeric, got {value!r}.")
+    result = float(value)
+    if not math.isfinite(result):
+        raise ValueError(f"{key} must be finite, got {value!r}.")
+    return result
 
 
 def _reference_image_path_override(value: Any, *, source: Path) -> str:

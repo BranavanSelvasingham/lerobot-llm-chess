@@ -23,14 +23,30 @@ from lerobot.sim import (  # noqa: E402
     CURRENT_GRIPPER_REFERENCE_PROFILE,
     SIM_CAMERA_CALIBRATION_PROFILES,
     SimCamera,
+    SimCameraConfig,
     make_sim_camera_config_from_profile,
 )
 import lerobot.sim.camera as sim_camera_module  # noqa: E402
+from lerobot.sim.config import SIM_CAMERA_DISTORTION_COEFFICIENT_ORDER  # noqa: E402
 
 SCHEMA = "lerobot.sim.camera_pose_fixture.v1"
 CORNER_LABELS = ("a1", "h1", "h8", "a8")
 DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "sim_camera_pose_fixture"
 FROZEN_MARKER_TIME_SECONDS = 0.0
+METADATA_CONTRACT_KEYS = (
+    "image_size_px",
+    "camera_matrix_px",
+    "intrinsics",
+    "distortion_coefficients",
+    "extrinsics.board_to_camera",
+    "coordinate_frame_convention",
+    "board_corners_xy",
+    "target_square.center_image_xy",
+    "piece_square.center_image_xy",
+    "hardware_skipped",
+    "gui_skipped",
+    "deterministic_case_id",
+)
 
 
 @dataclass(frozen=True)
@@ -173,6 +189,142 @@ def assert_point_in_bounds(point_xy: np.ndarray, width: int, height: int, *, lab
     x, y = float(point_xy[0]), float(point_xy[1])
     if not (0.0 <= x < float(width) and 0.0 <= y < float(height)):
         raise AssertionError(f"{label} is out of image bounds {width}x{height}: {[x, y]}")
+
+
+def assert_float_matrix(value: Any, *, shape: tuple[int, int], label: str) -> np.ndarray:
+    try:
+        matrix = np.asarray(value, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise AssertionError(f"{label} must be numeric: {value!r}") from exc
+    if matrix.shape != shape:
+        raise AssertionError(f"{label} shape {matrix.shape} != {shape}")
+    if not np.all(np.isfinite(matrix)):
+        raise AssertionError(f"{label} contains non-finite values: {matrix}")
+    return matrix
+
+
+def assert_float_vector(value: Any, *, length: int | None, label: str) -> np.ndarray:
+    try:
+        vector = np.asarray(value, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise AssertionError(f"{label} must be numeric: {value!r}") from exc
+    if vector.ndim != 1:
+        raise AssertionError(f"{label} must be one-dimensional, got {vector.shape}")
+    if length is not None and vector.shape != (length,):
+        raise AssertionError(f"{label} shape {vector.shape} != ({length},)")
+    if vector.size == 0:
+        raise AssertionError(f"{label} must contain at least one coefficient")
+    if not np.all(np.isfinite(vector)):
+        raise AssertionError(f"{label} contains non-finite values: {vector}")
+    return vector
+
+
+def assert_camera_metadata_contract(metadata: dict[str, Any], *, width: int, height: int) -> dict[str, Any]:
+    image_size = metadata.get("image_size_px")
+    if not isinstance(image_size, dict):
+        raise AssertionError("camera_metadata.image_size_px must be an object")
+    if image_size.get("width") != width or image_size.get("height") != height:
+        raise AssertionError(f"camera_metadata image size {image_size} != {width}x{height}")
+
+    camera_matrix = assert_float_matrix(
+        metadata.get("camera_matrix_px"),
+        shape=(3, 3),
+        label="camera_metadata.camera_matrix_px",
+    )
+    if not np.allclose(camera_matrix[2], np.array([0.0, 0.0, 1.0], dtype=float)):
+        raise AssertionError(f"camera_metadata.camera_matrix_px has invalid final row: {camera_matrix[2]}")
+
+    intrinsics = metadata.get("intrinsics")
+    if not isinstance(intrinsics, dict):
+        raise AssertionError("camera_metadata.intrinsics must be an object")
+    for key in ("fx_px", "fy_px", "cx_px", "cy_px", "camera_matrix_px"):
+        if key not in intrinsics:
+            raise AssertionError(f"camera_metadata.intrinsics missing {key}")
+    nested_matrix = assert_float_matrix(
+        intrinsics.get("camera_matrix_px"),
+        shape=(3, 3),
+        label="camera_metadata.intrinsics.camera_matrix_px",
+    )
+    if not np.allclose(camera_matrix, nested_matrix):
+        raise AssertionError("camera_metadata intrinsics matrix does not match camera_matrix_px")
+
+    distortion = assert_float_vector(
+        metadata.get("distortion_coefficients"),
+        length=None,
+        label="camera_metadata.distortion_coefficients",
+    )
+    coefficient_order = metadata.get("distortion_coefficient_order")
+    if not isinstance(coefficient_order, list) or len(coefficient_order) != len(distortion):
+        raise AssertionError(
+            "camera_metadata.distortion_coefficient_order must name each distortion coefficient"
+        )
+
+    extrinsics = metadata.get("extrinsics")
+    if not isinstance(extrinsics, dict):
+        raise AssertionError("camera_metadata.extrinsics must be an object")
+    board_to_camera = extrinsics.get("board_to_camera")
+    if not isinstance(board_to_camera, dict):
+        raise AssertionError("camera_metadata.extrinsics.board_to_camera must be an object")
+    rotation = assert_float_matrix(
+        board_to_camera.get("rotation_matrix"),
+        shape=(3, 3),
+        label="camera_metadata.extrinsics.board_to_camera.rotation_matrix",
+    )
+    translation = assert_float_vector(
+        board_to_camera.get("translation_m"),
+        length=3,
+        label="camera_metadata.extrinsics.board_to_camera.translation_m",
+    )
+    if not board_to_camera.get("name"):
+        raise AssertionError("camera_metadata.extrinsics.board_to_camera must have a name")
+
+    convention = metadata.get("coordinate_frame_convention")
+    if not isinstance(convention, dict):
+        raise AssertionError("camera_metadata.coordinate_frame_convention must be an object")
+    for key in ("image_frame", "camera_frame", "board_frame", "extrinsics", "scope"):
+        if not isinstance(convention.get(key), str) or not convention.get(key):
+            raise AssertionError(f"camera_metadata.coordinate_frame_convention missing {key}")
+
+    return {
+        "image_size_px": True,
+        "camera_matrix_px": True,
+        "intrinsics": True,
+        "distortion_coefficients": True,
+        "distortion_coefficient_count": int(distortion.size),
+        "distortion_coefficient_order": [str(value) for value in coefficient_order],
+        "extrinsics.board_to_camera": True,
+        "extrinsics_name": str(board_to_camera.get("name")),
+        "extrinsics_rotation_shape": [int(value) for value in rotation.shape],
+        "extrinsics_translation_m": [float(value) for value in translation.tolist()],
+        "coordinate_frame_convention": True,
+        "coordinate_frame_scope": str(convention.get("scope")),
+    }
+
+
+def assert_distortion_config_contract() -> dict[str, Any]:
+    expected_length = len(SIM_CAMERA_DISTORTION_COEFFICIENT_ORDER)
+    default_cfg = SimCameraConfig()
+    default_coefficients = default_cfg.distortion_coefficients or ()
+    if len(default_coefficients) != expected_length:
+        raise AssertionError(
+            "Default SimCameraConfig distortion_coefficients must match "
+            f"distortion_coefficient_order length {expected_length}; got {len(default_coefficients)}."
+        )
+
+    mismatched_error: str | None = None
+    try:
+        SimCameraConfig(distortion_coefficients=(0.0, 0.0, 0.0, 0.0))
+    except ValueError as exc:
+        mismatched_error = str(exc)
+    if not mismatched_error or "distortion_coefficients" not in mismatched_error:
+        raise AssertionError("Mismatched distortion_coefficients vector did not fail with a clear ValueError.")
+
+    return {
+        "default_coefficients_match_order": True,
+        "mismatched_coefficients_rejected": True,
+        "distortion_coefficient_order": list(SIM_CAMERA_DISTORTION_COEFFICIENT_ORDER),
+        "mismatched_error": mismatched_error,
+    }
 
 
 def shifted_corners(corners: np.ndarray, offsets: list[tuple[float, float]]) -> list[list[float]]:
@@ -332,6 +484,11 @@ def render_case(
 
     corners_xy = np.asarray(metadata["board_corners_xy"], dtype=float)
     corner_checks = assert_corners_valid(corners_xy, int(camera_cfg.width), int(camera_cfg.height))
+    metadata_checks = assert_camera_metadata_contract(
+        metadata,
+        width=int(camera_cfg.width),
+        height=int(camera_cfg.height),
+    )
 
     target_file, target_rank, target_center = square_center_xy(corners_xy, case.target_square)
     piece_file, piece_rank, piece_center = square_center_xy(corners_xy, str(camera_cfg.piece_square))
@@ -372,6 +529,16 @@ def render_case(
             "center_image_xy": [float(value) for value in piece_center],
         },
     }
+    metadata_contract_checks = {
+        **metadata_checks,
+        "board_corners_xy": True,
+        "target_square.center_image_xy": True,
+        "piece_square.center_image_xy": True,
+        "hardware_skipped": True,
+        "gui_skipped": True,
+        "deterministic_case_id": bool(case.case_id),
+        "required_keys": list(METADATA_CONTRACT_KEYS),
+    }
     payload = {
         "schema": SCHEMA,
         "ok": True,
@@ -399,11 +566,36 @@ def render_case(
             "annotated_frame_sha256": file_sha256(annotated_path),
         },
         "camera_metadata": metadata,
+        "metadata_contract_checks": metadata_contract_checks,
         "corner_checks": corner_checks,
         "projection": projection,
     }
     write_json(metadata_path, payload)
     return payload, frame_bgr
+
+
+def metadata_contract_summary(case_payloads: list[dict[str, Any]]) -> dict[str, Any]:
+    by_case: dict[str, dict[str, Any]] = {}
+    for payload in case_payloads:
+        case_id = str(payload.get("case_id"))
+        checks = payload.get("metadata_contract_checks")
+        checks = checks if isinstance(checks, dict) else {}
+        by_case[case_id] = {
+            key: bool(checks.get(key))
+            for key in METADATA_CONTRACT_KEYS
+        }
+    return {
+        "required_keys": list(METADATA_CONTRACT_KEYS),
+        "all_cases_include_required_metadata": all(
+            all(case_checks.values()) for case_checks in by_case.values()
+        ),
+        "case_count": len(case_payloads),
+        "by_case": by_case,
+        "scope": (
+            "SimCamera intrinsics/extrinsics are stable simulator reference metadata, "
+            "not physical SO-101 calibration truth."
+        ),
+    }
 
 
 def same_shape_frame_delta(reference_bgr: np.ndarray, candidate_bgr: np.ndarray) -> dict[str, Any] | None:
@@ -446,6 +638,7 @@ def main() -> int:
     args = parse_args()
     output_dir = args.output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    config_contract_checks = assert_distortion_config_contract()
 
     rendered = [
         render_case(profile_name=str(args.profile), case=case, output_dir=output_dir)
@@ -486,6 +679,7 @@ def main() -> int:
             "warmup": False,
             "reads_per_case": 1,
         },
+        "config_contract_checks": config_contract_checks,
         "artifacts": {
             "summary_path": str(summary_path),
             "case_dir": str(output_dir / "cases"),
@@ -496,6 +690,7 @@ def main() -> int:
         "frame_paths": frame_paths,
         "annotated_frame_paths": annotated_frame_paths,
         "metadata_paths": metadata_paths,
+        "metadata_contract": metadata_contract_summary(case_payloads),
         "cases": case_payloads,
         "comparisons_to_nominal": comparisons,
         "real_media_gap_notes": [
@@ -505,6 +700,7 @@ def main() -> int:
         ],
         "notes": [
             "This fixture uses existing SimCamera and SimCameraConfig profile APIs; it does not modify rendering or canonical calibration constants.",
+            "SimCamera intrinsics/extrinsics are simulator reference metadata for downstream tool compatibility, not physical calibration truth.",
             "Pixel deltas are recorded as review evidence only; pass/fail checks stay structural because SimCamera is a synthetic renderer.",
         ],
     }

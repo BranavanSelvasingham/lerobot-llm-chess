@@ -103,6 +103,11 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- Real-media gap: the current inventory is limited to `archive/chess_test_images/current_view.jpg`.",
         "- No real-world videos are present for motion, recovery, or timing references.",
         "- No reference media currently documents failure modes.",
+        (
+            "- SimCamera pose metadata includes `image_size_px`, `camera_matrix_px`, "
+            "`intrinsics`, `distortion_coefficients`, and `extrinsics.board_to_camera`."
+        ),
+        "- Those extrinsics are simulator reference metadata, not physical calibration truth.",
         "",
         "This bundle does not replace later physical SO-101 validation.",
         "",
@@ -318,6 +323,7 @@ def sim_camera_pose_fixture_section(pose_fixture: dict[str, Any] | None, summary
         "metadata_paths": metadata_paths if isinstance(metadata_paths, dict) else {},
         "hardware_skipped": pose_fixture.get("hardware_skipped") if pose_fixture else None,
         "gui_skipped": pose_fixture.get("gui_skipped") if pose_fixture else None,
+        "metadata_contract": pose_fixture.get("metadata_contract") if pose_fixture else None,
         "comparisons_to_nominal": pose_fixture.get("comparisons_to_nominal") if pose_fixture else None,
         "cases": [
             {
@@ -336,6 +342,11 @@ def sim_camera_pose_fixture_section(pose_fixture: dict[str, Any] | None, summary
                 ),
                 "unique_colors": (
                     case.get("image", {}).get("unique_colors") if isinstance(case.get("image"), dict) else None
+                ),
+                "metadata_contract_checks": (
+                    case.get("metadata_contract_checks")
+                    if isinstance(case.get("metadata_contract_checks"), dict)
+                    else None
                 ),
             }
             for case in case_rows
@@ -685,6 +696,7 @@ def main() -> int:
         "notes": [
             "This suite intentionally calls existing smoke scripts as subprocesses instead of duplicating their internals.",
             "It does not mutate simulator rendering, camera profiles, perception algorithms, robot execution, dependencies, or canonical calibration constants.",
+            "SimCamera intrinsics/extrinsics are simulator reference metadata for downstream tool compatibility, not physical calibration truth.",
         ],
     }
     write_json(summary_path, summary)

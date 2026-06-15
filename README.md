@@ -80,6 +80,8 @@ python chess_robot_ui_llm_v2.py --port /dev/tty.usbmodemXXXX
 
 Before simulator, camera profile, or perception calibration changes, run the hardware-free local regression gate documented in [docs/sim_calibration_regression.md](docs/sim_calibration_regression.md). A focused GitHub Actions workflow runs the same gate for relevant pull requests into `feat/telemetry-recording`. The suite records its summary and artifacts under `/private/tmp/lerobot_sim/calibration_regression_suite` locally, includes deterministic SimCamera pose-fixture frames for nominal and perturbed board/camera views, and skips robot hardware and GUI display paths.
 
+Each SimCamera pose-fixture case writes `camera_metadata.json` with projected board corners plus simulator-reference `image_size_px`, `camera_matrix_px`/`intrinsics`, zero distortion coefficients, and named `extrinsics.board_to_camera` frame metadata. These fields are a stable synthetic metadata contract for camera-first app/calibration tooling, not physical SO-101 calibration truth.
+
 ## 🏗️ Architecture
 
 ```
