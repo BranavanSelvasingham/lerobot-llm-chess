@@ -14,9 +14,10 @@ CATEGORY_ORDER = {
     "real_reference_comparison": 1,
     "ranked_candidate": 2,
     "perception_fixture": 3,
-    "pick_place_scenario": 4,
-    "negative_check": 5,
-    "logs": 6,
+    "sim_camera_pose_fixture": 4,
+    "pick_place_scenario": 5,
+    "negative_check": 6,
+    "logs": 7,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 
@@ -347,6 +348,64 @@ def collect_perception_fixture_artifacts(
         )
 
 
+def collect_sim_camera_pose_fixture_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> None:
+    fixture = suite.get("sim_camera_pose_fixture")
+    fixture = fixture if isinstance(fixture, dict) else {}
+    add_path(
+        artifacts,
+        category="sim_camera_pose_fixture",
+        label="sim_camera_pose_fixture:summary",
+        value=fixture.get("summary_path"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="sim_camera_pose_fixture.summary_path",
+        metrics={"status": fixture.get("status"), "case_count": fixture.get("case_count")},
+    )
+    cases = fixture.get("cases")
+    case_rows = cases if isinstance(cases, list) else []
+    case_metrics = {
+        str(case.get("case_id")): {
+            "view": case.get("view"),
+            "profile": case.get("profile"),
+            "target_square": case.get("target_square"),
+            "piece_square": case.get("piece_square"),
+            "unique_colors": case.get("unique_colors"),
+        }
+        for case in case_rows
+        if isinstance(case, dict) and isinstance(case.get("case_id"), str)
+    }
+    for collection_key, label_suffix in (
+        ("frame_paths", "frame"),
+        ("annotated_frame_paths", "annotated_frame"),
+        ("metadata_paths", "metadata"),
+    ):
+        paths = fixture.get(collection_key)
+        if not isinstance(paths, dict):
+            continue
+        for case_id, value in sorted(paths.items()):
+            case_id_str = str(case_id)
+            add_path(
+                artifacts,
+                category="sim_camera_pose_fixture",
+                label=f"sim_camera_pose_fixture:{case_id_str}:{label_suffix}",
+                value=value,
+                suite_summary_path=suite_summary_path,
+                output_dir=output_dir,
+                repo_root=repo_root,
+                source=f"sim_camera_pose_fixture.{collection_key}",
+                metrics=case_metrics.get(case_id_str),
+                scenario_id=case_id_str,
+            )
+
+
 def collect_pick_place_artifacts(
     *,
     suite: dict[str, Any],
@@ -531,6 +590,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         repo_root=repo_root,
     )
     collect_perception_fixture_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
+    collect_sim_camera_pose_fixture_artifacts(
         suite=suite,
         artifacts=artifacts,
         suite_summary_path=suite_summary_path,
