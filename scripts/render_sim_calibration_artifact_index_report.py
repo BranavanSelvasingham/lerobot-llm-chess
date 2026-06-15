@@ -507,6 +507,10 @@ def depth_distance_scorecard_artifact_row(artifact: dict[str, Any]) -> list[Any]
         metrics.get("mean_metadata_projected_corner_residual_px", ""),
         metrics.get("not_geometrically_comparable_row_count", ""),
         metrics.get("real_camera_depth_status", ""),
+        metrics.get("real_depth_depth_row_count", ""),
+        metrics.get("mean_real_vs_sim_projection_residual_px", ""),
+        metrics.get("mean_abs_real_vs_sim_depth_residual_mm", ""),
+        metrics.get("real_depth_reference_missing_inputs", ""),
         "ok" if artifact.get("exists") is True else "missing",
     ]
 
@@ -1077,7 +1081,8 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
     lines.append(
         "This is the first-pass scorecard for depth/distance judgment. It combines SimCamera "
         "ground truth, the metadata-derived rendered-corner PnP baseline, residual severity, "
-        "and the explicit `not_real_camera_depth` gap before the detailed tables below."
+        "and either a `real_depth_comparable` sidecar residual summary or a "
+        "`missing_real_depth_reference` checklist before the detailed tables below."
     )
     lines.extend(
         linked_table(
@@ -1094,6 +1099,10 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Mean Metadata-Corner px",
                 "Not Comparable Rows",
                 "Real Depth",
+                "Real Depth Rows",
+                "Mean Real-vs-Sim Proj px",
+                "Mean Abs Real-vs-Sim Depth mm",
+                "Missing Real Inputs",
                 "Status",
             ],
             [depth_distance_scorecard_artifact_row(row) for row in depth_scorecard_artifacts],
@@ -1266,9 +1275,10 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
     lines.extend(["", "### Real Projection Intake"])
     lines.append(
         "This artifact links selected real reference media to the metadata-native SimCamera "
-        "projection/depth view. It is expected to report `missing_real_calibration` until "
-        "real intrinsics plus board pose/extrinsics or corner detections are supplied; it "
-        "does not pretend real depth is available."
+        "projection/depth view. It reports `real_depth_comparable` only when selected "
+        "media has real_capture=true intrinsics, board pose/extrinsics or corner detections, "
+        "and depth references; otherwise it reports `missing_real_depth_reference` with "
+        "the exact missing inputs."
     )
     lines.extend(
         linked_table(

@@ -1,0 +1,22 @@
+{
+  "schema": "lerobot.sim.real_calibration_sidecar.board_pose.v1",
+  "sidecar_type": "board_pose",
+  "example_only": false,
+  "real_capture": true,
+  "test_only_fixture": true,
+  "physical_calibration_truth": false,
+  "image_size_px": [640, 480],
+  "corner_order": ["a1", "h1", "h8", "a8"],
+  "corners": [
+    {"label": "a1", "pixel_xy": [141.722, 417.278], "confidence": 1.0},
+    {"label": "h1", "pixel_xy": [497.278, 417.278], "confidence": 1.0},
+    {"label": "h8", "pixel_xy": [497.278, 61.722], "confidence": 1.0},
+    {"label": "a8", "pixel_xy": [141.722, 61.722], "confidence": 1.0}
+  ],
+  "board_size_m": 0.4,
+  "detection_source": "synthetic test-only detections copied from the simulator metadata-native baseline",
+  "notes": [
+    "Synthetic fixture only. It is real_capture=true solely to exercise scorecard/report residual propagation.",
+    "Do not treat these corners as measured physical SO-101 image detections."
+  ]
+}

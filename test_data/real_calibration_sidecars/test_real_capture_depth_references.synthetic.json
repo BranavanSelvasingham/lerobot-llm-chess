@@ -1,0 +1,38 @@
+{
+  "schema": "lerobot.sim.real_calibration_sidecar.depth.v1",
+  "sidecar_type": "depth",
+  "example_only": false,
+  "real_capture": true,
+  "test_only_fixture": true,
+  "physical_calibration_truth": false,
+  "depth_units": "m",
+  "depth_scale_to_m": 1.0,
+  "reference_frame": "Synthetic OpenCV camera frame; distances match simulator metadata-native points for plumbing tests only.",
+  "metric_references": [
+    {
+      "id": "board_center_z",
+      "target": "board_center",
+      "pixel_xy": [319.5, 239.5],
+      "distance_m": 0.72,
+      "distance_type": "camera_z"
+    },
+    {
+      "id": "piece_center_range",
+      "target": "piece_center",
+      "pixel_xy": [341.722, 261.722],
+      "distance_m": 0.7209,
+      "distance_type": "camera_range"
+    },
+    {
+      "id": "target_square_center_range",
+      "target": "target_square_center",
+      "pixel_xy": [341.722, 217.278],
+      "distance_m": 0.7209,
+      "distance_type": "camera_range"
+    }
+  ],
+  "notes": [
+    "Synthetic fixture only. These distances are not real depth sensor or physical tape measurements.",
+    "The real_capture=true gate is used here only to prove residual rows reach the scorecard/report path."
+  ]
+}

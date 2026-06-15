@@ -426,8 +426,9 @@ def build_summary(args: argparse.Namespace) -> dict[str, Any]:
                 "or assert calibration truth."
             ),
             (
-                "Synthetic fixtures must use example_only=true so they cannot be mistaken for "
-                "hardware calibration."
+                "Synthetic fixtures should use example_only=true unless they are explicitly "
+                "labelled test-only real_capture fixtures for residual plumbing; neither form "
+                "proves hardware calibration truth."
             ),
         ],
     }

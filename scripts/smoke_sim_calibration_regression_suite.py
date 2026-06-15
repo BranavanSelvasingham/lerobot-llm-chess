@@ -127,6 +127,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `real_projection_intake/real_projection_intake.json`",
         "- `real_projection_intake/real_projection_intake.csv`",
         "- `real_projection_intake/real_projection_intake_contact_sheet.png`",
+        "- `real_projection_intake/real_projection_residuals.json` when real_capture sidecars are comparable",
+        "- `real_projection_intake/real_projection_residuals.csv` when real_capture sidecars are comparable",
+        "- `real_projection_intake/real_projection_residual_overlay_contact_sheet.png` when real_capture sidecars are comparable",
         "- `reference_capture_checklist/reference_capture_checklist.json`",
         "- `reference_capture_checklist/reference_capture_checklist.md`",
         "- `negative_empty_inventory/comparison_set_summary.json`",
@@ -208,7 +211,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         (
             "- Real projection intake links selected real reference media to the metadata-native "
             "projection/depth view, writes JSON/CSV plus a contact-sheet PNG, and reports "
-            "`missing_real_calibration` until real intrinsics plus board pose/extrinsics are supplied."
+            "`real_depth_comparable` only when real_capture=true intrinsics, pose, and depth "
+            "sidecars can be compared; otherwise it reports `missing_real_depth_reference`."
         ),
         (
             f"- Optional visual review recording produced: `{markdown_bool(recording.get('produced'))}`; "
@@ -793,6 +797,8 @@ def real_projection_intake_section(intake: dict[str, Any] | None, summary_path: 
     intake = intake if isinstance(intake, dict) else {}
     paths = intake.get("paths")
     paths = paths if isinstance(paths, dict) else {}
+    residual_artifacts = intake.get("residual_artifacts")
+    residual_artifacts = residual_artifacts if isinstance(residual_artifacts, dict) else {}
     return {
         "summary_path": str(summary_path),
         "output_dir": str(summary_path.parent),
@@ -813,6 +819,7 @@ def real_projection_intake_section(intake: dict[str, Any] | None, summary_path: 
         "sim_metadata_native_depth_view_png_path": intake.get("sim_metadata_native_depth_view_png_path"),
         "sim_metadata_native_depth_view_csv_path": intake.get("sim_metadata_native_depth_view_csv_path"),
         "sim_expected_projected_point_count": intake.get("sim_expected_projected_point_count"),
+        "residual_artifacts": residual_artifacts,
         "records": intake.get("records"),
         "hardware_skipped": intake.get("hardware_skipped"),
         "gui_skipped": intake.get("gui_skipped"),
@@ -1267,6 +1274,36 @@ def main() -> int:
     summary["real_projection_intake"] = real_projection_intake_section(
         real_projection_intake,
         real_projection_intake_summary_path,
+    )
+    write_json(summary_path, summary)
+
+    visual_review_refresh_record, visual_review_refresh = run_child(
+        name="visual_review_real_depth_refresh",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "render_sim_calibration_visual_review.py"),
+            str(summary_path),
+            "--output-dir",
+            str(visual_review_dir),
+            "--try-video",
+        ],
+        output_dir=visual_review_dir,
+        expected_json_path=visual_review_summary_path,
+    )
+    child_records["visual_review_real_depth_refresh"] = visual_review_refresh_record
+    required_ok = all(record["ok"] for record in child_records.values())
+    summary["ok"] = required_ok
+    summary["status"] = "ok" if required_ok else "validation_failed"
+    summary["aggregate_status"] = {
+        "ok": required_ok,
+        "failed_children": [
+            name for name, record in child_records.items() if not bool(record.get("ok"))
+        ],
+    }
+    summary["child_commands"] = child_records
+    summary["visual_review"] = visual_review_section(
+        visual_review_refresh,
+        visual_review_summary_path,
     )
     write_json(summary_path, summary)
 
