@@ -549,6 +549,69 @@ def perceived_depth_stage_rows(comparison: dict[str, Any]) -> list[list[Any]]:
     return out
 
 
+def pnp_residual_artifact_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("frame_count", ""),
+        metrics.get("mean_metadata_projected_corner_residual_px", ""),
+        metrics.get("mean_rendered_corner_pnp_reprojection_residual_px", ""),
+        metrics.get("mean_abs_rendered_corner_pnp_camera_to_piece_error_mm", ""),
+        metrics.get("mean_abs_rendered_corner_pnp_camera_to_board_error_mm", ""),
+        metrics.get("not_geometrically_comparable_row_count", ""),
+        metrics.get("example_reason_labels", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def pnp_residual_diagnostic_signal(
+    index: dict[str, Any],
+    suite: dict[str, Any] | None,
+) -> dict[str, Any]:
+    candidates: list[dict[str, Any]] = []
+    visual_review = index.get("visual_review")
+    if isinstance(visual_review, dict):
+        candidates.append(visual_review)
+    if suite is not None and isinstance(suite.get("visual_review"), dict):
+        candidates.append(suite["visual_review"])
+    for candidate in candidates:
+        diagnostic = candidate.get("pnp_residual_diagnostics")
+        if isinstance(diagnostic, dict) and diagnostic:
+            return diagnostic
+    return {}
+
+
+def pnp_residual_stage_rows(diagnostic: dict[str, Any]) -> list[list[Any]]:
+    rows = diagnostic.get("rows")
+    rows = rows if isinstance(rows, list) else []
+    out: list[list[Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        comparability = row.get("source_comparability")
+        comparability = comparability if isinstance(comparability, dict) else {}
+        pnp_vs_gt = comparability.get("rendered_board_corner_pnp_vs_sim_ground_truth")
+        pnp_vs_gt = pnp_vs_gt if isinstance(pnp_vs_gt, dict) else {}
+        out.append(
+            [
+                row.get("stage", ""),
+                row.get("metadata_projected_corner_mean_residual_px", ""),
+                row.get("rendered_corner_pnp_reprojection_mean_residual_px", ""),
+                row.get("rendered_corner_pnp_camera_center_delta_norm_mm", ""),
+                row.get("rendered_corner_pnp_camera_to_piece_error_mm", ""),
+                row.get("rendered_corner_pnp_camera_to_board_error_mm", ""),
+                pnp_vs_gt.get("status", ""),
+                row.get("reason_labels", ""),
+                row.get("status", ""),
+            ]
+        )
+    return out
+
+
 def app_entrypoint_row(artifact: dict[str, Any]) -> list[Any]:
     metrics = artifact.get("metrics")
     metrics = metrics if isinstance(metrics, dict) else {}
@@ -875,6 +938,59 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         )
         if stage_rows
         else ["_No per-stage perceived-depth comparison rows were available._"]
+    )
+
+    pnp_residual_artifacts = [
+        row
+        for row in grouped.get("visual_review", [])
+        if str(row.get("label") or "").startswith("visual_review:pick_place_pnp_residual_diagnostics")
+    ]
+    pnp_diagnostic = pnp_residual_diagnostic_signal(index, suite)
+    lines.extend(["", "### Pick/Place PnP Residual Diagnostics"])
+    lines.append(
+        "This table diagnoses whether the rendered-board-corner PnP baseline is geometrically "
+        "comparable to simulator metadata extrinsics. Metadata-projected corner residuals "
+        "come from projecting 3D board corners through SimCamera intrinsics/extrinsics and "
+        "comparing those pixels with the rendered board-corner overlay."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Frames",
+                "Mean Metadata-Corner Residual px",
+                "Mean PnP Reproj px",
+                "Mean Abs Cam-Piece Error mm",
+                "Mean Abs Cam-Board Error mm",
+                "Not Comparable Rows",
+                "Example Reason Labels",
+                "Status",
+            ],
+            [pnp_residual_artifact_row(row) for row in pnp_residual_artifacts],
+        )
+        if pnp_residual_artifacts
+        else ["_No PnP residual diagnostic artifacts indexed._"]
+    )
+    diagnostic_stage_rows = pnp_residual_stage_rows(pnp_diagnostic)
+    lines.extend(
+        table(
+            [
+                "Stage",
+                "Metadata-Corner Residual px",
+                "PnP Reproj px",
+                "Camera Center Delta mm",
+                "Cam-Piece Error mm",
+                "Cam-Board Error mm",
+                "PnP vs GT Comparability",
+                "Reason Labels",
+                "Status",
+            ],
+            diagnostic_stage_rows,
+        )
+        if diagnostic_stage_rows
+        else ["_No per-stage PnP residual diagnostic rows were available._"]
     )
 
     pick_place_sequence = [

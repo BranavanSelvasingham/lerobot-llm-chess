@@ -529,6 +529,80 @@ def collect_visual_review_artifacts(
             ),
         )
 
+    pnp_diagnostics = visual_review.get("pnp_residual_diagnostics")
+    pnp_diagnostics = pnp_diagnostics if isinstance(pnp_diagnostics, dict) else {}
+    pnp_paths = pnp_diagnostics.get("paths")
+    pnp_paths = pnp_paths if isinstance(pnp_paths, dict) else {}
+    pnp_rows = pnp_diagnostics.get("rows")
+    pnp_rows = pnp_rows if isinstance(pnp_rows, list) else []
+    first_pnp = next((row for row in pnp_rows if isinstance(row, dict)), {})
+    pnp_aggregate = pnp_diagnostics.get("aggregate")
+    pnp_aggregate = pnp_aggregate if isinstance(pnp_aggregate, dict) else {}
+    pnp_assumptions = pnp_diagnostics.get("assumptions")
+    pnp_assumptions = pnp_assumptions if isinstance(pnp_assumptions, dict) else {}
+    pnp_artifact_summary = {
+        "status": pnp_diagnostics.get("status"),
+        "ok": pnp_diagnostics.get("ok"),
+        "frame_count": pnp_diagnostics.get("frame_count"),
+        "board_size_m": pnp_assumptions.get("board_size_m"),
+        "default_corner_order": pnp_assumptions.get("default_corner_order"),
+        "metadata_projection_comparability_threshold_px": pnp_assumptions.get(
+            "metadata_projection_comparability_threshold_px"
+        ),
+        "mean_metadata_projected_corner_residual_px": pnp_aggregate.get(
+            "mean_metadata_projected_corner_residual_px"
+        ),
+        "mean_rendered_corner_pnp_reprojection_residual_px": pnp_aggregate.get(
+            "mean_rendered_corner_pnp_reprojection_residual_px"
+        ),
+        "mean_abs_rendered_corner_pnp_camera_to_piece_error_mm": pnp_aggregate.get(
+            "mean_abs_rendered_corner_pnp_camera_to_piece_error_mm"
+        ),
+        "mean_abs_rendered_corner_pnp_camera_to_board_error_mm": pnp_aggregate.get(
+            "mean_abs_rendered_corner_pnp_camera_to_board_error_mm"
+        ),
+        "mean_rendered_corner_pnp_camera_center_delta_norm_mm": pnp_aggregate.get(
+            "mean_rendered_corner_pnp_camera_center_delta_norm_mm"
+        ),
+        "not_geometrically_comparable_row_count": pnp_aggregate.get(
+            "not_geometrically_comparable_row_count"
+        ),
+        "reason_label_counts": pnp_aggregate.get("reason_label_counts"),
+        "example_reason_labels": first_pnp.get("reason_labels"),
+        "example_metadata_projected_corner_mean_residual_px": first_pnp.get(
+            "metadata_projected_corner_mean_residual_px"
+        ),
+        "example_rendered_corner_pnp_reprojection_mean_residual_px": first_pnp.get(
+            "rendered_corner_pnp_reprojection_mean_residual_px"
+        ),
+        "example_rendered_corner_pnp_camera_center_delta_norm_mm": first_pnp.get(
+            "rendered_corner_pnp_camera_center_delta_norm_mm"
+        ),
+        "example_rendered_corner_pnp_camera_to_piece_error_mm": first_pnp.get(
+            "rendered_corner_pnp_camera_to_piece_error_mm"
+        ),
+        "example_rendered_corner_pnp_camera_to_board_error_mm": first_pnp.get(
+            "rendered_corner_pnp_camera_to_board_error_mm"
+        ),
+    }
+    for key, label_suffix in (("json", "json"), ("csv", "csv")):
+        add_path(
+            artifacts,
+            category="visual_review",
+            label=f"visual_review:pick_place_pnp_residual_diagnostics:{label_suffix}",
+            value=pnp_paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"visual_review.pnp_residual_diagnostics.paths.{key}",
+            metrics=pnp_artifact_summary,
+            scenario_id=(
+                pnp_diagnostics.get("scenario_id")
+                if isinstance(pnp_diagnostics.get("scenario_id"), str)
+                else None
+            ),
+        )
+
     contact_sheets = visual_review.get("contact_sheets")
     contact_sheet_rows = contact_sheets if isinstance(contact_sheets, list) else []
     for sheet in contact_sheet_rows:

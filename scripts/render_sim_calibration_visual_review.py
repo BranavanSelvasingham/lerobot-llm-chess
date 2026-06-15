@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import itertools
 import json
 import math
 import shutil
@@ -16,10 +17,13 @@ import numpy as np
 
 SCHEMA = "lerobot.sim.calibration_visual_review.v1"
 PERCEIVED_DEPTH_COMPARISON_SCHEMA = "lerobot.sim.pick_place_perceived_depth_comparison.v1"
+PNP_RESIDUAL_DIAGNOSTIC_SCHEMA = "lerobot.sim.pick_place_pnp_residual_diagnostics.v1"
 DEFAULT_CONTACT_SHEET_CELL_WIDTH = 360
 DEFAULT_VIDEO_FPS = 1.0
 VIDEO_CODEC = "mp4v"
 SIM_BOARD_SIZE_M = 0.4
+DEFAULT_BOARD_CORNER_ORDER = ("a1", "h1", "h8", "a8")
+METADATA_PROJECTION_COMPARABILITY_THRESHOLD_PX = 5.0
 PERCEIVED_DEPTH_ESTIMATOR_NAME = "rendered_board_corner_planar_pnp"
 PERCEIVED_DEPTH_ESTIMATOR_STATUS = "metadata_derived_baseline"
 PERCEIVED_DEPTH_ESTIMATOR_SOURCE = (
@@ -474,6 +478,38 @@ def board_corner_object_points_m() -> np.ndarray:
     )
 
 
+def board_corner_label_to_object_point_m(label: str) -> np.ndarray:
+    points = {
+        "a1": np.array([0.0, 0.0, 0.0], dtype=np.float64),
+        "h1": np.array([SIM_BOARD_SIZE_M, 0.0, 0.0], dtype=np.float64),
+        "h8": np.array([SIM_BOARD_SIZE_M, SIM_BOARD_SIZE_M, 0.0], dtype=np.float64),
+        "a8": np.array([0.0, SIM_BOARD_SIZE_M, 0.0], dtype=np.float64),
+    }
+    try:
+        return points[str(label)]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported board corner label {label!r}.") from exc
+
+
+def board_corner_object_points_for_order(labels: list[str] | tuple[str, ...]) -> np.ndarray:
+    if len(labels) != 4:
+        raise ValueError("Board corner order must contain exactly four labels.")
+    return np.asarray([board_corner_label_to_object_point_m(label) for label in labels], dtype=np.float64)
+
+
+def metadata_declared_corner_order(metadata: dict[str, Any]) -> list[str]:
+    convention = metadata.get("coordinate_frame_convention")
+    convention = convention if isinstance(convention, dict) else {}
+    order = convention.get("board_corners_xy_order")
+    if (
+        isinstance(order, list)
+        and len(order) == 4
+        and all(isinstance(value, str) for value in order)
+    ):
+        return [str(value) for value in order]
+    return list(DEFAULT_BOARD_CORNER_ORDER)
+
+
 def camera_distortion_coefficients(metadata: dict[str, Any]) -> np.ndarray:
     try:
         distortion = np.asarray(metadata.get("distortion_coefficients"), dtype=np.float64)
@@ -484,7 +520,11 @@ def camera_distortion_coefficients(metadata: dict[str, Any]) -> np.ndarray:
     return distortion.reshape(-1, 1)
 
 
-def solve_rendered_board_corner_pnp(metadata: dict[str, Any]) -> dict[str, Any]:
+def solve_rendered_board_corner_pnp(
+    metadata: dict[str, Any],
+    *,
+    object_points: np.ndarray | None = None,
+) -> dict[str, Any]:
     try:
         camera_matrix = np.asarray(metadata.get("camera_matrix_px"), dtype=np.float64)
         image_points = np.asarray(metadata.get("board_corners_xy"), dtype=np.float64)
@@ -497,13 +537,16 @@ def solve_rendered_board_corner_pnp(metadata: dict[str, Any]) -> dict[str, Any]:
     if not np.isfinite(camera_matrix).all() or not np.isfinite(image_points).all():
         return {"status": "estimator_unavailable", "reason": "camera matrix or board corners are non-finite"}
 
-    object_points = board_corner_object_points_m()
+    object_points = board_corner_object_points_m() if object_points is None else np.asarray(object_points, dtype=np.float64)
+    if object_points.shape != (4, 3) or not np.isfinite(object_points).all():
+        return {"status": "estimator_unavailable", "reason": "object points must be four finite 3D corners"}
     distortion = camera_distortion_coefficients(metadata)
     candidate_flags = [
         getattr(cv2, "SOLVEPNP_IPPE", cv2.SOLVEPNP_ITERATIVE),
         cv2.SOLVEPNP_ITERATIVE,
     ]
     last_error: str | None = None
+    candidates: list[dict[str, Any]] = []
     for flag in dict.fromkeys(candidate_flags):
         try:
             ok, rvec, tvec = cv2.solvePnP(
@@ -531,14 +574,34 @@ def solve_rendered_board_corner_pnp(metadata: dict[str, Any]) -> dict[str, Any]:
         ):
             last_error = "estimated pose or reprojection residuals are non-finite"
             continue
+        candidates.append(
+            {
+                "status": "ok",
+                "rotation_matrix": rotation,
+                "translation_m": translation,
+                "projected_corners_xy": projected_points,
+                "rendered_corners_xy": image_points,
+                "corner_reprojection_residuals_px": residuals,
+                "corner_reprojection_mean_residual_px": float(np.mean(residuals)),
+                "solve_pnp_flag": int(flag),
+            }
+        )
+    if candidates:
+        best = min(candidates, key=lambda row: float(row["corner_reprojection_mean_residual_px"]))
         return {
             "status": "ok",
-            "rotation_matrix": rotation,
-            "translation_m": translation,
-            "projected_corners_xy": projected_points,
-            "rendered_corners_xy": image_points,
-            "corner_reprojection_residuals_px": residuals,
-            "solve_pnp_flag": int(flag),
+            "rotation_matrix": best["rotation_matrix"],
+            "translation_m": best["translation_m"],
+            "projected_corners_xy": best["projected_corners_xy"],
+            "rendered_corners_xy": best["rendered_corners_xy"],
+            "corner_reprojection_residuals_px": best["corner_reprojection_residuals_px"],
+            "solve_pnp_flag": best["solve_pnp_flag"],
+            "solve_pnp_candidate_count": len(candidates),
+            "solve_pnp_candidate_flags": [int(candidate["solve_pnp_flag"]) for candidate in candidates],
+            "solve_pnp_candidate_mean_residuals_px": [
+                rounded_float(float(candidate["corner_reprojection_mean_residual_px"]), digits=3)
+                for candidate in candidates
+            ],
         }
     return {
         "status": "estimator_unavailable",
@@ -587,6 +650,9 @@ def estimate_depth_from_rendered_board_geometry(
             digits=3,
         ),
         "solve_pnp_flag": pnp.get("solve_pnp_flag"),
+        "solve_pnp_candidate_count": pnp.get("solve_pnp_candidate_count"),
+        "solve_pnp_candidate_flags": pnp.get("solve_pnp_candidate_flags"),
+        "solve_pnp_candidate_mean_residuals_px": pnp.get("solve_pnp_candidate_mean_residuals_px"),
     }
 
 
@@ -791,6 +857,574 @@ def abs_or_none(value: float | None, digits: int = 1) -> float | None:
     if value is None:
         return None
     return round(abs(float(value)), digits)
+
+
+def pnp_pose_diagnostics(
+    pnp: dict[str, Any],
+    *,
+    piece_square: str,
+    target_square: str,
+) -> dict[str, Any]:
+    if pnp.get("status") != "ok":
+        return {"status": pnp.get("status"), "reason": pnp.get("reason")}
+    try:
+        piece_board_m = board_square_center_m(piece_square)
+        target_board_m = board_square_center_m(target_square)
+    except ValueError as exc:
+        return {"status": "estimator_unavailable", "reason": str(exc)}
+
+    rotation = np.asarray(pnp["rotation_matrix"], dtype=float)
+    translation = np.asarray(pnp["translation_m"], dtype=float)
+    camera_center = -(rotation.T @ translation)
+    piece_camera = rotation @ piece_board_m + translation
+    target_camera = rotation @ target_board_m + translation
+    residuals = np.asarray(pnp["corner_reprojection_residuals_px"], dtype=float)
+    if not (
+        np.isfinite(camera_center).all()
+        and np.isfinite(piece_camera).all()
+        and np.isfinite(target_camera).all()
+        and np.isfinite(residuals).all()
+    ):
+        return {"status": "estimator_unavailable", "reason": "estimated pose contains non-finite values"}
+    return {
+        "status": "ok",
+        "camera_center_board_m": camera_center,
+        "camera_to_board_plane_m": abs(float(camera_center[2])),
+        "camera_to_piece_m": float(np.linalg.norm(piece_camera)),
+        "camera_to_target_square_m": float(np.linalg.norm(target_camera)),
+        "piece_camera_m": piece_camera,
+        "target_square_camera_m": target_camera,
+        "board_corner_reprojection_mean_residual_px": float(np.mean(residuals)),
+        "board_corner_reprojection_max_residual_px": float(np.max(residuals)),
+        "board_corner_reprojection_residuals_px": residuals,
+        "estimated_projected_corners_xy": np.asarray(pnp["projected_corners_xy"], dtype=float),
+        "rendered_corners_xy": np.asarray(pnp["rendered_corners_xy"], dtype=float),
+        "solve_pnp_flag": pnp.get("solve_pnp_flag"),
+        "solve_pnp_candidate_count": pnp.get("solve_pnp_candidate_count"),
+        "solve_pnp_candidate_flags": pnp.get("solve_pnp_candidate_flags"),
+        "solve_pnp_candidate_mean_residuals_px": pnp.get("solve_pnp_candidate_mean_residuals_px"),
+    }
+
+
+def metadata_projected_board_corner_check(
+    metadata: dict[str, Any],
+    *,
+    corner_order: list[str],
+) -> dict[str, Any]:
+    try:
+        rendered_corners = np.asarray(metadata.get("board_corners_xy"), dtype=float)
+        object_points = board_corner_object_points_for_order(corner_order)
+    except (TypeError, ValueError) as exc:
+        return {
+            "status": "source_unavailable",
+            "reason_label": "metadata_corner_geometry_unavailable",
+            "reason": str(exc),
+        }
+    if rendered_corners.shape != (4, 2) or not np.isfinite(rendered_corners).all():
+        return {
+            "status": "source_unavailable",
+            "reason_label": "rendered_board_corners_invalid",
+            "reason": "camera_metadata.board_corners_xy must contain four finite 2D points",
+        }
+    if metadata_camera_model(metadata) is None:
+        return {
+            "status": "source_unavailable",
+            "reason_label": "metadata_camera_model_unavailable",
+            "reason": "camera matrix or board_to_camera extrinsics are unavailable",
+        }
+
+    projected_rows: list[np.ndarray] = []
+    residuals: list[float] = []
+    for point, rendered in zip(object_points, rendered_corners, strict=True):
+        projected = project_board_point_m(metadata, point)
+        if projected is None:
+            return {
+                "status": "source_unavailable",
+                "reason_label": "metadata_projection_unavailable",
+                "reason": "Could not project at least one metadata 3D board corner",
+            }
+        _, projected_xy = projected
+        projected_rows.append(projected_xy)
+        residuals.append(float(np.linalg.norm(projected_xy - rendered)))
+
+    residual_array = np.asarray(residuals, dtype=float)
+    mean_residual = float(np.mean(residual_array))
+    comparable = mean_residual <= METADATA_PROJECTION_COMPARABILITY_THRESHOLD_PX
+    reason_label = (
+        "metadata_projection_matches_rendered_corners"
+        if comparable
+        else "rendered_board_corners_do_not_match_metadata_pinhole_projection"
+    )
+    return {
+        "status": "ok",
+        "corner_order": list(corner_order),
+        "projected_corners_xy": rounded_list(np.asarray(projected_rows).reshape(-1), digits=3),
+        "rendered_corners_xy": rounded_list(rendered_corners.reshape(-1), digits=3),
+        "residuals_px": [rounded_float(value, digits=3) for value in residual_array],
+        "mean_residual_px": rounded_float(mean_residual, digits=3),
+        "max_residual_px": rounded_float(float(np.max(residual_array)), digits=3),
+        "comparability_threshold_px": METADATA_PROJECTION_COMPARABILITY_THRESHOLD_PX,
+        "geometrically_comparable": comparable,
+        "reason_label": reason_label,
+        "source": (
+            "camera_metadata.camera_matrix_px plus "
+            "camera_metadata.extrinsics.board_to_camera projected onto metadata board_corners_xy"
+        ),
+    }
+
+
+def pnp_order_candidate_summary(
+    metadata: dict[str, Any],
+    *,
+    declared_order: list[str],
+    ground_truth_camera_center_m: np.ndarray | None,
+) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    for order in itertools.permutations(DEFAULT_BOARD_CORNER_ORDER):
+        try:
+            object_points = board_corner_object_points_for_order(order)
+        except ValueError:
+            continue
+        pnp = solve_rendered_board_corner_pnp(metadata, object_points=object_points)
+        candidate: dict[str, Any] = {
+            "corner_order": list(order),
+            "status": pnp.get("status"),
+        }
+        if pnp.get("status") == "ok":
+            pose = pnp_pose_diagnostics(
+                pnp,
+                piece_square=str(metadata.get("piece_square") or "e4"),
+                target_square=str(metadata.get("piece_square") or "e4"),
+            )
+            candidate.update(
+                {
+                    "board_corner_reprojection_mean_residual_px": rounded_float(
+                        pose.get("board_corner_reprojection_mean_residual_px"),
+                        digits=3,
+                    ),
+                    "estimated_camera_center_board_mm": vector_m_to_mm(
+                        pose.get("camera_center_board_m")
+                    ),
+                    "estimated_camera_to_board_plane_distance_mm": meters_to_mm(
+                        pose.get("camera_to_board_plane_m")
+                    ),
+                    "solve_pnp_flag": pnp.get("solve_pnp_flag"),
+                }
+            )
+            if ground_truth_camera_center_m is not None and pose.get("camera_center_board_m") is not None:
+                candidate["camera_center_delta_norm_mm"] = meters_to_mm(
+                    float(
+                        np.linalg.norm(
+                            np.asarray(pose["camera_center_board_m"], dtype=float)
+                            - np.asarray(ground_truth_camera_center_m, dtype=float)
+                        )
+                    )
+                )
+        else:
+            candidate["reason"] = pnp.get("reason")
+        rows.append(candidate)
+
+    ok_rows = [row for row in rows if row.get("status") == "ok"]
+    by_center = sorted(
+        [row for row in ok_rows if row.get("camera_center_delta_norm_mm") is not None],
+        key=lambda row: float(row["camera_center_delta_norm_mm"]),
+    )
+    by_reprojection = sorted(
+        [row for row in ok_rows if row.get("board_corner_reprojection_mean_residual_px") is not None],
+        key=lambda row: float(row["board_corner_reprojection_mean_residual_px"]),
+    )
+    declared_key = tuple(declared_order)
+    ranked_orders = [tuple(row["corner_order"]) for row in by_center if isinstance(row.get("corner_order"), list)]
+    declared_rank = ranked_orders.index(declared_key) + 1 if declared_key in ranked_orders else None
+    low_reprojection_count = sum(
+        1
+        for row in ok_rows
+        if row.get("board_corner_reprojection_mean_residual_px") is not None
+        and float(row["board_corner_reprojection_mean_residual_px"]) <= 1.0
+    )
+    best_center_order = by_center[0]["corner_order"] if by_center else None
+    reason_label = (
+        "corner_order_candidate_changes_closest_ground_truth_pose"
+        if best_center_order is not None and list(best_center_order) != list(declared_order)
+        else "declared_corner_order_recorded"
+    )
+    return {
+        "declared_corner_order": list(declared_order),
+        "tested_order_count": len(rows),
+        "ok_order_count": len(ok_rows),
+        "best_by_camera_center_delta": by_center[0] if by_center else None,
+        "best_by_reprojection_residual": by_reprojection[0] if by_reprojection else None,
+        "declared_order_rank_by_camera_center_delta": declared_rank,
+        "low_reprojection_order_count": low_reprojection_count,
+        "reason_label": reason_label,
+        "candidate_rows": rows,
+        "note": (
+            "Low reprojection residual alone cannot prove the rendered-corner PnP pose matches "
+            "the simulator metadata pose; this ranking compares estimated camera centers when "
+            "metadata extrinsics are available."
+        ),
+    }
+
+
+def source_comparability_diagnostic(
+    *,
+    metadata_projection_check: dict[str, Any],
+    pnp_pose: dict[str, Any],
+) -> dict[str, Any]:
+    metadata_comparable = metadata_projection_check.get("geometrically_comparable")
+    if metadata_projection_check.get("status") != "ok":
+        rendered_vs_metadata_status = "source_unavailable"
+        rendered_vs_metadata_reason = metadata_projection_check.get("reason_label")
+    elif metadata_comparable is True:
+        rendered_vs_metadata_status = "geometrically_comparable"
+        rendered_vs_metadata_reason = "metadata_projection_matches_rendered_corners"
+    else:
+        rendered_vs_metadata_status = "not_geometrically_comparable"
+        rendered_vs_metadata_reason = metadata_projection_check.get("reason_label")
+
+    pnp_status = "geometrically_comparable" if metadata_comparable is True else rendered_vs_metadata_status
+    pnp_reason = (
+        "rendered_corner_pnp_and_ground_truth_share_metadata_projection"
+        if metadata_comparable is True
+        else "rendered_corner_pnp_uses_overlay_geometry_that_does_not_match_metadata_extrinsics"
+    )
+    if pnp_pose.get("status") != "ok":
+        pnp_status = "source_unavailable"
+        pnp_reason = pnp_pose.get("reason") or "rendered_corner_pnp_unavailable"
+
+    return {
+        "metadata_extrinsics_projected_corners_vs_rendered_corners": {
+            "status": rendered_vs_metadata_status,
+            "reason_label": rendered_vs_metadata_reason,
+            "mean_residual_px": metadata_projection_check.get("mean_residual_px"),
+            "threshold_px": metadata_projection_check.get("comparability_threshold_px"),
+        },
+        "rendered_board_corner_pnp_vs_sim_ground_truth": {
+            "status": pnp_status,
+            "reason_label": pnp_reason,
+            "metadata_projection_mean_residual_px": metadata_projection_check.get("mean_residual_px"),
+        },
+        "rendered_board_corner_pnp_vs_rendered_corners": {
+            "status": "geometrically_comparable_by_construction"
+            if pnp_pose.get("status") == "ok"
+            else "source_unavailable",
+            "reason_label": (
+                "pnp_reprojects_the_same_rendered_corners_used_as_inputs"
+                if pnp_pose.get("status") == "ok"
+                else pnp_pose.get("reason")
+            ),
+            "mean_reprojection_residual_px": rounded_float(
+                pnp_pose.get("board_corner_reprojection_mean_residual_px"),
+                digits=3,
+            ),
+        },
+    }
+
+
+def compute_pnp_residual_diagnostic_row(
+    metric: dict[str, Any],
+    source_row: dict[str, Any],
+) -> dict[str, Any]:
+    capture = source_row.get("capture")
+    capture = capture if isinstance(capture, dict) else {}
+    metadata = capture.get("metadata")
+    metadata = metadata if isinstance(metadata, dict) else {}
+    flat = metric.get("distance_depth_fields")
+    flat = flat if isinstance(flat, dict) else {}
+    piece_square = str(metric.get("piece_square") or source_row.get("source_square") or "")
+    target_square = str(metric.get("target_square") or source_row.get("target_square") or piece_square)
+    declared_order = metadata_declared_corner_order(metadata)
+    ground_truth_center = camera_center_board_m(metadata)
+    metadata_projection = metadata_projected_board_corner_check(metadata, corner_order=declared_order)
+
+    try:
+        object_points = board_corner_object_points_for_order(declared_order)
+    except ValueError:
+        object_points = board_corner_object_points_m()
+    pnp = solve_rendered_board_corner_pnp(metadata, object_points=object_points)
+    pnp_pose = pnp_pose_diagnostics(pnp, piece_square=piece_square, target_square=target_square)
+    comparability = source_comparability_diagnostic(
+        metadata_projection_check=metadata_projection,
+        pnp_pose=pnp_pose,
+    )
+    order_summary = pnp_order_candidate_summary(
+        metadata,
+        declared_order=declared_order,
+        ground_truth_camera_center_m=ground_truth_center,
+    )
+
+    reason_labels = {
+        metadata_projection.get("reason_label"),
+        order_summary.get("reason_label"),
+    }
+    for row in comparability.values():
+        if isinstance(row, dict) and row.get("status") in {
+            "not_geometrically_comparable",
+            "source_unavailable",
+        }:
+            reason_labels.add(row.get("reason_label"))
+    if (
+        pnp_pose.get("status") == "ok"
+        and metadata_projection.get("status") == "ok"
+        and metadata_projection.get("geometrically_comparable") is False
+    ):
+        reason_labels.add("pnp_fits_rendered_overlay_but_not_metadata_extrinsics")
+    reason_label_rows = sorted(str(value) for value in reason_labels if value)
+
+    pnp_camera_center = pnp_pose.get("camera_center_board_m")
+    camera_center_delta_norm_mm = None
+    if ground_truth_center is not None and pnp_camera_center is not None:
+        camera_center_delta_norm_mm = meters_to_mm(
+            float(
+                np.linalg.norm(
+                    np.asarray(pnp_camera_center, dtype=float)
+                    - np.asarray(ground_truth_center, dtype=float)
+                )
+            )
+        )
+    piece_error = subtract_or_none(
+        meters_to_mm(pnp_pose.get("camera_to_piece_m")),
+        flat.get("camera_to_piece_distance_mm"),
+    )
+    board_error = subtract_or_none(
+        meters_to_mm(pnp_pose.get("camera_to_board_plane_m")),
+        flat.get("camera_to_board_plane_distance_mm"),
+    )
+    target_error = subtract_or_none(
+        meters_to_mm(pnp_pose.get("camera_to_target_square_m")),
+        flat.get("camera_to_target_square_distance_mm"),
+    )
+
+    return {
+        "id": metric.get("id") or source_row.get("id"),
+        "capture_label": metric.get("capture_label") or source_row.get("capture_label"),
+        "stage": metric.get("stage") or source_row.get("stage"),
+        "description": metric.get("description") or source_row.get("description"),
+        "scenario_id": metric.get("scenario_id") or source_row.get("scenario_id"),
+        "source_square": metric.get("source_square") or source_row.get("source_square"),
+        "target_square": target_square,
+        "piece_square": piece_square,
+        "status": "ok" if pnp_pose.get("status") == "ok" and metadata_projection.get("status") == "ok" else "partial",
+        "ok": pnp_pose.get("status") == "ok" and metadata_projection.get("status") == "ok",
+        "reason_labels": reason_label_rows,
+        "board_size_m": SIM_BOARD_SIZE_M,
+        "corner_order_assumption": list(DEFAULT_BOARD_CORNER_ORDER),
+        "metadata_declared_corner_order": declared_order,
+        "coordinate_frame_convention": metadata.get("coordinate_frame_convention"),
+        "source_comparability": comparability,
+        "metadata_projection_check": metadata_projection,
+        "corner_order_diagnostic": order_summary,
+        "ground_truth_source": "camera_metadata.extrinsics.board_to_camera",
+        "ground_truth_frame": flat.get("ground_truth_frame"),
+        "ground_truth_camera_center_board_mm": vector_m_to_mm(ground_truth_center),
+        "ground_truth_camera_to_piece_distance_mm": flat.get("camera_to_piece_distance_mm"),
+        "ground_truth_camera_to_board_plane_distance_mm": flat.get("camera_to_board_plane_distance_mm"),
+        "ground_truth_camera_to_target_square_distance_mm": flat.get("camera_to_target_square_distance_mm"),
+        "metadata_projected_corner_mean_residual_px": metadata_projection.get("mean_residual_px"),
+        "metadata_projected_corner_max_residual_px": metadata_projection.get("max_residual_px"),
+        "metadata_projected_corner_residuals_px": metadata_projection.get("residuals_px"),
+        "metadata_projected_corners_xy": metadata_projection.get("projected_corners_xy"),
+        "rendered_corners_xy": metadata_projection.get("rendered_corners_xy"),
+        "rendered_corner_pnp_estimator": PERCEIVED_DEPTH_ESTIMATOR_NAME,
+        "rendered_corner_pnp_status": pnp_pose.get("status"),
+        "rendered_corner_pnp_solve_flag": pnp_pose.get("solve_pnp_flag"),
+        "rendered_corner_pnp_candidate_count": pnp_pose.get("solve_pnp_candidate_count"),
+        "rendered_corner_pnp_candidate_flags": pnp_pose.get("solve_pnp_candidate_flags"),
+        "rendered_corner_pnp_candidate_mean_residuals_px": pnp_pose.get(
+            "solve_pnp_candidate_mean_residuals_px"
+        ),
+        "rendered_corner_pnp_camera_center_board_mm": vector_m_to_mm(pnp_camera_center),
+        "rendered_corner_pnp_camera_center_delta_norm_mm": camera_center_delta_norm_mm,
+        "rendered_corner_pnp_camera_to_piece_distance_mm": meters_to_mm(pnp_pose.get("camera_to_piece_m")),
+        "rendered_corner_pnp_camera_to_board_plane_distance_mm": meters_to_mm(
+            pnp_pose.get("camera_to_board_plane_m")
+        ),
+        "rendered_corner_pnp_camera_to_target_square_distance_mm": meters_to_mm(
+            pnp_pose.get("camera_to_target_square_m")
+        ),
+        "rendered_corner_pnp_camera_to_piece_error_mm": piece_error,
+        "rendered_corner_pnp_camera_to_piece_abs_error_mm": abs_or_none(piece_error),
+        "rendered_corner_pnp_camera_to_board_error_mm": board_error,
+        "rendered_corner_pnp_camera_to_board_abs_error_mm": abs_or_none(board_error),
+        "rendered_corner_pnp_camera_to_target_square_error_mm": target_error,
+        "rendered_corner_pnp_camera_to_target_square_abs_error_mm": abs_or_none(target_error),
+        "rendered_corner_pnp_reprojection_mean_residual_px": rounded_float(
+            pnp_pose.get("board_corner_reprojection_mean_residual_px"),
+            digits=3,
+        ),
+        "rendered_corner_pnp_reprojection_max_residual_px": rounded_float(
+            pnp_pose.get("board_corner_reprojection_max_residual_px"),
+            digits=3,
+        ),
+        "rendered_corner_pnp_reprojection_residuals_px": [
+            rounded_float(value, digits=3)
+            for value in np.asarray(
+                pnp_pose.get("board_corner_reprojection_residuals_px", []),
+                dtype=float,
+            ).reshape(-1)
+        ]
+        if pnp_pose.get("board_corner_reprojection_residuals_px") is not None
+        else None,
+        "rendered_corner_pnp_projected_corners_xy": rounded_list(
+            np.asarray(pnp_pose.get("estimated_projected_corners_xy"), dtype=float).reshape(-1),
+            digits=3,
+        )
+        if pnp_pose.get("estimated_projected_corners_xy") is not None
+        else None,
+        "diagnosis": (
+            "The rendered board-corner PnP residuals are trustworthy only as evidence that "
+            "the rendered overlay geometry and metadata extrinsics are not the same pinhole "
+            "camera source. Use metadata-projected-corner residuals and source_comparability "
+            "before treating this as a depth estimator."
+        ),
+    }
+
+
+def aggregate_pnp_diagnostic_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    aggregate: dict[str, Any] = {
+        "row_count": len(rows),
+        "ok_row_count": sum(1 for row in rows if row.get("ok") is True),
+    }
+    numeric_fields = {
+        "mean_metadata_projected_corner_residual_px": "metadata_projected_corner_mean_residual_px",
+        "max_metadata_projected_corner_residual_px": "metadata_projected_corner_max_residual_px",
+        "mean_rendered_corner_pnp_reprojection_residual_px": "rendered_corner_pnp_reprojection_mean_residual_px",
+        "mean_abs_rendered_corner_pnp_camera_to_piece_error_mm": "rendered_corner_pnp_camera_to_piece_abs_error_mm",
+        "mean_abs_rendered_corner_pnp_camera_to_board_error_mm": "rendered_corner_pnp_camera_to_board_abs_error_mm",
+        "mean_abs_rendered_corner_pnp_camera_to_target_square_error_mm": "rendered_corner_pnp_camera_to_target_square_abs_error_mm",
+        "mean_rendered_corner_pnp_camera_center_delta_norm_mm": "rendered_corner_pnp_camera_center_delta_norm_mm",
+    }
+    for output_key, row_key in numeric_fields.items():
+        values = [float(row[row_key]) for row in rows if row.get(row_key) is not None]
+        aggregate[output_key] = round(float(np.mean(values)), 3) if values else None
+
+    not_comparable = 0
+    label_counts: dict[str, int] = {}
+    for row in rows:
+        comparability = row.get("source_comparability")
+        comparability = comparability if isinstance(comparability, dict) else {}
+        pnp_vs_gt = comparability.get("rendered_board_corner_pnp_vs_sim_ground_truth")
+        pnp_vs_gt = pnp_vs_gt if isinstance(pnp_vs_gt, dict) else {}
+        if pnp_vs_gt.get("status") == "not_geometrically_comparable":
+            not_comparable += 1
+        labels = row.get("reason_labels")
+        for label in labels if isinstance(labels, list) else []:
+            label_counts[str(label)] = label_counts.get(str(label), 0) + 1
+    aggregate["not_geometrically_comparable_row_count"] = not_comparable
+    aggregate["reason_label_counts"] = dict(sorted(label_counts.items()))
+    return aggregate
+
+
+def write_pnp_residual_diagnostic_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    fieldnames = [
+        "id",
+        "stage",
+        "capture_label",
+        "scenario_id",
+        "source_square",
+        "target_square",
+        "piece_square",
+        "status",
+        "board_size_m",
+        "metadata_declared_corner_order",
+        "corner_order_assumption",
+        "metadata_projected_corner_mean_residual_px",
+        "metadata_projected_corner_max_residual_px",
+        "rendered_corner_pnp_reprojection_mean_residual_px",
+        "rendered_corner_pnp_solve_flag",
+        "rendered_corner_pnp_candidate_flags",
+        "rendered_corner_pnp_candidate_mean_residuals_px",
+        "rendered_corner_pnp_camera_center_delta_norm_mm",
+        "rendered_corner_pnp_camera_to_piece_distance_mm",
+        "ground_truth_camera_to_piece_distance_mm",
+        "rendered_corner_pnp_camera_to_piece_error_mm",
+        "rendered_corner_pnp_camera_to_board_plane_distance_mm",
+        "ground_truth_camera_to_board_plane_distance_mm",
+        "rendered_corner_pnp_camera_to_board_error_mm",
+        "rendered_corner_pnp_camera_to_target_square_distance_mm",
+        "ground_truth_camera_to_target_square_distance_mm",
+        "rendered_corner_pnp_camera_to_target_square_error_mm",
+        "reason_labels",
+        "source_comparability",
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({key: csv_value(row.get(key)) for key in fieldnames})
+
+
+def write_pnp_residual_diagnostics(
+    *,
+    metric_rows: list[dict[str, Any]],
+    source_rows: list[dict[str, Any]],
+    output_dir: Path,
+    suite_output_dir: Path,
+    sequence_metadata: dict[str, Any],
+    distance_metrics: dict[str, Any],
+    perceived_depth_comparison: dict[str, Any],
+) -> dict[str, Any]:
+    source_by_id = {
+        str(row.get("id")): row
+        for row in source_rows
+        if isinstance(row, dict) and row.get("id") is not None
+    }
+    rows = [
+        compute_pnp_residual_diagnostic_row(metric, source_by_id.get(str(metric.get("id")), {}))
+        for metric in metric_rows
+        if isinstance(metric, dict)
+    ]
+    json_path = output_dir / "pick_place_pnp_residual_diagnostics.json"
+    csv_path = output_dir / "pick_place_pnp_residual_diagnostics.csv"
+    aggregate = aggregate_pnp_diagnostic_rows(rows)
+    ok = bool(rows) and all(row.get("ok") is True for row in rows)
+    summary = {
+        "schema": PNP_RESIDUAL_DIAGNOSTIC_SCHEMA,
+        "ok": ok,
+        "status": "ok" if ok else "validation_failed",
+        "scenario_id": sequence_metadata.get("scenario_id"),
+        "source_square": sequence_metadata.get("source_square"),
+        "target_square": sequence_metadata.get("target_square"),
+        "frame_count": len(rows),
+        "paths": {
+            "json": str(json_path),
+            "csv": str(csv_path),
+            "json_relative_path": output_relative(json_path, suite_output_dir),
+            "csv_relative_path": output_relative(csv_path, suite_output_dir),
+        },
+        "source_depth_distance_metrics": distance_metrics.get("paths"),
+        "source_perceived_depth_comparison": perceived_depth_comparison.get("paths"),
+        "assumptions": {
+            "board_size_m": SIM_BOARD_SIZE_M,
+            "default_corner_order": list(DEFAULT_BOARD_CORNER_ORDER),
+            "metadata_corner_order_source": "camera_metadata.coordinate_frame_convention.board_corners_xy_order",
+            "metadata_projection_comparability_threshold_px": METADATA_PROJECTION_COMPARABILITY_THRESHOLD_PX,
+        },
+        "sources": {
+            "simulator_ground_truth_extrinsics": "camera_metadata.extrinsics.board_to_camera",
+            "rendered_board_corner_pnp": PERCEIVED_DEPTH_ESTIMATOR_SOURCE,
+            "internal_consistency_check": (
+                "Project 3D board corners through SimCamera metadata intrinsics/extrinsics and "
+                "compare them to camera_metadata.board_corners_xy."
+            ),
+        },
+        "units": {
+            "distance": "millimeters",
+            "image_residual": "pixels",
+        },
+        "aggregate": aggregate,
+        "rows": rows,
+        "review_note": (
+            "Large rendered-board-corner PnP depth residuals should be interpreted through "
+            "source_comparability. A low PnP reprojection residual only proves the PnP pose fits "
+            "the rendered corner overlay, not that the overlay was generated by the metadata "
+            "extrinsics as a true pinhole camera."
+        ),
+    }
+    write_json(json_path, summary)
+    write_pnp_residual_diagnostic_csv(csv_path, rows)
+    return summary
 
 
 def compute_perceived_depth_comparison_row(
@@ -1729,6 +2363,15 @@ def build_summary(
         sequence_metadata=pick_place_metadata,
         distance_metrics=distance_metrics,
     )
+    pnp_residual_diagnostics = write_pnp_residual_diagnostics(
+        metric_rows=metric_rows,
+        source_rows=pick_place_source_rows,
+        output_dir=output_dir,
+        suite_output_dir=suite_output_dir,
+        sequence_metadata=pick_place_metadata,
+        distance_metrics=distance_metrics,
+        perceived_depth_comparison=perceived_depth_comparison,
+    )
     metrics_by_id = {
         str(metric.get("id")): metric
         for metric in metric_rows
@@ -1826,6 +2469,7 @@ def build_summary(
         "frame_sequences": [pick_place_sequence],
         "distance_metrics": distance_metrics,
         "perceived_depth_comparison": perceived_depth_comparison,
+        "pnp_residual_diagnostics": pnp_residual_diagnostics,
         "app_entrypoint_frame": app_frame,
         "recording": recording,
         "recordings": {
@@ -1837,6 +2481,7 @@ def build_summary(
             "The pick/place sequence is rendered from the existing simulator scenario matrix and shows approach, grasp/contact, lift/transfer, place/release, and retreat frames with simulator ground-truth camera/board/piece distances.",
             "Pick/place depth artifacts label simulator ground truth separately from the unimplemented perceived-depth estimate; gripper-to-piece distance is currently a board-plane proxy from the rendered gripper overlay.",
             "Pick/place perceived-depth comparison artifacts add a metadata-derived rendered-board-corner PnP baseline and residuals against simulator ground truth; this is not a real-camera depth estimator.",
+            "Pick/place PnP residual diagnostics compare metadata-projected board corners, rendered-corner PnP, and simulator ground-truth extrinsics so source mismatches are visible.",
             "Optional MP4 recordings are best-effort only and are not required for the suite to pass.",
             "No simulator pixels, camera profiles, perception algorithms, UI behavior, or robot paths are changed by this helper.",
         ],
@@ -1857,6 +2502,7 @@ def failure_summary(output_dir: Path, suite_summary_path: Path, error: str) -> d
         "frame_sequences": [],
         "distance_metrics": {},
         "perceived_depth_comparison": {},
+        "pnp_residual_diagnostics": {},
         "app_entrypoint_frame": None,
         "recording": {
             "attempted": False,
