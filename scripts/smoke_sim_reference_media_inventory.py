@@ -13,6 +13,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "reference_media_inventory"
 SCHEMA = "lerobot.sim.reference_media_inventory.v1"
+MANIFEST_SCHEMA = "lerobot.sim.reference_media_manifest.v1"
 
 IMAGE_EXTENSIONS = frozenset({".bmp", ".gif", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"})
 VIDEO_EXTENSIONS = frozenset({".avi", ".m4v", ".mkv", ".mov", ".mp4", ".webm"})
@@ -40,6 +41,31 @@ EXPECTED_REFERENCE_CATEGORIES = (
     "lighting",
     "failure_mode",
 )
+DECLARED_METADATA_FIELDS = (
+    "capture_id",
+    "camera_view",
+    "board_visibility",
+    "piece_layout",
+    "gripper_visibility",
+    "calibration_targets",
+    "failure_mode",
+    "sim_profiles",
+    "declared_tags",
+    "notes",
+    "limitations",
+)
+TARGET_CATEGORY_ALIASES = {
+    "board_corners": "board_corners",
+    "board_corner_alignment": "board_corners",
+    "camera_pov": "camera_pov",
+    "camera_pose": "camera_pov",
+    "failure_mode": "failure_mode",
+    "gripper_overlay": "gripper_visibility",
+    "gripper_visibility": "gripper_visibility",
+    "lighting": "lighting",
+    "piece_scale": "piece_scale",
+    "workspace_geometry": "workspace_geometry",
+}
 
 
 @dataclass(frozen=True)
@@ -68,6 +94,15 @@ def parse_args() -> argparse.Namespace:
             "repo media roots: archive, artifacts, docs, scripts, src."
         ),
     )
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        default=None,
+        help=(
+            "Optional repo-relative JSON manifest describing reference-media intent and "
+            "coverage metadata for found media."
+        ),
+    )
     parser.add_argument("--output-name", default="reference_media_inventory.json")
     return parser.parse_args()
 
@@ -88,6 +123,218 @@ def relative_or_self(path: Path, root: Path) -> Path:
         return path.relative_to(root)
     except ValueError:
         return path
+
+
+def read_json_object(path: Path, *, label: str) -> tuple[dict[str, Any] | None, str | None]:
+    try:
+        payload = json.loads(path.read_text())
+    except json.JSONDecodeError as exc:
+        return None, f"Invalid JSON in {label} {path}: {exc}"
+    except OSError as exc:
+        return None, f"Could not read {label} {path}: {exc}"
+    if not isinstance(payload, dict):
+        return None, f"{label} {path} must contain a JSON object."
+    return payload, None
+
+
+def repo_local_manifest_path(raw_path: Path | None, repo_root: Path) -> tuple[Path | None, dict[str, str] | None]:
+    if raw_path is None:
+        return None, None
+    manifest_path = raw_path if raw_path.is_absolute() else repo_root / raw_path
+    resolved = manifest_path.expanduser().resolve()
+    try:
+        resolved.relative_to(repo_root.resolve())
+    except ValueError:
+        return (
+            resolved,
+            {
+                "path": str(resolved),
+                "status": "outside_repo",
+                "note": "Manifest path must resolve inside repo_root.",
+            },
+        )
+    return resolved, None
+
+
+def normalize_string_list(value: Any) -> list[str]:
+    if isinstance(value, str) and value:
+        return [value]
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if isinstance(item, str) and item]
+
+
+def declared_target_categories(metadata: dict[str, Any]) -> list[str]:
+    categories: set[str] = set()
+    for target in normalize_string_list(metadata.get("calibration_targets")):
+        key = target.strip().lower().replace("-", "_").replace(" ", "_")
+        category = TARGET_CATEGORY_ALIASES.get(key)
+        if category:
+            categories.add(category)
+    failure_mode = metadata.get("failure_mode")
+    if isinstance(failure_mode, str) and failure_mode.strip().lower() not in {"", "none", "none_documented", "not_applicable"}:
+        categories.add("failure_mode")
+    return sorted(categories)
+
+
+def manifest_path_issue(relative_path: Any, repo_root: Path) -> tuple[str | None, dict[str, str] | None]:
+    if not isinstance(relative_path, str) or not relative_path:
+        return None, {"path": str(relative_path), "status": "invalid_path", "note": "Media entry path must be a string."}
+    media_path = (repo_root / relative_path).resolve()
+    try:
+        media_path.relative_to(repo_root.resolve())
+    except ValueError:
+        return relative_path, {
+            "path": relative_path,
+            "status": "outside_repo",
+            "note": "Manifest media paths must resolve inside repo_root.",
+        }
+    if not media_path.exists():
+        return relative_path, {"path": relative_path, "status": "missing", "note": "Manifest media path does not exist."}
+    if not media_path.is_file():
+        return relative_path, {"path": relative_path, "status": "not_file", "note": "Manifest media path is not a file."}
+    if media_path.suffix.lower() not in MEDIA_EXTENSIONS:
+        return relative_path, {
+            "path": relative_path,
+            "status": "unsupported_media_type",
+            "note": "Manifest media path exists but is not a supported image/video extension.",
+        }
+    return repo_relative(media_path, repo_root), None
+
+
+def manifest_metadata(entry: dict[str, Any]) -> dict[str, Any]:
+    metadata: dict[str, Any] = {}
+    for field in DECLARED_METADATA_FIELDS:
+        if field in entry:
+            metadata[field] = entry[field]
+    metadata["declared_target_categories"] = declared_target_categories(metadata)
+    return metadata
+
+
+def load_reference_media_manifest(
+    manifest_arg: Path | None,
+    repo_root: Path,
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    manifest_path, path_issue = repo_local_manifest_path(manifest_arg, repo_root)
+    if manifest_arg is None:
+        return (
+            {
+                "schema": MANIFEST_SCHEMA,
+                "supplied": False,
+                "ok": True,
+                "status": "not_supplied",
+                "path": None,
+                "declared_media_count": 0,
+                "valid_media_count": 0,
+                "matched_media_count": 0,
+                "issue_count": 0,
+                "issues": [],
+                "notes": [
+                    "No manifest was supplied; inventory metadata is heuristic path/name metadata only.",
+                ],
+            },
+            {},
+        )
+    if path_issue is not None:
+        return (
+            {
+                "schema": MANIFEST_SCHEMA,
+                "supplied": True,
+                "ok": False,
+                "status": "validation_failed",
+                "path": str(manifest_path),
+                "declared_media_count": 0,
+                "valid_media_count": 0,
+                "matched_media_count": 0,
+                "issue_count": 1,
+                "issues": [path_issue],
+            },
+            {},
+        )
+    assert manifest_path is not None
+    payload, error = read_json_object(manifest_path, label="reference media manifest")
+    if error is not None or payload is None:
+        return (
+            {
+                "schema": MANIFEST_SCHEMA,
+                "supplied": True,
+                "ok": False,
+                "status": "validation_failed",
+                "path": repo_relative(manifest_path, repo_root),
+                "declared_media_count": 0,
+                "valid_media_count": 0,
+                "matched_media_count": 0,
+                "issue_count": 1,
+                "issues": [{"path": repo_relative(manifest_path, repo_root), "status": "invalid_json", "note": error or ""}],
+            },
+            {},
+        )
+
+    entries = payload.get("media")
+    if not isinstance(entries, list):
+        return (
+            {
+                "schema": MANIFEST_SCHEMA,
+                "supplied": True,
+                "ok": False,
+                "status": "validation_failed",
+                "path": repo_relative(manifest_path, repo_root),
+                "declared_media_count": 0,
+                "valid_media_count": 0,
+                "matched_media_count": 0,
+                "issue_count": 1,
+                "issues": [
+                    {
+                        "path": repo_relative(manifest_path, repo_root),
+                        "status": "invalid_media_list",
+                        "note": "Manifest must contain a media array.",
+                    }
+                ],
+            },
+            {},
+        )
+
+    manifest_schema = str(payload.get("schema") or MANIFEST_SCHEMA)
+    by_path: dict[str, dict[str, Any]] = {}
+    issues: list[dict[str, str]] = []
+    if manifest_schema != MANIFEST_SCHEMA:
+        issues.append(
+            {
+                "path": repo_relative(manifest_path, repo_root),
+                "status": "unexpected_schema",
+                "note": f"Expected {MANIFEST_SCHEMA}, got {manifest_schema}.",
+            }
+        )
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            issues.append({"path": f"media[{index}]", "status": "invalid_entry", "note": "Media entry must be an object."})
+            continue
+        relative_path, issue = manifest_path_issue(entry.get("relative_path"), repo_root)
+        if issue is not None:
+            issues.append(issue)
+            continue
+        assert relative_path is not None
+        if relative_path in by_path:
+            issues.append({"path": relative_path, "status": "duplicate_entry", "note": "Duplicate manifest media path."})
+            continue
+        by_path[relative_path] = manifest_metadata(entry)
+
+    return (
+        {
+            "schema": manifest_schema,
+            "supplied": True,
+            "ok": not issues,
+            "status": "ok" if not issues else "validation_failed",
+            "path": repo_relative(manifest_path, repo_root),
+            "declared_media_count": len(entries),
+            "valid_media_count": len(by_path),
+            "matched_media_count": 0,
+            "issue_count": len(issues),
+            "issues": issues,
+            "manifest_notes": payload.get("notes") if isinstance(payload.get("notes"), list) else [],
+        },
+        by_path,
+    )
 
 
 def iter_candidate_media(repo_root: Path, includes: list[Path]) -> tuple[list[Path], list[dict[str, str]]]:
@@ -319,11 +566,19 @@ def utility_categories(tags: list[str], media_type: str) -> dict[str, str]:
     return categories
 
 
-def calibration_notes(relative_path: str, tags: list[str], utilities: dict[str, str], wired_refs: list[SimulatorReference]) -> list[str]:
+def calibration_notes(
+    relative_path: str,
+    tags: list[str],
+    utilities: dict[str, str],
+    wired_refs: list[SimulatorReference],
+    declared_metadata: dict[str, Any] | None,
+) -> list[str]:
     notes: list[str] = []
     if any(ref.relative_path == relative_path for ref in wired_refs):
         profiles = sorted({ref.profile for ref in wired_refs if ref.relative_path == relative_path})
         notes.append(f"Wired into simulator profile(s): {', '.join(profiles)}.")
+    if declared_metadata:
+        notes.append("Manifest metadata declares intended calibration coverage for this media.")
     if "active_current_gripper_reference" in tags:
         notes.append(
             "Active current gripper reference: useful for camera POV, board-corner placement, piece scale, "
@@ -334,12 +589,34 @@ def calibration_notes(relative_path: str, tags: list[str], utilities: dict[str, 
     return notes
 
 
-def build_media_record(path: Path, repo_root: Path, wired_refs: list[SimulatorReference]) -> dict[str, Any]:
+def apply_declared_utility(
+    utilities: dict[str, str],
+    declared_metadata: dict[str, Any] | None,
+) -> dict[str, str]:
+    if not declared_metadata:
+        return utilities
+    updated = dict(utilities)
+    for category in declared_metadata.get("declared_target_categories", []):
+        if category in updated:
+            updated[category] = "declared"
+    return updated
+
+
+def build_media_record(
+    path: Path,
+    repo_root: Path,
+    wired_refs: list[SimulatorReference],
+    manifest_records: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
     relative_path = repo_relative(path, repo_root)
     media_type = infer_media_type(path)
     metadata = image_metadata(path) if media_type == "image" else video_metadata(path)
-    tags = inferred_tags(relative_path, media_type)
-    utilities = utility_categories(tags, media_type)
+    heuristic_tags = inferred_tags(relative_path, media_type)
+    declared_metadata = manifest_records.get(relative_path)
+    declared_tags = normalize_string_list(declared_metadata.get("declared_tags")) if declared_metadata else []
+    declared_category_tags = declared_metadata.get("declared_target_categories", []) if declared_metadata else []
+    tags = sorted(set(heuristic_tags) | set(declared_tags) | set(declared_category_tags))
+    utilities = apply_declared_utility(utility_categories(tags, media_type), declared_metadata)
     matching_refs = [ref for ref in wired_refs if ref.relative_path == relative_path]
 
     return {
@@ -355,10 +632,27 @@ def build_media_record(path: Path, repo_root: Path, wired_refs: list[SimulatorRe
         },
         "duration_seconds": metadata.get("duration_seconds"),
         "metadata": metadata,
-        "inferred_tags": tags,
-        "tagging_basis": "heuristic_path_and_filename",
+        "inferred_tags": heuristic_tags,
+        "declared_tags": declared_tags,
+        "reference_tags": tags,
+        "tagging_basis": (
+            "heuristic_path_and_filename_plus_manifest"
+            if declared_metadata
+            else "heuristic_path_and_filename"
+        ),
+        "declared_metadata": declared_metadata,
+        "manifest_validation": {
+            "declared": declared_metadata is not None,
+            "status": "matched" if declared_metadata is not None else "not_declared",
+        },
         "calibration_utility": utilities,
-        "calibration_utility_notes": calibration_notes(relative_path, tags, utilities, wired_refs),
+        "calibration_utility_notes": calibration_notes(
+            relative_path,
+            tags,
+            utilities,
+            wired_refs,
+            declared_metadata,
+        ),
         "currently_wired_into_simulator_tooling": bool(matching_refs),
         "simulator_references": [
             {"profile": ref.profile, "key": ref.key, "relative_path": ref.relative_path} for ref in matching_refs
@@ -371,7 +665,7 @@ def category_coverage(records: list[dict[str, Any]]) -> dict[str, list[str]]:
     for record in records:
         utilities = record["calibration_utility"]
         for category in EXPECTED_REFERENCE_CATEGORIES:
-            if utilities.get(category) in {"useful", "candidate"}:
+            if utilities.get(category) in {"useful", "candidate", "declared"}:
                 coverage[category].append(record["relative_path"])
     return {key: sorted(value) for key, value in coverage.items()}
 
@@ -385,7 +679,7 @@ def visibility_gaps(records: list[dict[str, Any]], wired_refs: list[SimulatorRef
                 {
                     "category": category,
                     "status": "missing",
-                    "note": "No found media was heuristically useful for this reference category.",
+                    "note": "No found media was heuristically or manifest-declared useful for this reference category.",
                 }
             )
     if not any(record["media_type"] == "video" for record in records):
@@ -413,8 +707,23 @@ def build_inventory(args: argparse.Namespace) -> dict[str, Any]:
     repo_root = args.repo_root.expanduser().resolve()
     includes = args.include if args.include else [Path(path) for path in DEFAULT_SCAN_ROOTS]
     wired_refs, simulator_reference_issues = simulator_reference_paths(repo_root)
+    manifest_summary, manifest_records = load_reference_media_manifest(args.manifest, repo_root)
     media_paths, scan_issues = iter_candidate_media(repo_root, includes)
-    records = [build_media_record(path, repo_root, wired_refs) for path in media_paths]
+    if manifest_records:
+        media_paths = sorted(
+            {path.resolve() for path in media_paths}
+            | {(repo_root / relative_path).resolve() for relative_path in manifest_records},
+            key=lambda path: repo_relative(path, repo_root),
+        )
+    records = [build_media_record(path, repo_root, wired_refs, manifest_records) for path in media_paths]
+    matched_manifest_paths = {
+        record["relative_path"] for record in records if record["manifest_validation"]["declared"]
+    }
+    manifest_summary = {
+        **manifest_summary,
+        "matched_media_count": len(matched_manifest_paths),
+        "unmatched_declared_media": sorted(set(manifest_records) - matched_manifest_paths),
+    }
     coverage = category_coverage(records)
     active_path = "archive/chess_test_images/current_view.jpg"
     active_records = [record for record in records if record["relative_path"] == active_path]
@@ -422,7 +731,7 @@ def build_inventory(args: argparse.Namespace) -> dict[str, Any]:
 
     return {
         "schema": SCHEMA,
-        "ok": True,
+        "ok": bool(manifest_summary.get("ok", True)),
         "repo_root": str(repo_root),
         "output_path": str(args.output_dir.expanduser().resolve() / args.output_name),
         "hardware_skipped": True,
@@ -433,6 +742,7 @@ def build_inventory(args: argparse.Namespace) -> dict[str, Any]:
             "excluded_dir_names": sorted(EXCLUDED_DIR_NAMES),
             "scan_issues": scan_issues,
         },
+        "manifest_summary": manifest_summary,
         "simulator_reference_paths": [
             {"profile": ref.profile, "key": ref.key, "relative_path": ref.relative_path} for ref in wired_refs
         ],
@@ -444,6 +754,10 @@ def build_inventory(args: argparse.Namespace) -> dict[str, Any]:
             "currently_wired_media_count": sum(
                 1 for record in records if record["currently_wired_into_simulator_tooling"]
             ),
+            "manifest_declared_media_count": sum(
+                1 for record in records if record["manifest_validation"]["declared"]
+            ),
+            "manifest_validation_status": manifest_summary["status"],
             "active_current_gripper_reference_detected": bool(active_records),
             "active_current_gripper_reference_path": active_path,
             "coverage": coverage,
@@ -458,7 +772,8 @@ def build_inventory(args: argparse.Namespace) -> dict[str, Any]:
             or "active_current_gripper_reference" in record["inferred_tags"]
         ],
         "notes": [
-            "Tags and calibration utility are heuristic, based on path/name and simulator wiring.",
+            "Default tags and calibration utility are heuristic, based on path/name and simulator wiring.",
+            "When a manifest is supplied, declared metadata is merged into reference_tags and calibration_utility.",
             "This inventory reports found media only; it does not create thumbnails or calibration datasets.",
         ],
     }
@@ -473,7 +788,7 @@ def main() -> int:
     inventory["output_path"] = str(output_path)
     output_path.write_text(json.dumps(inventory, indent=2) + "\n")
     print(json.dumps(inventory, indent=2))
-    return 0
+    return 0 if inventory["ok"] else 2
 
 
 if __name__ == "__main__":

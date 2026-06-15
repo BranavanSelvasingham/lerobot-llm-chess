@@ -18,6 +18,14 @@ That writes `/private/tmp/lerobot_sim/sim_camera_pose_fixture/sim_camera_pose_fi
 
 Each per-case `camera_metadata.json` contains `camera_metadata.image_size_px`, `camera_metadata.camera_matrix_px`, `camera_metadata.intrinsics`, `camera_metadata.distortion_coefficients`, `camera_metadata.extrinsics.board_to_camera`, and `camera_metadata.coordinate_frame_convention` alongside projected board corners. The same file records target and piece square centers under `projection`. These intrinsics/extrinsics are simulator reference metadata for camera-first tooling compatibility, not physical calibration truth.
 
+For reference-media intake metadata without running the full suite, use the manifest-aware inventory smoke:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_reference_media_inventory.py --manifest archive/reference_media_manifest.example.json --output-dir /private/tmp/lerobot_sim/reference_media_inventory_manifest
+```
+
+See [docs/sim_reference_media_intake.md](sim_reference_media_intake.md) for the manifest fields used to describe camera POV, board/piece/gripper visibility, calibration target intent, failure-mode coverage, simulator profile wiring, and limitations for future repo-local SO-101 photos/videos.
+
 ## GitHub Actions Signal
 
 The focused `Simulator Calibration Regression` workflow runs the same hardware-free suite for pull requests targeting `feat/telemetry-recording` when simulator, camera, chess perception, smoke-script, report-renderer, reference-image, or gate documentation paths change. It uses Python 3.12, installs only the Python modules needed by this suite, verifies the generated summary fields, writes a job summary naming the uploaded artifact, and uploads the suite output directory as a workflow artifact. After downloading the artifact, open `artifact_index_report.md` first, then follow its links to images, JSON summaries, and child logs.
@@ -154,7 +162,9 @@ That image currently covers camera POV, board corners, piece scale, gripper visi
 
 - No real-world videos are present for motion, recovery, or timing references.
 - No reference media currently documents failure modes.
-- The inventory tags and coverage are heuristic, based on path/name and simulator wiring.
+- The default inventory tags and coverage are heuristic, based on path/name and simulator wiring.
+- `archive/reference_media_manifest.example.json` demonstrates the manifest intake contract against that same image only; no new real photos or videos were captured in this slice.
+- When a manifest is supplied, the inventory validates repo-local media paths and records `manifest_summary`, per-record `declared_metadata`, per-record `manifest_validation`, merged `reference_tags`, and manifest-declared coverage/failure-mode gaps.
 
 Do not treat this suite as a substitute for later hardware validation. Treat it as the default local regression gate before touching the physical SO-101.
 

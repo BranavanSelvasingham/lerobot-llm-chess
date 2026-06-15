@@ -1,0 +1,43 @@
+{
+  "schema": "lerobot.sim.reference_media_manifest.v1",
+  "notes": [
+    "Example intake manifest for repo-local SO-101 chess reference media.",
+    "This example references the only real reference image currently present; no new real media was captured for this slice."
+  ],
+  "media": [
+    {
+      "relative_path": "archive/chess_test_images/current_view.jpg",
+      "capture_id": "current_view_static_gripper_reference",
+      "camera_view": "Static current camera view used by the current gripper-reference simulator profile.",
+      "board_visibility": "Board area and visible corners are usable for simulator review, but this is still a single heuristic reference image.",
+      "piece_layout": "Existing chess-test capture; treat as a scale/layout reference only until real capture notes are refreshed.",
+      "gripper_visibility": "Gripper is visible enough to review overlay placement and workspace geometry.",
+      "calibration_targets": [
+        "camera_pov",
+        "board_corners",
+        "piece_scale",
+        "gripper_visibility",
+        "workspace_geometry",
+        "lighting"
+      ],
+      "failure_mode": "none_documented",
+      "sim_profiles": [
+        "current_gripper_reference"
+      ],
+      "declared_tags": [
+        "real_reference",
+        "static_photo",
+        "current_single_image_baseline"
+      ],
+      "notes": [
+        "Preserves the currently wired simulator reference path for no-hardware CI.",
+        "Use future manifest entries for videos, alternate camera views, failure-mode frames, and profile-specific calibration targets."
+      ],
+      "limitations": [
+        "No real-world video coverage.",
+        "No explicit failure-mode media.",
+        "Does not establish physical SO-101 camera calibration truth."
+      ]
+    }
+  ]
+}
