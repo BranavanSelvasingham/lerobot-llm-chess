@@ -382,6 +382,10 @@ def app_entrypoint_metadata_section(
     camera = camera if isinstance(camera, dict) else {}
     contract = camera.get("metadata_contract")
     contract = contract if isinstance(contract, dict) else {}
+    app_camera_status = app_entrypoint.get("app_camera_status")
+    if not isinstance(app_camera_status, dict):
+        app_camera_status = camera.get("app_camera_status")
+    app_camera_status = app_camera_status if isinstance(app_camera_status, dict) else None
     checks = contract.get("checks")
     check_rows = [check for check in checks if isinstance(check, dict)] if isinstance(checks, list) else []
     contract_checks = {
@@ -407,6 +411,7 @@ def app_entrypoint_metadata_section(
         "skipped_markers": app_entrypoint.get("skipped_markers"),
         "metadata_contract": contract,
         "metadata_contract_checks": contract_checks,
+        "app_camera_status": app_camera_status,
         "camera": {
             "width": camera.get("width"),
             "height": camera.get("height"),

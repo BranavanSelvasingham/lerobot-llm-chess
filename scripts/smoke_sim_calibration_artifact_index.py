@@ -440,10 +440,21 @@ def collect_app_entrypoint_artifacts(
     metadata_contract = metadata_contract if isinstance(metadata_contract, dict) else {}
     contract_checks = app_entrypoint.get("metadata_contract_checks")
     contract_checks = contract_checks if isinstance(contract_checks, dict) else {}
+    app_camera_status = app_entrypoint.get("app_camera_status")
+    app_camera_status = app_camera_status if isinstance(app_camera_status, dict) else {}
+    app_camera_metadata_contract = app_camera_status.get("metadata_contract")
+    app_camera_metadata_contract = (
+        app_camera_metadata_contract
+        if isinstance(app_camera_metadata_contract, dict)
+        else {}
+    )
     metrics = {
         "status": app_entrypoint.get("status"),
         "ok": app_entrypoint.get("ok"),
         "sim_camera_profile": app_entrypoint.get("sim_camera_profile"),
+        "app_camera_status_ok": app_camera_status.get("ok"),
+        "app_camera_status_readout": app_camera_status.get("readout"),
+        "app_camera_status_contract": app_camera_metadata_contract.get("status"),
         "metadata_contract_ok": metadata_contract.get("ok"),
         "metadata_contract_check_count": metadata_contract.get("check_count"),
         "metadata_contract_failed_check_count": metadata_contract.get("failed_check_count"),

@@ -83,6 +83,7 @@ from lerobot.sim import (
     load_sim_camera_profile_overrides,
     make_sim_camera_config_from_profile,
     select_ranked_sim_camera_profile_overrides,
+    summarize_sim_camera_status,
 )
 from llm_toolkit import AppConfig, KinematicsTools  # pyright: ignore[reportMissingImports]
 
@@ -647,6 +648,12 @@ class ChessRobotUILLMV2(QMainWindow):
         self.camera_status.setStyleSheet("color: #8b949e;")
         cam_layout.addWidget(self.camera_status)
 
+        self.sim_camera_status = QLabel("")
+        self.sim_camera_status.setWordWrap(True)
+        self.sim_camera_status.setVisible(bool(self.cfg.sim))
+        self.sim_camera_status.setStyleSheet("color: #8b949e;")
+        cam_layout.addWidget(self.sim_camera_status)
+
         splitter.addWidget(cam_group)
 
         # Tools panel
@@ -1142,6 +1149,8 @@ class ChessRobotUILLMV2(QMainWindow):
         cam = self._camera
         if cam is None or not cam.is_connected:
             self.camera_status.setText("Camera: disconnected")
+            if hasattr(self, "sim_camera_status"):
+                self.sim_camera_status.setText("")
             return
 
         try:
@@ -1156,9 +1165,23 @@ class ChessRobotUILLMV2(QMainWindow):
             self.camera_label.setPixmap(pix.scaled(self.camera_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
             label = "Sim camera" if self.cfg.sim else "Camera"
             self.camera_status.setText(f"{label}: {w}x{h} @ ~{self.cfg.camera_fps}fps")
+            if self.cfg.sim and isinstance(cam, SimCamera):
+                metadata = cam.calibration_metadata()
+                status = summarize_sim_camera_status(
+                    metadata,
+                    selected_calibration=self.cfg.sim_camera_profile_selection,
+                    sim_camera_profile=self.cfg.sim_camera_profile,
+                )
+                self.sim_camera_status.setText(str(status["readout"]))
+                self.sim_camera_status.setVisible(True)
+            elif hasattr(self, "sim_camera_status"):
+                self.sim_camera_status.setText("")
+                self.sim_camera_status.setVisible(False)
         except Exception:
             # Don't spam; just keep last frame
             self.camera_status.setText("Camera: read failed")
+            if hasattr(self, "sim_camera_status"):
+                self.sim_camera_status.setText("")
 
     def capture_frame_base64(self) -> str | None:
         """Capture current camera frame as base64 JPEG for LLM vision."""
