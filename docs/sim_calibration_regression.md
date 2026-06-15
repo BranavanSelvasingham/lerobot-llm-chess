@@ -6,11 +6,11 @@ Run this hardware-free gate before changing simulator rendering, camera profiles
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_calibration_regression_suite.py --output-dir /private/tmp/lerobot_sim/calibration_regression_suite --python /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 --include-negative-check
 ```
 
-The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json` has `"ok": true` and `"status": "ok"`. It also writes `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index.json`, a compact review index for the real-reference images, ranked candidate artifacts, perception fixture evidence, pick/place release frames, visibility metrics, negative-check summary, and child logs.
+The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json` has `"ok": true` and `"status": "ok"`. It also writes `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index.json`, a compact review index for the real-reference images, ranked candidate artifacts, perception fixture evidence, pick/place release frames, visibility metrics, negative-check summary, and child logs. For quick review, open `/private/tmp/lerobot_sim/calibration_regression_suite/artifact_index_report.md` first; it is a deterministic Markdown view of that index and links the highest-signal generated evidence.
 
 ## GitHub Actions Signal
 
-The focused `Simulator Calibration Regression` workflow runs the same hardware-free suite for pull requests targeting `feat/telemetry-recording` when simulator, camera, chess perception, smoke-script, reference-image, or gate documentation paths change. It uses Python 3.12, installs only the Python modules needed by this suite, verifies the generated summary fields, and uploads the suite output directory as a workflow artifact.
+The focused `Simulator Calibration Regression` workflow runs the same hardware-free suite for pull requests targeting `feat/telemetry-recording` when simulator, camera, chess perception, smoke-script, report-renderer, reference-image, or gate documentation paths change. It uses Python 3.12, installs only the Python modules needed by this suite, verifies the generated summary fields, and uploads the suite output directory as a workflow artifact. After downloading the artifact, open `artifact_index_report.md` first, then follow its links to images, JSON summaries, and child logs.
 
 The workflow also treats `pick_place_scenario_matrix.piece_visibility` and `artifact_index.json` as part of the artifact contract. All four scenarios must report available visibility evidence, each target release frame path must exist, and each `target_release_open` row must include visible fraction, occlusion fraction, and gripper-clearance fields. The generated artifact index must exist, report `status: "ok"`, have a nonzero artifact count, have no missing artifacts, and include populated categories for real-reference comparisons, ranked candidates, perception fixture evidence, pick/place scenario release frames, the negative check, and child logs. These are structural availability checks rather than exact metric-value thresholds.
 
@@ -75,6 +75,7 @@ Common artifact paths under the output directory:
 - `pick_place_scenario_matrix/scenarios/*/06_target_release_open.jpg`
 - `negative_empty_inventory/comparison_set_summary.json`
 - `artifact_index.json`
+- `artifact_index_report.md`
 
 Each child also writes captured stdout/stderr text files in its own output directory.
 
@@ -83,6 +84,18 @@ The artifact index can be regenerated from an existing suite summary without rer
 ```bash
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_calibration_artifact_index.py /private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json --output-json /private/tmp/lerobot_sim/calibration_regression_suite/artifact_index.json
 ```
+
+The human-readable report can also be regenerated from either the artifact index or the suite summary:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/render_sim_calibration_artifact_index_report.py /private/tmp/lerobot_sim/calibration_regression_suite/artifact_index.json
+```
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/render_sim_calibration_artifact_index_report.py /private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json --output-md /private/tmp/lerobot_sim/calibration_regression_suite/artifact_index_report.md
+```
+
+The report includes the category summary table, artifact and missing counts, hardware/gui skipped markers, the current real-media visibility gap, real-reference comparison images, ranked candidate captures, perception fixture evidence, all pick/place release frames, negative-check status, and child stdout/stderr links.
 
 ## Skipped Paths
 
