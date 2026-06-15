@@ -12,7 +12,7 @@ The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/cal
 
 The focused `Simulator Calibration Regression` workflow runs the same hardware-free suite for pull requests targeting `feat/telemetry-recording` when simulator, camera, chess perception, smoke-script, reference-image, or gate documentation paths change. It uses Python 3.12, installs only the Python modules needed by this suite, verifies the generated summary fields, and uploads the suite output directory as a workflow artifact.
 
-The workflow also treats `pick_place_scenario_matrix.piece_visibility` as part of the artifact contract: all four scenarios must report available visibility evidence, each target release frame path must exist, and each `target_release_open` row must include visible fraction, occlusion fraction, and gripper-clearance fields. These are structural availability checks rather than exact metric-value thresholds.
+The workflow also treats `pick_place_scenario_matrix.piece_visibility` and `artifact_index.json` as part of the artifact contract. All four scenarios must report available visibility evidence, each target release frame path must exist, and each `target_release_open` row must include visible fraction, occlusion fraction, and gripper-clearance fields. The generated artifact index must exist, report `status: "ok"`, have a nonzero artifact count, have no missing artifacts, and include populated categories for real-reference comparisons, ranked candidates, perception fixture evidence, pick/place scenario release frames, the negative check, and child logs. These are structural availability checks rather than exact metric-value thresholds.
 
 This CI signal is still a simulator/perception regression gate only. It does not connect to SO-101 hardware, open GUI calibration flows, or replace later physical robot validation.
 
@@ -38,6 +38,7 @@ A passing summary should show:
 - `pick_place_scenario_matrix.aggregate_status.ok: true` with four scenario IDs and release-frame paths populated
 - `pick_place_scenario_matrix.piece_visibility.all_scenarios_available: true` with per-scenario visible fraction, occlusion fraction, and gripper clearance values
 - `negative_check.status: "no_reference_media_selected"` when `--include-negative-check` is used
+- `artifact_index.status: "ok"` with `artifact_count > 0`, `missing_artifact_count: 0`, an existing `path`, and categories covering real-reference comparison, ranked candidate, perception fixture, pick/place scenario, negative check, and logs
 
 The `piece_visibility` signal is a simulator-only geometry metric. Each pick/place capture reconstructs the active piece disc and visible gripper finger polygons from synthetic capture metadata, then reports:
 
@@ -129,6 +130,7 @@ print({
     "matrix_release_frames": summary["pick_place_scenario_matrix"]["release_frame_paths"],
     "matrix_piece_visibility": summary["pick_place_scenario_matrix"]["piece_visibility"],
     "negative_check": summary["negative_check"]["status"],
+    "artifact_index": summary["artifact_index"],
 })
 PY
 ```
