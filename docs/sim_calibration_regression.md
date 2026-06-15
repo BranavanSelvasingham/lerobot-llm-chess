@@ -34,7 +34,17 @@ A passing summary should show:
 - `calibration_session.selected_candidate` populated with the rank-1 candidate
 - `perception_fixture.status: "ok"` and fixture artifact paths populated
 - `pick_place_scenario_matrix.aggregate_status.ok: true` with four scenario IDs and release-frame paths populated
+- `pick_place_scenario_matrix.piece_visibility.all_scenarios_available: true` with per-scenario visible fraction, occlusion fraction, and gripper clearance values
 - `negative_check.status: "no_reference_media_selected"` when `--include-negative-check` is used
+
+The `piece_visibility` signal is a simulator-only geometry metric. Each pick/place capture reconstructs the active piece disc and visible gripper finger polygons from synthetic capture metadata, then reports:
+
+- `occlusion.visible_fraction` and `occlusion.occlusion_fraction`
+- `gripper_clearance.min_clearance_px`
+- `gripper_clearance.clear_of_gripper`
+- `status`, usually `clear` or `gripper_overlap`
+
+These values are evidence-only in this first pass. The suite reports them but does not fail on a visibility threshold until local and GitHub Actions runs prove the measured values are stable. They do not model physical chess-piece contact or real-camera segmentation.
 
 ## Outputs
 
@@ -58,6 +68,7 @@ Common artifact paths under the output directory:
 - `session/candidates/*/pick_place/06_target_release_open.jpg`
 - `fixture/fixture_summary.json`
 - `pick_place_scenario_matrix/scenario_matrix_summary.json`
+- `pick_place_scenario_matrix/scenarios/*/summary.json`
 - `pick_place_scenario_matrix/scenarios/*/06_target_release_open.jpg`
 - `negative_empty_inventory/comparison_set_summary.json`
 
@@ -107,6 +118,7 @@ print({
     "selected_candidate": summary["selected_candidate"]["candidate_id"],
     "matrix_scenarios": summary["pick_place_scenario_matrix"]["scenario_ids"],
     "matrix_release_frames": summary["pick_place_scenario_matrix"]["release_frame_paths"],
+    "matrix_piece_visibility": summary["pick_place_scenario_matrix"]["piece_visibility"],
     "negative_check": summary["negative_check"]["status"],
 })
 PY
