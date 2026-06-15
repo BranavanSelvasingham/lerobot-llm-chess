@@ -16,6 +16,7 @@ DEFAULT_BASE_PROFILE = "current_gripper_reference"
 SCHEMA = "lerobot.sim.calibration_regression_suite.v1"
 ARTIFACT_ENTRYPOINT_NAME = "README.md"
 ARTIFACT_REPORT_NAME = "artifact_index_report.md"
+VISUAL_REVIEW_SUMMARY_NAME = "visual_review_summary.json"
 BASELINE_CORNERS = [[32, 338], [594, 340], [540, 20], [86, 12]]
 PERTURBED_CORNERS = [[34, 337], [592, 342], [538, 22], [88, 14]]
 
@@ -84,11 +85,17 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
     manifest = summary.get("reference_media_manifest")
     manifest = manifest if isinstance(manifest, dict) else {}
     manifest_supplied = bool(manifest.get("supplied"))
+    visual_review = summary.get("visual_review")
+    visual_review = visual_review if isinstance(visual_review, dict) else {}
+    recording = visual_review.get("recording")
+    recording = recording if isinstance(recording, dict) else {}
     readme_path = output_dir / ARTIFACT_ENTRYPOINT_NAME
     lines = [
         "# Simulator Calibration Regression Artifacts",
         "",
         f"Open `{ARTIFACT_REPORT_NAME}` first. It is the review report for this artifact bundle.",
+        "For image-first inspection, open `visual_review/gripper_camera_pov_annotated_contact_sheet.png` "
+        "and `visual_review/sim_camera_pose_fixture_annotated_contact_sheet.png`.",
         "",
         "Core JSON summaries:",
         "",
@@ -103,6 +110,7 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `pick_place_scenario_matrix/scenario_matrix_summary.json`",
         "- `app_entrypoint/smoke_sim_app_entrypoints_summary.json`",
         "- `app_entrypoint/smoke_sim_app_metadata.json`",
+        "- `visual_review/visual_review_summary.json`",
         "- `negative_empty_inventory/comparison_set_summary.json`",
         "",
         "Review markers:",
@@ -141,6 +149,14 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         (
             "- App-entrypoint metadata evidence runs `smoke_sim_app_entrypoints.py --sim` "
             "compatibility paths against a synthetic SimCamera frame."
+        ),
+        (
+            "- Visual review contact sheets are stable PNG evidence generated from existing "
+            "suite frames under `visual_review/`."
+        ),
+        (
+            f"- Optional visual review recording produced: `{markdown_bool(recording.get('produced'))}`; "
+            f"skipped reason: `{recording.get('skipped_reason')}`."
         ),
         "- Those extrinsics are simulator reference metadata, not physical calibration truth.",
         "",
@@ -634,6 +650,33 @@ def gripper_camera_pov_section(pov: dict[str, Any] | None, summary_path: Path) -
     }
 
 
+def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
+    visual_review = visual_review if isinstance(visual_review, dict) else {}
+    contact_sheets = visual_review.get("contact_sheets")
+    contact_sheets = contact_sheets if isinstance(contact_sheets, list) else []
+    contact_sheet_paths = visual_review.get("contact_sheet_paths")
+    contact_sheet_paths = contact_sheet_paths if isinstance(contact_sheet_paths, dict) else {}
+    return {
+        "summary_path": str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(visual_review.get("ok", False)),
+        "status": visual_review.get("status"),
+        "contact_sheet_count": len(contact_sheets),
+        "contact_sheet_paths": {
+            str(key): str(value)
+            for key, value in sorted(contact_sheet_paths.items())
+            if isinstance(value, str)
+        },
+        "contact_sheets": contact_sheets,
+        "app_entrypoint_frame": visual_review.get("app_entrypoint_frame"),
+        "recording": visual_review.get("recording"),
+        "hardware_skipped": visual_review.get("hardware_skipped"),
+        "gui_skipped": visual_review.get("gui_skipped"),
+        "openai_skipped": visual_review.get("openai_skipped"),
+        "notes": visual_review.get("notes"),
+    }
+
+
 def run_negative_empty_inventory(
     *,
     args: argparse.Namespace,
@@ -866,6 +909,9 @@ def main() -> int:
         expected_json_path=app_entrypoint_summary_path,
     )
 
+    visual_review_dir = output_dir / "visual_review"
+    visual_review_summary_path = visual_review_dir / VISUAL_REVIEW_SUMMARY_NAME
+
     child_records = {
         "inventory": inventory_record,
         "comparison_set": comparison_record,
@@ -977,6 +1023,32 @@ def main() -> int:
             "SimCamera intrinsics/extrinsics are simulator reference metadata for downstream tool compatibility, not physical calibration truth.",
         ],
     }
+    write_json(summary_path, summary)
+
+    visual_review_record, visual_review = run_child(
+        name="visual_review",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "render_sim_calibration_visual_review.py"),
+            str(summary_path),
+            "--output-dir",
+            str(visual_review_dir),
+        ],
+        output_dir=visual_review_dir,
+        expected_json_path=visual_review_summary_path,
+    )
+    child_records["visual_review"] = visual_review_record
+    required_ok = all(record["ok"] for record in child_records.values())
+    summary["ok"] = required_ok
+    summary["status"] = "ok" if required_ok else "validation_failed"
+    summary["aggregate_status"] = {
+        "ok": required_ok,
+        "failed_children": [
+            name for name, record in child_records.items() if not bool(record.get("ok"))
+        ],
+    }
+    summary["child_commands"] = child_records
+    summary["visual_review"] = visual_review_section(visual_review, visual_review_summary_path)
     write_json(summary_path, summary)
 
     artifact_index_record, artifact_index = run_child(
