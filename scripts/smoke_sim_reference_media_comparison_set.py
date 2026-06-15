@@ -351,6 +351,8 @@ def build_fixture(args: argparse.Namespace, output_dir: Path) -> tuple[dict[str,
                 "media_type": record.get("media_type"),
                 "dimensions": record.get("dimensions"),
                 "selection_reasons": record.get("selection_reasons"),
+                "declared_metadata": record.get("declared_metadata"),
+                "manifest_validation": record.get("manifest_validation"),
                 "currently_wired_into_simulator_tooling": record.get("currently_wired_into_simulator_tooling"),
                 "simulator_references": record.get("simulator_references"),
             }
