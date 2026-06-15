@@ -76,6 +76,10 @@ python -m lerobot.scripts.lerobot_find_cameras opencv
 python chess_robot_ui_llm_v2.py --port /dev/tty.usbmodemXXXX
 ```
 
+### Simulator Calibration Regression
+
+Before simulator, camera profile, or perception calibration changes, run the hardware-free local regression gate documented in [docs/sim_calibration_regression.md](docs/sim_calibration_regression.md). It records the suite summary and artifacts under `/private/tmp/lerobot_sim/calibration_regression_suite` and skips robot hardware and GUI display paths.
+
 ## 🏗️ Architecture
 
 ```
@@ -110,6 +114,9 @@ lerobot-llm-chess/
 │   ├── setup_birds_eye_view.py
 │   ├── save_current_as_rest.py
 │   └── test_ik_to_square.py
+│
+├── docs/
+│   └── sim_calibration_regression.md # Hardware-free simulator calibration gate
 │
 ├── src/lerobot/                  # Core lerobot modules used
 │   ├── model/kinematics.py       # FK/IK via placo library
