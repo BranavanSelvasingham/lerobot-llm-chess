@@ -148,6 +148,35 @@ jobs:
               assert Path(pose_fixture["metadata_paths"][case_id]).is_file(), (case_id, pose_fixture)
           assert pose_fixture["hardware_skipped"] is True, pose_fixture
           assert pose_fixture["gui_skipped"] is True, pose_fixture
+          so101_contract = summary["so101_model_contract"]
+          assert so101_contract["ok"] is True, so101_contract
+          assert so101_contract["status"] in {
+              "missing_model",
+              "model_unavailable",
+              "model_contract_checked",
+              "model_contract_needs_follow_up",
+              "model_suffix_supported_not_directly_usable",
+          }, so101_contract
+          assert so101_contract["model_request_status"] in {
+              "model_not_supplied",
+              "model_unavailable",
+              "model_supplied",
+              "unsupported_suffix",
+          }, so101_contract
+          assert so101_contract["robot_kinematics_status"] in {
+              "missing_model",
+              "model_unavailable",
+              "supported_suffix_not_directly_usable",
+              "urdf_requires_placo",
+              "directly_usable",
+          }, so101_contract
+          assert so101_contract["target_frame"] == "gripper_frame_link", so101_contract
+          so101_artifacts = so101_contract["artifacts"]
+          for key in ("summary_json", "checklist_csv", "readme_md"):
+              assert isinstance(so101_artifacts.get(key), str) and Path(so101_artifacts[key]).is_file(), (
+                  key,
+                  so101_artifacts,
+              )
           ik_reachability = summary["ik_reachability_drill"]
           assert ik_reachability["ok"] is True, ik_reachability
           assert ik_reachability["status"] in {"ok_model_backed", "model_unavailable_fallback_complete"}, ik_reachability
@@ -238,6 +267,7 @@ jobs:
               "ranked_candidate",
               "perception_fixture",
               "sim_camera_pose_fixture",
+              "so101_model_contract",
               "ik_reachability",
               "pick_place_scenario",
               "negative_check",
@@ -298,6 +328,25 @@ jobs:
               and row.get("metrics", {}).get("status") in {"ok_model_backed", "model_unavailable_fallback_complete"}
               for row in artifacts_by_category["ik_reachability"]
           ), artifacts_by_category["ik_reachability"]
+          assert any(
+              row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("model_request_status") in {
+                  "model_not_supplied",
+                  "model_unavailable",
+                  "model_supplied",
+                  "unsupported_suffix",
+              }
+              for row in artifacts_by_category["so101_model_contract"]
+          ), artifacts_by_category["so101_model_contract"]
+          assert any(
+              row.get("kind") == "csv" and row.get("exists") is True
+              for row in artifacts_by_category["so101_model_contract"]
+          ), artifacts_by_category["so101_model_contract"]
+          assert any(
+              row.get("label") == "so101_model_contract:readme" and row.get("exists") is True
+              for row in artifacts_by_category["so101_model_contract"]
+          ), artifacts_by_category["so101_model_contract"]
           assert any(
               row.get("kind") == "csv" and row.get("exists") is True
               for row in artifacts_by_category["ik_reachability"]
@@ -367,6 +416,13 @@ jobs:
                           "case_ids": pose_fixture["case_ids"],
                           "frame_paths": pose_fixture["frame_paths"],
                       },
+                      "so101_model_contract": {
+                          "summary_path": so101_contract["summary_path"],
+                          "status": so101_contract["status"],
+                          "model_request_status": so101_contract["model_request_status"],
+                          "robot_kinematics_status": so101_contract["robot_kinematics_status"],
+                          "artifacts": so101_artifacts,
+                      },
                       "ik_reachability_drill": {
                           "summary_path": ik_reachability["summary_path"],
                           "row_count": ik_reachability["row_count"],
@@ -408,6 +464,7 @@ jobs:
               "session/session_summary.json",
               "fixture/fixture_summary.json",
               "sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json",
+              "so101_model_contract/so101_model_contract_summary.json",
               "ik_reachability_drill/ik_reachability_drill_summary.json",
               "pick_place_scenario_matrix/scenario_matrix_summary.json",
               "negative_empty_inventory/comparison_set_summary.json",

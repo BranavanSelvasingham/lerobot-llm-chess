@@ -20,12 +20,13 @@ CATEGORY_ORDER = {
     "ranked_candidate": 5,
     "perception_fixture": 6,
     "sim_camera_pose_fixture": 7,
-    "ik_reachability": 8,
-    "gripper_camera_pov": 9,
-    "app_entrypoint": 10,
-    "pick_place_scenario": 11,
-    "negative_check": 12,
-    "logs": 13,
+    "so101_model_contract": 8,
+    "ik_reachability": 9,
+    "gripper_camera_pov": 10,
+    "app_entrypoint": 11,
+    "pick_place_scenario": 12,
+    "negative_check": 13,
+    "logs": 14,
 }
 CATEGORY_LABELS = {
     "real_reference_media": "Real Reference Media",
@@ -36,6 +37,7 @@ CATEGORY_LABELS = {
     "ranked_candidate": "Ranked Candidate Captures",
     "perception_fixture": "Perception Fixture Evidence",
     "sim_camera_pose_fixture": "SimCamera Pose Fixture",
+    "so101_model_contract": "SO-101 Model Contract",
     "ik_reachability": "IK Reachability Drill",
     "gripper_camera_pov": "Gripper-Camera POV Review",
     "app_entrypoint": "App Entrypoint Metadata",
@@ -744,6 +746,25 @@ def metadata_native_depth_stage_rows(view: dict[str, Any]) -> list[list[Any]]:
             ]
         )
     return out
+
+
+def so101_model_contract_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("model_request_status", ""),
+        metrics.get("model_request_path", ""),
+        metrics.get("robot_kinematics_status", ""),
+        metrics.get("robot_kinematics_directly_usable", ""),
+        metrics.get("target_frame", ""),
+        metrics.get("missing_alignment_input_count", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
 
 
 def real_projection_intake_artifact_row(artifact: dict[str, Any]) -> list[Any]:
@@ -1473,6 +1494,35 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         else ["_No SimCamera pose fixture artifacts indexed._"]
     )
 
+    so101_model_contract = grouped.get("so101_model_contract", [])
+    lines.extend(["", "### SO-101 Model Contract"])
+    lines.append(
+        "This hardware-free child records whether the optional model requested through "
+        "`--ik-model-path` is available, whether the current RobotKinematics path can use "
+        "it directly, and which joint/frame/TCP alignment inputs still gate trustworthy "
+        "model-backed IK residuals."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Model Request",
+                "Model Path",
+                "RobotKinematics",
+                "Directly Usable",
+                "Target Frame",
+                "Missing Alignment Inputs",
+                "Artifact Status",
+            ],
+            [so101_model_contract_row(row) for row in so101_model_contract],
+        )
+        if so101_model_contract
+        else ["_No SO-101 model contract artifacts indexed._"]
+    )
+
     ik_reachability = grouped.get("ik_reachability", [])
     lines.extend(["", "### IK Reachability Drill"])
     lines.extend(
@@ -1602,6 +1652,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "- This report is a deterministic Markdown view of existing JSON artifacts only.",
             "- Visual review contact sheets are generated PNGs from existing suite frames and are the stable first-pass visual evidence.",
             "- The pick/place visual sequence is simulator-only evidence for approach, grasp/contact, lift/transfer, place/release, and retreat review.",
+            "- The SO-101 model contract checker is a hardware-free preflight for model availability, direct RobotKinematics usability, and joint/frame/TCP alignment inputs.",
             "- The IK reachability drill is a hardware-free feasibility gate; `model_unavailable_fallback_complete` remains a deliberate non-failing status until a repo-local SO-101 model is wired in.",
             "- The metadata-native projection/depth view is the simulator camera-model-aligned ground-truth artifact; rendered-overlay PnP diagnostics are source-mismatch evidence, not depth authority.",
             "- SimCamera pose fixture intrinsics/extrinsics are simulator reference metadata, not physical calibration truth.",

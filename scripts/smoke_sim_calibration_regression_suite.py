@@ -23,6 +23,7 @@ EVIDENCE_BUNDLE_DIR_NAME = "evidence_bundle"
 EVIDENCE_BUNDLE_MD_NAME = "sim_evidence_bundle.md"
 EVIDENCE_BUNDLE_JSON_NAME = "sim_evidence_bundle.json"
 IK_REACHABILITY_SUMMARY_NAME = "ik_reachability_drill_summary.json"
+SO101_MODEL_CONTRACT_SUMMARY_NAME = "so101_model_contract_summary.json"
 BASELINE_CORNERS = [[32, 338], [594, 340], [540, 20], [86, 12]]
 PERTURBED_CORNERS = [[34, 337], [592, 342], [538, 22], [88, 14]]
 
@@ -57,8 +58,9 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=None,
         help=(
-            "Optional SO-101 kinematic model path forwarded to the IK reachability child. "
-            "Default suite behavior remains model-free and non-failing."
+            "Optional SO-101 kinematic model path forwarded to the SO-101 model contract "
+            "checker and IK reachability child. Default suite behavior remains model-free "
+            "and non-failing."
         ),
     )
     parser.add_argument("--base-profile", default=DEFAULT_BASE_PROFILE)
@@ -125,6 +127,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `session/session_summary.json`",
         "- `fixture/fixture_summary.json`",
         "- `sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json`",
+        "- `so101_model_contract/so101_model_contract_summary.json`",
+        "- `so101_model_contract/so101_model_contract_checklist.csv`",
+        "- `so101_model_contract/README.md`",
         "- `ik_reachability_drill/ik_reachability_drill_summary.json`",
         "- `ik_reachability_drill/ik_reachability_drill_rows.csv`",
         "- `ik_reachability_drill/ik_reachability_drill_heatmap.png`",
@@ -188,6 +193,11 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         (
             "- Gripper-camera POV evidence records target center, projected square geometry, "
             "gripper opening, and synthetic visibility/occlusion/clearance rows."
+        ),
+        (
+            "- SO-101 model contract evidence records model availability, direct "
+            "RobotKinematics usability, joint/frame/TCP contract inputs, and the missing "
+            "alignment inputs that still gate trustworthy model-backed IK residuals."
         ),
         (
             "- IK reachability evidence records deterministic Cartesian/delta/radial command "
@@ -787,6 +797,58 @@ def ik_reachability_section(ik: dict[str, Any] | None, summary_path: Path) -> di
     }
 
 
+def so101_model_contract_section(contract: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
+    contract = contract if isinstance(contract, dict) else {}
+    model_request = contract.get("model_request")
+    model_request = model_request if isinstance(model_request, dict) else {}
+    robot_kinematics_path = contract.get("robot_kinematics_path")
+    robot_kinematics_path = robot_kinematics_path if isinstance(robot_kinematics_path, dict) else {}
+    expected_contract = contract.get("expected_contract")
+    expected_contract = expected_contract if isinstance(expected_contract, dict) else {}
+    artifacts = contract.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    missing_alignment_inputs = contract.get("model_to_sim_alignment_inputs_missing")
+    missing_alignment_inputs = missing_alignment_inputs if isinstance(missing_alignment_inputs, list) else []
+    return {
+        "summary_path": str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(contract.get("ok", False)),
+        "status": contract.get("status"),
+        "model_request_status": model_request.get("status"),
+        "model_request": {
+            "status": model_request.get("status"),
+            "path": model_request.get("path"),
+            "exists": model_request.get("exists"),
+            "supported_suffix": model_request.get("supported_suffix"),
+            "suffix": model_request.get("suffix"),
+            "reason": model_request.get("reason"),
+        },
+        "robot_kinematics_status": robot_kinematics_path.get("status"),
+        "robot_kinematics_path": {
+            "status": robot_kinematics_path.get("status"),
+            "directly_usable": robot_kinematics_path.get("directly_usable"),
+            "placo_available": robot_kinematics_path.get("placo_available"),
+            "reason": robot_kinematics_path.get("reason"),
+            "robot_kinematics_source": robot_kinematics_path.get("robot_kinematics_source"),
+        },
+        "target_frame": expected_contract.get("target_frame"),
+        "body_joints": expected_contract.get("body_joints"),
+        "missing_alignment_input_count": len(missing_alignment_inputs),
+        "missing_alignment_inputs": missing_alignment_inputs,
+        "artifacts": {
+            "summary_json": artifacts.get("summary_json")
+            if isinstance(artifacts.get("summary_json"), str)
+            else str(summary_path),
+            "checklist_csv": artifacts.get("checklist_csv"),
+            "readme_md": artifacts.get("readme_md"),
+        },
+        "hardware_skipped": contract.get("hardware_skipped"),
+        "gui_skipped": contract.get("gui_skipped"),
+        "openai_skipped": contract.get("openai_skipped"),
+        "limitations": contract.get("limitations"),
+    }
+
+
 def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
     visual_review = visual_review if isinstance(visual_review, dict) else {}
     contact_sheets = visual_review.get("contact_sheets")
@@ -1119,6 +1181,23 @@ def main() -> int:
         expected_json_path=pose_fixture_summary_path,
     )
 
+    so101_model_contract_dir = output_dir / "so101_model_contract"
+    so101_model_contract_summary_path = so101_model_contract_dir / SO101_MODEL_CONTRACT_SUMMARY_NAME
+    so101_model_contract_command = [
+        python,
+        str(REPO_ROOT / "scripts" / "smoke_sim_so101_model_contract.py"),
+        "--output-dir",
+        str(so101_model_contract_dir),
+    ]
+    if args.ik_model_path is not None:
+        so101_model_contract_command.extend(["--model-path", str(args.ik_model_path)])
+    so101_model_contract_record, so101_model_contract = run_child(
+        name="so101_model_contract",
+        command=so101_model_contract_command,
+        output_dir=so101_model_contract_dir,
+        expected_json_path=so101_model_contract_summary_path,
+    )
+
     ik_reachability_dir = output_dir / "ik_reachability_drill"
     ik_reachability_summary_path = ik_reachability_dir / IK_REACHABILITY_SUMMARY_NAME
     ik_reachability_command = [
@@ -1208,6 +1287,7 @@ def main() -> int:
         "calibration_session_report": session_record,
         "perception_regression_fixture": fixture_record,
         "sim_camera_pose_fixture": pose_fixture_record,
+        "so101_model_contract": so101_model_contract_record,
         "ik_reachability_drill": ik_reachability_record,
         "gripper_camera_pov_review": pov_record,
         "pick_place_scenario_matrix": matrix_record,
@@ -1280,6 +1360,10 @@ def main() -> int:
         "sim_camera_pose_fixture": sim_camera_pose_fixture_section(
             pose_fixture,
             pose_fixture_summary_path,
+        ),
+        "so101_model_contract": so101_model_contract_section(
+            so101_model_contract,
+            so101_model_contract_summary_path,
         ),
         "ik_reachability_drill": ik_reachability_section(
             ik_reachability,
