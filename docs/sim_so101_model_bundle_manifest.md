@@ -7,6 +7,49 @@ frame, TCP/gripper-tip offset, and base-to-board alignment inputs before the
 simulator treats Cartesian, delta, or radial reachability residuals as
 trustworthy.
 
+## Probe/Generator Flow
+
+Use the hardware-free probe when you have a candidate model path and optional
+separate mesh roots, but do not yet have a reviewed bundle manifest:
+
+```bash
+python scripts/smoke_sim_so101_model_bundle_probe.py --model-path /absolute/path/to/so101.urdf --asset-root /absolute/path/to/assets --output-dir /private/tmp/lerobot_sim/so101_model_bundle_probe
+```
+
+The probe accepts repeatable `--asset-root`, optional `--target-frame`, optional
+`--python`, and deterministic metadata flags for authority/provenance review
+strings. It never copies or imports model assets. It writes:
+
+- `so101_model_bundle.candidate.json`
+- `so101_model_bundle_probe_summary.json`
+- `so101_model_bundle_probe_checklist.csv`
+- `README.md`
+- `so101_model_contract/so101_model_contract_summary.json`
+- `so101_model_contract/so101_model_asset_preflight/so101_model_asset_preflight_summary.json`
+- `so101_model_bundle_manifest_check/so101_model_bundle_manifest_summary.json`
+
+With no `--model-path`, it still exits `0`, emits a candidate manifest template
+with an empty `model_path`, and reports `candidate_model_missing`. With a
+nonexistent model path, it exits `0`, preserves the requested path in the draft,
+and reports `candidate_model_unavailable`. With a readable URDF/MJCF/Xacro/XML
+candidate, it forwards the path and asset roots to the existing SO-101 model
+contract checker, which in turn runs the nested asset preflight so mesh
+diagnostics match the rest of the simulator gate.
+
+By default the generated candidate manifest leaves `authority` and
+`provenance` as empty objects and stores TODO details in
+`authority_placeholder` and `provenance_placeholder`. It also writes
+`tcp_offset_placeholder` and `base_to_board_alignment_placeholder` instead of
+inventing calibrated TCP or board-alignment values. That means the generated
+manifest remains diagnostic-only until an operator replaces those placeholders
+with reviewed fields and this checker reports `ready_for_model_backed_ik: true`.
+
+To re-check a generated draft directly:
+
+```bash
+python scripts/smoke_sim_so101_model_bundle_manifest.py --manifest-path /private/tmp/lerobot_sim/so101_model_bundle_probe/so101_model_bundle.candidate.json --output-dir /private/tmp/lerobot_sim/so101_model_bundle_probe_manifest_review
+```
+
 ```bash
 python scripts/smoke_sim_so101_model_bundle_manifest.py --manifest-path /absolute/path/to/so101_model_bundle.json --output-dir /private/tmp/lerobot_sim/so101_model_bundle_manifest
 ```
@@ -137,6 +180,12 @@ find candidate local model sources and decide which one is authoritative after
 license/provenance review. The manifest checker does not scan roots or infer
 authority from `--ik-model-path`; it consumes the reviewed result as a single
 declared bundle.
+
+The probe/generator sits between the inventory and the reviewed manifest. Use
+the inventory to find likely local model files, use the probe to turn a selected
+candidate plus separate mesh roots into a reviewed-manifest draft with contract
+and asset-preflight diagnostics, then fill authority, provenance, TCP, and
+base-to-board values before relying on the manifest checker for readiness.
 
 The manifest checker invokes the
 [SO-101 model contract checker](sim_so101_model_contract.md) as a child whenever
