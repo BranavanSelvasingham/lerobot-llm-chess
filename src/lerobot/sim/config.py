@@ -52,7 +52,7 @@ SIM_CAMERA_CALIBRATION_PROFILES: dict[str, dict[str, Any]] = {
         "gripper_center_x_px": 320,
         "gripper_y_px": 374,
         "gripper_opening_px": 56,
-        "gripper_finger_width_px": 72,
+        "gripper_finger_width_px": 64,
         "gripper_length_px": 170,
         "track_robot_gripper": True,
         "metadata_projected_board_geometry": True,
