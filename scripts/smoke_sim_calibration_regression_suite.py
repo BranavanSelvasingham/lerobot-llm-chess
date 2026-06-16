@@ -20,6 +20,11 @@ REFERENCE_MEDIA_INVENTORY_DIR_NAME = "reference_media_inventory"
 REFERENCE_MEDIA_INVENTORY_JSON_NAME = "reference_media_inventory.json"
 REFERENCE_MEDIA_INVENTORY_CSV_NAME = "reference_media_inventory.csv"
 REFERENCE_MEDIA_INVENTORY_README_NAME = "README.md"
+REFERENCE_CAMERA_TUNING_DIR_NAME = "reference_camera_tuning_diagnostics"
+REFERENCE_CAMERA_TUNING_JSON_NAME = "reference_camera_tuning_diagnostics.json"
+REFERENCE_CAMERA_TUNING_CSV_NAME = "reference_camera_tuning_diagnostics.csv"
+REFERENCE_CAMERA_TUNING_README_NAME = "README.md"
+REFERENCE_CAMERA_TUNING_SCORECARD_NAME = "reference_camera_tuning_scorecard.png"
 VISUAL_REVIEW_SUMMARY_NAME = "visual_review_summary.json"
 REFERENCE_CAPTURE_CHECKLIST_NAME = "reference_capture_checklist.json"
 REAL_PROJECTION_INTAKE_NAME = "real_projection_intake.json"
@@ -672,6 +677,10 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `comparison_set/reference_media_comparison_rows.csv`",
         "- `comparison_set/README.md`",
         "- `comparison_set/reference_media_comparison_contact_sheet.png` when produced",
+        f"- `{REFERENCE_CAMERA_TUNING_DIR_NAME}/{REFERENCE_CAMERA_TUNING_JSON_NAME}`",
+        f"- `{REFERENCE_CAMERA_TUNING_DIR_NAME}/{REFERENCE_CAMERA_TUNING_CSV_NAME}`",
+        f"- `{REFERENCE_CAMERA_TUNING_DIR_NAME}/{REFERENCE_CAMERA_TUNING_README_NAME}`",
+        f"- `{REFERENCE_CAMERA_TUNING_DIR_NAME}/{REFERENCE_CAMERA_TUNING_SCORECARD_NAME}` when produced",
         "- `session/session_summary.json`",
         "- `fixture/fixture_summary.json`",
         "- `sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json`",
@@ -768,6 +777,15 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             f"missing depth `{markdown_bool(comparison_set.get('missing_depth_reference'))}`; "
             f"missing pick/place video `{markdown_bool(comparison_set.get('missing_pick_place_video'))}`; "
             f"no videos `{markdown_bool(comparison_set.get('no_videos'))}`."
+        ),
+        (
+            "- Reference camera tuning diagnostics: "
+            f"status `{summary.get('reference_camera_tuning_diagnostics', {}).get('status')}`; "
+            f"selected comparisons `{summary.get('reference_camera_tuning_diagnostics', {}).get('selected_comparison_count')}`; "
+            f"visual comparisons `{summary.get('reference_camera_tuning_diagnostics', {}).get('visual_comparison_count')}`; "
+            f"metadata-only `{summary.get('reference_camera_tuning_diagnostics', {}).get('metadata_only_count')}`; "
+            "media assets copied into repo "
+            f"`{markdown_bool(summary.get('reference_camera_tuning_diagnostics', {}).get('media_assets_copied_into_repo'))}`."
         ),
         "- Reference capture checklist status: "
         f"`{summary.get('reference_capture_checklist', {}).get('status')}`.",
@@ -1141,6 +1159,82 @@ def reference_media_comparison_section(
         "contact_sheet": comparison.get("contact_sheet"),
         "artifacts": comparison_artifacts(comparison),
         "notes": comparison.get("notes"),
+    }
+
+
+def reference_camera_tuning_artifact_paths(
+    diagnostics: dict[str, Any] | None,
+    diagnostics_dir: Path,
+    summary_path: Path,
+) -> dict[str, str | None]:
+    diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+    artifacts = diagnostics.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    scorecard = diagnostics.get("scorecard")
+    scorecard = scorecard if isinstance(scorecard, dict) else {}
+    return {
+        "summary_json": str(artifacts.get("summary_json") or summary_path),
+        "csv_rows": str(artifacts.get("csv_rows") or diagnostics_dir / REFERENCE_CAMERA_TUNING_CSV_NAME),
+        "readme_md": str(artifacts.get("readme_md") or diagnostics_dir / REFERENCE_CAMERA_TUNING_README_NAME),
+        "scorecard_png": (
+            str(artifacts.get("scorecard_png") or scorecard.get("path"))
+            if scorecard.get("produced") is True
+            else None
+        ),
+    }
+
+
+def reference_camera_tuning_diagnostics_section(
+    diagnostics: dict[str, Any] | None,
+    diagnostics_dir: Path,
+    summary_path: Path,
+) -> dict[str, Any]:
+    diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+    paths = reference_camera_tuning_artifact_paths(diagnostics, diagnostics_dir, summary_path)
+    scorecard = diagnostics.get("scorecard")
+    scorecard = scorecard if isinstance(scorecard, dict) else {}
+    gaps = diagnostics.get("reference_gap_carry_through")
+    gaps = gaps if isinstance(gaps, dict) else {}
+    external = diagnostics.get("external_local_evidence_only")
+    external = external if isinstance(external, dict) else {}
+    suggestions = diagnostics.get("suggested_tuning_dimensions")
+    suggestions = suggestions if isinstance(suggestions, list) else []
+    return {
+        "summary_path": paths["summary_json"],
+        "csv_path": paths["csv_rows"],
+        "readme_path": paths["readme_md"],
+        "artifact_paths": paths,
+        "output_dir": str(diagnostics_dir),
+        "ok": diagnostics.get("ok"),
+        "status": diagnostics.get("status"),
+        "comparison_set_status": diagnostics.get("comparison_set_status"),
+        "selected_comparison_count": diagnostics.get("selected_comparison_count"),
+        "visual_comparison_count": diagnostics.get("visual_comparison_count"),
+        "metadata_only_count": diagnostics.get("metadata_only_count"),
+        "suggested_tuning_dimensions": suggestions,
+        "suggested_tuning_dimension_names": [
+            suggestion.get("dimension")
+            for suggestion in suggestions
+            if isinstance(suggestion, dict) and suggestion.get("dimension")
+        ],
+        "scorecard_path": scorecard.get("path") or paths["scorecard_png"],
+        "scorecard_status": scorecard.get("status"),
+        "scorecard_produced": scorecard.get("produced"),
+        "media_assets_copied_into_repo": diagnostics.get("media_assets_copied_into_repo", False),
+        "external_local_evidence_only": external,
+        "external_selected_count": external.get("external_selected_count"),
+        "external_selected_paths": external.get("external_selected_paths"),
+        "absolute_sibling_paths_are_local_evidence_only": external.get(
+            "absolute_sibling_paths_are_local_evidence_only"
+        ),
+        "missing_depth_reference": gaps.get("missing_depth_reference"),
+        "missing_pick_place_video": gaps.get("missing_pick_place_video"),
+        "no_videos": gaps.get("no_videos"),
+        "videos_present": gaps.get("videos_present"),
+        "reference_gaps": gaps.get("reference_gaps"),
+        "render_dependencies": diagnostics.get("render_dependencies"),
+        "input": diagnostics.get("input"),
+        "limits": diagnostics.get("limits"),
     }
 
 
@@ -2073,6 +2167,36 @@ def main() -> int:
         comparison_summary_path,
     )
 
+    tuning_dir = output_dir / REFERENCE_CAMERA_TUNING_DIR_NAME
+    tuning_summary_path = tuning_dir / REFERENCE_CAMERA_TUNING_JSON_NAME
+    if comparison_summary_path.is_file():
+        tuning_record, tuning_diagnostics = run_child(
+            name="reference_camera_tuning_diagnostics",
+            command=[
+                python,
+                str(REPO_ROOT / "scripts" / "smoke_sim_reference_camera_tuning_diagnostics.py"),
+                "--comparison-summary-json",
+                str(comparison_summary_path),
+                "--output-dir",
+                str(tuning_dir),
+            ],
+            output_dir=tuning_dir,
+            expected_json_path=tuning_summary_path,
+            non_failing_statuses={"metadata_only", "no_reference_media_selected"},
+        )
+    else:
+        tuning_record = skipped_child(
+            "reference_camera_tuning_diagnostics",
+            "comparison set summary JSON was not available",
+            tuning_summary_path,
+        )
+        tuning_diagnostics = None
+    tuning_record["diagnostics"] = reference_camera_tuning_diagnostics_section(
+        tuning_diagnostics,
+        tuning_dir,
+        tuning_summary_path,
+    )
+
     session_dir = output_dir / "session"
     session_summary_path = session_dir / "session_summary.json"
     session_record, session = run_child(
@@ -2316,6 +2440,7 @@ def main() -> int:
     child_records = {
         "reference_media_inventory": inventory_record,
         "comparison_set": comparison_record,
+        "reference_camera_tuning_diagnostics": tuning_record,
         "calibration_session_report": session_record,
         "perception_regression_fixture": fixture_record,
         "sim_camera_pose_fixture": pose_fixture_record,
@@ -2385,6 +2510,11 @@ def main() -> int:
                 comparison_summary_path,
             ),
         },
+        "reference_camera_tuning_diagnostics": reference_camera_tuning_diagnostics_section(
+            tuning_diagnostics,
+            tuning_dir,
+            tuning_summary_path,
+        ),
         "calibration_session": {
             "summary_path": str(session_summary_path),
             "candidate_count": session.get("candidate_count") if session else None,

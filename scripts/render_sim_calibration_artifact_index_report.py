@@ -15,28 +15,30 @@ CATEGORY_ORDER = {
     "reference_media_inventory": 0,
     "real_reference_media": 1,
     "reference_media_comparison": 2,
-    "reference_capture_checklist": 2,
-    "visual_review": 3,
-    "real_reference_comparison": 4,
-    "real_projection_intake": 5,
-    "ranked_candidate": 6,
-    "perception_fixture": 7,
-    "sim_camera_pose_fixture": 8,
-    "so101_model_source_inventory": 9,
-    "so101_model_bundle_manifest": 10,
-    "so101_model_contract": 11,
-    "so101_model_asset_preflight": 12,
-    "ik_reachability": 13,
-    "gripper_camera_pov": 14,
-    "app_entrypoint": 15,
-    "pick_place_scenario": 16,
-    "negative_check": 17,
-    "logs": 18,
+    "reference_camera_tuning_diagnostics": 3,
+    "reference_capture_checklist": 4,
+    "visual_review": 5,
+    "real_reference_comparison": 6,
+    "real_projection_intake": 7,
+    "ranked_candidate": 8,
+    "perception_fixture": 9,
+    "sim_camera_pose_fixture": 10,
+    "so101_model_source_inventory": 11,
+    "so101_model_bundle_manifest": 12,
+    "so101_model_contract": 13,
+    "so101_model_asset_preflight": 14,
+    "ik_reachability": 15,
+    "gripper_camera_pov": 16,
+    "app_entrypoint": 17,
+    "pick_place_scenario": 18,
+    "negative_check": 19,
+    "logs": 20,
 }
 CATEGORY_LABELS = {
     "reference_media_inventory": "Reference Media Inventory",
     "real_reference_media": "Real Reference Media",
     "reference_media_comparison": "Reference Media Comparison",
+    "reference_camera_tuning_diagnostics": "Reference Camera Tuning Diagnostics",
     "reference_capture_checklist": "Reference Capture Checklist",
     "visual_review": "Visual Review Artifacts",
     "real_reference_comparison": "Real Reference Comparisons",
@@ -398,6 +400,43 @@ def reference_media_comparison_artifact_row(artifact: dict[str, Any]) -> list[An
         metrics.get("contact_sheet_status", ""),
         metrics.get("media_assets_copied_into_repo", ""),
         metrics.get("external_selected_count", ""),
+        metrics.get("missing_depth_reference", ""),
+        metrics.get("missing_pick_place_video", ""),
+        metrics.get("no_videos", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def reference_camera_tuning_signal(
+    index: dict[str, Any],
+    suite: dict[str, Any] | None,
+) -> dict[str, Any]:
+    diagnostics = index.get("reference_camera_tuning_diagnostics")
+    if isinstance(diagnostics, dict) and diagnostics:
+        return diagnostics
+    if suite is not None and isinstance(suite.get("reference_camera_tuning_diagnostics"), dict):
+        return suite["reference_camera_tuning_diagnostics"]
+    return {}
+
+
+def reference_camera_tuning_artifact_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("selected_comparison_count", ""),
+        metrics.get("visual_comparison_count", ""),
+        metrics.get("metadata_only_count", ""),
+        compact_list(metrics.get("suggested_tuning_dimensions")),
+        metrics.get("scorecard_status", ""),
+        metrics.get("scorecard_produced", ""),
+        metrics.get("media_assets_copied_into_repo", ""),
+        metrics.get("external_selected_count", ""),
+        metrics.get("absolute_sibling_paths_are_local_evidence_only", ""),
         metrics.get("missing_depth_reference", ""),
         metrics.get("missing_pick_place_video", ""),
         metrics.get("no_videos", ""),
@@ -1311,6 +1350,85 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         )
         if reference_comparison_artifacts
         else ["_No reference media comparison artifacts indexed._"]
+    )
+
+    lines.extend(["", "## Reference Camera Tuning Diagnostics"])
+    tuning = reference_camera_tuning_signal(index, suite)
+    tuning_artifacts = grouped.get("reference_camera_tuning_diagnostics", [])
+    external = tuning.get("external_local_evidence_only")
+    external = external if isinstance(external, dict) else {}
+    gaps = tuning.get("reference_gap_carry_through")
+    gaps = gaps if isinstance(gaps, dict) else {}
+    lines.extend(
+        table(
+            ["Field", "Value"],
+            [
+                ["status", tuning.get("status", "")],
+                ["selected_comparison_count", tuning.get("selected_comparison_count", "")],
+                ["visual_comparison_count", tuning.get("visual_comparison_count", "")],
+                ["metadata_only_count", tuning.get("metadata_only_count", "")],
+                [
+                    "suggested_tuning_dimensions",
+                    compact_list(tuning.get("suggested_tuning_dimension_names") or tuning.get("suggested_tuning_dimensions")),
+                ],
+                ["scorecard_status", tuning.get("scorecard_status", "")],
+                ["scorecard_path", tuning.get("scorecard_path", "")],
+                [
+                    "media_assets_copied_into_repo",
+                    tuning.get("media_assets_copied_into_repo", ""),
+                ],
+                [
+                    "external_selected_count",
+                    tuning.get("external_selected_count", external.get("external_selected_count", "")),
+                ],
+                [
+                    "absolute_sibling_paths_are_local_evidence_only",
+                    tuning.get(
+                        "absolute_sibling_paths_are_local_evidence_only",
+                        external.get("absolute_sibling_paths_are_local_evidence_only", ""),
+                    ),
+                ],
+                [
+                    "missing_depth_reference",
+                    tuning.get("missing_depth_reference", gaps.get("missing_depth_reference", "")),
+                ],
+                [
+                    "missing_pick_place_video",
+                    tuning.get("missing_pick_place_video", gaps.get("missing_pick_place_video", "")),
+                ],
+                ["no_videos", tuning.get("no_videos", gaps.get("no_videos", ""))],
+                ["summary_path", tuning.get("summary_path", "")],
+                ["csv_path", tuning.get("csv_path", "")],
+                ["readme_path", tuning.get("readme_path", "")],
+            ],
+        )
+    )
+    lines.append("")
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Diagnostics Status",
+                "Selected",
+                "Visual",
+                "Metadata Only",
+                "Suggested Dimensions",
+                "Scorecard Status",
+                "Scorecard Produced",
+                "Copied Into Repo",
+                "External Selected",
+                "External Local Only",
+                "Missing Depth",
+                "Missing Pick/Place Video",
+                "No Videos",
+                "Artifact Status",
+            ],
+            [reference_camera_tuning_artifact_row(row) for row in tuning_artifacts],
+        )
+        if tuning_artifacts
+        else ["_No reference camera tuning diagnostics artifacts indexed._"]
     )
 
     lines.extend(["", "## Reference Capture Checklist"])

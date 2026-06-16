@@ -205,6 +205,34 @@ jobs:
               assert summary["comparison_set"]["artifacts"], summary["comparison_set"]
           else:
               assert summary["comparison_set"]["status"] == "no_reference_media_selected", summary["comparison_set"]
+          tuning = summary["reference_camera_tuning_diagnostics"]
+          assert tuning["ok"] is True, tuning
+          assert tuning["status"] in {"ok", "metadata_only", "no_reference_media_selected"}, tuning
+          assert isinstance(tuning["selected_comparison_count"], int), tuning
+          assert isinstance(tuning["visual_comparison_count"], int), tuning
+          assert isinstance(tuning["metadata_only_count"], int), tuning
+          assert isinstance(tuning["suggested_tuning_dimensions"], list), tuning
+          assert tuning["media_assets_copied_into_repo"] is False, tuning
+          if reference_inventory["candidate_count"] == 0:
+              assert tuning["status"] == "no_reference_media_selected", tuning
+          else:
+              assert tuning["selected_comparison_count"] > 0, tuning
+          assert tuning["missing_depth_reference"] == summary["comparison_set"]["missing_depth_reference"], tuning
+          assert tuning["missing_pick_place_video"] == summary["comparison_set"]["missing_pick_place_video"], tuning
+          assert tuning["no_videos"] == summary["comparison_set"]["no_videos"], tuning
+          tuning_child = summary["child_commands"]["reference_camera_tuning_diagnostics"]
+          assert tuning_child["ok"] is True, tuning_child
+          assert tuning_child["summary_status"] == tuning["status"], tuning_child
+          assert tuning_child["diagnostics"]["selected_comparison_count"] == tuning["selected_comparison_count"], tuning_child
+          assert tuning_child["diagnostics"]["media_assets_copied_into_repo"] is False, tuning_child
+          tuning_artifacts = tuning["artifact_paths"]
+          for key in ("summary_json", "csv_rows", "readme_md"):
+              assert isinstance(tuning_artifacts.get(key), str) and Path(tuning_artifacts[key]).is_file(), (
+                  key,
+                  tuning_artifacts,
+              )
+          if tuning["scorecard_produced"] is True:
+              assert isinstance(tuning["scorecard_path"], str) and Path(tuning["scorecard_path"]).is_file(), tuning
           assert summary["perception_fixture"]["status"] == "ok", summary["perception_fixture"]
           assert summary["perception_fixture"]["artifact_paths"], summary["perception_fixture"]
           pose_fixture = summary["sim_camera_pose_fixture"]
@@ -409,6 +437,7 @@ jobs:
 
           required_artifact_categories = {
               "reference_media_inventory",
+              "reference_camera_tuning_diagnostics",
               "real_reference_comparison",
               "ranked_candidate",
               "perception_fixture",
@@ -465,6 +494,28 @@ jobs:
               row.get("label") == "reference_media_inventory:readme" and row.get("exists") is True
               for row in artifacts_by_category["reference_media_inventory"]
           ), artifacts_by_category["reference_media_inventory"]
+          assert any(
+              row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("status") in {"ok", "metadata_only", "no_reference_media_selected"}
+              for row in artifacts_by_category["reference_camera_tuning_diagnostics"]
+          ), artifacts_by_category["reference_camera_tuning_diagnostics"]
+          assert any(
+              row.get("kind") == "csv" and row.get("exists") is True
+              for row in artifacts_by_category["reference_camera_tuning_diagnostics"]
+          ), artifacts_by_category["reference_camera_tuning_diagnostics"]
+          assert any(
+              row.get("label") == "reference_camera_tuning_diagnostics:readme"
+              and row.get("exists") is True
+              for row in artifacts_by_category["reference_camera_tuning_diagnostics"]
+          ), artifacts_by_category["reference_camera_tuning_diagnostics"]
+          if tuning["scorecard_produced"] is True:
+              assert any(
+                  row.get("label") == "reference_camera_tuning_diagnostics:scorecard"
+                  and row.get("kind") == "image"
+                  and row.get("exists") is True
+                  for row in artifacts_by_category["reference_camera_tuning_diagnostics"]
+              ), artifacts_by_category["reference_camera_tuning_diagnostics"]
           if reference_inventory["candidate_count"] > 0:
               assert any(
                   row.get("kind") == "image" and row.get("exists") is True
@@ -594,6 +645,7 @@ jobs:
           assert entrypoint_path.is_file(), entrypoint_path
           report_text = report_path.read_text()
           assert "## Reference Media Inventory" in report_text, report_text
+          assert "## Reference Camera Tuning Diagnostics" in report_text, report_text
           assert "### SO-101 Model Source Inventory" in report_text, report_text
           assert "### SO-101 Model Bundle Manifest" in report_text, report_text
           entrypoint_text = entrypoint_path.read_text()
@@ -603,6 +655,9 @@ jobs:
           assert "`reference_media_inventory/reference_media_inventory.json`" in entrypoint_text, entrypoint_text
           assert "`reference_media_inventory/reference_media_inventory.csv`" in entrypoint_text, entrypoint_text
           assert "`reference_media_inventory/README.md`" in entrypoint_text, entrypoint_text
+          assert "`reference_camera_tuning_diagnostics/reference_camera_tuning_diagnostics.json`" in entrypoint_text, entrypoint_text
+          assert "`reference_camera_tuning_diagnostics/reference_camera_tuning_diagnostics.csv`" in entrypoint_text, entrypoint_text
+          assert "`reference_camera_tuning_diagnostics/README.md`" in entrypoint_text, entrypoint_text
           assert "`so101_model_bundle_manifest/so101_model_bundle_manifest_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_model_bundle_manifest/so101_model_bundle_manifest_checklist.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_inventory_summary.json`" in entrypoint_text, entrypoint_text
@@ -647,6 +702,20 @@ jobs:
                           "reference_gaps": reference_inventory["reference_gaps"],
                           "source_configuration": inventory_configuration,
                           "artifacts": reference_inventory_artifacts,
+                      },
+                      "reference_camera_tuning_diagnostics": {
+                          "summary_path": tuning["summary_path"],
+                          "status": tuning["status"],
+                          "selected_comparison_count": tuning["selected_comparison_count"],
+                          "visual_comparison_count": tuning["visual_comparison_count"],
+                          "metadata_only_count": tuning["metadata_only_count"],
+                          "suggested_tuning_dimension_names": tuning["suggested_tuning_dimension_names"],
+                          "scorecard_status": tuning["scorecard_status"],
+                          "scorecard_path": tuning["scorecard_path"],
+                          "media_assets_copied_into_repo": tuning["media_assets_copied_into_repo"],
+                          "external_selected_count": tuning["external_selected_count"],
+                          "reference_gaps": tuning["reference_gaps"],
+                          "artifacts": tuning_artifacts,
                       },
                       "so101_model_source_inventory": {
                           "summary_path": source_inventory["summary_path"],
@@ -718,6 +787,7 @@ jobs:
               "artifact_index.json",
               "reference_media_inventory/reference_media_inventory.json",
               "comparison_set/comparison_set_summary.json",
+              "reference_camera_tuning_diagnostics/reference_camera_tuning_diagnostics.json",
               "session/session_summary.json",
               "fixture/fixture_summary.json",
               "sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json",
@@ -767,6 +837,16 @@ jobs:
               f"- `currently_wired_media_count`: `{summary['reference_media_inventory']['currently_wired_media_count']}`",
               f"- `reference_gaps`: `{summary['reference_media_inventory']['reference_gaps']}`",
               f"- `configured_roots`: `{summary['reference_media_inventory']['source_configuration']['reference_media_roots']}`",
+              "",
+              "Reference camera tuning diagnostics:",
+              f"- `status`: `{summary['reference_camera_tuning_diagnostics']['status']}`",
+              f"- `selected_comparison_count`: `{summary['reference_camera_tuning_diagnostics']['selected_comparison_count']}`",
+              f"- `visual_comparison_count`: `{summary['reference_camera_tuning_diagnostics']['visual_comparison_count']}`",
+              f"- `metadata_only_count`: `{summary['reference_camera_tuning_diagnostics']['metadata_only_count']}`",
+              f"- `suggested_tuning_dimension_names`: `{summary['reference_camera_tuning_diagnostics']['suggested_tuning_dimension_names']}`",
+              f"- `scorecard_status`: `{summary['reference_camera_tuning_diagnostics']['scorecard_status']}`",
+              f"- `media_assets_copied_into_repo`: `{summary['reference_camera_tuning_diagnostics']['media_assets_copied_into_repo']}`",
+              f"- `reference_gaps`: `{summary['reference_camera_tuning_diagnostics']['reference_gaps']}`",
               "",
               "SO-101 model source inventory:",
               f"- `status`: `{summary['so101_model_source_inventory']['status']}`",
