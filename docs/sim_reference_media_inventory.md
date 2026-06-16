@@ -67,6 +67,18 @@ The same diagnostics script also accepts the integrated suite root summary:
 
 It writes `reference_camera_tuning_diagnostics.json`, `reference_camera_tuning_diagnostics.csv`, `README.md`, and, when OpenCV/numpy can read the existing visual artifacts, `reference_camera_tuning_scorecard.png`. The report carries selected reference path/scope/classes, visual artifact availability, real vs synthetic dimensions/statistics, `mean_abs_delta`/`rmse` when present, projected board-corner bounding-box signals, gripper visibility/opening signals, preserved reference gaps, and `media_assets_copied_into_repo: false`. When visual metrics are unavailable, it exits successfully with metadata-only diagnostics rather than inventing comparison evidence.
 
+Focused SimCamera tuning before/after evidence:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_simcamera_tuning_before_after.py \
+  --output-dir /private/tmp/lerobot_sim/simcamera_tuning_before_after \
+  --python /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 \
+  --baseline-gripper-finger-width-px 72 \
+  --marker-time-seconds 0.0
+```
+
+This smoke compares a documented baseline gripper finger-width override against the current canonical SimCamera profile by invoking the deterministic profile sweep twice. It writes `simcamera_tuning_before_after_summary.json`, `simcamera_tuning_before_after_rows.csv`, `README.md`, and child sweep artifacts under `baseline_profile_sweep/` and `current_profile_sweep/`. Use it to review current-vs-baseline MAD/RMSE deltas, gripper overlay inputs, remaining tuning prompts, and visual artifact paths without copying media assets or claiming physical calibration truth.
+
 Suggested tuning dimensions are explicit review prompts only: camera framing/board scale/board crop, board color/texture/lighting, gripper overlay geometry/occlusion, piece size/contrast, and missing depth/video capture needs. The diagnostics do not modify simulator camera constants, renderer behavior, robot execution paths, camera/UI runtime, OpenAI/LLM paths, IK behavior, or media assets. They also do not close `missing_depth_reference`, `missing_pick_place_video`, or no-video gaps and are not physical calibration truth.
 
 Candidates include common image and video extensions plus `.json`, `.yaml`, and `.yml` files whose path or first small text chunk contains camera/calibration/board/depth keywords. The script excludes VCS, virtualenv, cache, build, and generated temp directories. Image dimensions are read with Pillow when already installed, otherwise by limited stdlib header parsing for supported formats. Video duration and dimensions are read only when `ffprobe` or OpenCV is already available. Missing metadata is non-failing.
