@@ -120,7 +120,9 @@ true:
 - the target frame is present or defaulted
 - a valid x/y/z TCP offset in meters is present
 - a real `base_to_board_transform` or `base_to_board_alignment` is populated
-- the child SO-101 model contract checker reports `model_contract_checked`
+- the child SO-101 model contract checker reports `model_contract_checked`, or
+  the URDF has the expected static joint/frame contract and the only runtime
+  follow-up is missing optional `placo`
 - the nested asset preflight has no missing or unresolved mesh references
 
 Any missing input appears in `missing_inputs`, in the CSV checklist, and in the

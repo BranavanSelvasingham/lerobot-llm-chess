@@ -157,6 +157,25 @@ derive the downstream contract/IK model path and contract asset roots from the
 manifest. Explicit `--ik-model-asset-root` values still take precedence for the
 contract checker asset preflight.
 
+To guard that forwarding contract without hardware or repo-local SO-101 assets,
+run the focused ready-bundle smoke:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_so101_bundle_ready_forwarding.py --output-dir /private/tmp/lerobot_sim/so101_bundle_ready_forwarding --python /Library/Frameworks/Python.framework/Versions/3.12/bin/python3
+```
+
+The smoke creates synthetic manifests and model/mesh fixtures under the output
+directory, invokes `scripts/smoke_sim_calibration_regression_suite.py` as the
+system under test, and writes
+`so101_bundle_ready_forwarding_summary.json`,
+`so101_bundle_ready_forwarding_cases.csv`, and `README.md`. It requires a ready
+manifest to forward the manifest-derived model path and mesh asset root when no
+explicit `--ik-model-path` is supplied, requires explicit `--ik-model-path` to
+take precedence and leave the ready manifest diagnostic-only, requires an
+incomplete placeholder-alignment manifest to remain not ready and not forward,
+and requires `artifact_index.missing_artifact_count: 0` for the forwarding and
+explicit-precedence suite runs.
+
 To exercise the same suite with declared reference-media metadata, pass an optional manifest:
 
 ```bash
