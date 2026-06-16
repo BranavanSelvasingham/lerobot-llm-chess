@@ -21,6 +21,27 @@ That integrated default scan is repo-local. A suite `--ik-model-path` value is
 forwarded only to the contract checker and IK drill; it is not treated as an
 authoritative inventory source.
 
+The integrated suite exposes the same reviewed-source concepts with explicit
+suite-level names:
+
+- `--so101-model-source-root` maps to inventory `--root` and replaces default
+  inventory roots. Repeat it for multiple reviewed scan roots.
+- `--so101-model-source-extra-root` maps to inventory `--extra-root` and keeps
+  the default repo-local scan roots. Repeat it for multiple appended roots.
+- `--so101-authoritative-model-path` maps to inventory `--authoritative-path`.
+- `--so101-authoritative-model-root` maps to inventory `--authoritative-root`.
+
+Use the authoritative flags only after source provenance, license, mesh
+dependencies, and authority have been reviewed. Supplying an empty reviewed root
+or authority root is still a non-failing diagnostic: the suite should report
+`missing_authoritative_model`, `candidate_count: 0`, and
+`authoritative_candidate_count: 0` rather than inventing a model. The suite
+preserves the configured values under
+`calibration_regression_summary.json.so101_model_source_inventory.source_configuration`,
+mirrors them in `so101_model_source_inventory_config`, writes the exact forwarded
+child command under `child_commands.so101_model_source_inventory.command`, and
+surfaces them in the generated artifact index/report.
+
 ## Scope
 
 By default the inventory scans repo-local roots: `models/`, `assets/`, `SO101/`, `src/`, `docs/`, `archive/`, `data/`, and the repo root. Missing roots are reported as roots with `exists: false`; they are not errors.

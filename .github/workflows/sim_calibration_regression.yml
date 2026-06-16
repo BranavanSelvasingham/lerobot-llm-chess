@@ -23,6 +23,7 @@ on:
     paths:
       - "archive/chess_test_images/current_view.jpg"
       - "docs/sim_calibration_regression.md"
+      - "docs/sim_so101_model_source_inventory.md"
       - "llm-tools/**"
       - "README.md"
       - "scripts/render_sim_*.py"
@@ -41,6 +42,7 @@ on:
     paths:
       - "archive/chess_test_images/current_view.jpg"
       - "docs/sim_calibration_regression.md"
+      - "docs/sim_so101_model_source_inventory.md"
       - "llm-tools/**"
       - "README.md"
       - "scripts/render_sim_*.py"
@@ -61,6 +63,10 @@ env:
   CALIBRATION_REGRESSION_OUTPUT_DIR: "/tmp/lerobot_sim/calibration_regression_suite"
   CALIBRATION_REGRESSION_ARTIFACT_NAME: "sim-calibration-regression-${{ github.run_id }}"
   IK_MODEL_PATH: ""
+  SO101_MODEL_SOURCE_ROOTS: ""
+  SO101_MODEL_SOURCE_EXTRA_ROOTS: ""
+  SO101_AUTHORITATIVE_MODEL_PATHS: ""
+  SO101_AUTHORITATIVE_MODEL_ROOTS: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -98,6 +104,19 @@ jobs:
 
       - name: Run simulator calibration regression suite
         run: |
+          append_repeatable_args() {
+            local flag="$1"
+            local values="$2"
+            if [ -z "${values}" ]; then
+              return 0
+            fi
+            while IFS= read -r value; do
+              if [ -n "${value}" ]; then
+                cmd+=("${flag}" "${value}")
+              fi
+            done <<< "${values}"
+          }
+
           cmd=(
             python
             scripts/smoke_sim_calibration_regression_suite.py
@@ -108,6 +127,10 @@ jobs:
           if [ -n "${IK_MODEL_PATH}" ]; then
             cmd+=(--ik-model-path "${IK_MODEL_PATH}")
           fi
+          append_repeatable_args --so101-model-source-root "${SO101_MODEL_SOURCE_ROOTS}"
+          append_repeatable_args --so101-model-source-extra-root "${SO101_MODEL_SOURCE_EXTRA_ROOTS}"
+          append_repeatable_args --so101-authoritative-model-path "${SO101_AUTHORITATIVE_MODEL_PATHS}"
+          append_repeatable_args --so101-authoritative-model-root "${SO101_AUTHORITATIVE_MODEL_ROOTS}"
           "${cmd[@]}"
 
       - name: Check regression summary
@@ -160,6 +183,15 @@ jobs:
           assert isinstance(source_inventory["authoritative_candidate_count"], int), source_inventory
           assert source_inventory["candidate_count"] >= source_inventory["likely_candidate_count"], source_inventory
           assert source_inventory["likely_candidate_count"] >= source_inventory["direct_contract_candidate_count"], source_inventory
+          source_configuration = source_inventory["source_configuration"]
+          assert source_configuration["ik_model_path_is_authority"] is False, source_configuration
+          assert source_configuration["ik_model_path_forwarded_to_inventory"] is False, source_configuration
+          assert isinstance(source_configuration["model_source_roots"], list), source_configuration
+          assert isinstance(source_configuration["model_source_extra_roots"], list), source_configuration
+          assert isinstance(source_configuration["authoritative_model_paths"], list), source_configuration
+          assert isinstance(source_configuration["authoritative_model_roots"], list), source_configuration
+          expected_scan_mode = "explicit_roots" if os.environ["SO101_MODEL_SOURCE_ROOTS"].strip() else "default_repo_roots"
+          assert source_configuration["scan_mode"] == expected_scan_mode, source_configuration
           if source_inventory["status"] == "missing_authoritative_model":
               assert source_inventory["authoritative_candidate_count"] == 0, source_inventory
               assert source_inventory["diagnostics"], source_inventory
@@ -464,6 +496,7 @@ jobs:
                           "status": source_inventory["status"],
                           "candidate_count": source_inventory["candidate_count"],
                           "authoritative_candidate_count": source_inventory["authoritative_candidate_count"],
+                          "source_configuration": source_configuration,
                           "recommended_contract_check_path": source_inventory["recommended_contract_check_path"],
                           "artifacts": source_inventory_artifacts,
                       },
@@ -543,6 +576,15 @@ jobs:
               f"- `gui_skipped`: `{markdown_bool(summary['gui_skipped'])}`",
               f"- `negative_check`: `{summary['negative_check']['status']}`",
               "- Real-media gap: no real-world videos or failure-mode reference media are present.",
+              "",
+              "SO-101 model source inventory:",
+              f"- `status`: `{summary['so101_model_source_inventory']['status']}`",
+              f"- `scan_mode`: `{summary['so101_model_source_inventory']['source_configuration']['scan_mode']}`",
+              f"- `configured_roots`: `{summary['so101_model_source_inventory']['source_configuration']['model_source_roots']}`",
+              f"- `configured_extra_roots`: `{summary['so101_model_source_inventory']['source_configuration']['model_source_extra_roots']}`",
+              f"- `authoritative_paths`: `{summary['so101_model_source_inventory']['source_configuration']['authoritative_model_paths']}`",
+              f"- `authoritative_roots`: `{summary['so101_model_source_inventory']['source_configuration']['authoritative_model_roots']}`",
+              "- `--ik-model-path` is forwarded only to the contract checker and IK drill, not to source authority.",
               "",
           ]
           rendered = "\n".join(lines) + "\n"
