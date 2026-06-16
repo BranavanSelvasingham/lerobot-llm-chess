@@ -16,29 +16,31 @@ CATEGORY_ORDER = {
     "real_reference_media": 1,
     "reference_media_comparison": 2,
     "reference_camera_tuning_diagnostics": 3,
-    "reference_capture_checklist": 4,
-    "visual_review": 5,
-    "real_reference_comparison": 6,
-    "real_projection_intake": 7,
-    "ranked_candidate": 8,
-    "perception_fixture": 9,
-    "sim_camera_pose_fixture": 10,
-    "so101_model_source_inventory": 11,
-    "so101_model_bundle_manifest": 12,
-    "so101_model_contract": 13,
-    "so101_model_asset_preflight": 14,
-    "ik_reachability": 15,
-    "gripper_camera_pov": 16,
-    "app_entrypoint": 17,
-    "pick_place_scenario": 18,
-    "negative_check": 19,
-    "logs": 20,
+    "sim_camera_profile_sweep": 4,
+    "reference_capture_checklist": 5,
+    "visual_review": 6,
+    "real_reference_comparison": 7,
+    "real_projection_intake": 8,
+    "ranked_candidate": 9,
+    "perception_fixture": 10,
+    "sim_camera_pose_fixture": 11,
+    "so101_model_source_inventory": 12,
+    "so101_model_bundle_manifest": 13,
+    "so101_model_contract": 14,
+    "so101_model_asset_preflight": 15,
+    "ik_reachability": 16,
+    "gripper_camera_pov": 17,
+    "app_entrypoint": 18,
+    "pick_place_scenario": 19,
+    "negative_check": 20,
+    "logs": 21,
 }
 CATEGORY_LABELS = {
     "reference_media_inventory": "Reference Media Inventory",
     "real_reference_media": "Real Reference Media",
     "reference_media_comparison": "Reference Media Comparison",
     "reference_camera_tuning_diagnostics": "Reference Camera Tuning Diagnostics",
+    "sim_camera_profile_sweep": "SimCamera Profile Sweep",
     "reference_capture_checklist": "Reference Capture Checklist",
     "visual_review": "Visual Review Artifacts",
     "real_reference_comparison": "Real Reference Comparisons",
@@ -442,6 +444,88 @@ def reference_camera_tuning_artifact_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("no_videos", ""),
         "ok" if artifact.get("exists") is True else "missing",
     ]
+
+
+def sim_camera_profile_sweep_signal(
+    index: dict[str, Any],
+    suite: dict[str, Any] | None,
+) -> dict[str, Any]:
+    sweep = index.get("sim_camera_profile_sweep")
+    if isinstance(sweep, dict) and sweep:
+        return sweep
+    if suite is not None and isinstance(suite.get("sim_camera_profile_sweep"), dict):
+        return suite["sim_camera_profile_sweep"]
+    return {}
+
+
+def sim_camera_profile_sweep_artifact_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("profile_name", ""),
+        metrics.get("current_gripper_finger_width_px", ""),
+        metrics.get("marker_time_seconds", ""),
+        metrics.get("candidate_count", ""),
+        metrics.get("best_candidate_id", ""),
+        metrics.get("current_mean_abs_delta", ""),
+        metrics.get("current_rmse", ""),
+        metrics.get("best_mean_abs_delta", ""),
+        metrics.get("best_rmse", ""),
+        metrics.get("mean_abs_delta_delta_vs_current", ""),
+        metrics.get("rmse_delta_vs_current", ""),
+        metrics.get("candidate_id", ""),
+        metrics.get("candidate_mean_abs_delta", ""),
+        metrics.get("candidate_rmse", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def sim_camera_profile_sweep_ranking_rows(sweep: dict[str, Any]) -> list[list[Any]]:
+    ranking = sweep.get("candidate_ranking")
+    ranking_rows = ranking if isinstance(ranking, list) else []
+    rows: list[list[Any]] = []
+    for row in ranking_rows:
+        if not isinstance(row, dict):
+            continue
+        artifacts = row.get("artifact_paths")
+        artifacts = artifacts if isinstance(artifacts, dict) else {}
+        annotated_path = artifacts.get("annotated_path")
+        rows.append(
+            [
+                row.get("rank", ""),
+                row.get("candidate_id", ""),
+                row.get("description", ""),
+                row.get("mean_abs_delta", ""),
+                row.get("rmse", ""),
+                row.get("mean_abs_delta_delta_vs_current", ""),
+                row.get("rmse_delta_vs_current", ""),
+                markdown_link(str(annotated_path), str(annotated_path)) if annotated_path else "",
+            ]
+        )
+    return rows
+
+
+def sim_camera_profile_sweep_prompt_rows(sweep: dict[str, Any]) -> list[list[Any]]:
+    prompts = sweep.get("remaining_tuning_prompts")
+    prompt_rows = prompts if isinstance(prompts, list) else []
+    rows: list[list[Any]] = []
+    for prompt in prompt_rows:
+        if not isinstance(prompt, dict):
+            continue
+        rows.append(
+            [
+                prompt.get("candidate_id", ""),
+                prompt.get("description", ""),
+                prompt.get("mean_abs_delta_delta_vs_current", ""),
+                prompt.get("rmse_delta_vs_current", ""),
+            ]
+        )
+    return rows
 
 
 def manifest_signal(index: dict[str, Any], suite: dict[str, Any] | None) -> dict[str, Any]:
@@ -1431,6 +1515,105 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         else ["_No reference camera tuning diagnostics artifacts indexed._"]
     )
 
+    lines.extend(["", "## SimCamera Profile Sweep"])
+    profile_sweep = sim_camera_profile_sweep_signal(index, suite)
+    profile_sweep_artifacts = grouped.get("sim_camera_profile_sweep", [])
+    current_vs_best = profile_sweep.get("current_vs_best_metrics")
+    current_vs_best = current_vs_best if isinstance(current_vs_best, dict) else {}
+    lines.append(
+        "This deterministic hardware-free child renders the current SimCamera profile and "
+        "explicit perturbation candidates against the saved gripper reference. Full-frame "
+        "image deltas are coarse review evidence, not physical calibration truth."
+    )
+    lines.extend(
+        table(
+            ["Field", "Value"],
+            [
+                ["status", profile_sweep.get("status", "")],
+                ["profile_name", profile_sweep.get("profile_name", "")],
+                [
+                    "current_gripper_finger_width_px",
+                    profile_sweep.get("current_gripper_finger_width_px", ""),
+                ],
+                ["marker_time_seconds", profile_sweep.get("marker_time_seconds", "")],
+                ["candidate_count", profile_sweep.get("candidate_count", "")],
+                ["current_mean_abs_delta", current_vs_best.get("current_mean_abs_delta", "")],
+                ["current_rmse", current_vs_best.get("current_rmse", "")],
+                ["best_candidate_id", profile_sweep.get("best_candidate_id", "")],
+                ["best_candidate_name", profile_sweep.get("best_candidate_name", "")],
+                ["best_mean_abs_delta", current_vs_best.get("best_mean_abs_delta", "")],
+                ["best_rmse", current_vs_best.get("best_rmse", "")],
+                [
+                    "mean_abs_delta_delta_vs_current",
+                    current_vs_best.get("mean_abs_delta_delta_vs_current", ""),
+                ],
+                ["rmse_delta_vs_current", current_vs_best.get("rmse_delta_vs_current", "")],
+                [
+                    "full_frame_image_delta_caveat",
+                    profile_sweep.get("full_frame_image_delta_caveat", ""),
+                ],
+                ["summary_path", profile_sweep.get("summary_path", "")],
+                ["candidate_montage_path", profile_sweep.get("candidate_montage_path", "")],
+                ["candidate_dir", profile_sweep.get("candidate_dir", "")],
+            ],
+        )
+    )
+    lines.extend(["", "### Candidate Ranking"])
+    ranking_rows = sim_camera_profile_sweep_ranking_rows(profile_sweep)
+    lines.extend(
+        linked_table(
+            [
+                "Rank",
+                "Candidate",
+                "Description",
+                "MAD",
+                "RMSE",
+                "MAD Delta",
+                "RMSE Delta",
+                "Annotated Frame",
+            ],
+            ranking_rows,
+        )
+        if ranking_rows
+        else ["_No SimCamera profile sweep ranking was available._"]
+    )
+    lines.extend(["", "### Remaining Tuning Prompts"])
+    prompt_rows = sim_camera_profile_sweep_prompt_rows(profile_sweep)
+    lines.extend(
+        table(["Candidate", "Description", "MAD Delta", "RMSE Delta"], prompt_rows)
+        if prompt_rows
+        else ["_No lower-MAD perturbation prompts remained in this sweep._"]
+    )
+    lines.extend(["", "### Sweep Artifacts"])
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Profile",
+                "Finger Width",
+                "Marker Time",
+                "Candidates",
+                "Best",
+                "Current MAD",
+                "Current RMSE",
+                "Best MAD",
+                "Best RMSE",
+                "MAD Delta",
+                "RMSE Delta",
+                "Candidate",
+                "Candidate MAD",
+                "Candidate RMSE",
+                "Artifact Status",
+            ],
+            [sim_camera_profile_sweep_artifact_row(row) for row in profile_sweep_artifacts],
+        )
+        if profile_sweep_artifacts
+        else ["_No SimCamera profile sweep artifacts indexed._"]
+    )
+
     lines.extend(["", "## Reference Capture Checklist"])
     checklist = reference_capture_checklist_signal(index, suite)
     checklist_artifacts = grouped.get("reference_capture_checklist", [])
@@ -2174,6 +2357,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "- The SO-101 model bundle manifest checker is hardware-free evidence for one reviewed bundle; it forwards model path and asset roots only when `ready_for_model_backed_ik` is true and explicit IK CLI inputs do not take precedence.",
             "- The SO-101 model contract checker is a hardware-free preflight for model availability, direct RobotKinematics usability, and joint/frame/TCP alignment inputs.",
             "- The IK reachability drill is a hardware-free feasibility gate; `model_unavailable_fallback_complete` remains a deliberate non-failing status until a repo-local SO-101 model is wired in.",
+            "- The SimCamera profile sweep is deterministic synthetic review evidence; its full-frame image deltas are coarse prompts, not physical calibration truth.",
             "- The metadata-native projection/depth view is the simulator camera-model-aligned ground-truth artifact; rendered-overlay PnP diagnostics are source-mismatch evidence, not depth authority.",
             "- SimCamera pose fixture intrinsics/extrinsics are simulator reference metadata, not physical calibration truth.",
             "- Gripper-camera POV visibility and clearance values are synthetic metadata evidence, not real-camera segmentation or physical contact proof.",

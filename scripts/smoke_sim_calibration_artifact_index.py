@@ -15,23 +15,24 @@ CATEGORY_ORDER = {
     "real_reference_media": 1,
     "reference_media_comparison": 2,
     "reference_camera_tuning_diagnostics": 3,
-    "reference_capture_checklist": 4,
-    "visual_review": 5,
-    "real_reference_comparison": 6,
-    "real_projection_intake": 7,
-    "ranked_candidate": 8,
-    "perception_fixture": 9,
-    "sim_camera_pose_fixture": 10,
-    "so101_model_source_inventory": 11,
-    "so101_model_bundle_manifest": 12,
-    "so101_model_contract": 13,
-    "so101_model_asset_preflight": 14,
-    "ik_reachability": 15,
-    "gripper_camera_pov": 16,
-    "app_entrypoint": 17,
-    "pick_place_scenario": 18,
-    "negative_check": 19,
-    "logs": 20,
+    "sim_camera_profile_sweep": 4,
+    "reference_capture_checklist": 5,
+    "visual_review": 6,
+    "real_reference_comparison": 7,
+    "real_projection_intake": 8,
+    "ranked_candidate": 9,
+    "perception_fixture": 10,
+    "sim_camera_pose_fixture": 11,
+    "so101_model_source_inventory": 12,
+    "so101_model_bundle_manifest": 13,
+    "so101_model_contract": 14,
+    "so101_model_asset_preflight": 15,
+    "ik_reachability": 16,
+    "gripper_camera_pov": 17,
+    "app_entrypoint": 18,
+    "pick_place_scenario": 19,
+    "negative_check": 20,
+    "logs": 21,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -494,6 +495,122 @@ def collect_reference_camera_tuning_diagnostics_artifacts(
         "suggested_tuning_dimension_names": suggestion_names,
         "input": source.get("input"),
         "limits": source.get("limits"),
+    }
+
+
+def collect_sim_camera_profile_sweep_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    sweep = suite.get("sim_camera_profile_sweep")
+    sweep = sweep if isinstance(sweep, dict) else {}
+    artifact_paths = sweep.get("artifact_paths")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    current_vs_best = sweep.get("current_vs_best_metrics")
+    current_vs_best = current_vs_best if isinstance(current_vs_best, dict) else {}
+    metrics = {
+        "status": sweep.get("status"),
+        "ok": sweep.get("ok"),
+        "profile_name": sweep.get("profile_name"),
+        "current_gripper_finger_width_px": sweep.get("current_gripper_finger_width_px"),
+        "marker_time_seconds": sweep.get("marker_time_seconds"),
+        "candidate_count": sweep.get("candidate_count"),
+        "current_mean_abs_delta": sweep.get(
+            "current_mean_abs_delta",
+            current_vs_best.get("current_mean_abs_delta"),
+        ),
+        "current_rmse": sweep.get("current_rmse", current_vs_best.get("current_rmse")),
+        "best_candidate_id": sweep.get("best_candidate_id"),
+        "best_candidate_name": sweep.get("best_candidate_name"),
+        "best_mean_abs_delta": sweep.get(
+            "best_mean_abs_delta",
+            current_vs_best.get("best_mean_abs_delta"),
+        ),
+        "best_rmse": sweep.get("best_rmse", current_vs_best.get("best_rmse")),
+        "mean_abs_delta_delta_vs_current": sweep.get(
+            "mean_abs_delta_delta_vs_current",
+            current_vs_best.get("mean_abs_delta_delta_vs_current"),
+        ),
+        "rmse_delta_vs_current": sweep.get(
+            "rmse_delta_vs_current",
+            current_vs_best.get("rmse_delta_vs_current"),
+        ),
+        "full_frame_image_delta_caveat": sweep.get("full_frame_image_delta_caveat"),
+        "remaining_tuning_prompt_count": len(sweep.get("remaining_tuning_prompts") or []),
+    }
+    for key, label_suffix in (
+        ("summary_json", "summary"),
+        ("candidate_montage_jpg", "candidate_montage"),
+        ("candidate_dir", "candidate_dir"),
+        ("current_overlay_jpg", "current_overlay"),
+        ("current_absolute_difference_jpg", "current_absolute_difference"),
+        ("current_side_by_side_jpg", "current_side_by_side"),
+        ("best_overlay_jpg", "best_overlay"),
+        ("best_absolute_difference_jpg", "best_absolute_difference"),
+        ("best_side_by_side_jpg", "best_side_by_side"),
+    ):
+        add_path(
+            artifacts,
+            category="sim_camera_profile_sweep",
+            label=f"sim_camera_profile_sweep:{label_suffix}",
+            value=artifact_paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"sim_camera_profile_sweep.artifact_paths.{key}",
+            metrics=metrics,
+        )
+
+    ranking = sweep.get("candidate_ranking")
+    ranking_rows = ranking if isinstance(ranking, list) else []
+    for row in ranking_rows:
+        if not isinstance(row, dict):
+            continue
+        candidate_id = row.get("candidate_id")
+        candidate_id = candidate_id if isinstance(candidate_id, str) else None
+        rank = row.get("rank") if isinstance(row.get("rank"), int) else None
+        row_artifacts = row.get("artifact_paths")
+        row_artifacts = row_artifacts if isinstance(row_artifacts, dict) else {}
+        candidate_metrics = {
+            **metrics,
+            "candidate_id": candidate_id,
+            "candidate_name": row.get("candidate_name"),
+            "candidate_description": row.get("description"),
+            "candidate_mean_abs_delta": row.get("mean_abs_delta"),
+            "candidate_rmse": row.get("rmse"),
+            "candidate_mean_abs_delta_delta_vs_current": row.get(
+                "mean_abs_delta_delta_vs_current"
+            ),
+            "candidate_rmse_delta_vs_current": row.get("rmse_delta_vs_current"),
+        }
+        for key, label_suffix in (("frame_path", "frame"), ("annotated_path", "annotated")):
+            add_path(
+                artifacts,
+                category="sim_camera_profile_sweep",
+                label=f"sim_camera_profile_sweep:{candidate_id}:{label_suffix}",
+                value=row_artifacts.get(key),
+                suite_summary_path=suite_summary_path,
+                output_dir=output_dir,
+                repo_root=repo_root,
+                source=f"sim_camera_profile_sweep.candidate_ranking.{key}",
+                metrics=candidate_metrics,
+                rank=rank,
+                candidate_id=candidate_id,
+            )
+
+    return {
+        **metrics,
+        "summary_path": artifact_paths.get("summary_json") or sweep.get("summary_path"),
+        "candidate_montage_path": artifact_paths.get("candidate_montage_jpg"),
+        "candidate_dir": artifact_paths.get("candidate_dir"),
+        "artifact_paths": artifact_paths,
+        "candidate_ranking": ranking_rows,
+        "remaining_tuning_prompts": sweep.get("remaining_tuning_prompts"),
+        "current_vs_best_metrics": current_vs_best,
     }
 
 
@@ -2274,6 +2391,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    sim_camera_profile_sweep = collect_sim_camera_profile_sweep_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
 
     reference_media_inventory = collect_reference_media_inventory_artifacts(
         suite=suite,
@@ -2453,6 +2577,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "reference_media_inventory": reference_media_inventory,
         "reference_media_comparison": reference_media_comparison,
         "reference_camera_tuning_diagnostics": reference_camera_tuning_diagnostics,
+        "sim_camera_profile_sweep": sim_camera_profile_sweep,
         "selected_real_reference_media": selected_media,
         "reference_capture_checklist": reference_capture_checklist,
         "real_projection_intake": real_projection_intake,
