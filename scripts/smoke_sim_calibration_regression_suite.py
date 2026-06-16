@@ -64,6 +64,46 @@ def parse_args() -> argparse.Namespace:
             "and non-failing."
         ),
     )
+    parser.add_argument(
+        "--so101-model-source-root",
+        type=Path,
+        action="append",
+        default=[],
+        help=(
+            "Reviewed SO-101 model-source root passed to the source inventory as --root. "
+            "Repeatable. Supplying this replaces the inventory child default repo-local roots."
+        ),
+    )
+    parser.add_argument(
+        "--so101-model-source-extra-root",
+        type=Path,
+        action="append",
+        default=[],
+        help=(
+            "Additional reviewed SO-101 model-source root passed to the source inventory as "
+            "--extra-root while retaining its default repo-local roots. Repeatable."
+        ),
+    )
+    parser.add_argument(
+        "--so101-authoritative-model-path",
+        type=Path,
+        action="append",
+        default=[],
+        help=(
+            "Reviewed authoritative SO-101 model path passed to the source inventory as "
+            "--authoritative-path. Repeatable. This is separate from --ik-model-path."
+        ),
+    )
+    parser.add_argument(
+        "--so101-authoritative-model-root",
+        type=Path,
+        action="append",
+        default=[],
+        help=(
+            "Reviewed authoritative SO-101 model root passed to the source inventory as "
+            "--authoritative-root. Repeatable. This is separate from --ik-model-path."
+        ),
+    )
     parser.add_argument("--base-profile", default=DEFAULT_BASE_PROFILE)
     parser.add_argument("--source-square", default="e4")
     parser.add_argument("--target-square", default="e5")
@@ -97,6 +137,62 @@ def markdown_bool(value: Any) -> str:
     return str(value)
 
 
+def cli_path_values(paths: list[Path] | None) -> list[str]:
+    if not paths:
+        return []
+    return [str(path.expanduser()) for path in paths]
+
+
+def markdown_list_value(values: Any) -> str:
+    if not isinstance(values, list) or not values:
+        return "none"
+    return "; ".join(str(value) for value in values)
+
+
+def so101_model_source_inventory_config(args: argparse.Namespace) -> dict[str, Any]:
+    roots = cli_path_values(args.so101_model_source_root)
+    extra_roots = cli_path_values(args.so101_model_source_extra_root)
+    authoritative_paths = cli_path_values(args.so101_authoritative_model_path)
+    authoritative_roots = cli_path_values(args.so101_authoritative_model_root)
+    return {
+        "scan_mode": "explicit_roots" if roots else "default_repo_roots",
+        "model_source_roots": roots,
+        "model_source_extra_roots": extra_roots,
+        "authoritative_model_paths": authoritative_paths,
+        "authoritative_model_roots": authoritative_roots,
+        "ik_model_path_is_authority": False,
+        "ik_model_path_forwarded_to_inventory": False,
+        "ik_model_path": str(args.ik_model_path.expanduser()) if args.ik_model_path is not None else None,
+        "notes": [
+            "--ik-model-path is forwarded only to the model contract checker and IK reachability drill.",
+            "Inventory authority must be declared with --so101-authoritative-model-path or --so101-authoritative-model-root.",
+        ],
+    }
+
+
+def so101_model_source_inventory_command(
+    *,
+    python: str,
+    inventory_dir: Path,
+    args: argparse.Namespace,
+) -> list[str]:
+    command = [
+        python,
+        str(REPO_ROOT / "scripts" / "smoke_sim_so101_model_source_inventory.py"),
+        "--output-dir",
+        str(inventory_dir),
+    ]
+    for root in args.so101_model_source_root:
+        command.extend(["--root", str(root.expanduser())])
+    for root in args.so101_model_source_extra_root:
+        command.extend(["--extra-root", str(root.expanduser())])
+    for path in args.so101_authoritative_model_path:
+        command.extend(["--authoritative-path", str(path.expanduser())])
+    for root in args.so101_authoritative_model_root:
+        command.extend(["--authoritative-root", str(root.expanduser())])
+    return command
+
+
 def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) -> Path:
     markers = summary.get("skipped_markers")
     markers = markers if isinstance(markers, dict) else {}
@@ -107,6 +203,10 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
     visual_review = visual_review if isinstance(visual_review, dict) else {}
     recording = visual_review.get("recording")
     recording = recording if isinstance(recording, dict) else {}
+    so101_inventory = summary.get("so101_model_source_inventory")
+    so101_inventory = so101_inventory if isinstance(so101_inventory, dict) else {}
+    so101_source_config = so101_inventory.get("source_configuration")
+    so101_source_config = so101_source_config if isinstance(so101_source_config, dict) else {}
     readme_path = output_dir / ARTIFACT_ENTRYPOINT_NAME
     lines = [
         "# Simulator Calibration Regression Artifacts",
@@ -203,6 +303,17 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             "candidate counts, authoritative-source status, provenance/license diagnostics, "
             "and a recommended contract-check candidate only when one is discovered; "
             "`--ik-model-path` is not treated as authoritative by this inventory gate."
+        ),
+        (
+            "- SO-101 inventory source configuration: "
+            f"mode `{so101_source_config.get('scan_mode')}`; roots "
+            f"`{markdown_list_value(so101_source_config.get('model_source_roots'))}`; extra roots "
+            f"`{markdown_list_value(so101_source_config.get('model_source_extra_roots'))}`; "
+            f"authoritative paths "
+            f"`{markdown_list_value(so101_source_config.get('authoritative_model_paths'))}`; "
+            f"authoritative roots "
+            f"`{markdown_list_value(so101_source_config.get('authoritative_model_roots'))}`; "
+            "`--ik-model-path` authority `false`."
         ),
         (
             "- SO-101 model contract evidence records model availability, direct "
@@ -862,6 +973,7 @@ def so101_model_contract_section(contract: dict[str, Any] | None, summary_path: 
 def so101_model_source_inventory_section(
     inventory: dict[str, Any] | None,
     summary_path: Path,
+    source_configuration: dict[str, Any],
 ) -> dict[str, Any]:
     inventory = inventory if isinstance(inventory, dict) else {}
     artifacts = inventory.get("artifacts")
@@ -884,6 +996,11 @@ def so101_model_source_inventory_section(
         "direct_contract_candidate_count": inventory.get("direct_contract_candidate_count"),
         "authoritative_candidate_count": inventory.get("authoritative_candidate_count"),
         "root_count": inventory.get("root_count"),
+        "source_configuration": source_configuration,
+        "configured_model_source_roots": source_configuration.get("model_source_roots"),
+        "configured_model_source_extra_roots": source_configuration.get("model_source_extra_roots"),
+        "configured_authoritative_model_paths": source_configuration.get("authoritative_model_paths"),
+        "configured_authoritative_model_roots": source_configuration.get("authoritative_model_roots"),
         "recommended_contract_check": recommended_contract_check,
         "recommended_contract_check_path": (
             recommended_contract_check.get("candidate_path")
@@ -1241,14 +1358,14 @@ def main() -> int:
     so101_model_source_inventory_summary_path = (
         so101_model_source_inventory_dir / SO101_MODEL_SOURCE_INVENTORY_SUMMARY_NAME
     )
+    so101_source_config = so101_model_source_inventory_config(args)
     so101_model_source_inventory_record, so101_model_source_inventory = run_child(
         name="so101_model_source_inventory",
-        command=[
-            python,
-            str(REPO_ROOT / "scripts" / "smoke_sim_so101_model_source_inventory.py"),
-            "--output-dir",
-            str(so101_model_source_inventory_dir),
-        ],
+        command=so101_model_source_inventory_command(
+            python=python,
+            inventory_dir=so101_model_source_inventory_dir,
+            args=args,
+        ),
         output_dir=so101_model_source_inventory_dir,
         expected_json_path=so101_model_source_inventory_summary_path,
     )
@@ -1396,6 +1513,7 @@ def main() -> int:
             "openai": "Suite and child smokes exercise local simulator/tool paths only; no OpenAI credentials or network calls are required.",
         },
         "candidate_inputs": candidate_paths,
+        "so101_model_source_inventory_config": so101_source_config,
         "child_commands": child_records,
         "reference_media_manifest": manifest_status_section(
             requested_manifest=args.reference_media_manifest,
@@ -1437,6 +1555,7 @@ def main() -> int:
         "so101_model_source_inventory": so101_model_source_inventory_section(
             so101_model_source_inventory,
             so101_model_source_inventory_summary_path,
+            so101_source_config,
         ),
         "so101_model_contract": so101_model_contract_section(
             so101_model_contract,

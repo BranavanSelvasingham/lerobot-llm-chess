@@ -141,6 +141,34 @@ def markdown_code(value: Any) -> str:
     return f"`{escaped}`"
 
 
+def compact_list(value: Any) -> str:
+    if not isinstance(value, list) or not value:
+        return ""
+    return "<br>".join(markdown_code(item) for item in value)
+
+
+def source_root_summary(metrics: dict[str, Any]) -> str:
+    parts = []
+    roots = compact_list(metrics.get("configured_model_source_roots"))
+    extra_roots = compact_list(metrics.get("configured_model_source_extra_roots"))
+    if roots:
+        parts.append(f"roots:<br>{roots}")
+    if extra_roots:
+        parts.append(f"extra:<br>{extra_roots}")
+    return "<br>".join(parts)
+
+
+def source_authority_summary(metrics: dict[str, Any]) -> str:
+    parts = []
+    paths = compact_list(metrics.get("configured_authoritative_model_paths"))
+    roots = compact_list(metrics.get("configured_authoritative_model_roots"))
+    if paths:
+        parts.append(f"paths:<br>{paths}")
+    if roots:
+        parts.append(f"roots:<br>{roots}")
+    return "<br>".join(parts)
+
+
 def display_path(artifact: dict[str, Any]) -> str:
     for key in ("relative_path", "repo_relative_path", "path"):
         value = artifact.get(key)
@@ -782,6 +810,9 @@ def so101_model_source_inventory_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("likely_candidate_count", ""),
         metrics.get("direct_contract_candidate_count", ""),
         metrics.get("authoritative_candidate_count", ""),
+        metrics.get("source_scan_mode", ""),
+        source_root_summary(metrics),
+        source_authority_summary(metrics),
         metrics.get("recommended_contract_check_path", ""),
         "ok" if artifact.get("exists") is True else "missing",
     ]
@@ -1533,6 +1564,9 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Likely",
                 "Direct Contract",
                 "Authoritative",
+                "Source Mode",
+                "Configured Roots",
+                "Authority Inputs",
                 "Recommended Contract Path",
                 "Artifact Status",
             ],

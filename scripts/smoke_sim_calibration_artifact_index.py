@@ -1285,6 +1285,8 @@ def collect_so101_model_source_inventory_artifacts(
         if isinstance(recommended_contract_check, dict)
         else {}
     )
+    source_configuration = inventory.get("source_configuration")
+    source_configuration = source_configuration if isinstance(source_configuration, dict) else {}
     metrics = {
         "status": inventory.get("status"),
         "ok": inventory.get("ok"),
@@ -1293,6 +1295,12 @@ def collect_so101_model_source_inventory_artifacts(
         "direct_contract_candidate_count": inventory.get("direct_contract_candidate_count"),
         "authoritative_candidate_count": inventory.get("authoritative_candidate_count"),
         "root_count": inventory.get("root_count"),
+        "source_scan_mode": source_configuration.get("scan_mode"),
+        "configured_model_source_roots": source_configuration.get("model_source_roots"),
+        "configured_model_source_extra_roots": source_configuration.get("model_source_extra_roots"),
+        "configured_authoritative_model_paths": source_configuration.get("authoritative_model_paths"),
+        "configured_authoritative_model_roots": source_configuration.get("authoritative_model_roots"),
+        "ik_model_path_is_authority": source_configuration.get("ik_model_path_is_authority"),
         "recommended_contract_check_path": inventory.get("recommended_contract_check_path")
         or recommended_contract_check.get("candidate_path"),
         "recommended_contract_check_candidate_id": recommended_contract_check.get("candidate_id"),
@@ -1324,6 +1332,7 @@ def collect_so101_model_source_inventory_artifacts(
         "likely_candidate_count": inventory.get("likely_candidate_count"),
         "direct_contract_candidate_count": inventory.get("direct_contract_candidate_count"),
         "authoritative_candidate_count": inventory.get("authoritative_candidate_count"),
+        "source_configuration": source_configuration,
         "recommended_contract_check_path": metrics["recommended_contract_check_path"],
         "recommended_contract_check": recommended_contract_check or None,
         "diagnostics": inventory.get("diagnostics"),
