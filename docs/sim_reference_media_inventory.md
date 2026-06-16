@@ -37,6 +37,18 @@ The output directory contains:
 - `reference_media_inventory.csv`: flat review rows with path, root, extension, size, dimensions/duration when available, and heuristic classifications.
 - `README.md`: reviewer entrypoint with counts, roots, missing evidence, and renderer guidance.
 
+Focused inventory-driven SimCamera comparison:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_reference_media_comparison_set.py \
+  --inventory-json /private/tmp/lerobot_sim/reference_media_inventory/reference_media_inventory.json \
+  --output-dir /private/tmp/lerobot_sim/reference_media_comparison_set
+```
+
+This smoke reads an existing inventory JSON and ranks a small candidate set before rendering any image artifact. The ranking is deterministic and favors the active/current gripper reference, records classified as `camera_pov` + `chessboard_board` + `gripper_arm`, repo-local media before external absolute sibling paths, and image rows before videos or calibration-data-only rows. It writes `comparison_set_summary.json`, `reference_media_comparison_rows.csv`, `README.md`, and, when OpenCV/numpy rendering is available, `reference_media_comparison_contact_sheet.png` plus per-reference derived side-by-side/overlay/difference images under `references/`.
+
+The comparison smoke never copies media into the repository. Repo-local and sibling media paths remain references to local evidence only; the generated artifacts live under the requested output directory. If rendering dependencies are unavailable, the smoke preserves metadata-only evidence and records the dependency gap instead of failing the inventory review path.
+
 Candidates include common image and video extensions plus `.json`, `.yaml`, and `.yml` files whose path or first small text chunk contains camera/calibration/board/depth keywords. The script excludes VCS, virtualenv, cache, build, and generated temp directories. Image dimensions are read with Pillow when already installed, otherwise by limited stdlib header parsing for supported formats. Video duration and dimensions are read only when `ffprobe` or OpenCV is already available. Missing metadata is non-failing.
 
 Each candidate gets transparent heuristic classes:
@@ -52,5 +64,7 @@ Each candidate gets transparent heuristic classes:
 Top-level `status` is `media_inventory_complete` when candidates are found and `media_inventory_empty` when none are found. `reference_gaps` can include `missing_gripper_pov`, `missing_board_closeup`, `missing_depth_reference`, `missing_calibration_target`, and `missing_pick_place_video`.
 
 Synthetic/example fixture paths are still listed as candidates, but they do not close real-reference gaps. The gaps are intended to answer whether reviewed real project or sibling evidence exists, not whether schema fixtures exercise downstream code.
+
+The comparison smoke carries those gaps forward in `diagnostics`: `missing_depth_reference`, `missing_pick_place_video`, `no_videos`, synthetic/example rows remaining diagnostic-only, and external absolute paths being local evidence only. That makes the artifact useful for camera-first simulator tuning while still making clear that missing depth, pick/place video, and physical calibration inputs remain open.
 
 Future simulator renderers should use found project or sibling media as local reference evidence for synthetic camera framing, board texture/lighting, gripper occlusion, and workspace geometry. Keep large photos/videos out of this repository unless they are intentionally reviewed fixtures; instead, record their local paths, provenance, and limitations in the inventory/manifest workflow and preserve explicit visibility gaps rather than inventing calibration truth.

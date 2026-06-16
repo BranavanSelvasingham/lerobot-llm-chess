@@ -10,6 +10,8 @@ The suite passes when `/private/tmp/lerobot_sim/calibration_regression_suite/cal
 
 The suite also runs `smoke_sim_reference_media_inventory.py` as the first child under `reference_media_inventory/`, preserving `reference_media_inventory.json`, `reference_media_inventory.csv`, and `README.md`. `calibration_regression_summary.json.reference_media_inventory` records inventory status, candidate/image/video/calibration-data counts, currently wired media count, current gripper reference detection, `reference_gaps`, artifact paths, scan roots, and child command diagnostics. The artifact index adds a `reference_media_inventory` category and the rendered report includes a `Reference Media Inventory` section before selected-media and visibility-gap tables.
 
+The follow-on `smoke_sim_reference_media_comparison_set.py` child reads that inventory JSON and writes `comparison_set/comparison_set_summary.json`, `comparison_set/reference_media_comparison_rows.csv`, `comparison_set/README.md`, and, when OpenCV/numpy rendering is available, `comparison_set/reference_media_comparison_contact_sheet.png` plus per-reference derived visual comparisons. Candidate selection is deterministic: active/current gripper reference first, then `camera_pov` + `chessboard_board` + `gripper_arm` class coverage, repo-local paths before external absolute sibling evidence, and image rows before video or calibration-data-only rows. Its diagnostics intentionally preserve `missing_depth_reference`, `missing_pick_place_video`, `no_videos`, synthetic/example rows as non-closing real gaps, and external absolute paths as local evidence only.
+
 To scan optional sibling evidence without committing media assets, pass repeatable roots:
 
 ```bash
@@ -384,6 +386,9 @@ Common artifact paths under the output directory:
 - `reference_media_inventory/reference_media_inventory.csv`
 - `reference_media_inventory/README.md`
 - `comparison_set/comparison_set_summary.json`
+- `comparison_set/reference_media_comparison_rows.csv`
+- `comparison_set/README.md`
+- `comparison_set/reference_media_comparison_contact_sheet.png` when rendering dependencies are available
 - `comparison_set/references/*/side_by_side.jpg`
 - `comparison_set/references/*/overlay.jpg`
 - `comparison_set/references/*/absolute_difference_heatmap.jpg`
