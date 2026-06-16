@@ -20,11 +20,12 @@ CATEGORY_ORDER = {
     "ranked_candidate": 5,
     "perception_fixture": 6,
     "sim_camera_pose_fixture": 7,
-    "gripper_camera_pov": 8,
-    "app_entrypoint": 9,
-    "pick_place_scenario": 10,
-    "negative_check": 11,
-    "logs": 12,
+    "ik_reachability": 8,
+    "gripper_camera_pov": 9,
+    "app_entrypoint": 10,
+    "pick_place_scenario": 11,
+    "negative_check": 12,
+    "logs": 13,
 }
 CATEGORY_LABELS = {
     "real_reference_media": "Real Reference Media",
@@ -35,6 +36,7 @@ CATEGORY_LABELS = {
     "ranked_candidate": "Ranked Candidate Captures",
     "perception_fixture": "Perception Fixture Evidence",
     "sim_camera_pose_fixture": "SimCamera Pose Fixture",
+    "ik_reachability": "IK Reachability Drill",
     "gripper_camera_pov": "Gripper-Camera POV Review",
     "app_entrypoint": "App Entrypoint Metadata",
     "pick_place_scenario": "Pick/Place Release Frames",
@@ -1471,6 +1473,36 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         else ["_No SimCamera pose fixture artifacts indexed._"]
     )
 
+    ik_reachability = grouped.get("ik_reachability", [])
+    lines.extend(["", "### IK Reachability Drill"])
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Row Count",
+                "Model Diagnostic",
+                "Solver",
+                "Status",
+            ],
+            [
+                [
+                    row.get("kind", ""),
+                    row.get("label", ""),
+                    markdown_link(display_path(row), link_path(row)),
+                    (row.get("metrics") or {}).get("row_count", ""),
+                    (row.get("metrics") or {}).get("model_diagnostic_status", ""),
+                    (row.get("metrics") or {}).get("model_solver_status", ""),
+                    "ok" if row.get("exists") else "missing",
+                ]
+                for row in ik_reachability
+            ],
+        )
+        if ik_reachability
+        else ["_No IK reachability artifacts indexed._"]
+    )
+
     pov = [
         row
         for row in grouped.get("gripper_camera_pov", [])
@@ -1570,6 +1602,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "- This report is a deterministic Markdown view of existing JSON artifacts only.",
             "- Visual review contact sheets are generated PNGs from existing suite frames and are the stable first-pass visual evidence.",
             "- The pick/place visual sequence is simulator-only evidence for approach, grasp/contact, lift/transfer, place/release, and retreat review.",
+            "- The IK reachability drill is a hardware-free feasibility gate; `model_unavailable_fallback_complete` remains a deliberate non-failing status until a repo-local SO-101 model is wired in.",
             "- The metadata-native projection/depth view is the simulator camera-model-aligned ground-truth artifact; rendered-overlay PnP diagnostics are source-mismatch evidence, not depth authority.",
             "- SimCamera pose fixture intrinsics/extrinsics are simulator reference metadata, not physical calibration truth.",
             "- Gripper-camera POV visibility and clearance values are synthetic metadata evidence, not real-camera segmentation or physical contact proof.",

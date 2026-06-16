@@ -19,11 +19,12 @@ CATEGORY_ORDER = {
     "ranked_candidate": 5,
     "perception_fixture": 6,
     "sim_camera_pose_fixture": 7,
-    "gripper_camera_pov": 8,
-    "app_entrypoint": 9,
-    "pick_place_scenario": 10,
-    "negative_check": 11,
-    "logs": 12,
+    "ik_reachability": 8,
+    "gripper_camera_pov": 9,
+    "app_entrypoint": 10,
+    "pick_place_scenario": 11,
+    "negative_check": 12,
+    "logs": 13,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -1144,6 +1145,66 @@ def collect_sim_camera_pose_fixture_artifacts(
     return metadata_contract
 
 
+def collect_ik_reachability_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    ik = suite.get("ik_reachability_drill")
+    ik = ik if isinstance(ik, dict) else {}
+    artifact_paths = ik.get("artifacts")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    model_diagnostic = ik.get("model_diagnostic")
+    model_diagnostic = model_diagnostic if isinstance(model_diagnostic, dict) else {}
+    model_solver = ik.get("model_solver")
+    model_solver = model_solver if isinstance(model_solver, dict) else {}
+    metrics = {
+        "status": ik.get("status"),
+        "ok": ik.get("ok"),
+        "row_count": ik.get("row_count"),
+        "counts_by_feasibility": ik.get("counts_by_feasibility"),
+        "model_diagnostic_status": model_diagnostic.get("status"),
+        "model_diagnostic_reason": model_diagnostic.get("reason"),
+        "repo_local_model_count": model_diagnostic.get("repo_local_model_count"),
+        "selected_model_path": model_diagnostic.get("selected_model_path"),
+        "selected_model_source": model_diagnostic.get("selected_model_source"),
+        "model_solver_available": model_solver.get("available"),
+        "model_solver_status": model_solver.get("status"),
+        "model_solver_backend": model_solver.get("solver_backend"),
+        "model_solver_reason": model_solver.get("reason"),
+    }
+    for key, label_suffix in (
+        ("summary_json", "summary"),
+        ("rows_csv", "rows"),
+        ("heatmap_png", "heatmap"),
+    ):
+        add_path(
+            artifacts,
+            category="ik_reachability",
+            label=f"ik_reachability:{label_suffix}",
+            value=artifact_paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"ik_reachability_drill.artifacts.{key}",
+            metrics=metrics,
+        )
+    return {
+        "status": ik.get("status"),
+        "ok": ik.get("ok"),
+        "summary_path": artifact_paths.get("summary_json") or ik.get("summary_path"),
+        "rows_csv_path": artifact_paths.get("rows_csv"),
+        "heatmap_png_path": artifact_paths.get("heatmap_png"),
+        "row_count": ik.get("row_count"),
+        "counts_by_feasibility": ik.get("counts_by_feasibility"),
+        "model_diagnostic": model_diagnostic,
+        "model_solver": model_solver,
+    }
+
+
 def collect_app_entrypoint_artifacts(
     *,
     suite: dict[str, Any],
@@ -1609,6 +1670,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    ik_reachability = collect_ik_reachability_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
     gripper_camera_pov = collect_gripper_camera_pov_artifacts(
         suite=suite,
         artifacts=artifacts,
@@ -1690,6 +1758,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "real_projection_intake": real_projection_intake,
         "visual_review": visual_review,
         "sim_camera_pose_fixture_metadata_contract": sim_camera_pose_metadata_contract,
+        "ik_reachability": ik_reachability,
         "gripper_camera_pov": gripper_camera_pov,
         "app_entrypoint_metadata_contract": app_entrypoint_metadata_contract,
         "pick_place_release_frame_count": sum(

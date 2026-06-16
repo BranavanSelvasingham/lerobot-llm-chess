@@ -22,6 +22,7 @@ REAL_PROJECTION_INTAKE_NAME = "real_projection_intake.json"
 EVIDENCE_BUNDLE_DIR_NAME = "evidence_bundle"
 EVIDENCE_BUNDLE_MD_NAME = "sim_evidence_bundle.md"
 EVIDENCE_BUNDLE_JSON_NAME = "sim_evidence_bundle.json"
+IK_REACHABILITY_SUMMARY_NAME = "ik_reachability_drill_summary.json"
 BASELINE_CORNERS = [[32, 338], [594, 340], [540, 20], [86, 12]]
 PERTURBED_CORNERS = [[34, 337], [592, 342], [538, 22], [88, 14]]
 
@@ -115,6 +116,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `session/session_summary.json`",
         "- `fixture/fixture_summary.json`",
         "- `sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json`",
+        "- `ik_reachability_drill/ik_reachability_drill_summary.json`",
+        "- `ik_reachability_drill/ik_reachability_drill_rows.csv`",
+        "- `ik_reachability_drill/ik_reachability_drill_heatmap.png`",
         "- `gripper_camera_pov_review/gripper_camera_pov_review_summary.json`",
         "- `pick_place_scenario_matrix/scenario_matrix_summary.json`",
         "- `app_entrypoint/smoke_sim_app_entrypoints_summary.json`",
@@ -175,6 +179,11 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         (
             "- Gripper-camera POV evidence records target center, projected square geometry, "
             "gripper opening, and synthetic visibility/occlusion/clearance rows."
+        ),
+        (
+            "- IK reachability evidence records deterministic Cartesian/delta/radial command "
+            "feasibility with summary JSON, rows CSV, and a heatmap PNG; missing repo-local "
+            "SO-101 models remain an explicit non-failing fallback diagnostic."
         ),
         (
             "- App-entrypoint metadata evidence runs `smoke_sim_app_entrypoints.py --sim` "
@@ -717,6 +726,49 @@ def gripper_camera_pov_section(pov: dict[str, Any] | None, summary_path: Path) -
     }
 
 
+def ik_reachability_section(ik: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
+    ik = ik if isinstance(ik, dict) else {}
+    artifacts = ik.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    row_summary = ik.get("summary")
+    row_summary = row_summary if isinstance(row_summary, dict) else {}
+    model_diagnostic = ik.get("model_diagnostic")
+    model_diagnostic = model_diagnostic if isinstance(model_diagnostic, dict) else {}
+    model_solver = ik.get("model_solver")
+    model_solver = model_solver if isinstance(model_solver, dict) else {}
+    return {
+        "summary_path": str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(ik.get("ok", False)),
+        "status": ik.get("status"),
+        "row_count": row_summary.get("row_count"),
+        "counts_by_feasibility": row_summary.get("counts_by_feasibility"),
+        "artifacts": {
+            "summary_json": artifacts.get("summary_json") if isinstance(artifacts.get("summary_json"), str) else str(summary_path),
+            "rows_csv": artifacts.get("rows_csv"),
+            "heatmap_png": artifacts.get("heatmap_png"),
+        },
+        "model_diagnostic": {
+            "status": model_diagnostic.get("status"),
+            "reason": model_diagnostic.get("reason"),
+            "selected_model_path": model_diagnostic.get("selected_model_path"),
+            "selected_model_source": model_diagnostic.get("selected_model_source"),
+            "repo_local_model_count": model_diagnostic.get("repo_local_model_count"),
+        },
+        "model_solver": {
+            "available": model_solver.get("available"),
+            "status": model_solver.get("status"),
+            "target_frame": model_solver.get("target_frame"),
+            "solver_backend": model_solver.get("solver_backend"),
+            "reason": model_solver.get("reason"),
+        },
+        "hardware_skipped": ik.get("hardware_skipped"),
+        "gui_skipped": ik.get("gui_skipped"),
+        "openai_skipped": ik.get("openai_skipped"),
+        "limitations": ik.get("limitations"),
+    }
+
+
 def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
     visual_review = visual_review if isinstance(visual_review, dict) else {}
     contact_sheets = visual_review.get("contact_sheets")
@@ -1049,6 +1101,20 @@ def main() -> int:
         expected_json_path=pose_fixture_summary_path,
     )
 
+    ik_reachability_dir = output_dir / "ik_reachability_drill"
+    ik_reachability_summary_path = ik_reachability_dir / IK_REACHABILITY_SUMMARY_NAME
+    ik_reachability_record, ik_reachability = run_child(
+        name="ik_reachability_drill",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_ik_reachability_drill.py"),
+            "--output-dir",
+            str(ik_reachability_dir),
+        ],
+        output_dir=ik_reachability_dir,
+        expected_json_path=ik_reachability_summary_path,
+    )
+
     pov_dir = output_dir / "gripper_camera_pov_review"
     pov_summary_path = pov_dir / "gripper_camera_pov_review_summary.json"
     pov_record, pov = run_child(
@@ -1121,6 +1187,7 @@ def main() -> int:
         "calibration_session_report": session_record,
         "perception_regression_fixture": fixture_record,
         "sim_camera_pose_fixture": pose_fixture_record,
+        "ik_reachability_drill": ik_reachability_record,
         "gripper_camera_pov_review": pov_record,
         "pick_place_scenario_matrix": matrix_record,
     }
@@ -1192,6 +1259,10 @@ def main() -> int:
         "sim_camera_pose_fixture": sim_camera_pose_fixture_section(
             pose_fixture,
             pose_fixture_summary_path,
+        ),
+        "ik_reachability_drill": ik_reachability_section(
+            ik_reachability,
+            ik_reachability_summary_path,
         ),
         "gripper_camera_pov_review": gripper_camera_pov_section(pov, pov_summary_path),
         "pick_place_scenario_matrix": matrix_summary_section(matrix, matrix_summary_path),

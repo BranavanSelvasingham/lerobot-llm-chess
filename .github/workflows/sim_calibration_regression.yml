@@ -140,6 +140,20 @@ jobs:
               assert Path(pose_fixture["metadata_paths"][case_id]).is_file(), (case_id, pose_fixture)
           assert pose_fixture["hardware_skipped"] is True, pose_fixture
           assert pose_fixture["gui_skipped"] is True, pose_fixture
+          ik_reachability = summary["ik_reachability_drill"]
+          assert ik_reachability["ok"] is True, ik_reachability
+          assert ik_reachability["status"] in {"ok_model_backed", "model_unavailable_fallback_complete"}, ik_reachability
+          assert isinstance(ik_reachability["row_count"], int) and ik_reachability["row_count"] > 0, ik_reachability
+          assert isinstance(ik_reachability["counts_by_feasibility"], dict) and ik_reachability["counts_by_feasibility"], ik_reachability
+          ik_artifacts = ik_reachability["artifacts"]
+          for key in ("summary_json", "rows_csv", "heatmap_png"):
+              assert isinstance(ik_artifacts.get(key), str) and Path(ik_artifacts[key]).is_file(), (key, ik_artifacts)
+          model_diagnostic = ik_reachability["model_diagnostic"]
+          assert model_diagnostic["status"] in {
+              "model_candidate_found",
+              "missing_model",
+              "model_unavailable",
+          }, model_diagnostic
           matrix = summary["pick_place_scenario_matrix"]
           assert matrix["ok"] is True, matrix
           assert matrix["aggregate_status"]["ok"] is True, matrix["aggregate_status"]
@@ -216,6 +230,7 @@ jobs:
               "ranked_candidate",
               "perception_fixture",
               "sim_camera_pose_fixture",
+              "ik_reachability",
               "pick_place_scenario",
               "negative_check",
               "logs",
@@ -269,6 +284,20 @@ jobs:
               and row.get("scenario_id") == "perturbed_board_pose_open_e4"
               for row in artifacts_by_category["sim_camera_pose_fixture"]
           ), artifacts_by_category["sim_camera_pose_fixture"]
+          assert any(
+              row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("status") in {"ok_model_backed", "model_unavailable_fallback_complete"}
+              for row in artifacts_by_category["ik_reachability"]
+          ), artifacts_by_category["ik_reachability"]
+          assert any(
+              row.get("kind") == "csv" and row.get("exists") is True
+              for row in artifacts_by_category["ik_reachability"]
+          ), artifacts_by_category["ik_reachability"]
+          assert any(
+              row.get("kind") == "image" and row.get("exists") is True
+              for row in artifacts_by_category["ik_reachability"]
+          ), artifacts_by_category["ik_reachability"]
           indexed_release_scenarios = {
               row.get("scenario_id")
               for row in artifacts_by_category["pick_place_scenario"]
@@ -330,6 +359,13 @@ jobs:
                           "case_ids": pose_fixture["case_ids"],
                           "frame_paths": pose_fixture["frame_paths"],
                       },
+                      "ik_reachability_drill": {
+                          "summary_path": ik_reachability["summary_path"],
+                          "row_count": ik_reachability["row_count"],
+                          "counts_by_feasibility": ik_reachability["counts_by_feasibility"],
+                          "artifacts": ik_artifacts,
+                          "model_diagnostic": model_diagnostic,
+                      },
                       "negative_check": summary["negative_check"]["status"],
                       "artifact_index": {
                           "path": str(artifact_index_path),
@@ -364,6 +400,7 @@ jobs:
               "session/session_summary.json",
               "fixture/fixture_summary.json",
               "sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json",
+              "ik_reachability_drill/ik_reachability_drill_summary.json",
               "pick_place_scenario_matrix/scenario_matrix_summary.json",
               "negative_empty_inventory/comparison_set_summary.json",
           ]
