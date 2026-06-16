@@ -275,6 +275,8 @@ For reference-media intake metadata without running the full suite, use the mani
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_reference_media_inventory.py --manifest archive/reference_media_manifest.example.json --output-dir /private/tmp/lerobot_sim/reference_media_inventory_manifest
 ```
 
+For the root-scanning inventory that emits JSON, CSV, README, real-reference classifications, optional sibling-root evidence, and explicit visibility gaps, see [docs/sim_reference_media_inventory.md](sim_reference_media_inventory.md).
+
 See [docs/sim_reference_media_intake.md](sim_reference_media_intake.md) for the manifest fields used to describe camera POV, board/piece/gripper visibility, calibration target intent, failure-mode coverage, simulator profile wiring, and limitations for future repo-local SO-101 photos/videos.
 
 ## GitHub Actions Signal
