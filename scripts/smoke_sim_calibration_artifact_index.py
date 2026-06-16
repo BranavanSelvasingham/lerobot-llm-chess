@@ -19,13 +19,14 @@ CATEGORY_ORDER = {
     "ranked_candidate": 5,
     "perception_fixture": 6,
     "sim_camera_pose_fixture": 7,
-    "so101_model_contract": 8,
-    "ik_reachability": 9,
-    "gripper_camera_pov": 10,
-    "app_entrypoint": 11,
-    "pick_place_scenario": 12,
-    "negative_check": 13,
-    "logs": 14,
+    "so101_model_source_inventory": 8,
+    "so101_model_contract": 9,
+    "ik_reachability": 10,
+    "gripper_camera_pov": 11,
+    "app_entrypoint": 12,
+    "pick_place_scenario": 13,
+    "negative_check": 14,
+    "logs": 15,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -1266,6 +1267,69 @@ def collect_so101_model_contract_artifacts(
     }
 
 
+def collect_so101_model_source_inventory_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    inventory = suite.get("so101_model_source_inventory")
+    inventory = inventory if isinstance(inventory, dict) else {}
+    artifact_paths = inventory.get("artifacts")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    recommended_contract_check = inventory.get("recommended_contract_check")
+    recommended_contract_check = (
+        recommended_contract_check
+        if isinstance(recommended_contract_check, dict)
+        else {}
+    )
+    metrics = {
+        "status": inventory.get("status"),
+        "ok": inventory.get("ok"),
+        "candidate_count": inventory.get("candidate_count"),
+        "likely_candidate_count": inventory.get("likely_candidate_count"),
+        "direct_contract_candidate_count": inventory.get("direct_contract_candidate_count"),
+        "authoritative_candidate_count": inventory.get("authoritative_candidate_count"),
+        "root_count": inventory.get("root_count"),
+        "recommended_contract_check_path": inventory.get("recommended_contract_check_path")
+        or recommended_contract_check.get("candidate_path"),
+        "recommended_contract_check_candidate_id": recommended_contract_check.get("candidate_id"),
+        "recommended_contract_check_authoritative": recommended_contract_check.get("authoritative"),
+    }
+    for key, label_suffix in (
+        ("summary_json", "summary"),
+        ("candidates_csv", "candidates"),
+        ("readme_md", "readme"),
+    ):
+        add_path(
+            artifacts,
+            category="so101_model_source_inventory",
+            label=f"so101_model_source_inventory:{label_suffix}",
+            value=artifact_paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"so101_model_source_inventory.artifacts.{key}",
+            metrics=metrics,
+        )
+    return {
+        "status": inventory.get("status"),
+        "ok": inventory.get("ok"),
+        "summary_path": artifact_paths.get("summary_json") or inventory.get("summary_path"),
+        "candidates_csv_path": artifact_paths.get("candidates_csv"),
+        "readme_md_path": artifact_paths.get("readme_md"),
+        "candidate_count": inventory.get("candidate_count"),
+        "likely_candidate_count": inventory.get("likely_candidate_count"),
+        "direct_contract_candidate_count": inventory.get("direct_contract_candidate_count"),
+        "authoritative_candidate_count": inventory.get("authoritative_candidate_count"),
+        "recommended_contract_check_path": metrics["recommended_contract_check_path"],
+        "recommended_contract_check": recommended_contract_check or None,
+        "diagnostics": inventory.get("diagnostics"),
+    }
+
+
 def collect_app_entrypoint_artifacts(
     *,
     suite: dict[str, Any],
@@ -1731,6 +1795,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    so101_model_source_inventory = collect_so101_model_source_inventory_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
     so101_model_contract = collect_so101_model_contract_artifacts(
         suite=suite,
         artifacts=artifacts,
@@ -1826,6 +1897,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "real_projection_intake": real_projection_intake,
         "visual_review": visual_review,
         "sim_camera_pose_fixture_metadata_contract": sim_camera_pose_metadata_contract,
+        "so101_model_source_inventory": so101_model_source_inventory,
         "so101_model_contract": so101_model_contract,
         "ik_reachability": ik_reachability,
         "gripper_camera_pov": gripper_camera_pov,
