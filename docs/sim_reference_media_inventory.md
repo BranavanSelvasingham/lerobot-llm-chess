@@ -49,6 +49,26 @@ This smoke reads an existing inventory JSON and ranks a small candidate set befo
 
 The comparison smoke never copies media into the repository. Repo-local and sibling media paths remain references to local evidence only; the generated artifacts live under the requested output directory. If rendering dependencies are unavailable, the smoke preserves metadata-only evidence and records the dependency gap instead of failing the inventory review path.
 
+Camera tuning diagnostics from an existing comparison summary:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_reference_camera_tuning_diagnostics.py \
+  --comparison-summary-json /private/tmp/lerobot_sim/reference_media_comparison_set/comparison_set_summary.json \
+  --output-dir /private/tmp/lerobot_sim/reference_camera_tuning_diagnostics
+```
+
+The same diagnostics script also accepts the integrated suite root summary:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_reference_camera_tuning_diagnostics.py \
+  --comparison-summary-json /private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json \
+  --output-dir /private/tmp/lerobot_sim/reference_camera_tuning_diagnostics_from_suite
+```
+
+It writes `reference_camera_tuning_diagnostics.json`, `reference_camera_tuning_diagnostics.csv`, `README.md`, and, when OpenCV/numpy can read the existing visual artifacts, `reference_camera_tuning_scorecard.png`. The report carries selected reference path/scope/classes, visual artifact availability, real vs synthetic dimensions/statistics, `mean_abs_delta`/`rmse` when present, projected board-corner bounding-box signals, gripper visibility/opening signals, preserved reference gaps, and `media_assets_copied_into_repo: false`. When visual metrics are unavailable, it exits successfully with metadata-only diagnostics rather than inventing comparison evidence.
+
+Suggested tuning dimensions are explicit review prompts only: camera framing/board scale/board crop, board color/texture/lighting, gripper overlay geometry/occlusion, piece size/contrast, and missing depth/video capture needs. The diagnostics do not modify simulator camera constants, renderer behavior, robot execution paths, camera/UI runtime, OpenAI/LLM paths, IK behavior, or media assets. They also do not close `missing_depth_reference`, `missing_pick_place_video`, or no-video gaps and are not physical calibration truth.
+
 Candidates include common image and video extensions plus `.json`, `.yaml`, and `.yml` files whose path or first small text chunk contains camera/calibration/board/depth keywords. The script excludes VCS, virtualenv, cache, build, and generated temp directories. Image dimensions are read with Pillow when already installed, otherwise by limited stdlib header parsing for supported formats. Video duration and dimensions are read only when `ffprobe` or OpenCV is already available. Missing metadata is non-failing.
 
 Each candidate gets transparent heuristic classes:
