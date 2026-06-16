@@ -47,8 +47,12 @@ Run the source inventory first:
 python scripts/smoke_sim_so101_model_source_inventory.py --root /absolute/path/to/model/source --output-dir /private/tmp/lerobot_sim/so101_model_source_inventory_external
 ```
 
-Then run this asset preflight on the selected candidate. Only after the model
-source and mesh assets are present should the model contract checker be used:
+Then run this asset preflight on the selected candidate when standalone mesh
+evidence is useful. The
+[SO-101 model contract checker](sim_so101_model_contract.md) also runs this
+preflight as a child diagnostic under its own output directory. Only after the
+model source and mesh assets are present should the model contract checker be
+treated as a gate for `--ik-model-path`:
 
 ```bash
 python scripts/smoke_sim_so101_model_contract.py --model-path /absolute/path/to/so101.urdf --output-dir /private/tmp/lerobot_sim/so101_model_contract_preflight_model
@@ -57,8 +61,8 @@ python scripts/smoke_sim_so101_model_contract.py --model-path /absolute/path/to/
 Do not treat `--ik-model-path` results as authoritative until the source
 inventory, asset preflight, and contract checker have all produced reviewed
 evidence. The known blocker class is a URDF that looks structurally compatible
-with the simulator contract, but fails `RobotKinematics` initialization because
-a referenced mesh such as `assets/base_motor_holder_so101_v1.stl` is missing.
+with the simulator contract, but cannot enter model-backed IK because a
+referenced mesh such as `assets/base_motor_holder_so101_v1.stl` is missing.
 
 ## Artifact Fields
 

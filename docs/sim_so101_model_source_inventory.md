@@ -44,10 +44,13 @@ surfaces them in the generated artifact index/report.
 
 After selecting a candidate model source, run the focused
 [SO-101 model asset preflight](sim_so101_model_asset_preflight.md) before the
-model contract checker. The asset preflight records missing URDF mesh
-dependencies such as `assets/base_motor_holder_so101_v1.stl` without importing
-or copying external assets, and keeps `package://` / `model://` diagnostics
-explicitly filesystem-only rather than pretending ROS package resolution exists.
+[SO-101 model contract checker](sim_so101_model_contract.md). The contract
+checker also runs asset preflight as a child diagnostic, so its JSON and README
+carry the same missing-mesh counts and child artifact paths. The asset preflight
+records missing URDF mesh dependencies such as
+`assets/base_motor_holder_so101_v1.stl` without importing or copying external
+assets, and keeps `package://` / `model://` diagnostics explicitly
+filesystem-only rather than pretending ROS package resolution exists.
 
 ## Scope
 
@@ -90,7 +93,9 @@ A separate local probe of `/Users/branavan/GitHub/lerobot-chess` found four URDF
 
 ## Contract Checker Handoff
 
-Only forward a candidate to `--ik-model-path` after the inventory reports an authoritative candidate and the focused contract checker has been run:
+Only forward a candidate to `--ik-model-path` after the inventory reports an
+authoritative candidate, asset preflight has no missing or unresolved mesh
+references, and the focused contract checker has been run:
 
 ```bash
 python scripts/smoke_sim_so101_model_contract.py --model-path /absolute/path/to/so101.urdf --output-dir /private/tmp/lerobot_sim/so101_model_contract_preflight_model

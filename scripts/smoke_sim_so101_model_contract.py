@@ -8,6 +8,7 @@ import csv
 import importlib.util
 import json
 import math
+import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -23,6 +24,7 @@ DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "so101_model_contrac
 ROBOT_METADATA_PATH = REPO_ROOT / "src" / "lerobot" / "sim" / "robot.py"
 KINEMATICS_PATH = REPO_ROOT / "src" / "lerobot" / "model" / "kinematics.py"
 DRILL_PATH = REPO_ROOT / "scripts" / "smoke_sim_ik_reachability_drill.py"
+ASSET_PREFLIGHT_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_asset_preflight.py"
 SUPPORTED_SUFFIXES = {".urdf", ".xml", ".mjcf", ".xacro"}
 EXPECTED_TARGET_FRAME = "gripper_frame_link"
 EXPECTED_TCP_FIELD_NAMES = (
@@ -91,15 +93,24 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 
 def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    asset_preflight = summary["model_asset_preflight"]
+    asset_artifacts = asset_preflight.get("artifacts") or {}
     lines = [
         "# SO-101 Model Contract Check",
         "",
         f"- `status`: `{summary['status']}`",
         f"- `model_request`: `{summary['model_request']['status']}`",
+        f"- `asset_preflight_status`: `{asset_preflight['status']}`",
+        f"- `asset_preflight_mesh_reference_count`: `{asset_preflight.get('mesh_reference_count')}`",
+        f"- `asset_preflight_missing_asset_count`: `{asset_preflight.get('missing_asset_count')}`",
+        f"- `asset_preflight_unresolved_reference_count`: `{asset_preflight.get('unresolved_reference_count')}`",
         f"- `direct_robot_kinematics_status`: `{summary['robot_kinematics_path']['status']}`",
         f"- `target_frame`: `{summary['expected_contract']['target_frame']}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `checklist_csv`: `{summary['artifacts']['checklist_csv']}`",
+        f"- `asset_preflight_summary_json`: `{asset_artifacts.get('summary_json')}`",
+        f"- `asset_preflight_assets_csv`: `{asset_artifacts.get('assets_csv')}`",
+        f"- `asset_preflight_readme_md`: `{asset_artifacts.get('readme_md')}`",
         "",
         "## Checklist",
         "",
@@ -217,6 +228,86 @@ def inspect_robot_kinematics_path(model_request: dict[str, Any]) -> dict[str, An
     }
 
 
+def run_asset_preflight(output_dir: Path, model_request: dict[str, Any]) -> dict[str, Any]:
+    preflight_dir = output_dir / "so101_model_asset_preflight"
+    summary_path = preflight_dir / "so101_model_asset_preflight_summary.json"
+    csv_path = preflight_dir / "so101_model_asset_preflight_assets.csv"
+    readme_path = preflight_dir / "README.md"
+
+    command = [
+        sys.executable,
+        str(ASSET_PREFLIGHT_PATH),
+        "--output-dir",
+        str(preflight_dir),
+    ]
+    if model_request.get("path") is not None:
+        command.extend(["--model-path", str(model_request["path"])])
+
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    base = {
+        "command": command,
+        "returncode": result.returncode,
+        "stdout": result.stdout.strip(),
+        "stderr": result.stderr.strip(),
+        "artifacts": {
+            "summary_json": str(summary_path),
+            "assets_csv": str(csv_path),
+            "readme_md": str(readme_path),
+        },
+    }
+
+    if result.returncode != 0:
+        return {
+            **base,
+            "status": "asset_preflight_failed",
+            "ok": False,
+            "reason": "Child asset preflight returned nonzero.",
+            "mesh_reference_count": None,
+            "present_asset_count": None,
+            "missing_asset_count": None,
+            "unresolved_reference_count": None,
+        }
+
+    try:
+        child_summary = json.loads(summary_path.read_text())
+    except Exception as exc:
+        return {
+            **base,
+            "status": "asset_preflight_summary_unavailable",
+            "ok": False,
+            "reason": f"{type(exc).__name__}: {exc}",
+            "mesh_reference_count": None,
+            "present_asset_count": None,
+            "missing_asset_count": None,
+            "unresolved_reference_count": None,
+        }
+
+    return {
+        **base,
+        "ok": bool(child_summary.get("ok")),
+        "status": child_summary.get("status"),
+        "model_request_status": child_summary.get("model_request", {}).get("status"),
+        "model_asset_inspection": child_summary.get("model_asset_inspection"),
+        "mesh_reference_count": child_summary.get("mesh_reference_count"),
+        "present_asset_count": child_summary.get("present_asset_count"),
+        "missing_asset_count": child_summary.get("missing_asset_count"),
+        "unresolved_reference_count": child_summary.get("unresolved_reference_count"),
+        "missing_assets": child_summary.get("missing_assets", []),
+        "unresolved_references": child_summary.get("unresolved_references", []),
+        "diagnostics": child_summary.get("diagnostics", []),
+        "limitations": child_summary.get("limitations", []),
+    }
+
+
+def asset_preflight_blocks_robot_kinematics(asset_preflight: dict[str, Any]) -> bool:
+    return asset_preflight.get("status") in {
+        "asset_preflight_needs_follow_up",
+        "asset_preflight_failed",
+        "asset_preflight_summary_unavailable",
+        "model_parse_error",
+    }
+
+
 def tag_name(element: ET.Element) -> str:
     return element.tag.rsplit("}", 1)[-1]
 
@@ -292,13 +383,27 @@ def inspect_xml_model(model_request: dict[str, Any], target_frame: str, expected
     }
 
 
-def try_robot_kinematics_init(model_request: dict[str, Any], target_frame: str, expected_joints: tuple[str, ...]) -> dict[str, Any]:
+def try_robot_kinematics_init(
+    model_request: dict[str, Any],
+    asset_preflight: dict[str, Any],
+    target_frame: str,
+    expected_joints: tuple[str, ...],
+) -> dict[str, Any]:
     if model_request["status"] == "model_not_supplied":
         return {"status": "not_attempted", "reason": "No model was supplied."}
     if not model_request["exists"]:
         return {"status": "not_attempted", "reason": "Supplied model path does not exist."}
     if model_request["suffix"] != ".urdf":
         return {"status": "not_attempted", "reason": "RobotKinematics only accepts URDF paths today."}
+    if asset_preflight_blocks_robot_kinematics(asset_preflight):
+        return {
+            "status": "not_attempted",
+            "reason": "Asset preflight found a blocker before RobotKinematics initialization.",
+            "asset_preflight_status": asset_preflight.get("status"),
+            "missing_asset_count": asset_preflight.get("missing_asset_count"),
+            "unresolved_reference_count": asset_preflight.get("unresolved_reference_count"),
+            "asset_preflight_artifacts": asset_preflight.get("artifacts"),
+        }
     if not module_available("placo"):
         return {"status": "not_attempted", "reason": "placo is unavailable in this environment."}
 
@@ -416,6 +521,7 @@ def row(
 def build_checklist_rows(
     metadata: dict[str, Any],
     model_request: dict[str, Any],
+    asset_preflight: dict[str, Any],
     robot_kinematics_path: dict[str, Any],
     xml_inspection: dict[str, Any],
     kinematics_init: dict[str, Any],
@@ -446,6 +552,38 @@ def build_checklist_rows(
             {"suffix": ".urdf", "placo_available": True},
             None,
             robot_kinematics_path["reason"],
+        ),
+        row(
+            "model_asset_preflight",
+            "asset_dependencies",
+            "ok"
+            if asset_preflight.get("status")
+            in {
+                "missing_model",
+                "model_unavailable",
+                "asset_preflight_checked",
+                "asset_preflight_limited_diagnostics",
+            }
+            else "action_required",
+            "warning",
+            str(ASSET_PREFLIGHT_PATH),
+            {
+                "status": asset_preflight.get("status"),
+                "mesh_reference_count": asset_preflight.get("mesh_reference_count"),
+                "present_asset_count": asset_preflight.get("present_asset_count"),
+                "missing_asset_count": asset_preflight.get("missing_asset_count"),
+                "unresolved_reference_count": asset_preflight.get("unresolved_reference_count"),
+                "artifacts": asset_preflight.get("artifacts"),
+            },
+            {
+                "missing_asset_count": 0,
+                "unresolved_reference_count": 0,
+            },
+            {
+                "missing_assets": asset_preflight.get("missing_assets"),
+                "unresolved_references": asset_preflight.get("unresolved_references"),
+            },
+            "Child asset preflight evidence is recorded before RobotKinematics initialization is attempted.",
         ),
         row(
             "body_joints",
@@ -556,6 +694,7 @@ def build_summary(
     target_frame: str,
     metadata: dict[str, Any],
     model_request: dict[str, Any],
+    asset_preflight: dict[str, Any],
     robot_kinematics_path: dict[str, Any],
     xml_inspection: dict[str, Any],
     kinematics_init: dict[str, Any],
@@ -567,6 +706,8 @@ def build_summary(
         status = "missing_model"
     elif not model_request["exists"]:
         status = "model_unavailable"
+    elif asset_preflight_blocks_robot_kinematics(asset_preflight):
+        status = "model_asset_preflight_needs_follow_up"
     elif kinematics_init["status"] == "initialized":
         status = "model_contract_checked"
     elif model_request["suffix"] == ".urdf":
@@ -582,6 +723,7 @@ def build_summary(
         "gui_skipped": True,
         "openai_skipped": True,
         "model_request": model_request,
+        "model_asset_preflight": asset_preflight,
         "robot_kinematics_path": robot_kinematics_path,
         "expected_contract": {
             "body_joints": list(metadata["body_joints"]),
@@ -611,14 +753,21 @@ def main() -> int:
     metadata = load_sim_robot_metadata()
     model_request = inspect_model_request(args.model_path)
     robot_kinematics_path = inspect_robot_kinematics_path(model_request)
+    asset_preflight = run_asset_preflight(output_dir, model_request)
     xml_inspection = inspect_xml_model(model_request, str(args.target_frame), metadata["body_joints"])
-    kinematics_init = try_robot_kinematics_init(model_request, str(args.target_frame), metadata["body_joints"])
+    kinematics_init = try_robot_kinematics_init(
+        model_request,
+        asset_preflight,
+        str(args.target_frame),
+        metadata["body_joints"],
+    )
     tcp_sources = inspect_tcp_configuration_sources()
     missing_alignment_inputs = build_alignment_inputs_missing()
 
     checklist_rows = build_checklist_rows(
         metadata,
         model_request,
+        asset_preflight,
         robot_kinematics_path,
         xml_inspection,
         kinematics_init,
@@ -639,6 +788,7 @@ def main() -> int:
         str(args.target_frame),
         metadata,
         model_request,
+        asset_preflight,
         robot_kinematics_path,
         xml_inspection,
         kinematics_init,
@@ -657,6 +807,12 @@ def main() -> int:
                 "ok": True,
                 "status": summary["status"],
                 "model_request_status": model_request["status"],
+                "asset_preflight_status": asset_preflight["status"],
+                "asset_preflight_mesh_reference_count": asset_preflight.get("mesh_reference_count"),
+                "asset_preflight_missing_asset_count": asset_preflight.get("missing_asset_count"),
+                "asset_preflight_unresolved_reference_count": asset_preflight.get("unresolved_reference_count"),
+                "asset_preflight_summary_json": asset_preflight.get("artifacts", {}).get("summary_json"),
+                "asset_preflight_assets_csv": asset_preflight.get("artifacts", {}).get("assets_csv"),
                 "robot_kinematics_status": robot_kinematics_path["status"],
                 "summary_json": str(summary_path),
                 "checklist_csv": str(csv_path),
