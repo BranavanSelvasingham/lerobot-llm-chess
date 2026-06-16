@@ -12,6 +12,16 @@ The suite also runs `smoke_sim_reference_media_inventory.py` as the first child 
 
 The follow-on `smoke_sim_reference_media_comparison_set.py` child reads that inventory JSON and writes `comparison_set/comparison_set_summary.json`, `comparison_set/reference_media_comparison_rows.csv`, `comparison_set/README.md`, and, when OpenCV/numpy rendering is available, `comparison_set/reference_media_comparison_contact_sheet.png` plus per-reference derived visual comparisons. Candidate selection is deterministic: active/current gripper reference first, then `camera_pov` + `chessboard_board` + `gripper_arm` class coverage, repo-local paths before external absolute sibling evidence, and image rows before video or calibration-data-only rows. `calibration_regression_summary.json.comparison_set`, `child_commands.comparison_set.diagnostics`, `artifact_index.json.reference_media_comparison`, and the rendered `Reference Media Comparison` report section expose status, selected candidate/media counts, visual comparison count, contact sheet path/status, JSON/CSV/README paths, `media_assets_copied_into_repo: false`, external selected count, and the missing depth/pick-place-video/no-video diagnostics. Its diagnostics intentionally preserve `missing_depth_reference`, `missing_pick_place_video`, `no_videos`, synthetic/example rows as non-closing real gaps, and external absolute paths as local evidence only.
 
+To turn those comparison artifacts into camera tuning review evidence without changing simulator behavior, run:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_reference_camera_tuning_diagnostics.py --comparison-summary-json /private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json --output-dir /private/tmp/lerobot_sim/reference_camera_tuning_diagnostics
+```
+
+The diagnostics script accepts either the suite `calibration_regression_summary.json` or the child `comparison_set/comparison_set_summary.json`. It writes `reference_camera_tuning_diagnostics.json`, `reference_camera_tuning_diagnostics.csv`, `README.md`, and an optional `reference_camera_tuning_scorecard.png` when OpenCV/numpy can read existing visual artifacts. The output summarizes selected reference path/scope/classes, side-by-side/overlay/difference/annotated artifact availability, real vs synthetic image dimensions/statistics, `mean_abs_delta`/`rmse` when present, projected board-corner bounding-box/framing signals, gripper visibility/opening signals, preserved reference gaps, and `media_assets_copied_into_repo: false`. If metrics or images are absent, status can be `metadata_only` or `no_reference_media_selected` and still exit successfully.
+
+The suggested dimensions are review prompts for future simulator tuning only: camera framing/board scale/board crop, board color/texture/lighting, gripper overlay geometry/occlusion, piece size/contrast, and missing depth/video capture needs. This diagnostics path does not update SimCamera constants, renderer behavior, camera/UI runtime, robot execution, OpenAI/LLM paths, IK behavior, or media assets. Synthetic comparison evidence remains hardware-free review evidence and does not close missing real depth-reference or pick/place-video gaps.
+
 To scan optional sibling evidence without committing media assets, pass repeatable roots:
 
 ```bash
