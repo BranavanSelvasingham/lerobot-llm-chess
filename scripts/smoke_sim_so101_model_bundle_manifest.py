@@ -108,6 +108,13 @@ def normalize_path(path: Path) -> Path:
     return path.expanduser().resolve(strict=False)
 
 
+def executable_arg(path: Path) -> str:
+    raw = str(path)
+    if path.is_absolute() or "/" in raw:
+        return str(normalize_path(path))
+    return raw
+
+
 def resolve_manifest_relative(value: str, manifest_dir: Path | None) -> Path:
     raw_path = Path(value).expanduser()
     if raw_path.is_absolute() or manifest_dir is None:
@@ -510,7 +517,7 @@ def run_contract_checker(
         }
 
     command = [
-        str(normalize_path(python_path)),
+        executable_arg(python_path),
         str(CONTRACT_CHECKER_PATH),
         "--output-dir",
         str(contract_dir),
@@ -596,10 +603,26 @@ def run_contract_checker(
 
 def contract_non_blocking(contract: dict[str, Any]) -> tuple[bool, list[str]]:
     diagnostics: list[str] = []
-    if contract.get("status") != "model_contract_checked":
-        diagnostics.append(f"contract_status:{contract.get('status')}")
     if contract.get("model_request_status") != "model_supplied":
         diagnostics.append(f"model_request_status:{contract.get('model_request_status')}")
+
+    contract_status = contract.get("status")
+    if contract_status == "model_contract_checked":
+        pass
+    elif (
+        contract_status == "model_contract_needs_follow_up"
+        and contract.get("robot_kinematics_status") == "urdf_requires_placo"
+        and contract.get("robot_kinematics_initialization_status") == "not_attempted"
+    ):
+        structure = (contract.get("child_diagnostics") or {}).get("model_structure_inspection") or {}
+        missing_joints = structure.get("expected_joint_names_missing")
+        target_frame_present = structure.get("target_frame_present")
+        if missing_joints:
+            diagnostics.append(f"model_structure_missing_joints:{missing_joints}")
+        if target_frame_present is not True:
+            diagnostics.append(f"model_structure_target_frame_present:{target_frame_present}")
+    else:
+        diagnostics.append(f"contract_status:{contract_status}")
 
     asset_preflight = contract.get("model_asset_preflight") or {}
     if asset_preflight.get("status") not in {"asset_preflight_checked", "asset_preflight_limited_diagnostics"}:
