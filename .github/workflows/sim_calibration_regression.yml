@@ -613,7 +613,7 @@ jobs:
           assert "Reference media gaps:" in entrypoint_text, entrypoint_text
           if not os.environ["REFERENCE_MEDIA_ROOTS"].strip():
               assert "No real-world videos are present for motion, recovery, or timing references." in entrypoint_text, entrypoint_text
-              assert "No reference media currently documents failure modes." in entrypoint_text, entrypoint_text
+              assert "Failure-mode reference gap is not reported by the current inventory." in entrypoint_text, entrypoint_text
 
           print(
               json.dumps(
