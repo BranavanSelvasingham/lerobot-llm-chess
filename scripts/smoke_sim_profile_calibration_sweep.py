@@ -603,6 +603,7 @@ def main() -> int:
 
     summary = {
         "ok": True,
+        "status": "ok",
         "scenario": "sim_profile_calibration_sweep",
         "profile": str(args.profile),
         "profile_values": jsonable(profile_values),

@@ -233,6 +233,54 @@ jobs:
               )
           if tuning["scorecard_produced"] is True:
               assert isinstance(tuning["scorecard_path"], str) and Path(tuning["scorecard_path"]).is_file(), tuning
+          profile_sweep = summary["sim_camera_profile_sweep"]
+          assert profile_sweep["ok"] is True, profile_sweep
+          assert profile_sweep["status"] == "ok", profile_sweep
+          assert profile_sweep["profile_name"] == "current_gripper_reference", profile_sweep
+          assert_json_number(profile_sweep["current_gripper_finger_width_px"], "profile_sweep.current_gripper_finger_width_px")
+          assert profile_sweep["marker_time_seconds"] == 0.0, profile_sweep
+          assert isinstance(profile_sweep["candidate_count"], int) and profile_sweep["candidate_count"] > 0, profile_sweep
+          assert_json_number(profile_sweep["current_mean_abs_delta"], "profile_sweep.current_mean_abs_delta")
+          assert_json_number(profile_sweep["current_rmse"], "profile_sweep.current_rmse")
+          assert profile_sweep["best_candidate_id"], profile_sweep
+          assert profile_sweep["best_candidate_name"], profile_sweep
+          assert_json_number(profile_sweep["best_mean_abs_delta"], "profile_sweep.best_mean_abs_delta")
+          assert_json_number(profile_sweep["best_rmse"], "profile_sweep.best_rmse")
+          assert_json_number(profile_sweep["mean_abs_delta_delta_vs_current"], "profile_sweep.mean_abs_delta_delta_vs_current")
+          assert_json_number(profile_sweep["rmse_delta_vs_current"], "profile_sweep.rmse_delta_vs_current")
+          assert "hardware-free" in profile_sweep["full_frame_image_delta_caveat"], profile_sweep
+          assert isinstance(profile_sweep["candidate_ranking"], list), profile_sweep
+          assert len(profile_sweep["candidate_ranking"]) == profile_sweep["candidate_count"], profile_sweep
+          assert isinstance(profile_sweep["remaining_tuning_prompts"], list), profile_sweep
+          profile_sweep_paths = profile_sweep["artifact_paths"]
+          for key in (
+              "summary_json",
+              "candidate_montage_jpg",
+              "current_overlay_jpg",
+              "current_absolute_difference_jpg",
+              "current_side_by_side_jpg",
+              "best_overlay_jpg",
+              "best_absolute_difference_jpg",
+              "best_side_by_side_jpg",
+          ):
+              assert isinstance(profile_sweep_paths.get(key), str) and Path(profile_sweep_paths[key]).is_file(), (
+                  key,
+                  profile_sweep_paths,
+              )
+          assert isinstance(profile_sweep_paths.get("candidate_dir"), str) and Path(profile_sweep_paths["candidate_dir"]).is_dir(), profile_sweep_paths
+          best_ranking_row = profile_sweep["candidate_ranking"][0]
+          assert best_ranking_row["candidate_id"] == profile_sweep["best_candidate_id"], (
+              best_ranking_row,
+              profile_sweep["best_candidate_id"],
+          )
+          assert "frame_path" in best_ranking_row["artifact_paths"], best_ranking_row
+          assert Path(best_ranking_row["artifact_paths"]["frame_path"]).is_file(), best_ranking_row
+          assert Path(best_ranking_row["artifact_paths"]["annotated_path"]).is_file(), best_ranking_row
+          profile_sweep_child = summary["child_commands"]["sim_camera_profile_sweep"]
+          assert profile_sweep_child["ok"] is True, profile_sweep_child
+          assert profile_sweep_child["summary_status"] == "ok", profile_sweep_child
+          assert profile_sweep_child["diagnostics"]["candidate_count"] == profile_sweep["candidate_count"], profile_sweep_child
+          assert profile_sweep_child["diagnostics"]["best_candidate_id"] == profile_sweep["best_candidate_id"], profile_sweep_child
           assert summary["perception_fixture"]["status"] == "ok", summary["perception_fixture"]
           assert summary["perception_fixture"]["artifact_paths"], summary["perception_fixture"]
           pose_fixture = summary["sim_camera_pose_fixture"]
@@ -438,6 +486,7 @@ jobs:
           required_artifact_categories = {
               "reference_media_inventory",
               "reference_camera_tuning_diagnostics",
+              "sim_camera_profile_sweep",
               "real_reference_comparison",
               "ranked_candidate",
               "perception_fixture",
@@ -516,6 +565,36 @@ jobs:
                   and row.get("exists") is True
                   for row in artifacts_by_category["reference_camera_tuning_diagnostics"]
               ), artifacts_by_category["reference_camera_tuning_diagnostics"]
+          assert any(
+              row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("status") == "ok"
+              for row in artifacts_by_category["sim_camera_profile_sweep"]
+          ), artifacts_by_category["sim_camera_profile_sweep"]
+          assert any(
+              row.get("label") == "sim_camera_profile_sweep:candidate_montage"
+              and row.get("kind") == "image"
+              and row.get("exists") is True
+              for row in artifacts_by_category["sim_camera_profile_sweep"]
+          ), artifacts_by_category["sim_camera_profile_sweep"]
+          assert any(
+              row.get("label") == "sim_camera_profile_sweep:current_overlay"
+              and row.get("kind") == "image"
+              and row.get("exists") is True
+              for row in artifacts_by_category["sim_camera_profile_sweep"]
+          ), artifacts_by_category["sim_camera_profile_sweep"]
+          assert any(
+              row.get("label") == "sim_camera_profile_sweep:best_absolute_difference"
+              and row.get("kind") == "image"
+              and row.get("exists") is True
+              for row in artifacts_by_category["sim_camera_profile_sweep"]
+          ), artifacts_by_category["sim_camera_profile_sweep"]
+          assert any(
+              row.get("exists") is True
+              and row.get("candidate_id") == profile_sweep["best_candidate_id"]
+              and row.get("rank") == 1
+              for row in artifacts_by_category["sim_camera_profile_sweep"]
+          ), artifacts_by_category["sim_camera_profile_sweep"]
           if reference_inventory["candidate_count"] > 0:
               assert any(
                   row.get("kind") == "image" and row.get("exists") is True
@@ -646,6 +725,7 @@ jobs:
           report_text = report_path.read_text()
           assert "## Reference Media Inventory" in report_text, report_text
           assert "## Reference Camera Tuning Diagnostics" in report_text, report_text
+          assert "## SimCamera Profile Sweep" in report_text, report_text
           assert "### SO-101 Model Source Inventory" in report_text, report_text
           assert "### SO-101 Model Bundle Manifest" in report_text, report_text
           entrypoint_text = entrypoint_path.read_text()
@@ -658,6 +738,10 @@ jobs:
           assert "`reference_camera_tuning_diagnostics/reference_camera_tuning_diagnostics.json`" in entrypoint_text, entrypoint_text
           assert "`reference_camera_tuning_diagnostics/reference_camera_tuning_diagnostics.csv`" in entrypoint_text, entrypoint_text
           assert "`reference_camera_tuning_diagnostics/README.md`" in entrypoint_text, entrypoint_text
+          assert "`sim_camera_profile_sweep/summary.json`" in entrypoint_text, entrypoint_text
+          assert "`sim_camera_profile_sweep/candidate_montage.jpg`" in entrypoint_text, entrypoint_text
+          assert "SimCamera profile sweep:" in entrypoint_text, entrypoint_text
+          assert "Full-frame image delta" in entrypoint_text, entrypoint_text
           assert "`so101_model_bundle_manifest/so101_model_bundle_manifest_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_model_bundle_manifest/so101_model_bundle_manifest_checklist.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_inventory_summary.json`" in entrypoint_text, entrypoint_text
@@ -716,6 +800,18 @@ jobs:
                           "external_selected_count": tuning["external_selected_count"],
                           "reference_gaps": tuning["reference_gaps"],
                           "artifacts": tuning_artifacts,
+                      },
+                      "sim_camera_profile_sweep": {
+                          "summary_path": profile_sweep["summary_path"],
+                          "status": profile_sweep["status"],
+                          "profile_name": profile_sweep["profile_name"],
+                          "current_gripper_finger_width_px": profile_sweep["current_gripper_finger_width_px"],
+                          "marker_time_seconds": profile_sweep["marker_time_seconds"],
+                          "candidate_count": profile_sweep["candidate_count"],
+                          "current_vs_best_metrics": profile_sweep["current_vs_best_metrics"],
+                          "best_candidate_id": profile_sweep["best_candidate_id"],
+                          "remaining_tuning_prompts": profile_sweep["remaining_tuning_prompts"],
+                          "artifacts": profile_sweep_paths,
                       },
                       "so101_model_source_inventory": {
                           "summary_path": source_inventory["summary_path"],
@@ -788,6 +884,7 @@ jobs:
               "reference_media_inventory/reference_media_inventory.json",
               "comparison_set/comparison_set_summary.json",
               "reference_camera_tuning_diagnostics/reference_camera_tuning_diagnostics.json",
+              "sim_camera_profile_sweep/summary.json",
               "session/session_summary.json",
               "fixture/fixture_summary.json",
               "sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json",
@@ -847,6 +944,17 @@ jobs:
               f"- `scorecard_status`: `{summary['reference_camera_tuning_diagnostics']['scorecard_status']}`",
               f"- `media_assets_copied_into_repo`: `{summary['reference_camera_tuning_diagnostics']['media_assets_copied_into_repo']}`",
               f"- `reference_gaps`: `{summary['reference_camera_tuning_diagnostics']['reference_gaps']}`",
+              "",
+              "SimCamera profile sweep:",
+              f"- `status`: `{summary['sim_camera_profile_sweep']['status']}`",
+              f"- `profile_name`: `{summary['sim_camera_profile_sweep']['profile_name']}`",
+              f"- `current_gripper_finger_width_px`: `{summary['sim_camera_profile_sweep']['current_gripper_finger_width_px']}`",
+              f"- `marker_time_seconds`: `{summary['sim_camera_profile_sweep']['marker_time_seconds']}`",
+              f"- `candidate_count`: `{summary['sim_camera_profile_sweep']['candidate_count']}`",
+              f"- `best_candidate_id`: `{summary['sim_camera_profile_sweep']['best_candidate_id']}`",
+              f"- `current_vs_best_metrics`: `{summary['sim_camera_profile_sweep']['current_vs_best_metrics']}`",
+              f"- `remaining_tuning_prompts`: `{summary['sim_camera_profile_sweep']['remaining_tuning_prompts']}`",
+              f"- `full_frame_image_delta_caveat`: `{summary['sim_camera_profile_sweep']['full_frame_image_delta_caveat']}`",
               "",
               "SO-101 model source inventory:",
               f"- `status`: `{summary['so101_model_source_inventory']['status']}`",

@@ -25,6 +25,9 @@ REFERENCE_CAMERA_TUNING_JSON_NAME = "reference_camera_tuning_diagnostics.json"
 REFERENCE_CAMERA_TUNING_CSV_NAME = "reference_camera_tuning_diagnostics.csv"
 REFERENCE_CAMERA_TUNING_README_NAME = "README.md"
 REFERENCE_CAMERA_TUNING_SCORECARD_NAME = "reference_camera_tuning_scorecard.png"
+SIM_CAMERA_PROFILE_SWEEP_DIR_NAME = "sim_camera_profile_sweep"
+SIM_CAMERA_PROFILE_SWEEP_JSON_NAME = "summary.json"
+SIM_CAMERA_PROFILE_SWEEP_MARKER_TIME_SECONDS = 0.0
 VISUAL_REVIEW_SUMMARY_NAME = "visual_review_summary.json"
 REFERENCE_CAPTURE_CHECKLIST_NAME = "reference_capture_checklist.json"
 REAL_PROJECTION_INTAKE_NAME = "real_projection_intake.json"
@@ -616,6 +619,19 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
     )
     comparison_set = summary.get("comparison_set")
     comparison_set = comparison_set if isinstance(comparison_set, dict) else {}
+    profile_sweep = summary.get("sim_camera_profile_sweep")
+    profile_sweep = profile_sweep if isinstance(profile_sweep, dict) else {}
+    profile_sweep_metrics = profile_sweep.get("current_vs_best_metrics")
+    profile_sweep_metrics = profile_sweep_metrics if isinstance(profile_sweep_metrics, dict) else {}
+    profile_sweep_paths = profile_sweep.get("artifact_paths")
+    profile_sweep_paths = profile_sweep_paths if isinstance(profile_sweep_paths, dict) else {}
+    profile_sweep_prompts = profile_sweep.get("remaining_tuning_prompts")
+    profile_sweep_prompts = profile_sweep_prompts if isinstance(profile_sweep_prompts, list) else []
+    profile_sweep_prompt_ids = [
+        prompt.get("candidate_id")
+        for prompt in profile_sweep_prompts
+        if isinstance(prompt, dict) and prompt.get("candidate_id")
+    ]
     reference_inventory_counts_row = reference_media_inventory_counts(reference_inventory)
     reference_gap_ids = {
         str(gap) for gap in reference_inventory_counts_row.get("reference_gaps", []) if gap
@@ -681,6 +697,14 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         f"- `{REFERENCE_CAMERA_TUNING_DIR_NAME}/{REFERENCE_CAMERA_TUNING_CSV_NAME}`",
         f"- `{REFERENCE_CAMERA_TUNING_DIR_NAME}/{REFERENCE_CAMERA_TUNING_README_NAME}`",
         f"- `{REFERENCE_CAMERA_TUNING_DIR_NAME}/{REFERENCE_CAMERA_TUNING_SCORECARD_NAME}` when produced",
+        f"- `{SIM_CAMERA_PROFILE_SWEEP_DIR_NAME}/{SIM_CAMERA_PROFILE_SWEEP_JSON_NAME}`",
+        f"- `{SIM_CAMERA_PROFILE_SWEEP_DIR_NAME}/candidate_montage.jpg`",
+        f"- `{SIM_CAMERA_PROFILE_SWEEP_DIR_NAME}/current_overlay.jpg`",
+        f"- `{SIM_CAMERA_PROFILE_SWEEP_DIR_NAME}/current_absolute_difference_heatmap.jpg`",
+        f"- `{SIM_CAMERA_PROFILE_SWEEP_DIR_NAME}/current_side_by_side.jpg`",
+        f"- `{SIM_CAMERA_PROFILE_SWEEP_DIR_NAME}/best_overlay.jpg`",
+        f"- `{SIM_CAMERA_PROFILE_SWEEP_DIR_NAME}/best_absolute_difference_heatmap.jpg`",
+        f"- `{SIM_CAMERA_PROFILE_SWEEP_DIR_NAME}/best_side_by_side.jpg`",
         "- `session/session_summary.json`",
         "- `fixture/fixture_summary.json`",
         "- `sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json`",
@@ -786,6 +810,34 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             f"metadata-only `{summary.get('reference_camera_tuning_diagnostics', {}).get('metadata_only_count')}`; "
             "media assets copied into repo "
             f"`{markdown_bool(summary.get('reference_camera_tuning_diagnostics', {}).get('media_assets_copied_into_repo'))}`."
+        ),
+        (
+            "- SimCamera profile sweep: "
+            f"status `{profile_sweep.get('status')}`; profile `{profile_sweep.get('profile_name')}`; "
+            f"current finger width `{profile_sweep.get('current_gripper_finger_width_px')}` px; "
+            f"marker time `{profile_sweep.get('marker_time_seconds')}`; candidates "
+            f"`{profile_sweep.get('candidate_count')}`; current MAD/RMSE "
+            f"`{profile_sweep_metrics.get('current_mean_abs_delta')}`/"
+            f"`{profile_sweep_metrics.get('current_rmse')}`; best "
+            f"`{profile_sweep.get('best_candidate_id')}` MAD/RMSE "
+            f"`{profile_sweep_metrics.get('best_mean_abs_delta')}`/"
+            f"`{profile_sweep_metrics.get('best_rmse')}`; delta vs current "
+            f"`{profile_sweep_metrics.get('mean_abs_delta_delta_vs_current')}`/"
+            f"`{profile_sweep_metrics.get('rmse_delta_vs_current')}`."
+        ),
+        (
+            "- SimCamera profile sweep artifacts: "
+            f"summary `{profile_sweep_paths.get('summary_json')}`; montage "
+            f"`{profile_sweep_paths.get('candidate_montage_jpg')}`; current/best overlays and "
+            "difference heatmaps are indexed under `sim_camera_profile_sweep/`."
+        ),
+        (
+            "- SimCamera profile sweep remaining tuning prompts: "
+            f"`{markdown_list_value(profile_sweep_prompt_ids)}`."
+        ),
+        (
+            "- SimCamera profile sweep caveat: "
+            f"{profile_sweep.get('full_frame_image_delta_caveat') or 'Full-frame image delta is hardware-free coarse evidence only.'}"
         ),
         "- Reference capture checklist status: "
         f"`{summary.get('reference_capture_checklist', {}).get('status')}`.",
@@ -1235,6 +1287,215 @@ def reference_camera_tuning_diagnostics_section(
         "render_dependencies": diagnostics.get("render_dependencies"),
         "input": diagnostics.get("input"),
         "limits": diagnostics.get("limits"),
+    }
+
+
+def metric_number(value: Any) -> float | None:
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def candidate_by_name(candidates: list[dict[str, Any]], name: str | None) -> dict[str, Any]:
+    if not name:
+        return {}
+    for candidate in candidates:
+        if isinstance(candidate, dict) and candidate.get("name") == name:
+            return candidate
+    return {}
+
+
+def candidate_metric(candidate: dict[str, Any], key: str) -> float | None:
+    metrics = candidate.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    return metric_number(metrics.get(key))
+
+
+def sim_camera_profile_sweep_artifact_paths(
+    sweep: dict[str, Any] | None,
+    sweep_dir: Path,
+    summary_path: Path,
+) -> dict[str, str | None]:
+    sweep = sweep if isinstance(sweep, dict) else {}
+    artifacts = sweep.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    return {
+        "summary_json": str(artifacts.get("summary_path") or summary_path),
+        "candidate_montage_jpg": str(
+            artifacts.get("candidate_montage_path") or sweep_dir / "candidate_montage.jpg"
+        ),
+        "candidate_dir": str(artifacts.get("candidate_dir") or sweep_dir / "candidates"),
+        "current_overlay_jpg": artifacts.get("current_overlay_path"),
+        "current_absolute_difference_jpg": artifacts.get("current_absolute_difference_path"),
+        "current_side_by_side_jpg": artifacts.get("current_side_by_side_path"),
+        "best_overlay_jpg": artifacts.get("best_overlay_path"),
+        "best_absolute_difference_jpg": artifacts.get("best_absolute_difference_path"),
+        "best_side_by_side_jpg": artifacts.get("best_side_by_side_path"),
+    }
+
+
+def sim_camera_profile_candidate_ranking(
+    sweep: dict[str, Any] | None,
+    current: dict[str, Any],
+) -> list[dict[str, Any]]:
+    sweep = sweep if isinstance(sweep, dict) else {}
+    candidates = sweep.get("candidates")
+    candidate_rows = [row for row in candidates if isinstance(row, dict)] if isinstance(candidates, list) else []
+    current_mad = candidate_metric(current, "mean_abs_delta")
+    current_rmse = candidate_metric(current, "rmse")
+    ranked = sorted(
+        candidate_rows,
+        key=lambda row: (
+            candidate_metric(row, "mean_abs_delta")
+            if candidate_metric(row, "mean_abs_delta") is not None
+            else float("inf"),
+            str(row.get("name") or ""),
+        ),
+    )
+    rows: list[dict[str, Any]] = []
+    for rank, candidate in enumerate(ranked, start=1):
+        mean_abs_delta = candidate_metric(candidate, "mean_abs_delta")
+        rmse = candidate_metric(candidate, "rmse")
+        rows.append(
+            {
+                "rank": rank,
+                "candidate_id": candidate.get("name"),
+                "candidate_name": candidate.get("name"),
+                "description": candidate.get("description"),
+                "mean_abs_delta": mean_abs_delta,
+                "rmse": rmse,
+                "mean_abs_delta_delta_vs_current": (
+                    mean_abs_delta - current_mad
+                    if mean_abs_delta is not None and current_mad is not None
+                    else None
+                ),
+                "rmse_delta_vs_current": (
+                    rmse - current_rmse if rmse is not None and current_rmse is not None else None
+                ),
+                "artifact_paths": {
+                    "frame_path": candidate.get("frame_path"),
+                    "annotated_path": candidate.get("annotated_path"),
+                },
+            }
+        )
+    return rows
+
+
+def sim_camera_profile_sweep_section(
+    sweep: dict[str, Any] | None,
+    sweep_dir: Path,
+    summary_path: Path,
+) -> dict[str, Any]:
+    sweep = sweep if isinstance(sweep, dict) else {}
+    candidates = sweep.get("candidates")
+    candidate_rows = [row for row in candidates if isinstance(row, dict)] if isinstance(candidates, list) else []
+    selection = sweep.get("selection")
+    selection = selection if isinstance(selection, dict) else {}
+    current = candidate_by_name(candidate_rows, "current")
+    best_candidate_id = selection.get("best_candidate")
+    best = candidate_by_name(candidate_rows, best_candidate_id if isinstance(best_candidate_id, str) else None)
+    if not best and candidate_rows:
+        best = min(
+            candidate_rows,
+            key=lambda row: (
+                candidate_metric(row, "mean_abs_delta")
+                if candidate_metric(row, "mean_abs_delta") is not None
+                else float("inf"),
+                str(row.get("name") or ""),
+            ),
+        )
+        best_candidate_id = best.get("name")
+
+    current_mad = candidate_metric(current, "mean_abs_delta")
+    current_rmse = candidate_metric(current, "rmse")
+    best_mad = candidate_metric(best, "mean_abs_delta")
+    best_rmse = candidate_metric(best, "rmse")
+    ranked_candidates = sim_camera_profile_candidate_ranking(sweep, current)
+    remaining_prompts = [
+        {
+            "candidate_id": row.get("candidate_id"),
+            "candidate_name": row.get("candidate_name"),
+            "description": row.get("description"),
+            "mean_abs_delta_delta_vs_current": row.get("mean_abs_delta_delta_vs_current"),
+            "rmse_delta_vs_current": row.get("rmse_delta_vs_current"),
+        }
+        for row in ranked_candidates
+        if row.get("candidate_id") != "current"
+        and metric_number(row.get("mean_abs_delta_delta_vs_current")) is not None
+        and float(row["mean_abs_delta_delta_vs_current"]) < 0.0
+    ][:5]
+    image = sweep.get("image")
+    image = image if isinstance(image, dict) else {}
+    current_gripper = current.get("gripper") if isinstance(current.get("gripper"), dict) else {}
+    effective_profile_values = sweep.get("effective_profile_values")
+    effective_profile_values = (
+        effective_profile_values if isinstance(effective_profile_values, dict) else {}
+    )
+    paths = sim_camera_profile_sweep_artifact_paths(sweep, sweep_dir, summary_path)
+    caveat = selection.get("caveat") or (
+        "Full-frame image delta is hardware-free coarse review evidence only; it is not "
+        "physical camera calibration truth."
+    )
+    if isinstance(caveat, str) and "hardware-free" not in caveat.lower():
+        caveat = (
+            f"{caveat} This suite treats the full-frame image delta as hardware-free "
+            "coarse review evidence only, not physical calibration truth."
+        )
+    return {
+        "summary_path": paths["summary_json"],
+        "output_dir": str(sweep_dir),
+        "artifact_paths": paths,
+        "ok": bool(sweep.get("ok", False)),
+        "status": sweep.get("status") or ("ok" if sweep.get("ok") is True else None),
+        "profile_name": sweep.get("profile"),
+        "reference_image_path": sweep.get("reference_image_path"),
+        "current_gripper_finger_width_px": current_gripper.get(
+            "finger_width_px",
+            effective_profile_values.get("gripper_finger_width_px"),
+        ),
+        "marker_time_seconds": sweep.get("marker_time_seconds"),
+        "candidate_count": image.get("candidate_count", len(candidate_rows)),
+        "best_by": selection.get("best_by"),
+        "current_candidate_id": current.get("name"),
+        "current_candidate_name": current.get("name"),
+        "current_mean_abs_delta": current_mad,
+        "current_rmse": current_rmse,
+        "best_candidate_id": best_candidate_id,
+        "best_candidate_name": best.get("name"),
+        "best_candidate_description": best.get("description"),
+        "best_mean_abs_delta": best_mad,
+        "best_rmse": best_rmse,
+        "mean_abs_delta_delta_vs_current": (
+            best_mad - current_mad if best_mad is not None and current_mad is not None else None
+        ),
+        "rmse_delta_vs_current": (
+            best_rmse - current_rmse
+            if best_rmse is not None and current_rmse is not None
+            else None
+        ),
+        "current_vs_best_metrics": {
+            "current_candidate_id": current.get("name"),
+            "best_candidate_id": best_candidate_id,
+            "current_mean_abs_delta": current_mad,
+            "current_rmse": current_rmse,
+            "best_mean_abs_delta": best_mad,
+            "best_rmse": best_rmse,
+            "mean_abs_delta_delta_vs_current": (
+                best_mad - current_mad
+                if best_mad is not None and current_mad is not None
+                else None
+            ),
+            "rmse_delta_vs_current": (
+                best_rmse - current_rmse
+                if best_rmse is not None and current_rmse is not None
+                else None
+            ),
+        },
+        "candidate_ranking": ranked_candidates,
+        "remaining_tuning_prompts": remaining_prompts,
+        "full_frame_image_delta_caveat": caveat,
+        "notes": [
+            "This sweep is deterministic simulator-only review evidence and does not mutate SimCamera constants.",
+            "Full-frame image delta is a coarse hardware-free ranking signal, not physical calibration truth.",
+        ],
     }
 
 
@@ -2197,6 +2458,33 @@ def main() -> int:
         tuning_summary_path,
     )
 
+    sim_camera_profile_sweep_dir = output_dir / SIM_CAMERA_PROFILE_SWEEP_DIR_NAME
+    sim_camera_profile_sweep_summary_path = (
+        sim_camera_profile_sweep_dir / SIM_CAMERA_PROFILE_SWEEP_JSON_NAME
+    )
+    sim_camera_profile_sweep_record, sim_camera_profile_sweep = run_child(
+        name="sim_camera_profile_sweep",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_profile_calibration_sweep.py"),
+            "--output-dir",
+            str(sim_camera_profile_sweep_dir),
+            "--reference-image",
+            str(args.reference_image.expanduser()),
+            "--profile",
+            str(args.base_profile),
+            "--marker-time-seconds",
+            str(SIM_CAMERA_PROFILE_SWEEP_MARKER_TIME_SECONDS),
+        ],
+        output_dir=sim_camera_profile_sweep_dir,
+        expected_json_path=sim_camera_profile_sweep_summary_path,
+    )
+    sim_camera_profile_sweep_record["diagnostics"] = sim_camera_profile_sweep_section(
+        sim_camera_profile_sweep,
+        sim_camera_profile_sweep_dir,
+        sim_camera_profile_sweep_summary_path,
+    )
+
     session_dir = output_dir / "session"
     session_summary_path = session_dir / "session_summary.json"
     session_record, session = run_child(
@@ -2441,6 +2729,7 @@ def main() -> int:
         "reference_media_inventory": inventory_record,
         "comparison_set": comparison_record,
         "reference_camera_tuning_diagnostics": tuning_record,
+        "sim_camera_profile_sweep": sim_camera_profile_sweep_record,
         "calibration_session_report": session_record,
         "perception_regression_fixture": fixture_record,
         "sim_camera_pose_fixture": pose_fixture_record,
@@ -2514,6 +2803,11 @@ def main() -> int:
             tuning_diagnostics,
             tuning_dir,
             tuning_summary_path,
+        ),
+        "sim_camera_profile_sweep": sim_camera_profile_sweep_section(
+            sim_camera_profile_sweep,
+            sim_camera_profile_sweep_dir,
+            sim_camera_profile_sweep_summary_path,
         ),
         "calibration_session": {
             "summary_path": str(session_summary_path),
