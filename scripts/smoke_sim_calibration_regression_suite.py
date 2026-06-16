@@ -52,6 +52,15 @@ def parse_args() -> argparse.Namespace:
             "Default suite and CI behavior remain manifest-free."
         ),
     )
+    parser.add_argument(
+        "--ik-model-path",
+        type=Path,
+        default=None,
+        help=(
+            "Optional SO-101 kinematic model path forwarded to the IK reachability child. "
+            "Default suite behavior remains model-free and non-failing."
+        ),
+    )
     parser.add_argument("--base-profile", default=DEFAULT_BASE_PROFILE)
     parser.add_argument("--source-square", default="e4")
     parser.add_argument("--target-square", default="e5")
@@ -736,6 +745,13 @@ def ik_reachability_section(ik: dict[str, Any] | None, summary_path: Path) -> di
     model_diagnostic = model_diagnostic if isinstance(model_diagnostic, dict) else {}
     model_solver = ik.get("model_solver")
     model_solver = model_solver if isinstance(model_solver, dict) else {}
+    explicit_model_path = model_diagnostic.get("explicit_model_path")
+    configured_model_path = None
+    if isinstance(explicit_model_path, dict):
+        candidate_path = explicit_model_path.get("path")
+        configured_model_path = candidate_path if isinstance(candidate_path, str) else None
+    elif isinstance(explicit_model_path, str):
+        configured_model_path = explicit_model_path
     return {
         "summary_path": str(summary_path),
         "output_dir": str(summary_path.parent),
@@ -743,6 +759,8 @@ def ik_reachability_section(ik: dict[str, Any] | None, summary_path: Path) -> di
         "status": ik.get("status"),
         "row_count": row_summary.get("row_count"),
         "counts_by_feasibility": row_summary.get("counts_by_feasibility"),
+        "configured_model_path": configured_model_path,
+        "configured_model_request": explicit_model_path,
         "artifacts": {
             "summary_json": artifacts.get("summary_json") if isinstance(artifacts.get("summary_json"), str) else str(summary_path),
             "rows_csv": artifacts.get("rows_csv"),
@@ -1103,14 +1121,17 @@ def main() -> int:
 
     ik_reachability_dir = output_dir / "ik_reachability_drill"
     ik_reachability_summary_path = ik_reachability_dir / IK_REACHABILITY_SUMMARY_NAME
+    ik_reachability_command = [
+        python,
+        str(REPO_ROOT / "scripts" / "smoke_sim_ik_reachability_drill.py"),
+        "--output-dir",
+        str(ik_reachability_dir),
+    ]
+    if args.ik_model_path is not None:
+        ik_reachability_command.extend(["--model-path", str(args.ik_model_path)])
     ik_reachability_record, ik_reachability = run_child(
         name="ik_reachability_drill",
-        command=[
-            python,
-            str(REPO_ROOT / "scripts" / "smoke_sim_ik_reachability_drill.py"),
-            "--output-dir",
-            str(ik_reachability_dir),
-        ],
+        command=ik_reachability_command,
         output_dir=ik_reachability_dir,
         expected_json_path=ik_reachability_summary_path,
     )

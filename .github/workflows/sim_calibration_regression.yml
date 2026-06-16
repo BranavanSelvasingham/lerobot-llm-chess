@@ -60,6 +60,7 @@ env:
   PYTHON_VERSION: "3.12"
   CALIBRATION_REGRESSION_OUTPUT_DIR: "/tmp/lerobot_sim/calibration_regression_suite"
   CALIBRATION_REGRESSION_ARTIFACT_NAME: "sim-calibration-regression-${{ github.run_id }}"
+  IK_MODEL_PATH: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -97,10 +98,17 @@ jobs:
 
       - name: Run simulator calibration regression suite
         run: |
-          python scripts/smoke_sim_calibration_regression_suite.py \
-            --output-dir "${CALIBRATION_REGRESSION_OUTPUT_DIR}" \
-            --python "$(python -c 'import sys; print(sys.executable)')" \
+          cmd=(
+            python
+            scripts/smoke_sim_calibration_regression_suite.py
+            --output-dir "${CALIBRATION_REGRESSION_OUTPUT_DIR}"
+            --python "$(python -c 'import sys; print(sys.executable)')"
             --include-negative-check
+          )
+          if [ -n "${IK_MODEL_PATH}" ]; then
+            cmd+=(--ik-model-path "${IK_MODEL_PATH}")
+          fi
+          "${cmd[@]}"
 
       - name: Check regression summary
         run: |
