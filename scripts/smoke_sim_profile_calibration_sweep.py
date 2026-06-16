@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import math
 import sys
@@ -25,6 +26,7 @@ from lerobot.sim import (
     SimCamera,
     make_sim_camera_config_from_profile,
 )
+import lerobot.sim.camera as sim_camera_module
 
 CORNER_LABELS = ("a1", "h1", "h8", "a8")
 DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "profile_calibration_sweep"
@@ -68,6 +70,24 @@ def parse_args() -> argparse.Namespace:
         help="Override the base profile's synthetic piece square.",
     )
     parser.add_argument("--gripper-percent", type=float, default=80.0)
+    parser.add_argument(
+        "--gripper-finger-width-px",
+        type=int,
+        default=None,
+        help=(
+            "Override the base gripper finger width for this sweep. This is useful for "
+            "deterministic before/after checks without changing the selected profile."
+        ),
+    )
+    parser.add_argument(
+        "--marker-time-seconds",
+        type=float,
+        default=0.0,
+        help=(
+            "Fixed timestamp used by SimCamera marker rendering while scoring candidates. "
+            "Keeping this fixed makes image-delta rankings deterministic."
+        ),
+    )
     parser.add_argument("--overlay-alpha", type=float, default=0.50)
     parser.add_argument(
         "--limit",
@@ -104,6 +124,16 @@ def jsonable(value: Any) -> Any:
     if isinstance(value, dict):
         return {str(key): jsonable(item) for key, item in value.items()}
     return value
+
+
+@contextlib.contextmanager
+def fixed_sim_camera_marker_time(marker_time_seconds: float):
+    original_time = sim_camera_module.time.time
+    sim_camera_module.time.time = lambda: float(marker_time_seconds)
+    try:
+        yield
+    finally:
+        sim_camera_module.time.time = original_time
 
 
 def image_stats(image_bgr: np.ndarray) -> dict[str, Any]:
@@ -374,6 +404,7 @@ def render_candidate(
     reference_bgr: np.ndarray,
     gripper_percent: float,
     candidate_dir: Path,
+    marker_time_seconds: float,
 ) -> dict[str, Any]:
     overrides = {**base_overrides, **candidate.overrides}
     camera_cfg = make_sim_camera_config_from_profile(profile_name, **overrides)
@@ -381,7 +412,8 @@ def render_candidate(
     try:
         camera.connect(warmup=False)
         camera.set_robot_state({"gripper": gripper_percent})
-        frame_bgr = camera.read(ColorMode.BGR)
+        with fixed_sim_camera_marker_time(marker_time_seconds):
+            frame_bgr = camera.read(ColorMode.BGR)
         metadata = camera.calibration_metadata()
     finally:
         if camera.is_connected:
@@ -501,8 +533,14 @@ def main() -> int:
     reference_bgr = read_reference_image(reference_path)
     height, width = reference_bgr.shape[:2]
     profile_values = SIM_CAMERA_CALIBRATION_PROFILES[str(args.profile)]
+    effective_profile_values = dict(profile_values)
     gripper_percent = float(np.clip(float(args.gripper_percent), 0.0, 100.0))
+    if args.gripper_finger_width_px is not None:
+        if args.gripper_finger_width_px <= 0:
+            raise AssertionError("--gripper-finger-width-px must be positive.")
+        effective_profile_values["gripper_finger_width_px"] = int(args.gripper_finger_width_px)
     overlay_alpha = float(np.clip(float(args.overlay_alpha), 0.0, 1.0))
+    marker_time_seconds = float(args.marker_time_seconds)
 
     base_overrides: dict[str, Any] = {
         "width": int(width),
@@ -510,10 +548,12 @@ def main() -> int:
         "color_mode": ColorMode.BGR,
         "reference_image_path": reference_path,
     }
+    if args.gripper_finger_width_px is not None:
+        base_overrides["gripper_finger_width_px"] = int(args.gripper_finger_width_px)
     if args.piece_square is not None:
         base_overrides["piece_square"] = str(args.piece_square)
 
-    candidates = build_candidates(profile_values, args.piece_square)
+    candidates = build_candidates(effective_profile_values, args.piece_square)
     if args.limit and args.limit > 0:
         candidates = candidates[: int(args.limit)]
 
@@ -525,6 +565,7 @@ def main() -> int:
             reference_bgr=reference_bgr,
             gripper_percent=gripper_percent,
             candidate_dir=candidate_dir,
+            marker_time_seconds=marker_time_seconds,
         )
         for candidate in candidates
     ]
@@ -565,9 +606,11 @@ def main() -> int:
         "scenario": "sim_profile_calibration_sweep",
         "profile": str(args.profile),
         "profile_values": jsonable(profile_values),
+        "effective_profile_values": jsonable(effective_profile_values),
         "reference_image_path": str(reference_path),
         "output_dir": str(output_dir),
         "gripper_percent": gripper_percent,
+        "marker_time_seconds": marker_time_seconds,
         "overlay_alpha": overlay_alpha,
         "image": {
             "reference": image_stats(reference_bgr),
