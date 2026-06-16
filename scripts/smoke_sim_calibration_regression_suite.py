@@ -65,6 +65,17 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--ik-model-asset-root",
+        type=Path,
+        action="append",
+        default=[],
+        help=(
+            "Optional SO-101 mesh/assets root forwarded to the model contract checker as "
+            "--model-asset-root. Repeatable. This is separate from --ik-model-path and "
+            "source authority options."
+        ),
+    )
+    parser.add_argument(
         "--so101-model-source-root",
         type=Path,
         action="append",
@@ -170,6 +181,21 @@ def so101_model_source_inventory_config(args: argparse.Namespace) -> dict[str, A
     }
 
 
+def so101_model_contract_config(args: argparse.Namespace) -> dict[str, Any]:
+    asset_roots = cli_path_values(args.ik_model_asset_root)
+    return {
+        "ik_model_path": str(args.ik_model_path.expanduser()) if args.ik_model_path is not None else None,
+        "ik_model_asset_roots": asset_roots,
+        "asset_root_forwarded_to_ik_reachability": False,
+        "ik_model_path_is_authority": False,
+        "notes": [
+            "--ik-model-path is forwarded to the contract checker and IK reachability drill.",
+            "--ik-model-asset-root is forwarded only to the contract checker asset preflight.",
+            "Mesh/assets roots do not mark model-source authority and do not change RobotKinematics arguments.",
+        ],
+    }
+
+
 def so101_model_source_inventory_command(
     *,
     python: str,
@@ -207,6 +233,12 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
     so101_inventory = so101_inventory if isinstance(so101_inventory, dict) else {}
     so101_source_config = so101_inventory.get("source_configuration")
     so101_source_config = so101_source_config if isinstance(so101_source_config, dict) else {}
+    so101_contract = summary.get("so101_model_contract")
+    so101_contract = so101_contract if isinstance(so101_contract, dict) else {}
+    so101_contract_config = summary.get("so101_model_contract_config")
+    so101_contract_config = so101_contract_config if isinstance(so101_contract_config, dict) else {}
+    so101_asset_preflight = so101_contract.get("model_asset_preflight")
+    so101_asset_preflight = so101_asset_preflight if isinstance(so101_asset_preflight, dict) else {}
     readme_path = output_dir / ARTIFACT_ENTRYPOINT_NAME
     lines = [
         "# Simulator Calibration Regression Artifacts",
@@ -322,6 +354,20 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             "- SO-101 model contract evidence records model availability, direct "
             "RobotKinematics usability, joint/frame/TCP contract inputs, and the missing "
             "alignment inputs that still gate trustworthy model-backed IK residuals."
+        ),
+        (
+            "- SO-101 model contract configuration: "
+            f"`--ik-model-path` `{so101_contract_config.get('ik_model_path') or 'none'}`; "
+            f"asset roots `{markdown_list_value(so101_contract_config.get('ik_model_asset_roots'))}`; "
+            "asset roots are forwarded only to the nested asset preflight."
+        ),
+        (
+            "- SO-101 model asset preflight configuration: "
+            f"roots `{markdown_list_value(so101_asset_preflight.get('asset_roots'))}`; "
+            f"mesh `{so101_asset_preflight.get('mesh_reference_count')}`; "
+            f"present `{so101_asset_preflight.get('present_asset_count')}`; "
+            f"missing `{so101_asset_preflight.get('missing_asset_count')}`; "
+            f"unresolved `{so101_asset_preflight.get('unresolved_reference_count')}`."
         ),
         (
             "- IK reachability evidence records deterministic Cartesian/delta/radial command "
@@ -933,6 +979,8 @@ def so101_model_contract_section(contract: dict[str, Any] | None, summary_path: 
     artifacts = artifacts if isinstance(artifacts, dict) else {}
     asset_preflight = contract.get("model_asset_preflight")
     asset_preflight = asset_preflight if isinstance(asset_preflight, dict) else {}
+    asset_root_configuration = contract.get("model_asset_root_configuration")
+    asset_root_configuration = asset_root_configuration if isinstance(asset_root_configuration, dict) else {}
     missing_alignment_inputs = contract.get("model_to_sim_alignment_inputs_missing")
     missing_alignment_inputs = missing_alignment_inputs if isinstance(missing_alignment_inputs, list) else []
     return {
@@ -949,6 +997,12 @@ def so101_model_contract_section(contract: dict[str, Any] | None, summary_path: 
             "suffix": model_request.get("suffix"),
             "reason": model_request.get("reason"),
         },
+        "model_asset_root_configuration": {
+            "asset_roots": asset_root_configuration.get("asset_roots"),
+            "asset_root_count": asset_root_configuration.get("asset_root_count"),
+            "asset_root_checks": asset_root_configuration.get("asset_root_checks"),
+            "notes": asset_root_configuration.get("notes"),
+        },
         "robot_kinematics_status": robot_kinematics_path.get("status"),
         "robot_kinematics_path": {
             "status": robot_kinematics_path.get("status"),
@@ -963,6 +1017,8 @@ def so101_model_contract_section(contract: dict[str, Any] | None, summary_path: 
             "status": asset_preflight.get("status"),
             "ok": asset_preflight.get("ok"),
             "model_request_status": asset_preflight.get("model_request_status"),
+            "asset_roots": asset_preflight.get("asset_roots"),
+            "asset_root_checks": asset_preflight.get("asset_root_checks"),
             "mesh_reference_count": asset_preflight.get("mesh_reference_count"),
             "present_asset_count": asset_preflight.get("present_asset_count"),
             "missing_asset_count": asset_preflight.get("missing_asset_count"),
@@ -1377,6 +1433,7 @@ def main() -> int:
         so101_model_source_inventory_dir / SO101_MODEL_SOURCE_INVENTORY_SUMMARY_NAME
     )
     so101_source_config = so101_model_source_inventory_config(args)
+    so101_contract_config = so101_model_contract_config(args)
     so101_model_source_inventory_record, so101_model_source_inventory = run_child(
         name="so101_model_source_inventory",
         command=so101_model_source_inventory_command(
@@ -1398,6 +1455,8 @@ def main() -> int:
     ]
     if args.ik_model_path is not None:
         so101_model_contract_command.extend(["--model-path", str(args.ik_model_path)])
+    for asset_root in args.ik_model_asset_root:
+        so101_model_contract_command.extend(["--model-asset-root", str(asset_root.expanduser())])
     so101_model_contract_record, so101_model_contract = run_child(
         name="so101_model_contract",
         command=so101_model_contract_command,
@@ -1532,6 +1591,7 @@ def main() -> int:
         },
         "candidate_inputs": candidate_paths,
         "so101_model_source_inventory_config": so101_source_config,
+        "so101_model_contract_config": so101_contract_config,
         "child_commands": child_records,
         "reference_media_manifest": manifest_status_section(
             requested_manifest=args.reference_media_manifest,

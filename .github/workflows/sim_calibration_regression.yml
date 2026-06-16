@@ -23,6 +23,8 @@ on:
     paths:
       - "archive/chess_test_images/current_view.jpg"
       - "docs/sim_calibration_regression.md"
+      - "docs/sim_so101_model_asset_preflight.md"
+      - "docs/sim_so101_model_contract.md"
       - "docs/sim_so101_model_source_inventory.md"
       - "llm-tools/**"
       - "README.md"
@@ -42,6 +44,8 @@ on:
     paths:
       - "archive/chess_test_images/current_view.jpg"
       - "docs/sim_calibration_regression.md"
+      - "docs/sim_so101_model_asset_preflight.md"
+      - "docs/sim_so101_model_contract.md"
       - "docs/sim_so101_model_source_inventory.md"
       - "llm-tools/**"
       - "README.md"
@@ -63,6 +67,7 @@ env:
   CALIBRATION_REGRESSION_OUTPUT_DIR: "/tmp/lerobot_sim/calibration_regression_suite"
   CALIBRATION_REGRESSION_ARTIFACT_NAME: "sim-calibration-regression-${{ github.run_id }}"
   IK_MODEL_PATH: ""
+  IK_MODEL_ASSET_ROOTS: ""
   SO101_MODEL_SOURCE_ROOTS: ""
   SO101_MODEL_SOURCE_EXTRA_ROOTS: ""
   SO101_AUTHORITATIVE_MODEL_PATHS: ""
@@ -127,6 +132,7 @@ jobs:
           if [ -n "${IK_MODEL_PATH}" ]; then
             cmd+=(--ik-model-path "${IK_MODEL_PATH}")
           fi
+          append_repeatable_args --ik-model-asset-root "${IK_MODEL_ASSET_ROOTS}"
           append_repeatable_args --so101-model-source-root "${SO101_MODEL_SOURCE_ROOTS}"
           append_repeatable_args --so101-model-source-extra-root "${SO101_MODEL_SOURCE_EXTRA_ROOTS}"
           append_repeatable_args --so101-authoritative-model-path "${SO101_AUTHORITATIVE_MODEL_PATHS}"
@@ -184,12 +190,16 @@ jobs:
           assert source_inventory["candidate_count"] >= source_inventory["likely_candidate_count"], source_inventory
           assert source_inventory["likely_candidate_count"] >= source_inventory["direct_contract_candidate_count"], source_inventory
           source_configuration = source_inventory["source_configuration"]
+          contract_configuration = summary["so101_model_contract_config"]
           assert source_configuration["ik_model_path_is_authority"] is False, source_configuration
           assert source_configuration["ik_model_path_forwarded_to_inventory"] is False, source_configuration
           assert isinstance(source_configuration["model_source_roots"], list), source_configuration
           assert isinstance(source_configuration["model_source_extra_roots"], list), source_configuration
           assert isinstance(source_configuration["authoritative_model_paths"], list), source_configuration
           assert isinstance(source_configuration["authoritative_model_roots"], list), source_configuration
+          assert contract_configuration["ik_model_path_is_authority"] is False, contract_configuration
+          assert contract_configuration["asset_root_forwarded_to_ik_reachability"] is False, contract_configuration
+          assert isinstance(contract_configuration["ik_model_asset_roots"], list), contract_configuration
           expected_scan_mode = "explicit_roots" if os.environ["SO101_MODEL_SOURCE_ROOTS"].strip() else "default_repo_roots"
           assert source_configuration["scan_mode"] == expected_scan_mode, source_configuration
           if source_inventory["status"] == "missing_authoritative_model":
@@ -224,6 +234,19 @@ jobs:
               "directly_usable",
           }, so101_contract
           assert so101_contract["target_frame"] == "gripper_frame_link", so101_contract
+          contract_asset_root_config = so101_contract["model_asset_root_configuration"]
+          assert isinstance(contract_asset_root_config["asset_roots"], list), contract_asset_root_config
+          assert isinstance(contract_asset_root_config["asset_root_checks"], list), contract_asset_root_config
+          expected_asset_roots = [
+              value
+              for value in os.environ["IK_MODEL_ASSET_ROOTS"].splitlines()
+              if value
+          ]
+          assert contract_configuration["ik_model_asset_roots"] == expected_asset_roots, contract_configuration
+          assert contract_asset_root_config["asset_roots"] == expected_asset_roots, contract_asset_root_config
+          asset_preflight = so101_contract["model_asset_preflight"]
+          assert isinstance(asset_preflight["asset_roots"], list), asset_preflight
+          assert asset_preflight["asset_roots"] == expected_asset_roots, asset_preflight
           so101_artifacts = so101_contract["artifacts"]
           for key in ("summary_json", "checklist_csv", "readme_md"):
               assert isinstance(so101_artifacts.get(key), str) and Path(so101_artifacts[key]).is_file(), (
@@ -505,6 +528,9 @@ jobs:
                           "status": so101_contract["status"],
                           "model_request_status": so101_contract["model_request_status"],
                           "robot_kinematics_status": so101_contract["robot_kinematics_status"],
+                          "contract_configuration": contract_configuration,
+                          "model_asset_root_configuration": contract_asset_root_config,
+                          "model_asset_preflight": asset_preflight,
                           "artifacts": so101_artifacts,
                       },
                       "ik_reachability_drill": {
@@ -585,6 +611,11 @@ jobs:
               f"- `authoritative_paths`: `{summary['so101_model_source_inventory']['source_configuration']['authoritative_model_paths']}`",
               f"- `authoritative_roots`: `{summary['so101_model_source_inventory']['source_configuration']['authoritative_model_roots']}`",
               "- `--ik-model-path` is forwarded only to the contract checker and IK drill, not to source authority.",
+              "",
+              "SO-101 model contract:",
+              f"- `ik_model_path`: `{summary['so101_model_contract_config']['ik_model_path']}`",
+              f"- `ik_model_asset_roots`: `{summary['so101_model_contract_config']['ik_model_asset_roots']}`",
+              "- Asset roots are forwarded only to the contract checker's nested asset preflight.",
               "",
           ]
           rendered = "\n".join(lines) + "\n"
