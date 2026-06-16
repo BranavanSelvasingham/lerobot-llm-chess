@@ -19,12 +19,13 @@ CATEGORY_ORDER = {
     "ranked_candidate": 5,
     "perception_fixture": 6,
     "sim_camera_pose_fixture": 7,
-    "ik_reachability": 8,
-    "gripper_camera_pov": 9,
-    "app_entrypoint": 10,
-    "pick_place_scenario": 11,
-    "negative_check": 12,
-    "logs": 13,
+    "so101_model_contract": 8,
+    "ik_reachability": 9,
+    "gripper_camera_pov": 10,
+    "app_entrypoint": 11,
+    "pick_place_scenario": 12,
+    "negative_check": 13,
+    "logs": 14,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -1205,6 +1206,66 @@ def collect_ik_reachability_artifacts(
     }
 
 
+def collect_so101_model_contract_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    contract = suite.get("so101_model_contract")
+    contract = contract if isinstance(contract, dict) else {}
+    artifact_paths = contract.get("artifacts")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    model_request = contract.get("model_request")
+    model_request = model_request if isinstance(model_request, dict) else {}
+    robot_kinematics_path = contract.get("robot_kinematics_path")
+    robot_kinematics_path = robot_kinematics_path if isinstance(robot_kinematics_path, dict) else {}
+    metrics = {
+        "status": contract.get("status"),
+        "ok": contract.get("ok"),
+        "model_request_status": contract.get("model_request_status") or model_request.get("status"),
+        "model_request_path": model_request.get("path"),
+        "model_request_exists": model_request.get("exists"),
+        "robot_kinematics_status": contract.get("robot_kinematics_status")
+        or robot_kinematics_path.get("status"),
+        "robot_kinematics_directly_usable": robot_kinematics_path.get("directly_usable"),
+        "placo_available": robot_kinematics_path.get("placo_available"),
+        "target_frame": contract.get("target_frame"),
+        "missing_alignment_input_count": contract.get("missing_alignment_input_count"),
+    }
+    for key, label_suffix in (
+        ("summary_json", "summary"),
+        ("checklist_csv", "checklist"),
+        ("readme_md", "readme"),
+    ):
+        add_path(
+            artifacts,
+            category="so101_model_contract",
+            label=f"so101_model_contract:{label_suffix}",
+            value=artifact_paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"so101_model_contract.artifacts.{key}",
+            metrics=metrics,
+        )
+    return {
+        "status": contract.get("status"),
+        "ok": contract.get("ok"),
+        "summary_path": artifact_paths.get("summary_json") or contract.get("summary_path"),
+        "checklist_csv_path": artifact_paths.get("checklist_csv"),
+        "readme_md_path": artifact_paths.get("readme_md"),
+        "model_request_status": metrics["model_request_status"],
+        "model_request": model_request,
+        "robot_kinematics_status": metrics["robot_kinematics_status"],
+        "robot_kinematics_path": robot_kinematics_path,
+        "target_frame": contract.get("target_frame"),
+        "missing_alignment_input_count": contract.get("missing_alignment_input_count"),
+    }
+
+
 def collect_app_entrypoint_artifacts(
     *,
     suite: dict[str, Any],
@@ -1670,6 +1731,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    so101_model_contract = collect_so101_model_contract_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
     ik_reachability = collect_ik_reachability_artifacts(
         suite=suite,
         artifacts=artifacts,
@@ -1758,6 +1826,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "real_projection_intake": real_projection_intake,
         "visual_review": visual_review,
         "sim_camera_pose_fixture_metadata_contract": sim_camera_pose_metadata_contract,
+        "so101_model_contract": so101_model_contract,
         "ik_reachability": ik_reachability,
         "gripper_camera_pov": gripper_camera_pov,
         "app_entrypoint_metadata_contract": app_entrypoint_metadata_contract,
