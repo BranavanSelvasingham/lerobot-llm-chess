@@ -72,12 +72,15 @@ For the local sibling URDF probe, the existing contract checker reported:
 - `ok: true`
 - `status: "model_contract_needs_follow_up"`
 - `model_request.status: "model_supplied"`
-- `robot_kinematics_path.status: "urdf_requires_placo"`
+- `robot_kinematics_path.status: "directly_usable"`
+- `robot_kinematics_path.placo_available: true`
+- `robot_kinematics_initialization.status: "initialization_failed"`
+- `robot_kinematics_initialization.reason: "ValueError: Mesh assets/base_motor_holder_so101_v1.stl could not be found."`
 - `model_structure_inspection.status: "urdf_contract_visible"`
 - `model_structure_inspection.target_frame_present: true`
 - `model_structure_inspection.expected_joint_names_missing: []`
 
-That means the XML names line up with the current simulator contract, but the runtime `RobotKinematics` path was not initialized in this environment because `placo` is unavailable. It also does not resolve model-to-sim frame alignment, TCP/gripper-tip offset, base-to-board alignment, collision policy, or source authority.
+That means the URDF path is directly compatible with the current `RobotKinematics`/placo code path in this environment, and the XML names line up with the current simulator contract. Runtime initialization still fails because referenced mesh assets are missing from the candidate root, so the candidate remains untrusted and model-backed IK residuals still cannot be treated as authoritative. It also does not resolve model-to-sim frame alignment, TCP/gripper-tip offset, base-to-board alignment, collision policy, or source authority.
 
 ## Missing Inputs
 
