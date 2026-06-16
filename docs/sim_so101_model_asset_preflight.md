@@ -39,6 +39,11 @@ resolution, Gazebo model lookup, network access, or asset copying. For `.xml`,
 `.mjcf`, and `.xacro`, it emits limited static diagnostics and only checks
 literal mesh attributes visible in the file.
 
+`--asset-root` is mesh-resolution context only. It lets a reviewed model file
+live separately from STL/DAE/OBJ assets, but it does not make the model source
+authoritative, does not copy assets into the repo, and does not change
+`RobotKinematics` behavior.
+
 ## Review Order
 
 Run the source inventory first:
@@ -58,6 +63,13 @@ treated as a gate for `--ik-model-path`:
 python scripts/smoke_sim_so101_model_contract.py --model-path /absolute/path/to/so101.urdf --output-dir /private/tmp/lerobot_sim/so101_model_contract_preflight_model
 ```
 
+If the URDF/MJCF source and meshes live in separate reviewed locations, pass
+the same roots through the contract checker:
+
+```bash
+python scripts/smoke_sim_so101_model_contract.py --model-path /absolute/path/to/so101.urdf --model-asset-root /absolute/path/to/assets --output-dir /private/tmp/lerobot_sim/so101_model_contract_preflight_model
+```
+
 Do not treat `--ik-model-path` results as authoritative until the source
 inventory, asset preflight, and contract checker have all produced reviewed
 evidence. The known blocker class is a URDF that looks structurally compatible
@@ -70,6 +82,7 @@ High-signal JSON fields:
 
 - `status`
 - `model_request.status`
+- `asset_roots`
 - `model_asset_inspection.scan_mode`
 - `mesh_reference_count`
 - `present_asset_count`
@@ -93,3 +106,15 @@ and indexes the child summary/CSV/README in the
 `so101_model_asset_preflight` artifact category. In
 `artifact_index_report.md`, this category appears before IK reachability so
 missing mesh/assets are visible before model-backed residual evidence.
+
+Use the suite-level `--ik-model-asset-root` option to forward repeatable asset
+roots into that nested preflight:
+
+```bash
+python scripts/smoke_sim_calibration_regression_suite.py --ik-model-path /absolute/path/to/so101.urdf --ik-model-asset-root /absolute/path/to/assets --output-dir /private/tmp/lerobot_sim/calibration_regression_suite_model
+```
+
+The suite records the exact roots in
+`so101_model_contract_config.ik_model_asset_roots`,
+`so101_model_contract.model_asset_root_configuration`, and
+`so101_model_contract.model_asset_preflight.asset_roots`.

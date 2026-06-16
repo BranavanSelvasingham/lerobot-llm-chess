@@ -67,6 +67,16 @@ def parse_args() -> argparse.Namespace:
         default=EXPECTED_TARGET_FRAME,
         help="Expected tool frame for RobotKinematics when a URDF-backed path is available.",
     )
+    parser.add_argument(
+        "--model-asset-root",
+        type=Path,
+        action="append",
+        default=[],
+        help=(
+            "Additional root forwarded to the SO-101 model asset preflight as --asset-root. "
+            "Repeatable. This does not change the reviewed model source or RobotKinematics path."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -95,11 +105,15 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
     path.parent.mkdir(parents=True, exist_ok=True)
     asset_preflight = summary["model_asset_preflight"]
     asset_artifacts = asset_preflight.get("artifacts") or {}
+    asset_root_config = summary["model_asset_root_configuration"]
+    asset_roots = asset_root_config.get("asset_roots") or []
     lines = [
         "# SO-101 Model Contract Check",
         "",
         f"- `status`: `{summary['status']}`",
         f"- `model_request`: `{summary['model_request']['status']}`",
+        f"- `model_asset_root_count`: `{asset_root_config['asset_root_count']}`",
+        f"- `model_asset_roots`: `{'; '.join(asset_roots) if asset_roots else 'none'}`",
         f"- `asset_preflight_status`: `{asset_preflight['status']}`",
         f"- `asset_preflight_mesh_reference_count`: `{asset_preflight.get('mesh_reference_count')}`",
         f"- `asset_preflight_missing_asset_count`: `{asset_preflight.get('missing_asset_count')}`",
@@ -228,7 +242,43 @@ def inspect_robot_kinematics_path(model_request: dict[str, Any]) -> dict[str, An
     }
 
 
-def run_asset_preflight(output_dir: Path, model_request: dict[str, Any]) -> dict[str, Any]:
+def normalize_asset_roots(asset_roots: list[Path]) -> list[Path]:
+    seen: set[str] = set()
+    normalized_roots: list[Path] = []
+    for root in asset_roots:
+        normalized = root.expanduser().resolve(strict=False)
+        key = str(normalized)
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized_roots.append(normalized)
+    return normalized_roots
+
+
+def inspect_asset_roots(asset_roots: list[Path]) -> dict[str, Any]:
+    return {
+        "asset_roots": [str(root) for root in asset_roots],
+        "asset_root_count": len(asset_roots),
+        "asset_root_checks": [
+            {
+                "path": str(root),
+                "exists": root.exists(),
+                "is_dir": root.is_dir(),
+            }
+            for root in asset_roots
+        ],
+        "notes": [
+            "--model-asset-root is forwarded only to the asset preflight child as --asset-root.",
+            "It does not mark a model source authoritative and does not change RobotKinematics initialization arguments.",
+        ],
+    }
+
+
+def run_asset_preflight(
+    output_dir: Path,
+    model_request: dict[str, Any],
+    asset_roots: list[Path],
+) -> dict[str, Any]:
     preflight_dir = output_dir / "so101_model_asset_preflight"
     summary_path = preflight_dir / "so101_model_asset_preflight_summary.json"
     csv_path = preflight_dir / "so101_model_asset_preflight_assets.csv"
@@ -242,6 +292,8 @@ def run_asset_preflight(output_dir: Path, model_request: dict[str, Any]) -> dict
     ]
     if model_request.get("path") is not None:
         command.extend(["--model-path", str(model_request["path"])])
+    for asset_root in asset_roots:
+        command.extend(["--asset-root", str(asset_root)])
 
     result = subprocess.run(command, capture_output=True, text=True, check=False)
     base = {
@@ -266,6 +318,8 @@ def run_asset_preflight(output_dir: Path, model_request: dict[str, Any]) -> dict
             "present_asset_count": None,
             "missing_asset_count": None,
             "unresolved_reference_count": None,
+            "asset_roots": [str(root) for root in asset_roots],
+            "asset_root_checks": inspect_asset_roots(asset_roots)["asset_root_checks"],
         }
 
     try:
@@ -280,6 +334,8 @@ def run_asset_preflight(output_dir: Path, model_request: dict[str, Any]) -> dict
             "present_asset_count": None,
             "missing_asset_count": None,
             "unresolved_reference_count": None,
+            "asset_roots": [str(root) for root in asset_roots],
+            "asset_root_checks": inspect_asset_roots(asset_roots)["asset_root_checks"],
         }
 
     return {
@@ -287,6 +343,8 @@ def run_asset_preflight(output_dir: Path, model_request: dict[str, Any]) -> dict
         "ok": bool(child_summary.get("ok")),
         "status": child_summary.get("status"),
         "model_request_status": child_summary.get("model_request", {}).get("status"),
+        "asset_roots": child_summary.get("asset_roots", [str(root) for root in asset_roots]),
+        "asset_root_checks": inspect_asset_roots(asset_roots)["asset_root_checks"],
         "model_asset_inspection": child_summary.get("model_asset_inspection"),
         "mesh_reference_count": child_summary.get("mesh_reference_count"),
         "present_asset_count": child_summary.get("present_asset_count"),
@@ -521,6 +579,7 @@ def row(
 def build_checklist_rows(
     metadata: dict[str, Any],
     model_request: dict[str, Any],
+    model_asset_root_configuration: dict[str, Any],
     asset_preflight: dict[str, Any],
     robot_kinematics_path: dict[str, Any],
     xml_inspection: dict[str, Any],
@@ -569,6 +628,8 @@ def build_checklist_rows(
             str(ASSET_PREFLIGHT_PATH),
             {
                 "status": asset_preflight.get("status"),
+                "asset_roots": asset_preflight.get("asset_roots"),
+                "asset_root_checks": asset_preflight.get("asset_root_checks"),
                 "mesh_reference_count": asset_preflight.get("mesh_reference_count"),
                 "present_asset_count": asset_preflight.get("present_asset_count"),
                 "missing_asset_count": asset_preflight.get("missing_asset_count"),
@@ -584,6 +645,17 @@ def build_checklist_rows(
                 "unresolved_references": asset_preflight.get("unresolved_references"),
             },
             "Child asset preflight evidence is recorded before RobotKinematics initialization is attempted.",
+        ),
+        row(
+            "model_asset_roots",
+            "asset_dependencies",
+            "ok",
+            "info",
+            "cli",
+            model_asset_root_configuration,
+            {"asset_roots": "optional repeatable external mesh/assets roots"},
+            None,
+            "Configured roots are diagnostics for asset resolution only; they do not establish model-source authority.",
         ),
         row(
             "body_joints",
@@ -694,6 +766,7 @@ def build_summary(
     target_frame: str,
     metadata: dict[str, Any],
     model_request: dict[str, Any],
+    model_asset_root_configuration: dict[str, Any],
     asset_preflight: dict[str, Any],
     robot_kinematics_path: dict[str, Any],
     xml_inspection: dict[str, Any],
@@ -723,6 +796,7 @@ def build_summary(
         "gui_skipped": True,
         "openai_skipped": True,
         "model_request": model_request,
+        "model_asset_root_configuration": model_asset_root_configuration,
         "model_asset_preflight": asset_preflight,
         "robot_kinematics_path": robot_kinematics_path,
         "expected_contract": {
@@ -750,10 +824,12 @@ def main() -> int:
     output_dir = args.output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    asset_roots = normalize_asset_roots(list(args.model_asset_root))
+    model_asset_root_configuration = inspect_asset_roots(asset_roots)
     metadata = load_sim_robot_metadata()
     model_request = inspect_model_request(args.model_path)
     robot_kinematics_path = inspect_robot_kinematics_path(model_request)
-    asset_preflight = run_asset_preflight(output_dir, model_request)
+    asset_preflight = run_asset_preflight(output_dir, model_request, asset_roots)
     xml_inspection = inspect_xml_model(model_request, str(args.target_frame), metadata["body_joints"])
     kinematics_init = try_robot_kinematics_init(
         model_request,
@@ -767,6 +843,7 @@ def main() -> int:
     checklist_rows = build_checklist_rows(
         metadata,
         model_request,
+        model_asset_root_configuration,
         asset_preflight,
         robot_kinematics_path,
         xml_inspection,
@@ -788,6 +865,7 @@ def main() -> int:
         str(args.target_frame),
         metadata,
         model_request,
+        model_asset_root_configuration,
         asset_preflight,
         robot_kinematics_path,
         xml_inspection,
@@ -807,6 +885,7 @@ def main() -> int:
                 "ok": True,
                 "status": summary["status"],
                 "model_request_status": model_request["status"],
+                "model_asset_roots": model_asset_root_configuration["asset_roots"],
                 "asset_preflight_status": asset_preflight["status"],
                 "asset_preflight_mesh_reference_count": asset_preflight.get("mesh_reference_count"),
                 "asset_preflight_missing_asset_count": asset_preflight.get("missing_asset_count"),

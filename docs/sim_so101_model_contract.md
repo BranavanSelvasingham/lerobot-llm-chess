@@ -8,6 +8,21 @@ model-backed IK through `--ik-model-path`.
 python scripts/smoke_sim_so101_model_contract.py --model-path /absolute/path/to/so101.urdf --output-dir /private/tmp/lerobot_sim/so101_model_contract_preflight_model
 ```
 
+When a reviewed URDF/MJCF source references meshes from a separate directory,
+pair it with repeatable asset roots:
+
+```bash
+python scripts/smoke_sim_so101_model_contract.py --model-path /absolute/path/to/so101.urdf --model-asset-root /absolute/path/to/assets --output-dir /private/tmp/lerobot_sim/so101_model_contract_preflight_model
+```
+
+`--model-path` names the candidate model file being inspected. It is the path
+that may later become `--ik-model-path` for model-backed IK. `--model-asset-root`
+is only mesh-resolution context forwarded to the nested asset preflight as
+`--asset-root`; it is repeatable, diagnostic, and never passed into
+`RobotKinematics`. Source authority still comes from the inventory
+`--so101-authoritative-model-path` or `--so101-authoritative-model-root`
+options after provenance/license review.
+
 The checker writes:
 
 - `so101_model_contract_summary.json`
@@ -49,7 +64,10 @@ High-signal JSON fields:
 
 - `status`
 - `model_request.status`
+- `model_asset_root_configuration.asset_roots`
+- `model_asset_root_configuration.asset_root_checks`
 - `model_asset_preflight.status`
+- `model_asset_preflight.asset_roots`
 - `model_asset_preflight.mesh_reference_count`
 - `model_asset_preflight.present_asset_count`
 - `model_asset_preflight.missing_asset_count`
@@ -71,3 +89,13 @@ mirrors `model_asset_preflight` into the suite summary and indexes the nested
 summary/CSV/README as `so101_model_asset_preflight` artifacts. The rendered
 artifact report shows this section before IK reachability with mesh, present,
 missing, and unresolved counts.
+
+The full suite equivalent is:
+
+```bash
+python scripts/smoke_sim_calibration_regression_suite.py --ik-model-path /absolute/path/to/so101.urdf --ik-model-asset-root /absolute/path/to/assets --output-dir /private/tmp/lerobot_sim/calibration_regression_suite_model
+```
+
+The suite records those roots in `so101_model_contract_config`, mirrors the
+contract checker's `model_asset_root_configuration`, and preserves the child
+command under `child_commands.so101_model_contract.command`.
