@@ -21,12 +21,13 @@ CATEGORY_ORDER = {
     "sim_camera_pose_fixture": 7,
     "so101_model_source_inventory": 8,
     "so101_model_contract": 9,
-    "ik_reachability": 10,
-    "gripper_camera_pov": 11,
-    "app_entrypoint": 12,
-    "pick_place_scenario": 13,
-    "negative_check": 14,
-    "logs": 15,
+    "so101_model_asset_preflight": 10,
+    "ik_reachability": 11,
+    "gripper_camera_pov": 12,
+    "app_entrypoint": 13,
+    "pick_place_scenario": 14,
+    "negative_check": 15,
+    "logs": 16,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -1267,6 +1268,61 @@ def collect_so101_model_contract_artifacts(
     }
 
 
+def collect_so101_model_asset_preflight_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    contract = suite.get("so101_model_contract")
+    contract = contract if isinstance(contract, dict) else {}
+    asset_preflight = contract.get("model_asset_preflight")
+    asset_preflight = asset_preflight if isinstance(asset_preflight, dict) else {}
+    artifact_paths = asset_preflight.get("artifacts")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    metrics = {
+        "status": asset_preflight.get("status"),
+        "ok": asset_preflight.get("ok"),
+        "model_request_status": asset_preflight.get("model_request_status"),
+        "mesh_reference_count": asset_preflight.get("mesh_reference_count"),
+        "present_asset_count": asset_preflight.get("present_asset_count"),
+        "missing_asset_count": asset_preflight.get("missing_asset_count"),
+        "unresolved_reference_count": asset_preflight.get("unresolved_reference_count"),
+        "missing_assets": asset_preflight.get("missing_assets"),
+        "unresolved_references": asset_preflight.get("unresolved_references"),
+    }
+    for key, label_suffix in (
+        ("summary_json", "summary"),
+        ("assets_csv", "assets"),
+        ("readme_md", "readme"),
+    ):
+        add_path(
+            artifacts,
+            category="so101_model_asset_preflight",
+            label=f"so101_model_asset_preflight:{label_suffix}",
+            value=artifact_paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"so101_model_contract.model_asset_preflight.artifacts.{key}",
+            metrics=metrics,
+        )
+    return {
+        "status": asset_preflight.get("status"),
+        "ok": asset_preflight.get("ok"),
+        "summary_path": artifact_paths.get("summary_json"),
+        "assets_csv_path": artifact_paths.get("assets_csv"),
+        "readme_md_path": artifact_paths.get("readme_md"),
+        "model_request_status": asset_preflight.get("model_request_status"),
+        "mesh_reference_count": asset_preflight.get("mesh_reference_count"),
+        "present_asset_count": asset_preflight.get("present_asset_count"),
+        "missing_asset_count": asset_preflight.get("missing_asset_count"),
+        "unresolved_reference_count": asset_preflight.get("unresolved_reference_count"),
+    }
+
+
 def collect_so101_model_source_inventory_artifacts(
     *,
     suite: dict[str, Any],
@@ -1818,6 +1874,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    so101_model_asset_preflight = collect_so101_model_asset_preflight_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
     ik_reachability = collect_ik_reachability_artifacts(
         suite=suite,
         artifacts=artifacts,
@@ -1908,6 +1971,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "sim_camera_pose_fixture_metadata_contract": sim_camera_pose_metadata_contract,
         "so101_model_source_inventory": so101_model_source_inventory,
         "so101_model_contract": so101_model_contract,
+        "so101_model_asset_preflight": so101_model_asset_preflight,
         "ik_reachability": ik_reachability,
         "gripper_camera_pov": gripper_camera_pov,
         "app_entrypoint_metadata_contract": app_entrypoint_metadata_contract,

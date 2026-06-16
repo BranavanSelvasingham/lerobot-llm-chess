@@ -22,12 +22,13 @@ CATEGORY_ORDER = {
     "sim_camera_pose_fixture": 7,
     "so101_model_source_inventory": 8,
     "so101_model_contract": 9,
-    "ik_reachability": 10,
-    "gripper_camera_pov": 11,
-    "app_entrypoint": 12,
-    "pick_place_scenario": 13,
-    "negative_check": 14,
-    "logs": 15,
+    "so101_model_asset_preflight": 10,
+    "ik_reachability": 11,
+    "gripper_camera_pov": 12,
+    "app_entrypoint": 13,
+    "pick_place_scenario": 14,
+    "negative_check": 15,
+    "logs": 16,
 }
 CATEGORY_LABELS = {
     "real_reference_media": "Real Reference Media",
@@ -40,6 +41,7 @@ CATEGORY_LABELS = {
     "sim_camera_pose_fixture": "SimCamera Pose Fixture",
     "so101_model_source_inventory": "SO-101 Model Source Inventory",
     "so101_model_contract": "SO-101 Model Contract",
+    "so101_model_asset_preflight": "SO-101 Model Asset Preflight",
     "ik_reachability": "IK Reachability Drill",
     "gripper_camera_pov": "Gripper-Camera POV Review",
     "app_entrypoint": "App Entrypoint Metadata",
@@ -793,6 +795,24 @@ def so101_model_contract_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("robot_kinematics_directly_usable", ""),
         metrics.get("target_frame", ""),
         metrics.get("missing_alignment_input_count", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def so101_model_asset_preflight_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("model_request_status", ""),
+        metrics.get("mesh_reference_count", ""),
+        metrics.get("present_asset_count", ""),
+        metrics.get("missing_asset_count", ""),
+        metrics.get("unresolved_reference_count", ""),
         "ok" if artifact.get("exists") is True else "missing",
     ]
 
@@ -1603,6 +1623,33 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         )
         if so101_model_contract
         else ["_No SO-101 model contract artifacts indexed._"]
+    )
+
+    so101_model_asset_preflight = grouped.get("so101_model_asset_preflight", [])
+    lines.extend(["", "### SO-101 Model Asset Preflight"])
+    lines.append(
+        "This table surfaces the model contract checker's nested asset preflight before "
+        "IK reachability evidence. Missing or unresolved mesh references remain "
+        "non-failing diagnostics, but they are visible as follow-up counts and linked artifacts."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Model Request",
+                "Mesh Refs",
+                "Present",
+                "Missing",
+                "Unresolved",
+                "Artifact Status",
+            ],
+            [so101_model_asset_preflight_row(row) for row in so101_model_asset_preflight],
+        )
+        if so101_model_asset_preflight
+        else ["_No SO-101 model asset-preflight artifacts indexed._"]
     )
 
     ik_reachability = grouped.get("ik_reachability", [])

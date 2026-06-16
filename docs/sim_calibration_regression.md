@@ -29,7 +29,14 @@ request probe mirrored under `ik_reachability_drill.configured_model_request`,
 plus `ik_reachability_drill.model_diagnostic.selected_model_path` when the
 child can use it. If the supplied path is missing or unusable, the suite still
 exits successfully and records a `missing_model` or `model_unavailable`
-diagnostic instead of turning the hardware-free gate red.
+diagnostic instead of turning the hardware-free gate red. The contract section
+also mirrors the child asset-preflight result under
+`so101_model_contract.model_asset_preflight`, including `status`,
+`mesh_reference_count`, `present_asset_count`, `missing_asset_count`,
+`unresolved_reference_count`, and child artifact paths. The artifact index and
+Markdown report expose the same data in a dedicated
+`so101_model_asset_preflight` category before IK reachability, so missing mesh
+or unresolved asset references are visible before residual checks.
 
 To ask the integrated suite to scan reviewed model-source locations, pass
 suite-level inventory options. These forward only to
@@ -86,7 +93,8 @@ To inspect a candidate model explicitly:
 ```
 
 This checker writes `so101_model_contract_summary.json`,
-`so101_model_contract_checklist.csv`, and `README.md`. It records whether the
+`so101_model_contract_checklist.csv`, `README.md`, and nested
+`so101_model_asset_preflight/` summary/CSV/README evidence. It records whether the
 supplied path exists, whether its suffix is one of `.urdf`, `.xml`, `.mjcf`, or
 `.xacro`, whether it is directly usable by the current
 `RobotKinematics`/placo path, the simulator-side body-joint and joint-limit
@@ -187,6 +195,12 @@ The focused `Simulator Calibration Regression` workflow runs the same hardware-f
 
 The workflow also treats `sim_camera_pose_fixture`, `so101_model_source_inventory`, `so101_model_contract`, `ik_reachability_drill`, `gripper_camera_pov_review`, `visual_review`, `real_projection_intake`, `evidence_bundle`, `app_entrypoint_metadata`, `pick_place_scenario_matrix.piece_visibility`, and `artifact_index.json` as part of the artifact contract. The pose fixture must report deterministic nominal and perturbed case IDs, raw frames, annotated frames, per-case metadata JSON, projected board corners, and target/piece centers. The SO-101 model-source inventory must report a deterministic summary JSON, candidates CSV, and README, expose status, candidate counts, authoritative candidate count, recommended contract-check path when present, and preserve `missing_authoritative_model` as explicit non-failing CI evidence when no reviewed source exists. The SO-101 model contract checker must report a deterministic summary JSON, checklist CSV, and README, expose model request status, direct RobotKinematics status, target frame, and artifact paths, and preserve `missing_model` / `model_not_supplied` as explicit non-failing CI evidence when no model is supplied. The IK reachability drill must report a deterministic summary JSON, rows CSV, and heatmap PNG, expose row counts and counts-by-feasibility, and preserve model diagnostic status so `model_unavailable_fallback_complete` is explicit but non-failing when no repo-local SO-101 model is available. The gripper-camera POV review must report a small open/approach/grasp/release state sequence with raw frames, annotated frames, per-state metadata JSON, target square center and projected square polygon, gripper opening, SimCamera metadata contract checks, and piece visibility/occlusion/clearance rows. The visual review must report stable PNG contact sheets for gripper POV, pose fixture, and pick/place sequence frames, plus distance-annotated pick/place sequence frames, pick/place depth-distance scorecard PNG/JSON, pick/place depth/distance JSON/CSV metrics, pick/place perceived-depth comparison JSON/CSV metrics, pick/place PnP residual diagnostic JSON/CSV metrics, metadata-native SimCamera projection/depth PNG/JSON/CSV metrics, and a copied app-entrypoint frame for convenient bundle browsing. The evidence bundle must write `evidence_bundle/sim_evidence_bundle.md` and `.json` after real projection intake and the real-depth-aware visual-review refresh are complete; missing optional capture-plan artifacts and codec-dependent MP4s remain non-fatal. The depth/distance metrics must label simulator ground truth separately from perceived depth, include camera-to-board/piece distances, target/piece world coordinates, projected pixel coordinates, projection residuals, and a clearly sourced gripper-to-piece proxy when true end-effector depth is unavailable. The depth-distance scorecard must summarize SimCamera ground truth, the metadata-derived rendered-corner PnP baseline, mean/max simulator baseline residuals, corner residuals in pixels, and a `real_depth_reference` section whose status is either `real_depth_comparable` with real-vs-sim residual metrics or `missing_real_depth_reference` with required sidecar inputs. The perceived-depth comparison must add a clearly labeled metadata-derived rendered-board-corner PnP baseline with estimated camera-to-piece/board distances, simulator ground-truth distances, signed/absolute residuals, estimator source/status, and an explicit note that it is not real-camera depth perception. The PnP residual diagnostic must compare simulator ground-truth extrinsics, the rendered-board-corner PnP estimate, and metadata-projected 3D board corners for the same frames; it must report corner ordering assumptions, board size, reprojection residuals, camera-center/board distances, source comparability, and reason labels when sources are not geometrically comparable. The metadata-native projection/depth view must project board corners/center plus per-stage piece and target square centers directly through `camera_metadata.camera_matrix_px` and `camera_metadata.extrinsics.board_to_camera`, report `metadata_projected_pixel_xy`, `camera_frame_xyz_mm`, `camera_z_depth_mm`, `camera_range_mm`, `board_plane_distance_mm`, `source_model: simcamera_metadata`, and link back to the existing depth-distance and PnP diagnostic artifact paths. The real projection intake must link selected real reference media to that metadata-native depth view, report `real_reference_media_path`, `real_intrinsics_status`, `real_board_pose_status`, `real_depth_status`, `sim_metadata_native_depth_view_path`, `sim_expected_projected_points`, `comparable`, `depth_comparable`, `missing_inputs`, next capture requirements, and residual artifacts when real_capture sidecars are present. The app-entrypoint smoke must report a synthetic frame, a metadata sidecar when requested, skipped hardware/gui/OpenAI markers, passing app-facing metadata contract checks, and the same compact `app_camera_status` readout shown by `chess_robot_ui_llm_v2.py --sim`. All four pick/place scenarios must report available visibility evidence, each target release frame path must exist, and each `target_release_open` row must include visible fraction, occlusion fraction, and gripper-clearance fields. The generated artifact index must exist, report `status: "ok"`, have a nonzero artifact count, have no missing artifacts, and include populated categories for the evidence bundle, visual-review contact sheets, sequence frames, depth-distance scorecard, depth/distance metrics, perceived-depth comparison metrics, PnP residual diagnostic metrics, metadata-native projection/depth metrics, real-reference comparisons, real projection intake, ranked candidates, perception fixture evidence, SimCamera pose fixture evidence, SO-101 model-source inventory evidence, SO-101 model contract evidence, IK reachability evidence, gripper-camera POV evidence, app-entrypoint evidence, pick/place scenario release frames, the negative check, and child logs. These are structural availability checks rather than exact metric-value thresholds.
 
+The artifact contract also includes the dedicated `so101_model_asset_preflight`
+index/report category. It is sourced from the contract checker's nested child
+preflight and must expose summary/CSV/README artifacts plus status, mesh
+reference count, present count, missing count, and unresolved count before the
+IK reachability section.
+
 This CI signal is still a simulator/perception regression gate only. It does not connect to SO-101 hardware, open GUI calibration flows, or replace later physical robot validation.
 
 ## What This Proves
@@ -201,7 +215,7 @@ The suite orchestrates these existing smoke scripts as subprocesses and records 
 - `smoke_sim_perception_regression_fixture.py` packages the selected ranked candidate into perception fixture evidence.
 - `smoke_sim_camera_pose_fixture.py` renders deterministic nominal, perturbed, overview, and gripper-state SimCamera pose review frames plus per-case metadata.
 - `smoke_sim_so101_model_source_inventory.py` records deterministic repo-local SO-101 model-source inventory evidence, candidate/provenance/authority counts, and explicit missing-authoritative-model diagnostics before contract or IK checks.
-- `smoke_sim_so101_model_contract.py` records deterministic model availability, RobotKinematics usability, joint/frame/TCP contract, and missing alignment inputs before model-backed IK residuals are trusted.
+- `smoke_sim_so101_model_contract.py` records deterministic model availability, RobotKinematics usability, joint/frame/TCP contract, nested asset-preflight mesh evidence, and missing alignment inputs before model-backed IK residuals are trusted.
 - `smoke_sim_ik_reachability_drill.py` records deterministic Cartesian, delta, and radial command feasibility evidence plus explicit missing-model fallback diagnostics.
 - `smoke_sim_gripper_camera_pov_review.py` renders deterministic gripper-camera POV frames for open, approach, grasp-window, closed, and release-style gripper states using existing SimCamera/KinematicsTools metadata and piece-visibility geometry.
 - `smoke_sim_pick_place_scenario_matrix.py` runs center, edge-file, back-rank, and near-gripper pick/place scenarios.
@@ -226,6 +240,7 @@ A passing summary should show:
 - `so101_model_source_inventory.status: "missing_authoritative_model"` or `"authoritative_model_found"` with candidate counts, authoritative candidate count, recommended contract-check path when present, and summary/CSV/README artifact paths populated
 - `so101_model_source_inventory.source_configuration.scan_mode: "default_repo_roots"` in the default run or `"explicit_roots"` when `--so101-model-source-root` is supplied, with configured roots/authority lists preserved
 - `so101_model_contract.status: "missing_model"`, `"model_unavailable"`, `"model_contract_checked"`, `"model_contract_needs_follow_up"`, or `"model_suffix_supported_not_directly_usable"` with `model_request_status`, `robot_kinematics_status`, `target_frame`, and summary/CSV/README artifact paths populated
+- `so101_model_contract.model_asset_preflight.status: "missing_model"`, `"model_unavailable"`, `"asset_preflight_checked"`, `"asset_preflight_limited_diagnostics"`, or `"asset_preflight_needs_follow_up"` with mesh, present, missing, unresolved counts and nested summary/CSV/README artifact paths populated
 - `ik_reachability_drill.status: "ok_model_backed"` or `"model_unavailable_fallback_complete"` with `row_count > 0`, populated `counts_by_feasibility`, and summary/CSV/heatmap artifact paths populated
 - `ik_reachability_drill.configured_model_path` populated when `--ik-model-path` is supplied, otherwise `null`
 - `ik_reachability_drill.configured_model_request` mirrored from the child diagnostic when `--ik-model-path` is supplied
@@ -280,6 +295,9 @@ Common artifact paths under the output directory:
 - `so101_model_contract/so101_model_contract_summary.json`
 - `so101_model_contract/so101_model_contract_checklist.csv`
 - `so101_model_contract/README.md`
+- `so101_model_contract/so101_model_asset_preflight/so101_model_asset_preflight_summary.json`
+- `so101_model_contract/so101_model_asset_preflight/so101_model_asset_preflight_assets.csv`
+- `so101_model_contract/so101_model_asset_preflight/README.md`
 - `ik_reachability_drill/ik_reachability_drill_summary.json`
 - `ik_reachability_drill/ik_reachability_drill_rows.csv`
 - `ik_reachability_drill/ik_reachability_drill_heatmap.png`
