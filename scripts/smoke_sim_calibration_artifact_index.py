@@ -11,24 +11,25 @@ from typing import Any
 SCHEMA = "lerobot.sim.calibration_artifact_index.v1"
 CATEGORY_ORDER = {
     "evidence_bundle": 0,
-    "real_reference_media": 0,
-    "reference_capture_checklist": 1,
-    "visual_review": 2,
-    "real_reference_comparison": 3,
-    "real_projection_intake": 4,
-    "ranked_candidate": 5,
-    "perception_fixture": 6,
-    "sim_camera_pose_fixture": 7,
-    "so101_model_source_inventory": 8,
-    "so101_model_bundle_manifest": 9,
-    "so101_model_contract": 10,
-    "so101_model_asset_preflight": 11,
-    "ik_reachability": 12,
-    "gripper_camera_pov": 13,
-    "app_entrypoint": 14,
-    "pick_place_scenario": 15,
-    "negative_check": 16,
-    "logs": 17,
+    "reference_media_inventory": 0,
+    "real_reference_media": 1,
+    "reference_capture_checklist": 2,
+    "visual_review": 3,
+    "real_reference_comparison": 4,
+    "real_projection_intake": 5,
+    "ranked_candidate": 6,
+    "perception_fixture": 7,
+    "sim_camera_pose_fixture": 8,
+    "so101_model_source_inventory": 9,
+    "so101_model_bundle_manifest": 10,
+    "so101_model_contract": 11,
+    "so101_model_asset_preflight": 12,
+    "ik_reachability": 13,
+    "gripper_camera_pov": 14,
+    "app_entrypoint": 15,
+    "pick_place_scenario": 16,
+    "negative_check": 17,
+    "logs": 18,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -265,6 +266,95 @@ def collect_real_reference_media(
             }
         )
     return sorted(rows, key=lambda row: str(row.get("relative_path") or ""))
+
+
+def reference_media_inventory_from_suite(suite: dict[str, Any]) -> dict[str, Any]:
+    inventory = suite.get("reference_media_inventory")
+    if isinstance(inventory, dict) and inventory:
+        return inventory
+    inventory = suite.get("inventory")
+    return inventory if isinstance(inventory, dict) else {}
+
+
+def reference_media_inventory_metrics(inventory: dict[str, Any]) -> dict[str, Any]:
+    summary = inventory.get("summary")
+    summary = summary if isinstance(summary, dict) else {}
+    current = inventory.get("current_gripper_reference")
+    current = current if isinstance(current, dict) else {}
+    return {
+        "status": inventory.get("status") or summary.get("status"),
+        "ok": inventory.get("ok"),
+        "candidate_count": inventory.get("candidate_count", summary.get("candidate_count")),
+        "image_count": inventory.get("image_count", summary.get("image_count")),
+        "video_count": inventory.get("video_count", summary.get("video_count")),
+        "calibration_data_count": inventory.get(
+            "calibration_data_count",
+            summary.get("calibration_data_count"),
+        ),
+        "currently_wired_media_count": inventory.get(
+            "currently_wired_media_count",
+            summary.get("currently_wired_media_count"),
+        ),
+        "current_gripper_reference_detected": current.get(
+            "detected",
+            summary.get("active_current_gripper_reference_detected"),
+        ),
+        "current_gripper_reference_path": current.get(
+            "path",
+            summary.get("active_current_gripper_reference_path"),
+        ),
+        "reference_gaps": inventory.get("reference_gaps") or summary.get("reference_gaps"),
+        "scan_mode": (
+            inventory.get("source_configuration", {}).get("scan_mode")
+            if isinstance(inventory.get("source_configuration"), dict)
+            else None
+        ),
+    }
+
+
+def collect_reference_media_inventory_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    inventory = reference_media_inventory_from_suite(suite)
+    artifact_paths = inventory.get("artifact_paths")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    metrics = reference_media_inventory_metrics(inventory)
+    paths = {
+        "summary_json": inventory.get("summary_path") or artifact_paths.get("summary_json"),
+        "csv": inventory.get("csv_path") or artifact_paths.get("csv"),
+        "readme_md": inventory.get("readme_path") or artifact_paths.get("readme_md"),
+    }
+    for key, label_suffix in (
+        ("summary_json", "summary"),
+        ("csv", "csv"),
+        ("readme_md", "readme"),
+    ):
+        add_path(
+            artifacts,
+            category="reference_media_inventory",
+            label=f"reference_media_inventory:{label_suffix}",
+            value=paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"reference_media_inventory.{key}",
+            metrics=metrics,
+        )
+    return {
+        **metrics,
+        "summary_path": paths.get("summary_json"),
+        "csv_path": paths.get("csv"),
+        "readme_path": paths.get("readme_md"),
+        "artifact_paths": paths,
+        "visibility_gaps": inventory.get("visibility_gaps"),
+        "scan": inventory.get("scan"),
+        "source_configuration": inventory.get("source_configuration"),
+    }
 
 
 def collect_comparison_artifacts(
@@ -1941,6 +2031,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         repo_root=repo_root,
     )
 
+    reference_media_inventory = collect_reference_media_inventory_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
     selected_media = collect_real_reference_media(
         suite=suite,
         comparison_set=comparison_set_summary,
@@ -2109,6 +2206,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         },
         "reference_media_manifest": suite.get("reference_media_manifest"),
         "evidence_bundle": evidence_bundle,
+        "reference_media_inventory": reference_media_inventory,
         "selected_real_reference_media": selected_media,
         "reference_capture_checklist": reference_capture_checklist,
         "real_projection_intake": real_projection_intake,

@@ -12,26 +12,28 @@ ARTIFACT_INDEX_SCHEMA = "lerobot.sim.calibration_artifact_index.v1"
 SUITE_SCHEMA = "lerobot.sim.calibration_regression_suite.v1"
 DEFAULT_REPORT_NAME = "artifact_index_report.md"
 CATEGORY_ORDER = {
-    "real_reference_media": 0,
-    "reference_capture_checklist": 1,
-    "visual_review": 2,
-    "real_reference_comparison": 3,
-    "real_projection_intake": 4,
-    "ranked_candidate": 5,
-    "perception_fixture": 6,
-    "sim_camera_pose_fixture": 7,
-    "so101_model_source_inventory": 8,
-    "so101_model_bundle_manifest": 9,
-    "so101_model_contract": 10,
-    "so101_model_asset_preflight": 11,
-    "ik_reachability": 12,
-    "gripper_camera_pov": 13,
-    "app_entrypoint": 14,
-    "pick_place_scenario": 15,
-    "negative_check": 16,
-    "logs": 17,
+    "reference_media_inventory": 0,
+    "real_reference_media": 1,
+    "reference_capture_checklist": 2,
+    "visual_review": 3,
+    "real_reference_comparison": 4,
+    "real_projection_intake": 5,
+    "ranked_candidate": 6,
+    "perception_fixture": 7,
+    "sim_camera_pose_fixture": 8,
+    "so101_model_source_inventory": 9,
+    "so101_model_bundle_manifest": 10,
+    "so101_model_contract": 11,
+    "so101_model_asset_preflight": 12,
+    "ik_reachability": 13,
+    "gripper_camera_pov": 14,
+    "app_entrypoint": 15,
+    "pick_place_scenario": 16,
+    "negative_check": 17,
+    "logs": 18,
 }
 CATEGORY_LABELS = {
+    "reference_media_inventory": "Reference Media Inventory",
     "real_reference_media": "Real Reference Media",
     "reference_capture_checklist": "Reference Capture Checklist",
     "visual_review": "Visual Review Artifacts",
@@ -288,10 +290,59 @@ def skipped_marker_rows(index: dict[str, Any], suite: dict[str, Any] | None) -> 
 def suite_inventory_gaps(suite: dict[str, Any] | None) -> list[dict[str, Any]]:
     if suite is None:
         return []
-    inventory = suite.get("inventory")
+    inventory = suite.get("reference_media_inventory")
+    if not isinstance(inventory, dict) or not inventory:
+        inventory = suite.get("inventory")
     inventory = inventory if isinstance(inventory, dict) else {}
     gaps = inventory.get("visibility_gaps")
     return [gap for gap in gaps if isinstance(gap, dict)] if isinstance(gaps, list) else []
+
+
+def reference_media_inventory_signal(index: dict[str, Any], suite: dict[str, Any] | None) -> dict[str, Any]:
+    candidates: list[dict[str, Any]] = []
+    inventory = index.get("reference_media_inventory")
+    if isinstance(inventory, dict):
+        candidates.append(inventory)
+    if suite is not None:
+        for key in ("reference_media_inventory", "inventory"):
+            suite_inventory = suite.get(key)
+            if isinstance(suite_inventory, dict):
+                candidates.append(suite_inventory)
+    for candidate in candidates:
+        if candidate:
+            return candidate
+    return {}
+
+
+def inventory_summary_value(inventory: dict[str, Any], key: str) -> Any:
+    if key in inventory:
+        return inventory.get(key)
+    summary = inventory.get("summary")
+    if isinstance(summary, dict):
+        return summary.get(key)
+    return None
+
+
+def inventory_current_gripper_reference(inventory: dict[str, Any]) -> dict[str, Any]:
+    current = inventory.get("current_gripper_reference")
+    if isinstance(current, dict):
+        return current
+    summary = inventory.get("summary")
+    summary = summary if isinstance(summary, dict) else {}
+    return {
+        "detected": summary.get("active_current_gripper_reference_detected"),
+        "path": summary.get("active_current_gripper_reference_path"),
+    }
+
+
+def inventory_reference_gaps(inventory: dict[str, Any]) -> list[Any]:
+    gaps = inventory.get("reference_gaps")
+    if isinstance(gaps, list):
+        return gaps
+    summary = inventory.get("summary")
+    if isinstance(summary, dict) and isinstance(summary.get("reference_gaps"), list):
+        return summary["reference_gaps"]
+    return []
 
 
 def selected_media_rows(index: dict[str, Any]) -> list[list[Any]]:
@@ -890,6 +941,26 @@ def real_projection_intake_artifact_row(artifact: dict[str, Any]) -> list[Any]:
     ]
 
 
+def reference_media_inventory_artifact_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("candidate_count", ""),
+        metrics.get("image_count", ""),
+        metrics.get("video_count", ""),
+        metrics.get("calibration_data_count", ""),
+        metrics.get("currently_wired_media_count", ""),
+        metrics.get("current_gripper_reference_detected", ""),
+        compact_list(metrics.get("reference_gaps")),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
 def real_projection_intake_signal(index: dict[str, Any], suite: dict[str, Any] | None) -> dict[str, Any]:
     candidates: list[dict[str, Any]] = []
     intake = index.get("real_projection_intake")
@@ -1061,7 +1132,55 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
     lines.extend(["", "## Skipped Hardware, GUI, And OpenAI"])
     lines.extend(table(["Path", "Skipped", "Marker"], skipped_marker_rows(index, suite)))
 
-    lines.extend(["", "## Real Reference Media Gap"])
+    lines.extend(["", "## Reference Media Inventory"])
+    reference_inventory = reference_media_inventory_signal(index, suite)
+    current_reference = inventory_current_gripper_reference(reference_inventory)
+    lines.extend(
+        table(
+            ["Field", "Value"],
+            [
+                ["status", inventory_summary_value(reference_inventory, "status")],
+                ["candidate_count", inventory_summary_value(reference_inventory, "candidate_count")],
+                ["image_count", inventory_summary_value(reference_inventory, "image_count")],
+                ["video_count", inventory_summary_value(reference_inventory, "video_count")],
+                [
+                    "calibration_data_count",
+                    inventory_summary_value(reference_inventory, "calibration_data_count"),
+                ],
+                [
+                    "currently_wired_media_count",
+                    inventory_summary_value(reference_inventory, "currently_wired_media_count"),
+                ],
+                ["current_gripper_reference_detected", current_reference.get("detected", "")],
+                ["current_gripper_reference_path", current_reference.get("path", "")],
+                ["reference_gaps", inventory_reference_gaps(reference_inventory)],
+            ],
+        )
+    )
+    inventory_artifacts = grouped.get("reference_media_inventory", [])
+    lines.append("")
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Inventory Status",
+                "Candidates",
+                "Images",
+                "Videos",
+                "Calibration Data",
+                "Wired",
+                "Current Gripper Ref",
+                "Gaps",
+                "Artifact Status",
+            ],
+            [reference_media_inventory_artifact_row(row) for row in inventory_artifacts],
+        )
+        if inventory_artifacts
+        else ["_No reference media inventory artifacts indexed._"]
+    )
+    lines.extend(["", "### Manifest And Selected Media"])
     manifest = manifest_signal(index, suite)
     lines.extend(
         table(
@@ -1098,6 +1217,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         lines.append("_No real reference media selected in the artifact index._")
     gaps = suite_inventory_gaps(suite)
     if gaps:
+        lines.extend(["", "### Visibility Gaps"])
         lines.append("")
         lines.extend(table(["Gap", "Status", "Note"], gap_rows(gaps)))
     else:
@@ -1840,6 +1960,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "## Notes",
             "",
             "- This report is a deterministic Markdown view of existing JSON artifacts only.",
+            "- The reference media inventory records repo-local or explicit-root candidates and visibility gaps without copying media assets into the artifact bundle.",
             "- Visual review contact sheets are generated PNGs from existing suite frames and are the stable first-pass visual evidence.",
             "- The pick/place visual sequence is simulator-only evidence for approach, grasp/contact, lift/transfer, place/release, and retreat review.",
             "- The SO-101 model-source inventory is a hardware-free provenance preflight; `missing_authoritative_model` is a successful explicit diagnostic, and `--ik-model-path` is not automatically treated as authoritative.",

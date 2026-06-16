@@ -23,6 +23,7 @@ on:
     paths:
       - "archive/chess_test_images/current_view.jpg"
       - "docs/sim_calibration_regression.md"
+      - "docs/sim_reference_media_inventory.md"
       - "docs/sim_so101_model_asset_preflight.md"
       - "docs/sim_so101_model_bundle_manifest.md"
       - "docs/sim_so101_model_contract.md"
@@ -45,6 +46,7 @@ on:
     paths:
       - "archive/chess_test_images/current_view.jpg"
       - "docs/sim_calibration_regression.md"
+      - "docs/sim_reference_media_inventory.md"
       - "docs/sim_so101_model_asset_preflight.md"
       - "docs/sim_so101_model_bundle_manifest.md"
       - "docs/sim_so101_model_contract.md"
@@ -68,6 +70,7 @@ env:
   PYTHON_VERSION: "3.12"
   CALIBRATION_REGRESSION_OUTPUT_DIR: "/tmp/lerobot_sim/calibration_regression_suite"
   CALIBRATION_REGRESSION_ARTIFACT_NAME: "sim-calibration-regression-${{ github.run_id }}"
+  REFERENCE_MEDIA_ROOTS: ""
   IK_MODEL_PATH: ""
   IK_MODEL_ASSET_ROOTS: ""
   SO101_MODEL_BUNDLE_MANIFEST: ""
@@ -132,6 +135,7 @@ jobs:
             --python "$(python -c 'import sys; print(sys.executable)')"
             --include-negative-check
           )
+          append_repeatable_args --reference-media-root "${REFERENCE_MEDIA_ROOTS}"
           if [ -n "${IK_MODEL_PATH}" ]; then
             cmd+=(--ik-model-path "${IK_MODEL_PATH}")
           fi
@@ -163,9 +167,44 @@ jobs:
           assert summary["status"] == "ok", summary["status"]
           assert summary["hardware_skipped"] is True
           assert summary["gui_skipped"] is True
+          reference_inventory = summary["reference_media_inventory"]
+          assert reference_inventory["ok"] is True, reference_inventory
+          assert reference_inventory["status"] in {
+              "media_inventory_complete",
+              "media_inventory_empty",
+          }, reference_inventory
+          assert isinstance(reference_inventory["candidate_count"], int), reference_inventory
+          assert isinstance(reference_inventory["image_count"], int), reference_inventory
+          assert isinstance(reference_inventory["video_count"], int), reference_inventory
+          assert isinstance(reference_inventory["calibration_data_count"], int), reference_inventory
+          assert isinstance(reference_inventory["currently_wired_media_count"], int), reference_inventory
+          assert isinstance(reference_inventory["reference_gaps"], list), reference_inventory
+          inventory_configuration = reference_inventory["source_configuration"]
+          expected_reference_scan_mode = "explicit_roots" if os.environ["REFERENCE_MEDIA_ROOTS"].strip() else "repo_root_only"
+          assert inventory_configuration["scan_mode"] == expected_reference_scan_mode, inventory_configuration
+          inventory_child = summary["child_commands"]["reference_media_inventory"]
+          assert inventory_child["ok"] is True, inventory_child
+          assert inventory_child["summary_status"] == reference_inventory["status"], inventory_child
+          assert inventory_child["diagnostics"]["candidate_count"] == reference_inventory["candidate_count"], inventory_child
+          reference_inventory_artifacts = reference_inventory["artifact_paths"]
+          for key in ("summary_json", "csv", "readme_md"):
+              assert isinstance(reference_inventory_artifacts.get(key), str) and Path(reference_inventory_artifacts[key]).is_file(), (
+                  key,
+                  reference_inventory_artifacts,
+              )
+          if not os.environ["REFERENCE_MEDIA_ROOTS"].strip():
+              assert reference_inventory["candidate_count"] > 0, reference_inventory
+              assert reference_inventory["image_count"] > 0, reference_inventory
+              assert reference_inventory["current_gripper_reference"]["detected"] is True, reference_inventory
+              assert reference_inventory["currently_wired_media_count"] >= 1, reference_inventory
+              assert "missing_depth_reference" in reference_inventory["reference_gaps"], reference_inventory
+              assert "missing_pick_place_video" in reference_inventory["reference_gaps"], reference_inventory
           assert summary["selected_candidate"]["candidate_id"], summary["selected_candidate"]
-          assert summary["comparison_set"]["status"] == "ok", summary["comparison_set"]
-          assert summary["comparison_set"]["artifacts"], summary["comparison_set"]
+          if reference_inventory["candidate_count"] > 0:
+              assert summary["comparison_set"]["status"] == "ok", summary["comparison_set"]
+              assert summary["comparison_set"]["artifacts"], summary["comparison_set"]
+          else:
+              assert summary["comparison_set"]["status"] == "no_reference_media_selected", summary["comparison_set"]
           assert summary["perception_fixture"]["status"] == "ok", summary["perception_fixture"]
           assert summary["perception_fixture"]["artifact_paths"], summary["perception_fixture"]
           pose_fixture = summary["sim_camera_pose_fixture"]
@@ -369,6 +408,7 @@ jobs:
           )
 
           required_artifact_categories = {
+              "reference_media_inventory",
               "real_reference_comparison",
               "ranked_candidate",
               "perception_fixture",
@@ -381,6 +421,8 @@ jobs:
               "negative_check",
               "logs",
           }
+          if reference_inventory["candidate_count"] == 0:
+              required_artifact_categories.remove("real_reference_comparison")
           summary_category_rows = {
               row["category"]: row
               for row in artifact_index_summary["categories"]
@@ -407,9 +449,27 @@ jobs:
               for category in required_artifact_categories
           }
           assert any(
-              row.get("kind") == "image" and row.get("exists") is True
-              for row in artifacts_by_category["real_reference_comparison"]
-          ), artifacts_by_category["real_reference_comparison"]
+              row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("status") in {
+                  "media_inventory_complete",
+                  "media_inventory_empty",
+              }
+              for row in artifacts_by_category["reference_media_inventory"]
+          ), artifacts_by_category["reference_media_inventory"]
+          assert any(
+              row.get("kind") == "csv" and row.get("exists") is True
+              for row in artifacts_by_category["reference_media_inventory"]
+          ), artifacts_by_category["reference_media_inventory"]
+          assert any(
+              row.get("label") == "reference_media_inventory:readme" and row.get("exists") is True
+              for row in artifacts_by_category["reference_media_inventory"]
+          ), artifacts_by_category["reference_media_inventory"]
+          if reference_inventory["candidate_count"] > 0:
+              assert any(
+                  row.get("kind") == "image" and row.get("exists") is True
+                  for row in artifacts_by_category["real_reference_comparison"]
+              ), artifacts_by_category["real_reference_comparison"]
           assert any(
               row.get("exists") is True and row.get("candidate_id")
               for row in artifacts_by_category["ranked_candidate"]
@@ -533,21 +593,27 @@ jobs:
           assert report_path.is_file(), report_path
           assert entrypoint_path.is_file(), entrypoint_path
           report_text = report_path.read_text()
+          assert "## Reference Media Inventory" in report_text, report_text
           assert "### SO-101 Model Source Inventory" in report_text, report_text
           assert "### SO-101 Model Bundle Manifest" in report_text, report_text
           entrypoint_text = entrypoint_path.read_text()
           assert "Open `artifact_index_report.md` first." in entrypoint_text, entrypoint_text
           assert "`calibration_regression_summary.json`" in entrypoint_text, entrypoint_text
           assert "`artifact_index.json`" in entrypoint_text, entrypoint_text
+          assert "`reference_media_inventory/reference_media_inventory.json`" in entrypoint_text, entrypoint_text
+          assert "`reference_media_inventory/reference_media_inventory.csv`" in entrypoint_text, entrypoint_text
+          assert "`reference_media_inventory/README.md`" in entrypoint_text, entrypoint_text
           assert "`so101_model_bundle_manifest/so101_model_bundle_manifest_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_model_bundle_manifest/so101_model_bundle_manifest_checklist.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_inventory_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_candidates.csv`" in entrypoint_text, entrypoint_text
           assert "`hardware_skipped: true`" in entrypoint_text, entrypoint_text
           assert "`gui_skipped: true`" in entrypoint_text, entrypoint_text
-          assert "Real-media gap:" in entrypoint_text, entrypoint_text
-          assert "No real-world videos are present for motion, recovery, or timing references." in entrypoint_text, entrypoint_text
-          assert "No reference media currently documents failure modes." in entrypoint_text, entrypoint_text
+          assert "Reference media inventory:" in entrypoint_text, entrypoint_text
+          assert "Reference media gaps:" in entrypoint_text, entrypoint_text
+          if not os.environ["REFERENCE_MEDIA_ROOTS"].strip():
+              assert "No real-world videos are present for motion, recovery, or timing references." in entrypoint_text, entrypoint_text
+              assert "No reference media currently documents failure modes." in entrypoint_text, entrypoint_text
 
           print(
               json.dumps(
@@ -568,6 +634,19 @@ jobs:
                           "summary_path": pose_fixture["summary_path"],
                           "case_ids": pose_fixture["case_ids"],
                           "frame_paths": pose_fixture["frame_paths"],
+                      },
+                      "reference_media_inventory": {
+                          "summary_path": reference_inventory["summary_path"],
+                          "status": reference_inventory["status"],
+                          "candidate_count": reference_inventory["candidate_count"],
+                          "image_count": reference_inventory["image_count"],
+                          "video_count": reference_inventory["video_count"],
+                          "calibration_data_count": reference_inventory["calibration_data_count"],
+                          "currently_wired_media_count": reference_inventory["currently_wired_media_count"],
+                          "current_gripper_reference": reference_inventory["current_gripper_reference"],
+                          "reference_gaps": reference_inventory["reference_gaps"],
+                          "source_configuration": inventory_configuration,
+                          "artifacts": reference_inventory_artifacts,
                       },
                       "so101_model_source_inventory": {
                           "summary_path": source_inventory["summary_path"],
@@ -637,7 +716,7 @@ jobs:
           core_json_paths = [
               "calibration_regression_summary.json",
               "artifact_index.json",
-              "inventory/reference_media_inventory.json",
+              "reference_media_inventory/reference_media_inventory.json",
               "comparison_set/comparison_set_summary.json",
               "session/session_summary.json",
               "fixture/fixture_summary.json",
@@ -657,6 +736,13 @@ jobs:
                   return str(value).lower()
               return str(value)
 
+          reference_gaps = set(summary["reference_media_inventory"]["reference_gaps"])
+          real_media_gap_line = (
+              "- Real-media gap: no real-world videos or failure-mode reference media are present."
+              if "missing_pick_place_video" in reference_gaps
+              else "- Real-media gap: pick/place video references are present in the configured inventory roots."
+          )
+
           lines = [
               "## Simulator Calibration Regression Artifacts",
               "",
@@ -670,7 +756,17 @@ jobs:
               f"- `hardware_skipped`: `{markdown_bool(summary['hardware_skipped'])}`",
               f"- `gui_skipped`: `{markdown_bool(summary['gui_skipped'])}`",
               f"- `negative_check`: `{summary['negative_check']['status']}`",
-              "- Real-media gap: no real-world videos or failure-mode reference media are present.",
+              real_media_gap_line,
+              "",
+              "Reference media inventory:",
+              f"- `status`: `{summary['reference_media_inventory']['status']}`",
+              f"- `candidate_count`: `{summary['reference_media_inventory']['candidate_count']}`",
+              f"- `image_count`: `{summary['reference_media_inventory']['image_count']}`",
+              f"- `video_count`: `{summary['reference_media_inventory']['video_count']}`",
+              f"- `calibration_data_count`: `{summary['reference_media_inventory']['calibration_data_count']}`",
+              f"- `currently_wired_media_count`: `{summary['reference_media_inventory']['currently_wired_media_count']}`",
+              f"- `reference_gaps`: `{summary['reference_media_inventory']['reference_gaps']}`",
+              f"- `configured_roots`: `{summary['reference_media_inventory']['source_configuration']['reference_media_roots']}`",
               "",
               "SO-101 model source inventory:",
               f"- `status`: `{summary['so101_model_source_inventory']['status']}`",

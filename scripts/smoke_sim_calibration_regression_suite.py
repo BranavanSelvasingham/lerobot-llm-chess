@@ -16,6 +16,10 @@ DEFAULT_BASE_PROFILE = "current_gripper_reference"
 SCHEMA = "lerobot.sim.calibration_regression_suite.v1"
 ARTIFACT_ENTRYPOINT_NAME = "README.md"
 ARTIFACT_REPORT_NAME = "artifact_index_report.md"
+REFERENCE_MEDIA_INVENTORY_DIR_NAME = "reference_media_inventory"
+REFERENCE_MEDIA_INVENTORY_JSON_NAME = "reference_media_inventory.json"
+REFERENCE_MEDIA_INVENTORY_CSV_NAME = "reference_media_inventory.csv"
+REFERENCE_MEDIA_INVENTORY_README_NAME = "README.md"
 VISUAL_REVIEW_SUMMARY_NAME = "visual_review_summary.json"
 REFERENCE_CAPTURE_CHECKLIST_NAME = "reference_capture_checklist.json"
 REAL_PROJECTION_INTAKE_NAME = "real_projection_intake.json"
@@ -53,6 +57,17 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Optional repo-local reference-media manifest passed only to the inventory child. "
             "Default suite and CI behavior remain manifest-free."
+        ),
+    )
+    parser.add_argument(
+        "--reference-media-root",
+        type=Path,
+        action="append",
+        default=[],
+        help=(
+            "Optional file or directory root forwarded to the reference-media inventory as "
+            "--root. Repeatable. Supplying roots replaces the inventory child's default "
+            "repo-root scan, so pass --reference-media-root . when adding sibling roots."
         ),
     )
     parser.add_argument(
@@ -449,12 +464,163 @@ def so101_model_source_inventory_command(
     return command
 
 
+def reference_media_inventory_command(
+    *,
+    python: str,
+    inventory_dir: Path,
+    args: argparse.Namespace,
+) -> list[str]:
+    command = [
+        python,
+        str(REPO_ROOT / "scripts" / "smoke_sim_reference_media_inventory.py"),
+        "--output-dir",
+        str(inventory_dir),
+    ]
+    for root in args.reference_media_root:
+        command.extend(["--root", str(root.expanduser())])
+    if args.reference_media_manifest is not None:
+        command.extend(["--manifest", str(args.reference_media_manifest.expanduser())])
+    return command
+
+
+def reference_media_inventory_config(args: argparse.Namespace) -> dict[str, Any]:
+    roots = cli_path_values(args.reference_media_root)
+    return {
+        "scan_mode": "explicit_roots" if roots else "repo_root_only",
+        "reference_media_roots": roots,
+        "manifest": (
+            str(args.reference_media_manifest.expanduser())
+            if args.reference_media_manifest is not None
+            else None
+        ),
+        "notes": [
+            "The default suite scan invokes the inventory without --root, which scans repo_root only.",
+            "Supplying --reference-media-root forwards repeatable --root values to the inventory child.",
+            "Roots are evidence inputs only; the suite does not copy or claim authority over media assets.",
+        ],
+    }
+
+
+def reference_media_inventory_artifact_paths(
+    inventory: dict[str, Any] | None,
+    inventory_dir: Path,
+) -> dict[str, str]:
+    inventory = inventory if isinstance(inventory, dict) else {}
+    return {
+        "summary_json": str(
+            inventory.get("output_path") or inventory_dir / REFERENCE_MEDIA_INVENTORY_JSON_NAME
+        ),
+        "csv": str(inventory.get("csv_path") or inventory_dir / REFERENCE_MEDIA_INVENTORY_CSV_NAME),
+        "readme_md": str(
+            inventory.get("readme_path") or inventory_dir / REFERENCE_MEDIA_INVENTORY_README_NAME
+        ),
+    }
+
+
+def reference_media_inventory_counts(inventory: dict[str, Any] | None) -> dict[str, Any]:
+    inventory = inventory if isinstance(inventory, dict) else {}
+    summary = inventory.get("summary")
+    summary = summary if isinstance(summary, dict) else {}
+    return {
+        "status": inventory.get("status") or summary.get("status"),
+        "candidate_count": summary.get("candidate_count", 0),
+        "media_count": summary.get("media_count", 0),
+        "image_count": summary.get("image_count", 0),
+        "video_count": summary.get("video_count", 0),
+        "calibration_data_count": summary.get("calibration_data_count", 0),
+        "currently_wired_media_count": summary.get("currently_wired_media_count", 0),
+        "reference_gaps": inventory.get("reference_gaps") or summary.get("reference_gaps") or [],
+        "current_gripper_reference": {
+            "detected": summary.get("active_current_gripper_reference_detected"),
+            "path": summary.get("active_current_gripper_reference_path"),
+        },
+    }
+
+
+def reference_media_inventory_child_diagnostics(
+    *,
+    inventory: dict[str, Any] | None,
+    inventory_dir: Path,
+    config: dict[str, Any],
+) -> dict[str, Any]:
+    inventory = inventory if isinstance(inventory, dict) else {}
+    scan = inventory.get("scan")
+    scan = scan if isinstance(scan, dict) else {}
+    return {
+        **reference_media_inventory_counts(inventory),
+        "artifact_paths": reference_media_inventory_artifact_paths(inventory, inventory_dir),
+        "scan": {
+            "roots": scan.get("roots"),
+            "default_scan_scope": scan.get("default_scan_scope"),
+            "scan_issues": scan.get("scan_issues"),
+        },
+        "source_configuration": config,
+    }
+
+
+def reference_media_inventory_section(
+    *,
+    inventory: dict[str, Any] | None,
+    inventory_dir: Path,
+    config: dict[str, Any],
+) -> dict[str, Any]:
+    inventory = inventory if isinstance(inventory, dict) else {}
+    paths = reference_media_inventory_artifact_paths(inventory, inventory_dir)
+    diagnostics = reference_media_inventory_child_diagnostics(
+        inventory=inventory,
+        inventory_dir=inventory_dir,
+        config=config,
+    )
+    return {
+        "ok": bool(inventory.get("ok", False)),
+        "summary_path": paths["summary_json"],
+        "csv_path": paths["csv"],
+        "readme_path": paths["readme_md"],
+        "output_dir": str(inventory_dir),
+        "artifact_paths": paths,
+        "summary": inventory.get("summary"),
+        "manifest_summary": inventory.get("manifest_summary"),
+        "next_recommended_reference_fixture_inputs": inventory.get(
+            "next_recommended_reference_fixture_inputs"
+        ),
+        "visibility_gaps": inventory.get("visibility_gaps"),
+        "scan": inventory.get("scan"),
+        "source_configuration": config,
+        **diagnostics,
+    }
+
+
+def reference_media_inventory_empty(inventory: dict[str, Any] | None) -> bool:
+    counts = reference_media_inventory_counts(inventory)
+    return counts.get("status") == "media_inventory_empty" or int(counts.get("candidate_count") or 0) == 0
+
+
 def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) -> Path:
     markers = summary.get("skipped_markers")
     markers = markers if isinstance(markers, dict) else {}
     manifest = summary.get("reference_media_manifest")
     manifest = manifest if isinstance(manifest, dict) else {}
     manifest_supplied = bool(manifest.get("supplied"))
+    reference_inventory = summary.get("reference_media_inventory")
+    reference_inventory = (
+        reference_inventory
+        if isinstance(reference_inventory, dict)
+        else summary.get("inventory")
+        if isinstance(summary.get("inventory"), dict)
+        else {}
+    )
+    reference_inventory_counts_row = reference_media_inventory_counts(reference_inventory)
+    reference_gap_ids = {
+        str(gap) for gap in reference_inventory_counts_row.get("reference_gaps", []) if gap
+    }
+    visibility_gap_rows = reference_inventory.get("visibility_gaps")
+    visibility_gap_rows = visibility_gap_rows if isinstance(visibility_gap_rows, list) else []
+    failure_mode_gap = any(
+        isinstance(row, dict)
+        and row.get("category") == "failure_mode"
+        and row.get("status") == "missing"
+        for row in visibility_gap_rows
+    )
     visual_review = summary.get("visual_review")
     visual_review = visual_review if isinstance(visual_review, dict) else {}
     recording = visual_review.get("recording")
@@ -497,7 +663,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `artifact_index.json`",
         f"- `{EVIDENCE_BUNDLE_DIR_NAME}/{EVIDENCE_BUNDLE_MD_NAME}`",
         f"- `{EVIDENCE_BUNDLE_DIR_NAME}/{EVIDENCE_BUNDLE_JSON_NAME}`",
-        "- `inventory/reference_media_inventory.json`",
+        f"- `{REFERENCE_MEDIA_INVENTORY_DIR_NAME}/{REFERENCE_MEDIA_INVENTORY_JSON_NAME}`",
+        f"- `{REFERENCE_MEDIA_INVENTORY_DIR_NAME}/{REFERENCE_MEDIA_INVENTORY_CSV_NAME}`",
+        f"- `{REFERENCE_MEDIA_INVENTORY_DIR_NAME}/{REFERENCE_MEDIA_INVENTORY_README_NAME}`",
         "- `comparison_set/comparison_set_summary.json`",
         "- `session/session_summary.json`",
         "- `fixture/fixture_summary.json`",
@@ -565,11 +733,33 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             f"- Manifest-declared media selected for comparison: "
             f"`{manifest.get('selected_declared_media_count')}`."
         ),
-        "- Real-media gap: the current inventory is limited to `archive/chess_test_images/current_view.jpg`.",
+        (
+            "- Reference media inventory: "
+            f"status `{reference_inventory_counts_row.get('status')}`; candidates "
+            f"`{reference_inventory_counts_row.get('candidate_count')}`; images "
+            f"`{reference_inventory_counts_row.get('image_count')}`; videos "
+            f"`{reference_inventory_counts_row.get('video_count')}`; calibration data "
+            f"`{reference_inventory_counts_row.get('calibration_data_count')}`; wired "
+            f"`{reference_inventory_counts_row.get('currently_wired_media_count')}`; "
+            "current gripper reference detected "
+            f"`{markdown_bool(reference_inventory_counts_row.get('current_gripper_reference', {}).get('detected'))}`."
+        ),
+        (
+            "- Reference media gaps: "
+            f"`{markdown_list_value(reference_inventory_counts_row.get('reference_gaps'))}`."
+        ),
         "- Reference capture checklist status: "
         f"`{summary.get('reference_capture_checklist', {}).get('status')}`.",
-        "- No real-world videos are present for motion, recovery, or timing references.",
-        "- No reference media currently documents failure modes.",
+        (
+            "- No real-world videos are present for motion, recovery, or timing references."
+            if "missing_pick_place_video" in reference_gap_ids
+            else "- Pick/place video reference gap is not reported by the current inventory."
+        ),
+        (
+            "- No reference media currently documents failure modes."
+            if failure_mode_gap
+            else "- Failure-mode reference gap is not reported by the current inventory."
+        ),
         (
             "- SimCamera pose metadata includes `image_size_px`, `camera_matrix_px`, "
             "`intrinsics`, `distortion_coefficients`, and `extrinsics.board_to_camera`."
@@ -716,6 +906,7 @@ def run_child(
     output_dir: Path,
     expected_json_path: Path,
     expected_failure: bool = False,
+    non_failing_statuses: set[str] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     output_dir.mkdir(parents=True, exist_ok=True)
     stdout_path = output_dir / f"{name}_stdout.txt"
@@ -732,15 +923,28 @@ def run_child(
         summary_error = f"Expected summary JSON was not written: {expected_json_path}"
 
     payload_ok = bool(payload.get("ok", True)) if payload is not None else False
+    payload_status = payload.get("status") if payload else None
+    non_failing_status = (
+        isinstance(payload_status, str)
+        and non_failing_statuses is not None
+        and payload_status in non_failing_statuses
+        and summary_error is None
+    )
     if expected_failure:
         ok = result.returncode != 0 and (payload is None or not payload_ok)
     else:
-        ok = result.returncode == 0 and payload is not None and payload_ok and summary_error is None
+        ok = (
+            result.returncode == 0
+            and payload is not None
+            and payload_ok
+            and summary_error is None
+        ) or non_failing_status
 
     record = {
         "name": name,
         "ok": ok,
         "expected_failure": expected_failure,
+        "non_failing_status": payload_status if non_failing_status else None,
         "command": command,
         "return_code": int(result.returncode),
         "stdout_path": str(stdout_path),
@@ -748,7 +952,7 @@ def run_child(
         "expected_output_json_path": str(expected_json_path),
         "summary_loaded": payload is not None,
         "summary_error": summary_error,
-        "summary_status": payload.get("status") if payload else None,
+        "summary_status": payload_status,
     }
     return record, payload
 
@@ -1709,26 +1913,34 @@ def main() -> int:
     candidate_paths = write_candidate_inputs(args, output_dir)
     python = str(args.python.expanduser())
 
-    inventory_dir = output_dir / "inventory"
-    inventory_json_path = inventory_dir / "reference_media_inventory.json"
-    inventory_command = [
-        python,
-        str(REPO_ROOT / "scripts" / "smoke_sim_reference_media_inventory.py"),
-        "--output-dir",
-        str(inventory_dir),
-    ]
-    if args.reference_media_manifest is not None:
-        inventory_command.extend(["--manifest", str(args.reference_media_manifest.expanduser())])
+    reference_media_config = reference_media_inventory_config(args)
+    inventory_dir = output_dir / REFERENCE_MEDIA_INVENTORY_DIR_NAME
+    inventory_json_path = inventory_dir / REFERENCE_MEDIA_INVENTORY_JSON_NAME
+    inventory_command = reference_media_inventory_command(
+        python=python,
+        inventory_dir=inventory_dir,
+        args=args,
+    )
     inventory_record, inventory = run_child(
-        name="inventory",
+        name="reference_media_inventory",
         command=inventory_command,
         output_dir=inventory_dir,
         expected_json_path=inventory_json_path,
+    )
+    inventory_record["diagnostics"] = reference_media_inventory_child_diagnostics(
+        inventory=inventory,
+        inventory_dir=inventory_dir,
+        config=reference_media_config,
     )
 
     comparison_dir = output_dir / "comparison_set"
     comparison_summary_path = comparison_dir / "comparison_set_summary.json"
     if inventory_json_path.is_file():
+        comparison_non_failing_statuses = (
+            {"no_reference_media_selected"}
+            if reference_media_inventory_empty(inventory)
+            else None
+        )
         comparison_record, comparison = run_child(
             name="comparison_set",
             command=[
@@ -1743,6 +1955,7 @@ def main() -> int:
             ],
             output_dir=comparison_dir,
             expected_json_path=comparison_summary_path,
+            non_failing_statuses=comparison_non_failing_statuses,
         )
     else:
         comparison_record = skipped_child("comparison_set", "inventory JSON was not available", comparison_summary_path)
@@ -1989,7 +2202,7 @@ def main() -> int:
     visual_review_summary_path = visual_review_dir / VISUAL_REVIEW_SUMMARY_NAME
 
     child_records = {
-        "inventory": inventory_record,
+        "reference_media_inventory": inventory_record,
         "comparison_set": comparison_record,
         "calibration_session_report": session_record,
         "perception_regression_fixture": fixture_record,
@@ -2034,6 +2247,7 @@ def main() -> int:
         "candidate_inputs": candidate_paths,
         "so101_model_bundle_manifest_config": so101_bundle_config,
         "so101_model_bundle_manifest_forwarding": so101_bundle_forwarding,
+        "reference_media_inventory_config": reference_media_config,
         "so101_model_source_inventory_config": so101_source_config,
         "so101_model_contract_config": so101_contract_config,
         "child_commands": child_records,
@@ -2042,15 +2256,16 @@ def main() -> int:
             inventory=inventory,
             comparison=comparison,
         ),
-        "inventory": {
-            "summary_path": str(inventory_json_path),
-            "summary": inventory.get("summary") if inventory else None,
-            "manifest_summary": inventory.get("manifest_summary") if inventory else None,
-            "next_recommended_reference_fixture_inputs": (
-                inventory.get("next_recommended_reference_fixture_inputs") if inventory else None
-            ),
-            "visibility_gaps": inventory.get("visibility_gaps") if inventory else None,
-        },
+        "reference_media_inventory": reference_media_inventory_section(
+            inventory=inventory,
+            inventory_dir=inventory_dir,
+            config=reference_media_config,
+        ),
+        "inventory": reference_media_inventory_section(
+            inventory=inventory,
+            inventory_dir=inventory_dir,
+            config=reference_media_config,
+        ),
         "comparison_set": {
             "summary_path": str(comparison_summary_path),
             "status": comparison.get("status") if comparison else None,

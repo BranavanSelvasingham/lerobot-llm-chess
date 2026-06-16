@@ -19,6 +19,18 @@ Explicit multi-root scan, keeping the repo plus an optional sibling checkout:
 
 Supplying any `--root` replaces the default, so use `--root .` when adding sibling roots. Unreadable or missing roots are reported under `scan.scan_issues`; media is never copied into the repository or output directory.
 
+Integrated suite scan with the same repeatable roots:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_calibration_regression_suite.py \
+  --output-dir /private/tmp/lerobot_sim/calibration_regression_suite_reference_roots \
+  --python /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 \
+  --reference-media-root . \
+  --reference-media-root /Users/branavan/GitHub/lerobot-chess
+```
+
+The integrated suite writes the inventory under `reference_media_inventory/` and mirrors status, candidate counts, image/video/calibration-data counts, currently wired media count, current gripper reference detection, `reference_gaps`, scan roots, child command diagnostics, and JSON/CSV/README artifact paths into `calibration_regression_summary.json.reference_media_inventory`. Empty explicit roots remain successful evidence: the inventory reports `media_inventory_empty`, and the suite records the comparison-set `no_reference_media_selected` diagnostic without failing the hardware-free gate.
+
 The output directory contains:
 
 - `reference_media_inventory.json`: deterministic summary, per-candidate metadata, classifications, simulator wiring, and gaps.
