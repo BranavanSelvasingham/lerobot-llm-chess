@@ -132,7 +132,27 @@ For a reviewed model-backed IK bundle, use
 to validate one JSON manifest that ties together the selected model path,
 asset roots, authority/provenance, target-frame/TCP offset, and base-to-board
 alignment. The integrated suite runs that checker automatically in
-no-manifest diagnostic mode. To supply a reviewed bundle to the suite:
+no-manifest diagnostic mode.
+
+If you have a candidate model path and mesh roots but not a reviewed manifest,
+run the focused probe/generator first:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_so101_model_bundle_probe.py --model-path /absolute/path/to/so101.urdf --asset-root /absolute/path/to/assets --output-dir /private/tmp/lerobot_sim/so101_model_bundle_probe
+```
+
+The probe writes `so101_model_bundle.candidate.json`,
+`so101_model_bundle_probe_summary.json`,
+`so101_model_bundle_probe_checklist.csv`, and nested child evidence from the
+existing model contract checker, asset preflight, and bundle manifest checker.
+It is intended to follow the model-source inventory and precede a reviewed
+manifest: it does not scan for authority, does not copy external assets, and
+does not fill calibrated TCP or base-to-board values. The generated draft keeps
+`authority` and `provenance` empty by default, records TODO placeholders, and
+therefore remains diagnostic-only until the manifest checker reports
+`ready_for_model_backed_ik: true`.
+
+To supply a reviewed bundle to the suite:
 
 ```bash
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_calibration_regression_suite.py --output-dir /private/tmp/lerobot_sim/calibration_regression_suite_bundle --python /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 --include-negative-check --so101-model-bundle-manifest /absolute/path/to/so101_model_bundle.json
