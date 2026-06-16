@@ -42,6 +42,13 @@ mirrors them in `so101_model_source_inventory_config`, writes the exact forwarde
 child command under `child_commands.so101_model_source_inventory.command`, and
 surfaces them in the generated artifact index/report.
 
+After selecting a candidate model source, run the focused
+[SO-101 model asset preflight](sim_so101_model_asset_preflight.md) before the
+model contract checker. The asset preflight records missing URDF mesh
+dependencies such as `assets/base_motor_holder_so101_v1.stl` without importing
+or copying external assets, and keeps `package://` / `model://` diagnostics
+explicitly filesystem-only rather than pretending ROS package resolution exists.
+
 ## Scope
 
 By default the inventory scans repo-local roots: `models/`, `assets/`, `SO101/`, `src/`, `docs/`, `archive/`, `data/`, and the repo root. Missing roots are reported as roots with `exists: false`; they are not errors.
