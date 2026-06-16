@@ -99,3 +99,10 @@ python scripts/smoke_sim_calibration_regression_suite.py --ik-model-path /absolu
 The suite records those roots in `so101_model_contract_config`, mirrors the
 contract checker's `model_asset_root_configuration`, and preserves the child
 command under `child_commands.so101_model_contract.command`.
+
+For reviewed model-backed IK readiness, collect the model path, asset roots,
+authority/provenance, target-frame/TCP offset, and base-to-board alignment in a
+[SO-101 model bundle manifest](sim_so101_model_bundle_manifest.md). The bundle
+manifest checker wraps this contract checker and its nested asset preflight, but
+does not replace source inventory review or make `--ik-model-path`
+authoritative by itself.

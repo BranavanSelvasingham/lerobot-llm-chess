@@ -127,6 +127,13 @@ checklist of next inputs. If a supplied path is missing, it exits `0` with
 checker also attempts a non-destructive `RobotKinematics` initialization and
 reports joint/frame visibility separately from runtime initialization success.
 
+For a reviewed model-backed IK bundle, use
+[docs/sim_so101_model_bundle_manifest.md](sim_so101_model_bundle_manifest.md)
+to validate one JSON manifest that ties together the selected model path,
+asset roots, authority/provenance, target-frame/TCP offset, and base-to-board
+alignment. That focused checker wraps the model contract checker and nested
+asset preflight, but it is not wired into this regression suite yet.
+
 To exercise the same suite with declared reference-media metadata, pass an optional manifest:
 
 ```bash

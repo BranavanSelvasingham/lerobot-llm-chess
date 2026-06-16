@@ -52,6 +52,13 @@ records missing URDF mesh dependencies such as
 assets, and keeps `package://` / `model://` diagnostics explicitly
 filesystem-only rather than pretending ROS package resolution exists.
 
+When a candidate has been reviewed, record the reviewed model path, asset roots,
+authority/provenance, TCP offset, and base-to-board alignment together in a
+[SO-101 model bundle manifest](sim_so101_model_bundle_manifest.md). The bundle
+manifest checker consumes that reviewed declaration and reruns the contract
+checker with forwarded asset roots before any later `--ik-model-path` result is
+treated as model-backed IK readiness evidence.
+
 ## Scope
 
 By default the inventory scans repo-local roots: `models/`, `assets/`, `SO101/`, `src/`, `docs/`, `archive/`, `data/`, and the repo root. Missing roots are reported as roots with `exists: false`; they are not errors.
