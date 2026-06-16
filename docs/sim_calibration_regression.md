@@ -24,6 +24,34 @@ use it. If the supplied path is missing or unusable, the suite still exits
 successfully and records a `missing_model` or `model_unavailable` diagnostic
 instead of turning the hardware-free gate red.
 
+Before treating `--ik-model-path` results as meaningful model-backed IK
+evidence, run the focused hardware-free contract checker:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_so101_model_contract.py --output-dir /private/tmp/lerobot_sim/so101_model_contract_preflight
+```
+
+To inspect a candidate model explicitly:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_so101_model_contract.py --model-path /absolute/path/to/so101.urdf --output-dir /private/tmp/lerobot_sim/so101_model_contract_preflight_model
+```
+
+This checker writes `so101_model_contract_summary.json`,
+`so101_model_contract_checklist.csv`, and `README.md`. It records whether the
+supplied path exists, whether its suffix is one of `.urdf`, `.xml`, `.mjcf`, or
+`.xacro`, whether it is directly usable by the current
+`RobotKinematics`/placo path, the simulator-side body-joint and joint-limit
+contract from `src/lerobot/sim/robot.py`, the expected target frame
+`gripper_frame_link`, any visible TCP or gripper-tip field hits, and the
+remaining model-to-sim alignment inputs still required before low IK residuals
+should be treated as trustworthy. If no model is supplied, the checker exits
+`0` with a structured `missing_model` / `model_not_supplied` diagnostic and a
+checklist of next inputs. If a supplied path is missing, it exits `0` with
+`model_unavailable`. If a URDF is supplied and `placo` is available, the
+checker also attempts a non-destructive `RobotKinematics` initialization and
+reports joint/frame visibility separately from runtime initialization success.
+
 To exercise the same suite with declared reference-media metadata, pass an optional manifest:
 
 ```bash
