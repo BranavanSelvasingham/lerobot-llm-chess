@@ -32,6 +32,22 @@ physical camera/board/depth measurements.
 For a narrower camera/board pose check without running the full suite:
 
 ```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_depth_distance_drill.py --output-dir /private/tmp/lerobot_sim/depth_distance_drill
+```
+
+That writes `/private/tmp/lerobot_sim/depth_distance_drill/depth_distance_drill_summary.json`,
+`/private/tmp/lerobot_sim/depth_distance_drill/depth_distance_drill_rows.csv`,
+and `/private/tmp/lerobot_sim/depth_distance_drill/depth_distance_drill_heatmap.png`.
+The drill samples deterministic center, edge, back-rank, and near-gripper squares
+under nominal plus small simulator-only `board_to_camera` translation/rotation
+perturbations. Rows report camera-to-board and camera-to-piece-proxy distances,
+camera-frame z-depth, projected pixel positions, image-edge margin, synthetic
+gripper-clearance proxy, range/pixel deltas from nominal, and explicit
+simulator-only limitations in `mm` and `px`. It does not update calibration
+constants, run the full evidence bundle, open real cameras, move motors, or
+exercise UI/OpenAI paths.
+
+```bash
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_camera_pose_fixture.py --output-dir /private/tmp/lerobot_sim/sim_camera_pose_fixture
 ```
 
