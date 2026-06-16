@@ -14,23 +14,24 @@ CATEGORY_ORDER = {
     "reference_media_inventory": 0,
     "real_reference_media": 1,
     "reference_media_comparison": 2,
-    "reference_capture_checklist": 2,
-    "visual_review": 3,
-    "real_reference_comparison": 4,
-    "real_projection_intake": 5,
-    "ranked_candidate": 6,
-    "perception_fixture": 7,
-    "sim_camera_pose_fixture": 8,
-    "so101_model_source_inventory": 9,
-    "so101_model_bundle_manifest": 10,
-    "so101_model_contract": 11,
-    "so101_model_asset_preflight": 12,
-    "ik_reachability": 13,
-    "gripper_camera_pov": 14,
-    "app_entrypoint": 15,
-    "pick_place_scenario": 16,
-    "negative_check": 17,
-    "logs": 18,
+    "reference_camera_tuning_diagnostics": 3,
+    "reference_capture_checklist": 4,
+    "visual_review": 5,
+    "real_reference_comparison": 6,
+    "real_projection_intake": 7,
+    "ranked_candidate": 8,
+    "perception_fixture": 9,
+    "sim_camera_pose_fixture": 10,
+    "so101_model_source_inventory": 11,
+    "so101_model_bundle_manifest": 12,
+    "so101_model_contract": 13,
+    "so101_model_asset_preflight": 14,
+    "ik_reachability": 15,
+    "gripper_camera_pov": 16,
+    "app_entrypoint": 17,
+    "pick_place_scenario": 18,
+    "negative_check": 19,
+    "logs": 20,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -374,6 +375,125 @@ def collect_reference_media_comparison_artifacts(
         "contact_sheet_path": metrics.get("contact_sheet_path") or paths.get("contact_sheet_png"),
         "artifact_paths": paths,
         "diagnostics": comparison_set.get("diagnostics"),
+    }
+
+
+def collect_reference_camera_tuning_diagnostics_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    diagnostics = suite.get("reference_camera_tuning_diagnostics")
+    diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+    child_summary = load_optional_json(
+        diagnostics.get("summary_path"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
+    child_summary = child_summary if isinstance(child_summary, dict) else {}
+    source = child_summary if child_summary else diagnostics
+    artifact_paths = source.get("artifact_paths")
+    if not isinstance(artifact_paths, dict):
+        artifact_paths = source.get("artifacts")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    scorecard = source.get("scorecard")
+    scorecard = scorecard if isinstance(scorecard, dict) else {}
+    gaps = source.get("reference_gap_carry_through")
+    gaps = gaps if isinstance(gaps, dict) else {}
+    external = source.get("external_local_evidence_only")
+    external = external if isinstance(external, dict) else {}
+    suggestions = source.get("suggested_tuning_dimensions")
+    suggestions = suggestions if isinstance(suggestions, list) else []
+    suggestion_names = [
+        suggestion.get("dimension")
+        for suggestion in suggestions
+        if isinstance(suggestion, dict) and suggestion.get("dimension")
+    ]
+    paths = {
+        "summary_json": source.get("summary_path") or artifact_paths.get("summary_json"),
+        "csv_rows": source.get("csv_path") or artifact_paths.get("csv_rows"),
+        "readme_md": source.get("readme_path") or artifact_paths.get("readme_md"),
+        "scorecard_png": (
+            source.get("scorecard_path")
+            or artifact_paths.get("scorecard_png")
+            or scorecard.get("path")
+            if scorecard.get("produced") is True
+            else None
+        ),
+    }
+    metrics = {
+        "status": source.get("status"),
+        "ok": source.get("ok"),
+        "comparison_set_status": source.get("comparison_set_status"),
+        "selected_comparison_count": source.get("selected_comparison_count"),
+        "visual_comparison_count": source.get("visual_comparison_count"),
+        "metadata_only_count": source.get("metadata_only_count"),
+        "suggested_tuning_dimensions": suggestion_names,
+        "scorecard_status": source.get("scorecard_status") or scorecard.get("status"),
+        "scorecard_produced": source.get("scorecard_produced")
+        if source.get("scorecard_produced") is not None
+        else scorecard.get("produced"),
+        "scorecard_path": source.get("scorecard_path") or paths.get("scorecard_png"),
+        "media_assets_copied_into_repo": source.get("media_assets_copied_into_repo", False),
+        "external_selected_count": source.get(
+            "external_selected_count",
+            external.get("external_selected_count"),
+        ),
+        "external_selected_paths": source.get(
+            "external_selected_paths",
+            external.get("external_selected_paths"),
+        ),
+        "absolute_sibling_paths_are_local_evidence_only": source.get(
+            "absolute_sibling_paths_are_local_evidence_only",
+            external.get("absolute_sibling_paths_are_local_evidence_only"),
+        ),
+        "missing_depth_reference": source.get(
+            "missing_depth_reference",
+            gaps.get("missing_depth_reference"),
+        ),
+        "missing_pick_place_video": source.get(
+            "missing_pick_place_video",
+            gaps.get("missing_pick_place_video"),
+        ),
+        "no_videos": source.get("no_videos", gaps.get("no_videos")),
+        "videos_present": source.get("videos_present", gaps.get("videos_present")),
+        "reference_gaps": source.get("reference_gaps", gaps.get("reference_gaps")),
+        "render_dependencies": source.get("render_dependencies"),
+    }
+    for key, label_suffix in (
+        ("summary_json", "summary"),
+        ("csv_rows", "rows"),
+        ("readme_md", "readme"),
+        ("scorecard_png", "scorecard"),
+    ):
+        add_path(
+            artifacts,
+            category="reference_camera_tuning_diagnostics",
+            label=f"reference_camera_tuning_diagnostics:{label_suffix}",
+            value=paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"reference_camera_tuning_diagnostics.artifact_paths.{key}",
+            metrics=metrics,
+        )
+    return {
+        **metrics,
+        "summary_path": paths.get("summary_json"),
+        "csv_path": paths.get("csv_rows"),
+        "readme_path": paths.get("readme_md"),
+        "scorecard_path": metrics.get("scorecard_path"),
+        "artifact_paths": paths,
+        "external_local_evidence_only": external,
+        "reference_gap_carry_through": gaps,
+        "suggested_tuning_dimensions": suggestions,
+        "suggested_tuning_dimension_names": suggestion_names,
+        "input": source.get("input"),
+        "limits": source.get("limits"),
     }
 
 
@@ -2147,6 +2267,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    reference_camera_tuning_diagnostics = collect_reference_camera_tuning_diagnostics_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
 
     reference_media_inventory = collect_reference_media_inventory_artifacts(
         suite=suite,
@@ -2325,6 +2452,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "evidence_bundle": evidence_bundle,
         "reference_media_inventory": reference_media_inventory,
         "reference_media_comparison": reference_media_comparison,
+        "reference_camera_tuning_diagnostics": reference_camera_tuning_diagnostics,
         "selected_real_reference_media": selected_media,
         "reference_capture_checklist": reference_capture_checklist,
         "real_projection_intake": real_projection_intake,
