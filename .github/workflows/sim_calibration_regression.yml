@@ -24,6 +24,7 @@ on:
       - "archive/chess_test_images/current_view.jpg"
       - "docs/sim_calibration_regression.md"
       - "docs/sim_so101_model_asset_preflight.md"
+      - "docs/sim_so101_model_bundle_manifest.md"
       - "docs/sim_so101_model_contract.md"
       - "docs/sim_so101_model_source_inventory.md"
       - "llm-tools/**"
@@ -45,6 +46,7 @@ on:
       - "archive/chess_test_images/current_view.jpg"
       - "docs/sim_calibration_regression.md"
       - "docs/sim_so101_model_asset_preflight.md"
+      - "docs/sim_so101_model_bundle_manifest.md"
       - "docs/sim_so101_model_contract.md"
       - "docs/sim_so101_model_source_inventory.md"
       - "llm-tools/**"
@@ -68,6 +70,7 @@ env:
   CALIBRATION_REGRESSION_ARTIFACT_NAME: "sim-calibration-regression-${{ github.run_id }}"
   IK_MODEL_PATH: ""
   IK_MODEL_ASSET_ROOTS: ""
+  SO101_MODEL_BUNDLE_MANIFEST: ""
   SO101_MODEL_SOURCE_ROOTS: ""
   SO101_MODEL_SOURCE_EXTRA_ROOTS: ""
   SO101_AUTHORITATIVE_MODEL_PATHS: ""
@@ -132,6 +135,9 @@ jobs:
           if [ -n "${IK_MODEL_PATH}" ]; then
             cmd+=(--ik-model-path "${IK_MODEL_PATH}")
           fi
+          if [ -n "${SO101_MODEL_BUNDLE_MANIFEST}" ]; then
+            cmd+=(--so101-model-bundle-manifest "${SO101_MODEL_BUNDLE_MANIFEST}")
+          fi
           append_repeatable_args --ik-model-asset-root "${IK_MODEL_ASSET_ROOTS}"
           append_repeatable_args --so101-model-source-root "${SO101_MODEL_SOURCE_ROOTS}"
           append_repeatable_args --so101-model-source-extra-root "${SO101_MODEL_SOURCE_EXTRA_ROOTS}"
@@ -177,6 +183,30 @@ jobs:
               assert Path(pose_fixture["metadata_paths"][case_id]).is_file(), (case_id, pose_fixture)
           assert pose_fixture["hardware_skipped"] is True, pose_fixture
           assert pose_fixture["gui_skipped"] is True, pose_fixture
+          bundle_manifest = summary["so101_model_bundle_manifest"]
+          assert bundle_manifest["ok"] is True, bundle_manifest
+          assert bundle_manifest["status"] in {
+              "model_bundle_manifest_not_supplied",
+              "model_bundle_manifest_unavailable",
+              "model_bundle_manifest_parse_error",
+              "model_bundle_manifest_schema_error",
+              "model_bundle_manifest_needs_follow_up",
+              "model_bundle_manifest_ready_for_model_backed_ik",
+          }, bundle_manifest
+          assert bundle_manifest["ready_for_model_backed_ik"] in {True, False}, bundle_manifest
+          bundle_request = bundle_manifest["manifest_request"]
+          if os.environ["SO101_MODEL_BUNDLE_MANIFEST"].strip():
+              assert bundle_request["path"], bundle_request
+          else:
+              assert bundle_manifest["status"] == "model_bundle_manifest_not_supplied", bundle_manifest
+              assert bundle_request["status"] == "model_bundle_manifest_not_supplied", bundle_request
+              assert bundle_manifest["forwarding"]["diagnostic_only"] is True, bundle_manifest["forwarding"]
+          bundle_artifacts = bundle_manifest["artifacts"]
+          for key in ("summary_json", "checklist_csv", "readme_md"):
+              assert isinstance(bundle_artifacts.get(key), str) and Path(bundle_artifacts[key]).is_file(), (
+                  key,
+                  bundle_artifacts,
+              )
           source_inventory = summary["so101_model_source_inventory"]
           assert source_inventory["ok"] is True, source_inventory
           assert source_inventory["status"] in {
@@ -344,6 +374,7 @@ jobs:
               "perception_fixture",
               "sim_camera_pose_fixture",
               "so101_model_source_inventory",
+              "so101_model_bundle_manifest",
               "so101_model_contract",
               "ik_reachability",
               "pick_place_scenario",
@@ -410,6 +441,27 @@ jobs:
               row.get("label") == "so101_model_source_inventory:readme" and row.get("exists") is True
               for row in artifacts_by_category["so101_model_source_inventory"]
           ), artifacts_by_category["so101_model_source_inventory"]
+          assert any(
+              row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("status") in {
+                  "model_bundle_manifest_not_supplied",
+                  "model_bundle_manifest_unavailable",
+                  "model_bundle_manifest_parse_error",
+                  "model_bundle_manifest_schema_error",
+                  "model_bundle_manifest_needs_follow_up",
+                  "model_bundle_manifest_ready_for_model_backed_ik",
+              }
+              for row in artifacts_by_category["so101_model_bundle_manifest"]
+          ), artifacts_by_category["so101_model_bundle_manifest"]
+          assert any(
+              row.get("kind") == "csv" and row.get("exists") is True
+              for row in artifacts_by_category["so101_model_bundle_manifest"]
+          ), artifacts_by_category["so101_model_bundle_manifest"]
+          assert any(
+              row.get("label") == "so101_model_bundle_manifest:readme" and row.get("exists") is True
+              for row in artifacts_by_category["so101_model_bundle_manifest"]
+          ), artifacts_by_category["so101_model_bundle_manifest"]
           assert any(
               row.get("kind") == "json"
               and row.get("exists") is True
@@ -482,10 +534,13 @@ jobs:
           assert entrypoint_path.is_file(), entrypoint_path
           report_text = report_path.read_text()
           assert "### SO-101 Model Source Inventory" in report_text, report_text
+          assert "### SO-101 Model Bundle Manifest" in report_text, report_text
           entrypoint_text = entrypoint_path.read_text()
           assert "Open `artifact_index_report.md` first." in entrypoint_text, entrypoint_text
           assert "`calibration_regression_summary.json`" in entrypoint_text, entrypoint_text
           assert "`artifact_index.json`" in entrypoint_text, entrypoint_text
+          assert "`so101_model_bundle_manifest/so101_model_bundle_manifest_summary.json`" in entrypoint_text, entrypoint_text
+          assert "`so101_model_bundle_manifest/so101_model_bundle_manifest_checklist.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_inventory_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_candidates.csv`" in entrypoint_text, entrypoint_text
           assert "`hardware_skipped: true`" in entrypoint_text, entrypoint_text
@@ -522,6 +577,19 @@ jobs:
                           "source_configuration": source_configuration,
                           "recommended_contract_check_path": source_inventory["recommended_contract_check_path"],
                           "artifacts": source_inventory_artifacts,
+                      },
+                      "so101_model_bundle_manifest": {
+                          "summary_path": bundle_manifest["summary_path"],
+                          "status": bundle_manifest["status"],
+                          "ready_for_model_backed_ik": bundle_manifest["ready_for_model_backed_ik"],
+                          "manifest_request": bundle_manifest["manifest_request"],
+                          "model_path": bundle_manifest["model_path"],
+                          "asset_roots": bundle_manifest["asset_roots"],
+                          "target_frame": bundle_manifest["target_frame"],
+                          "tcp_offset": bundle_manifest["tcp_offset"],
+                          "base_to_board_alignment": bundle_manifest["base_to_board_alignment"],
+                          "forwarding": bundle_manifest["forwarding"],
+                          "artifacts": bundle_artifacts,
                       },
                       "so101_model_contract": {
                           "summary_path": so101_contract["summary_path"],
@@ -574,6 +642,7 @@ jobs:
               "session/session_summary.json",
               "fixture/fixture_summary.json",
               "sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json",
+              "so101_model_bundle_manifest/so101_model_bundle_manifest_summary.json",
               "so101_model_source_inventory/so101_model_source_inventory_summary.json",
               "so101_model_contract/so101_model_contract_summary.json",
               "ik_reachability_drill/ik_reachability_drill_summary.json",
@@ -611,6 +680,15 @@ jobs:
               f"- `authoritative_paths`: `{summary['so101_model_source_inventory']['source_configuration']['authoritative_model_paths']}`",
               f"- `authoritative_roots`: `{summary['so101_model_source_inventory']['source_configuration']['authoritative_model_roots']}`",
               "- `--ik-model-path` is forwarded only to the contract checker and IK drill, not to source authority.",
+              "",
+              "SO-101 model bundle manifest:",
+              f"- `status`: `{summary['so101_model_bundle_manifest']['status']}`",
+              f"- `ready_for_model_backed_ik`: `{summary['so101_model_bundle_manifest']['ready_for_model_backed_ik']}`",
+              f"- `manifest_path`: `{summary['so101_model_bundle_manifest']['manifest_request']['path']}`",
+              f"- `model_path`: `{summary['so101_model_bundle_manifest']['model_path']['path']}`",
+              f"- `asset_roots`: `{summary['so101_model_bundle_manifest']['asset_roots']['asset_roots']}`",
+              f"- `diagnostic_only`: `{summary['so101_model_bundle_manifest']['forwarding']['diagnostic_only']}`",
+              f"- `diagnostic_only_reason`: `{summary['so101_model_bundle_manifest']['forwarding']['diagnostic_only_reason']}`",
               "",
               "SO-101 model contract:",
               f"- `ik_model_path`: `{summary['so101_model_contract_config']['ik_model_path']}`",

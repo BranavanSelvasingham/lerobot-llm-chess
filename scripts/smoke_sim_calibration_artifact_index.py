@@ -20,14 +20,15 @@ CATEGORY_ORDER = {
     "perception_fixture": 6,
     "sim_camera_pose_fixture": 7,
     "so101_model_source_inventory": 8,
-    "so101_model_contract": 9,
-    "so101_model_asset_preflight": 10,
-    "ik_reachability": 11,
-    "gripper_camera_pov": 12,
-    "app_entrypoint": 13,
-    "pick_place_scenario": 14,
-    "negative_check": 15,
-    "logs": 16,
+    "so101_model_bundle_manifest": 9,
+    "so101_model_contract": 10,
+    "so101_model_asset_preflight": 11,
+    "ik_reachability": 12,
+    "gripper_camera_pov": 13,
+    "app_entrypoint": 14,
+    "pick_place_scenario": 15,
+    "negative_check": 16,
+    "logs": 17,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -1268,6 +1269,143 @@ def collect_so101_model_contract_artifacts(
     }
 
 
+def collect_so101_model_bundle_manifest_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    bundle = suite.get("so101_model_bundle_manifest")
+    bundle = bundle if isinstance(bundle, dict) else {}
+    artifact_paths = bundle.get("artifacts")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    manifest_request = bundle.get("manifest_request")
+    manifest_request = manifest_request if isinstance(manifest_request, dict) else {}
+    model_path = bundle.get("model_path")
+    model_path = model_path if isinstance(model_path, dict) else {}
+    asset_roots = bundle.get("asset_roots")
+    asset_roots = asset_roots if isinstance(asset_roots, dict) else {}
+    target_frame = bundle.get("target_frame")
+    target_frame = target_frame if isinstance(target_frame, dict) else {}
+    tcp_offset = bundle.get("tcp_offset")
+    tcp_offset = tcp_offset if isinstance(tcp_offset, dict) else {}
+    alignment = bundle.get("base_to_board_alignment")
+    alignment = alignment if isinstance(alignment, dict) else {}
+    forwarding = bundle.get("forwarding")
+    forwarding = forwarding if isinstance(forwarding, dict) else {}
+    contract = bundle.get("contract_checker")
+    contract = contract if isinstance(contract, dict) else {}
+    contract_artifacts = contract.get("artifacts")
+    contract_artifacts = contract_artifacts if isinstance(contract_artifacts, dict) else {}
+    asset_preflight = bundle.get("model_asset_preflight")
+    asset_preflight = asset_preflight if isinstance(asset_preflight, dict) else {}
+    asset_preflight_artifacts = asset_preflight.get("artifacts")
+    asset_preflight_artifacts = asset_preflight_artifacts if isinstance(asset_preflight_artifacts, dict) else {}
+    metrics = {
+        "status": bundle.get("status"),
+        "ok": bundle.get("ok"),
+        "manifest_request_status": manifest_request.get("status"),
+        "manifest_path": manifest_request.get("path"),
+        "ready_for_model_backed_ik": bundle.get("ready_for_model_backed_ik"),
+        "model_path_status": model_path.get("status"),
+        "model_path": model_path.get("path"),
+        "asset_root_status": asset_roots.get("status"),
+        "asset_roots": asset_roots.get("asset_roots"),
+        "target_frame": target_frame.get("value"),
+        "target_frame_status": target_frame.get("status"),
+        "tcp_offset_status": tcp_offset.get("status"),
+        "tcp_offset_field": tcp_offset.get("field"),
+        "base_to_board_alignment_status": alignment.get("status"),
+        "base_to_board_alignment_field": alignment.get("field"),
+        "contract_status": contract.get("status"),
+        "contract_model_request_status": contract.get("model_request_status"),
+        "contract_robot_kinematics_status": contract.get("robot_kinematics_status"),
+        "asset_preflight_status": asset_preflight.get("status"),
+        "asset_preflight_mesh_reference_count": asset_preflight.get("mesh_reference_count"),
+        "asset_preflight_present_asset_count": asset_preflight.get("present_asset_count"),
+        "asset_preflight_missing_asset_count": asset_preflight.get("missing_asset_count"),
+        "asset_preflight_unresolved_reference_count": asset_preflight.get("unresolved_reference_count"),
+        "missing_inputs": bundle.get("missing_inputs"),
+        "diagnostic_only": forwarding.get("diagnostic_only"),
+        "diagnostic_only_reason": forwarding.get("diagnostic_only_reason"),
+        "ik_model_path_source": forwarding.get("ik_model_path_source"),
+        "ik_model_asset_root_source": forwarding.get("ik_model_asset_root_source"),
+        "used_for_downstream_contract": forwarding.get("used_for_downstream_contract"),
+        "used_for_downstream_ik": forwarding.get("used_for_downstream_ik"),
+    }
+    for key, label_suffix in (
+        ("summary_json", "summary"),
+        ("checklist_csv", "checklist"),
+        ("readme_md", "readme"),
+    ):
+        add_path(
+            artifacts,
+            category="so101_model_bundle_manifest",
+            label=f"so101_model_bundle_manifest:{label_suffix}",
+            value=artifact_paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"so101_model_bundle_manifest.artifacts.{key}",
+            metrics=metrics,
+        )
+
+    if contract.get("returncode") is not None:
+        for key, label_suffix in (
+            ("summary_json", "child_contract_summary"),
+            ("checklist_csv", "child_contract_checklist"),
+            ("readme_md", "child_contract_readme"),
+        ):
+            add_path(
+                artifacts,
+                category="so101_model_bundle_manifest",
+                label=f"so101_model_bundle_manifest:{label_suffix}",
+                value=contract_artifacts.get(key),
+                suite_summary_path=suite_summary_path,
+                output_dir=output_dir,
+                repo_root=repo_root,
+                source=f"so101_model_bundle_manifest.contract_checker.artifacts.{key}",
+                metrics=metrics,
+            )
+        for key, label_suffix in (
+            ("summary_json", "child_asset_preflight_summary"),
+            ("assets_csv", "child_asset_preflight_assets"),
+            ("readme_md", "child_asset_preflight_readme"),
+        ):
+            add_path(
+                artifacts,
+                category="so101_model_bundle_manifest",
+                label=f"so101_model_bundle_manifest:{label_suffix}",
+                value=asset_preflight_artifacts.get(key),
+                suite_summary_path=suite_summary_path,
+                output_dir=output_dir,
+                repo_root=repo_root,
+                source=f"so101_model_bundle_manifest.model_asset_preflight.artifacts.{key}",
+                metrics=metrics,
+            )
+
+    return {
+        "status": bundle.get("status"),
+        "ok": bundle.get("ok"),
+        "summary_path": artifact_paths.get("summary_json") or bundle.get("summary_path"),
+        "checklist_csv_path": artifact_paths.get("checklist_csv"),
+        "readme_md_path": artifact_paths.get("readme_md"),
+        "manifest_request": manifest_request,
+        "ready_for_model_backed_ik": bundle.get("ready_for_model_backed_ik"),
+        "model_path": model_path,
+        "asset_roots": asset_roots,
+        "target_frame": target_frame,
+        "tcp_offset": tcp_offset,
+        "base_to_board_alignment": alignment,
+        "contract_checker": contract,
+        "model_asset_preflight": asset_preflight,
+        "missing_inputs": bundle.get("missing_inputs"),
+        "forwarding": forwarding,
+    }
+
+
 def collect_so101_model_asset_preflight_artifacts(
     *,
     suite: dict[str, Any],
@@ -1867,6 +2005,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    so101_model_bundle_manifest = collect_so101_model_bundle_manifest_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
     so101_model_contract = collect_so101_model_contract_artifacts(
         suite=suite,
         artifacts=artifacts,
@@ -1970,6 +2115,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "visual_review": visual_review,
         "sim_camera_pose_fixture_metadata_contract": sim_camera_pose_metadata_contract,
         "so101_model_source_inventory": so101_model_source_inventory,
+        "so101_model_bundle_manifest": so101_model_bundle_manifest,
         "so101_model_contract": so101_model_contract,
         "so101_model_asset_preflight": so101_model_asset_preflight,
         "ik_reachability": ik_reachability,

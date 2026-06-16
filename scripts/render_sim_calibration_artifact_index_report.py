@@ -21,14 +21,15 @@ CATEGORY_ORDER = {
     "perception_fixture": 6,
     "sim_camera_pose_fixture": 7,
     "so101_model_source_inventory": 8,
-    "so101_model_contract": 9,
-    "so101_model_asset_preflight": 10,
-    "ik_reachability": 11,
-    "gripper_camera_pov": 12,
-    "app_entrypoint": 13,
-    "pick_place_scenario": 14,
-    "negative_check": 15,
-    "logs": 16,
+    "so101_model_bundle_manifest": 9,
+    "so101_model_contract": 10,
+    "so101_model_asset_preflight": 11,
+    "ik_reachability": 12,
+    "gripper_camera_pov": 13,
+    "app_entrypoint": 14,
+    "pick_place_scenario": 15,
+    "negative_check": 16,
+    "logs": 17,
 }
 CATEGORY_LABELS = {
     "real_reference_media": "Real Reference Media",
@@ -40,6 +41,7 @@ CATEGORY_LABELS = {
     "perception_fixture": "Perception Fixture Evidence",
     "sim_camera_pose_fixture": "SimCamera Pose Fixture",
     "so101_model_source_inventory": "SO-101 Model Source Inventory",
+    "so101_model_bundle_manifest": "SO-101 Model Bundle Manifest",
     "so101_model_contract": "SO-101 Model Contract",
     "so101_model_asset_preflight": "SO-101 Model Asset Preflight",
     "ik_reachability": "IK Reachability Drill",
@@ -838,6 +840,30 @@ def so101_model_source_inventory_row(artifact: dict[str, Any]) -> list[Any]:
     ]
 
 
+def so101_model_bundle_manifest_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("manifest_request_status", ""),
+        metrics.get("ready_for_model_backed_ik", ""),
+        metrics.get("model_path", ""),
+        compact_list(metrics.get("asset_roots")),
+        metrics.get("target_frame", ""),
+        metrics.get("tcp_offset_field", ""),
+        metrics.get("base_to_board_alignment_status", ""),
+        metrics.get("contract_status", ""),
+        metrics.get("asset_preflight_status", ""),
+        metrics.get("diagnostic_only", ""),
+        metrics.get("diagnostic_only_reason", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
 def real_projection_intake_artifact_row(artifact: dict[str, Any]) -> list[Any]:
     metrics = artifact.get("metrics")
     metrics = metrics if isinstance(metrics, dict) else {}
@@ -1596,6 +1622,41 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         else ["_No SO-101 model source inventory artifacts indexed._"]
     )
 
+    so101_model_bundle_manifest = grouped.get("so101_model_bundle_manifest", [])
+    lines.extend(["", "### SO-101 Model Bundle Manifest"])
+    lines.append(
+        "This hardware-free child records one reviewed SO-101 model bundle manifest, "
+        "including model path, asset roots, target frame, TCP/gripper-tip offset, "
+        "base-to-board alignment, child contract diagnostics, and nested asset-preflight "
+        "diagnostics. Manifest fields remain diagnostic-only unless "
+        "`ready_for_model_backed_ik` is true; explicit suite CLI model inputs take precedence."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Request",
+                "Ready",
+                "Model Path",
+                "Asset Roots",
+                "Target Frame",
+                "TCP Field",
+                "Alignment",
+                "Contract",
+                "Asset Preflight",
+                "Diagnostic Only",
+                "Reason",
+                "Artifact Status",
+            ],
+            [so101_model_bundle_manifest_row(row) for row in so101_model_bundle_manifest],
+        )
+        if so101_model_bundle_manifest
+        else ["_No SO-101 model bundle manifest artifacts indexed._"]
+    )
+
     so101_model_contract = grouped.get("so101_model_contract", [])
     lines.extend(["", "### SO-101 Model Contract"])
     lines.append(
@@ -1782,6 +1843,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "- Visual review contact sheets are generated PNGs from existing suite frames and are the stable first-pass visual evidence.",
             "- The pick/place visual sequence is simulator-only evidence for approach, grasp/contact, lift/transfer, place/release, and retreat review.",
             "- The SO-101 model-source inventory is a hardware-free provenance preflight; `missing_authoritative_model` is a successful explicit diagnostic, and `--ik-model-path` is not automatically treated as authoritative.",
+            "- The SO-101 model bundle manifest checker is hardware-free evidence for one reviewed bundle; it forwards model path and asset roots only when `ready_for_model_backed_ik` is true and explicit IK CLI inputs do not take precedence.",
             "- The SO-101 model contract checker is a hardware-free preflight for model availability, direct RobotKinematics usability, and joint/frame/TCP alignment inputs.",
             "- The IK reachability drill is a hardware-free feasibility gate; `model_unavailable_fallback_complete` remains a deliberate non-failing status until a repo-local SO-101 model is wired in.",
             "- The metadata-native projection/depth view is the simulator camera-model-aligned ground-truth artifact; rendered-overlay PnP diagnostics are source-mismatch evidence, not depth authority.",

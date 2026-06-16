@@ -24,6 +24,7 @@ EVIDENCE_BUNDLE_MD_NAME = "sim_evidence_bundle.md"
 EVIDENCE_BUNDLE_JSON_NAME = "sim_evidence_bundle.json"
 IK_REACHABILITY_SUMMARY_NAME = "ik_reachability_drill_summary.json"
 SO101_MODEL_SOURCE_INVENTORY_SUMMARY_NAME = "so101_model_source_inventory_summary.json"
+SO101_MODEL_BUNDLE_MANIFEST_SUMMARY_NAME = "so101_model_bundle_manifest_summary.json"
 SO101_MODEL_CONTRACT_SUMMARY_NAME = "so101_model_contract_summary.json"
 BASELINE_CORNERS = [[32, 338], [594, 340], [540, 20], [86, 12]]
 PERTURBED_CORNERS = [[34, 337], [592, 342], [538, 22], [88, 14]]
@@ -73,6 +74,17 @@ def parse_args() -> argparse.Namespace:
             "Optional SO-101 mesh/assets root forwarded to the model contract checker as "
             "--model-asset-root. Repeatable. This is separate from --ik-model-path and "
             "source authority options."
+        ),
+    )
+    parser.add_argument(
+        "--so101-model-bundle-manifest",
+        type=Path,
+        default=None,
+        help=(
+            "Optional reviewed SO-101 model bundle manifest passed to the bundle manifest "
+            "checker. When the checker reports ready_for_model_backed_ik=true and no "
+            "--ik-model-path was supplied, the suite may derive downstream contract/IK "
+            "model path and contract asset roots from this manifest."
         ),
     )
     parser.add_argument(
@@ -160,38 +172,253 @@ def markdown_list_value(values: Any) -> str:
     return "; ".join(str(value) for value in values)
 
 
-def so101_model_source_inventory_config(args: argparse.Namespace) -> dict[str, Any]:
-    roots = cli_path_values(args.so101_model_source_root)
-    extra_roots = cli_path_values(args.so101_model_source_extra_root)
-    authoritative_paths = cli_path_values(args.so101_authoritative_model_path)
-    authoritative_roots = cli_path_values(args.so101_authoritative_model_root)
+def so101_model_source_inventory_config(
+    args: argparse.Namespace,
+    *,
+    model_source_roots: list[Path],
+    model_source_extra_roots: list[Path],
+    authoritative_model_paths: list[Path],
+    authoritative_model_roots: list[Path],
+    bundle_inventory_forwarding: dict[str, Any],
+    effective_ik_model_path: Path | None,
+) -> dict[str, Any]:
+    roots = cli_path_values(model_source_roots)
+    extra_roots = cli_path_values(model_source_extra_roots)
+    authoritative_paths = cli_path_values(authoritative_model_paths)
+    authoritative_roots = cli_path_values(authoritative_model_roots)
     return {
         "scan_mode": "explicit_roots" if roots else "default_repo_roots",
         "model_source_roots": roots,
         "model_source_extra_roots": extra_roots,
         "authoritative_model_paths": authoritative_paths,
         "authoritative_model_roots": authoritative_roots,
+        "model_source_root_source": bundle_inventory_forwarding.get("model_source_root_source"),
+        "authoritative_model_path_source": bundle_inventory_forwarding.get(
+            "authoritative_model_path_source"
+        ),
         "ik_model_path_is_authority": False,
         "ik_model_path_forwarded_to_inventory": False,
-        "ik_model_path": str(args.ik_model_path.expanduser()) if args.ik_model_path is not None else None,
+        "ik_model_path": (
+            str(effective_ik_model_path.expanduser()) if effective_ik_model_path is not None else None
+        ),
+        "explicit_ik_model_path": (
+            str(args.ik_model_path.expanduser()) if args.ik_model_path is not None else None
+        ),
+        "bundle_manifest": bundle_inventory_forwarding,
         "notes": [
             "--ik-model-path is forwarded only to the model contract checker and IK reachability drill.",
             "Inventory authority must be declared with --so101-authoritative-model-path or --so101-authoritative-model-root.",
+            "A ready bundle manifest may supply a reviewed model path as inventory root and authoritative path when no explicit inventory source options were supplied.",
         ],
     }
 
 
-def so101_model_contract_config(args: argparse.Namespace) -> dict[str, Any]:
-    asset_roots = cli_path_values(args.ik_model_asset_root)
+def so101_inventory_forwarding_decision(
+    *,
+    args: argparse.Namespace,
+    bundle_forwarding: dict[str, Any],
+) -> tuple[list[Path], list[Path], list[Path], list[Path], dict[str, Any]]:
+    explicit_source_inputs = any(
+        [
+            args.so101_model_source_root,
+            args.so101_model_source_extra_root,
+            args.so101_authoritative_model_path,
+            args.so101_authoritative_model_root,
+        ]
+    )
+    roots = list(args.so101_model_source_root)
+    extra_roots = list(args.so101_model_source_extra_root)
+    authoritative_paths = list(args.so101_authoritative_model_path)
+    authoritative_roots = list(args.so101_authoritative_model_root)
+    model_path = path_from_string(bundle_forwarding.get("model_path"))
+    use_bundle = (
+        bundle_forwarding.get("ready_for_model_backed_ik") is True
+        and not explicit_source_inputs
+        and model_path is not None
+    )
+    if use_bundle:
+        roots = [model_path]
+        authoritative_paths = [model_path]
+
+    reason = None
+    if explicit_source_inputs:
+        reason = "explicit_source_inventory_inputs_supplied"
+    elif bundle_forwarding.get("ready_for_model_backed_ik") is not True:
+        reason = f"bundle_not_ready_for_inventory_authority:{bundle_forwarding.get('manifest_status')}"
+    elif model_path is None:
+        reason = "bundle_ready_without_model_path"
+
+    forwarding = {
+        "used_for_source_inventory": use_bundle,
+        "diagnostic_only": not use_bundle,
+        "diagnostic_only_reason": None if use_bundle else reason,
+        "model_source_root_source": "so101_model_bundle_manifest" if use_bundle else (
+            "explicit_cli" if args.so101_model_source_root else "default_repo_roots"
+        ),
+        "authoritative_model_path_source": "so101_model_bundle_manifest" if use_bundle else (
+            "explicit_cli" if args.so101_authoritative_model_path else "not_supplied"
+        ),
+        "manifest_status": bundle_forwarding.get("manifest_status"),
+        "ready_for_model_backed_ik": bundle_forwarding.get("ready_for_model_backed_ik"),
+        "model_path": str(model_path) if model_path is not None else None,
+        "notes": [
+            "The bundle manifest supplies source-inventory authority only when ready_for_model_backed_ik is true.",
+            "Explicit source inventory CLI options take precedence over bundle-derived inventory inputs.",
+        ],
+    }
+    return roots, extra_roots, authoritative_paths, authoritative_roots, forwarding
+
+
+def so101_model_contract_config(
+    args: argparse.Namespace,
+    *,
+    effective_ik_model_path: Path | None,
+    effective_asset_roots: list[Path],
+    bundle_forwarding: dict[str, Any],
+) -> dict[str, Any]:
+    explicit_asset_roots = cli_path_values(args.ik_model_asset_root)
+    asset_roots = cli_path_values(effective_asset_roots)
     return {
-        "ik_model_path": str(args.ik_model_path.expanduser()) if args.ik_model_path is not None else None,
+        "ik_model_path": (
+            str(effective_ik_model_path.expanduser())
+            if effective_ik_model_path is not None
+            else None
+        ),
+        "explicit_ik_model_path": (
+            str(args.ik_model_path.expanduser()) if args.ik_model_path is not None else None
+        ),
+        "ik_model_path_source": bundle_forwarding.get("ik_model_path_source"),
         "ik_model_asset_roots": asset_roots,
+        "explicit_ik_model_asset_roots": explicit_asset_roots,
+        "ik_model_asset_root_source": bundle_forwarding.get("ik_model_asset_root_source"),
         "asset_root_forwarded_to_ik_reachability": False,
         "ik_model_path_is_authority": False,
+        "bundle_manifest": bundle_forwarding,
         "notes": [
-            "--ik-model-path is forwarded to the contract checker and IK reachability drill.",
-            "--ik-model-asset-root is forwarded only to the contract checker asset preflight.",
+            "The effective ik_model_path is forwarded to the contract checker and IK reachability drill.",
+            "The effective ik_model_asset_roots are forwarded only to the contract checker asset preflight.",
             "Mesh/assets roots do not mark model-source authority and do not change RobotKinematics arguments.",
+            "Manifest-derived model path and asset roots are used only when ready_for_model_backed_ik is true and no explicit --ik-model-path was supplied.",
+        ],
+    }
+
+
+def so101_model_bundle_manifest_config(args: argparse.Namespace) -> dict[str, Any]:
+    return {
+        "supplied": args.so101_model_bundle_manifest is not None,
+        "requested_path": (
+            str(args.so101_model_bundle_manifest.expanduser())
+            if args.so101_model_bundle_manifest is not None
+            else None
+        ),
+        "notes": [
+            "The bundle manifest checker runs in every suite invocation.",
+            "No supplied manifest is recorded as explicit non-failing evidence.",
+            "Manifest data is diagnostic-only unless the checker reports ready_for_model_backed_ik true.",
+        ],
+    }
+
+
+def so101_model_bundle_manifest_command(
+    *,
+    python: str,
+    bundle_dir: Path,
+    args: argparse.Namespace,
+) -> list[str]:
+    command = [
+        python,
+        str(REPO_ROOT / "scripts" / "smoke_sim_so101_model_bundle_manifest.py"),
+        "--output-dir",
+        str(bundle_dir),
+        "--python",
+        python,
+    ]
+    if args.so101_model_bundle_manifest is not None:
+        command.extend(["--manifest-path", str(args.so101_model_bundle_manifest.expanduser())])
+    return command
+
+
+def path_from_string(value: Any) -> Path | None:
+    if isinstance(value, str) and value:
+        return Path(value).expanduser()
+    return None
+
+
+def paths_from_strings(values: Any) -> list[Path]:
+    if not isinstance(values, list):
+        return []
+    return [Path(value).expanduser() for value in values if isinstance(value, str) and value]
+
+
+def so101_bundle_forwarding_decision(
+    *,
+    args: argparse.Namespace,
+    bundle: dict[str, Any] | None,
+) -> dict[str, Any]:
+    bundle = bundle if isinstance(bundle, dict) else {}
+    manifest_request = bundle.get("manifest_request")
+    manifest_request = manifest_request if isinstance(manifest_request, dict) else {}
+    model_path = bundle.get("model_path")
+    model_path = model_path if isinstance(model_path, dict) else {}
+    asset_roots = bundle.get("asset_roots")
+    asset_roots = asset_roots if isinstance(asset_roots, dict) else {}
+    ready = bundle.get("ready_for_model_backed_ik") is True
+    explicit_model_path = args.ik_model_path is not None
+    explicit_asset_roots = bool(args.ik_model_asset_root)
+    manifest_status = bundle.get("status") or manifest_request.get("status")
+    bundle_model_path = path_from_string(model_path.get("path"))
+    bundle_asset_roots = paths_from_strings(asset_roots.get("asset_roots"))
+
+    effective_model_path = args.ik_model_path
+    effective_asset_roots = list(args.ik_model_asset_root)
+    model_path_source = "explicit_cli" if explicit_model_path else "not_supplied"
+    asset_root_source = "explicit_cli" if explicit_asset_roots else "not_supplied"
+    diagnostic_only_reason: str | None = None
+    downstream_model_path_forwarded = False
+    downstream_asset_roots_forwarded = False
+
+    if explicit_model_path:
+        diagnostic_only_reason = "explicit_ik_model_path_supplied"
+    elif not ready:
+        diagnostic_only_reason = f"bundle_not_ready_for_model_backed_ik:{manifest_status}"
+    elif bundle_model_path is None:
+        diagnostic_only_reason = "bundle_ready_without_model_path"
+    else:
+        effective_model_path = bundle_model_path
+        model_path_source = "so101_model_bundle_manifest"
+        downstream_model_path_forwarded = True
+        if explicit_asset_roots:
+            asset_root_source = "explicit_cli"
+        else:
+            effective_asset_roots = bundle_asset_roots
+            asset_root_source = "so101_model_bundle_manifest"
+            downstream_asset_roots_forwarded = bool(bundle_asset_roots)
+
+    return {
+        "manifest_supplied": manifest_request.get("path") is not None,
+        "manifest_request_status": manifest_request.get("status"),
+        "manifest_status": manifest_status,
+        "manifest_path": manifest_request.get("path"),
+        "ready_for_model_backed_ik": ready,
+        "model_path": str(bundle_model_path) if bundle_model_path is not None else None,
+        "asset_roots": [str(path) for path in bundle_asset_roots],
+        "explicit_ik_model_path_supplied": explicit_model_path,
+        "explicit_ik_model_asset_roots_supplied": explicit_asset_roots,
+        "used_for_downstream_contract": downstream_model_path_forwarded,
+        "used_for_downstream_ik": downstream_model_path_forwarded,
+        "used_for_downstream_asset_preflight": downstream_asset_roots_forwarded or explicit_asset_roots,
+        "diagnostic_only": not downstream_model_path_forwarded,
+        "diagnostic_only_reason": diagnostic_only_reason,
+        "effective_ik_model_path": (
+            str(effective_model_path.expanduser()) if effective_model_path is not None else None
+        ),
+        "effective_ik_model_asset_roots": [str(path.expanduser()) for path in effective_asset_roots],
+        "ik_model_path_source": model_path_source,
+        "ik_model_asset_root_source": asset_root_source,
+        "notes": [
+            "Manifest data is not forwarded to contract or IK unless ready_for_model_backed_ik is true.",
+            "An explicit --ik-model-path takes precedence over the bundle manifest.",
+            "An explicit --ik-model-asset-root list takes precedence for contract asset preflight roots.",
         ],
     }
 
@@ -200,7 +427,10 @@ def so101_model_source_inventory_command(
     *,
     python: str,
     inventory_dir: Path,
-    args: argparse.Namespace,
+    model_source_roots: list[Path],
+    model_source_extra_roots: list[Path],
+    authoritative_model_paths: list[Path],
+    authoritative_model_roots: list[Path],
 ) -> list[str]:
     command = [
         python,
@@ -208,13 +438,13 @@ def so101_model_source_inventory_command(
         "--output-dir",
         str(inventory_dir),
     ]
-    for root in args.so101_model_source_root:
+    for root in model_source_roots:
         command.extend(["--root", str(root.expanduser())])
-    for root in args.so101_model_source_extra_root:
+    for root in model_source_extra_roots:
         command.extend(["--extra-root", str(root.expanduser())])
-    for path in args.so101_authoritative_model_path:
+    for path in authoritative_model_paths:
         command.extend(["--authoritative-path", str(path.expanduser())])
-    for root in args.so101_authoritative_model_root:
+    for root in authoritative_model_roots:
         command.extend(["--authoritative-root", str(root.expanduser())])
     return command
 
@@ -233,6 +463,18 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
     so101_inventory = so101_inventory if isinstance(so101_inventory, dict) else {}
     so101_source_config = so101_inventory.get("source_configuration")
     so101_source_config = so101_source_config if isinstance(so101_source_config, dict) else {}
+    so101_bundle = summary.get("so101_model_bundle_manifest")
+    so101_bundle = so101_bundle if isinstance(so101_bundle, dict) else {}
+    so101_bundle_forwarding = so101_bundle.get("forwarding")
+    so101_bundle_forwarding = so101_bundle_forwarding if isinstance(so101_bundle_forwarding, dict) else {}
+    so101_bundle_model_path = so101_bundle.get("model_path")
+    so101_bundle_model_path = so101_bundle_model_path if isinstance(so101_bundle_model_path, dict) else {}
+    so101_bundle_asset_roots = so101_bundle.get("asset_roots")
+    so101_bundle_asset_roots = so101_bundle_asset_roots if isinstance(so101_bundle_asset_roots, dict) else {}
+    so101_bundle_tcp = so101_bundle.get("tcp_offset")
+    so101_bundle_tcp = so101_bundle_tcp if isinstance(so101_bundle_tcp, dict) else {}
+    so101_bundle_alignment = so101_bundle.get("base_to_board_alignment")
+    so101_bundle_alignment = so101_bundle_alignment if isinstance(so101_bundle_alignment, dict) else {}
     so101_contract = summary.get("so101_model_contract")
     so101_contract = so101_contract if isinstance(so101_contract, dict) else {}
     so101_contract_config = summary.get("so101_model_contract_config")
@@ -260,6 +502,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `session/session_summary.json`",
         "- `fixture/fixture_summary.json`",
         "- `sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json`",
+        "- `so101_model_bundle_manifest/so101_model_bundle_manifest_summary.json`",
+        "- `so101_model_bundle_manifest/so101_model_bundle_manifest_checklist.csv`",
+        "- `so101_model_bundle_manifest/README.md`",
         "- `so101_model_source_inventory/so101_model_source_inventory_summary.json`",
         "- `so101_model_source_inventory/so101_model_source_candidates.csv`",
         "- `so101_model_source_inventory/README.md`",
@@ -349,6 +594,28 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             f"authoritative roots "
             f"`{markdown_list_value(so101_source_config.get('authoritative_model_roots'))}`; "
             "`--ik-model-path` authority `false`."
+        ),
+        (
+            "- SO-101 model bundle manifest evidence records the reviewed bundle request, "
+            "model path, asset roots, target frame, TCP/gripper-tip offset, base-to-board "
+            "alignment, child contract diagnostics, and nested asset-preflight diagnostics."
+        ),
+        (
+            "- SO-101 model bundle manifest status: "
+            f"`{so101_bundle.get('status')}`; ready_for_model_backed_ik "
+            f"`{markdown_bool(so101_bundle.get('ready_for_model_backed_ik'))}`; "
+            f"model `{so101_bundle_model_path.get('path') or 'none'}`; roots "
+            f"`{markdown_list_value(so101_bundle_asset_roots.get('asset_roots'))}`; "
+            f"target frame `{so101_bundle.get('target_frame', {}).get('value') if isinstance(so101_bundle.get('target_frame'), dict) else None}`; "
+            f"TCP field `{so101_bundle_tcp.get('field')}`; alignment "
+            f"`{so101_bundle_alignment.get('status')}`."
+        ),
+        (
+            "- SO-101 model bundle forwarding: "
+            f"diagnostic_only `{markdown_bool(so101_bundle_forwarding.get('diagnostic_only'))}`; "
+            f"reason `{so101_bundle_forwarding.get('diagnostic_only_reason')}`; "
+            f"effective model path source `{so101_bundle_forwarding.get('ik_model_path_source')}`; "
+            f"effective asset-root source `{so101_bundle_forwarding.get('ik_model_asset_root_source')}`."
         ),
         (
             "- SO-101 model contract evidence records model availability, direct "
@@ -1096,6 +1363,130 @@ def so101_model_source_inventory_section(
     }
 
 
+def so101_model_bundle_manifest_section(
+    bundle: dict[str, Any] | None,
+    summary_path: Path,
+    config: dict[str, Any],
+    forwarding: dict[str, Any],
+) -> dict[str, Any]:
+    bundle = bundle if isinstance(bundle, dict) else {}
+    artifacts = bundle.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    manifest_request = bundle.get("manifest_request")
+    manifest_request = manifest_request if isinstance(manifest_request, dict) else {}
+    model_path = bundle.get("model_path")
+    model_path = model_path if isinstance(model_path, dict) else {}
+    asset_roots = bundle.get("asset_roots")
+    asset_roots = asset_roots if isinstance(asset_roots, dict) else {}
+    target_frame = bundle.get("target_frame")
+    target_frame = target_frame if isinstance(target_frame, dict) else {}
+    tcp_offset = bundle.get("tcp_offset")
+    tcp_offset = tcp_offset if isinstance(tcp_offset, dict) else {}
+    alignment = bundle.get("base_to_board_alignment")
+    alignment = alignment if isinstance(alignment, dict) else {}
+    contract = bundle.get("contract_checker")
+    contract = contract if isinstance(contract, dict) else {}
+    contract_artifacts = contract.get("artifacts")
+    contract_artifacts = contract_artifacts if isinstance(contract_artifacts, dict) else {}
+    asset_preflight = contract.get("model_asset_preflight")
+    asset_preflight = asset_preflight if isinstance(asset_preflight, dict) else {}
+    asset_preflight_artifacts = asset_preflight.get("artifacts")
+    asset_preflight_artifacts = asset_preflight_artifacts if isinstance(asset_preflight_artifacts, dict) else {}
+    authority = bundle.get("authority")
+    authority = authority if isinstance(authority, dict) else {}
+    provenance = bundle.get("provenance")
+    provenance = provenance if isinstance(provenance, dict) else {}
+    field_checks = bundle.get("field_checks")
+    field_checks = field_checks if isinstance(field_checks, list) else []
+    return {
+        "summary_path": str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(bundle.get("ok", False)),
+        "status": bundle.get("status"),
+        "config": config,
+        "forwarding": forwarding,
+        "ready_for_model_backed_ik": bundle.get("ready_for_model_backed_ik"),
+        "manifest_request": {
+            "status": manifest_request.get("status"),
+            "path": manifest_request.get("path"),
+            "exists": manifest_request.get("exists"),
+            "diagnostics": manifest_request.get("diagnostics"),
+        },
+        "model_path": {
+            "status": model_path.get("status"),
+            "raw": model_path.get("raw"),
+            "path": model_path.get("path"),
+            "exists": model_path.get("exists"),
+            "suffix": model_path.get("suffix"),
+            "diagnostics": model_path.get("diagnostics"),
+        },
+        "asset_roots": {
+            "status": asset_roots.get("status"),
+            "present": asset_roots.get("present"),
+            "asset_roots": asset_roots.get("asset_roots"),
+            "asset_root_checks": asset_roots.get("asset_root_checks"),
+            "diagnostics": asset_roots.get("diagnostics"),
+        },
+        "authority_status": authority.get("status"),
+        "provenance_status": provenance.get("status"),
+        "target_frame": {
+            "status": target_frame.get("status"),
+            "value": target_frame.get("value"),
+            "diagnostics": target_frame.get("diagnostics"),
+        },
+        "tcp_offset": {
+            "status": tcp_offset.get("status"),
+            "field": tcp_offset.get("field"),
+            "value": tcp_offset.get("value"),
+            "diagnostics": tcp_offset.get("diagnostics"),
+        },
+        "base_to_board_alignment": {
+            "status": alignment.get("status"),
+            "field": alignment.get("field"),
+            "value": alignment.get("value"),
+            "placeholder_field": alignment.get("placeholder_field"),
+            "placeholder_value": alignment.get("placeholder_value"),
+            "diagnostics": alignment.get("diagnostics"),
+        },
+        "contract_checker": {
+            "status": contract.get("status"),
+            "ok": contract.get("ok"),
+            "returncode": contract.get("returncode"),
+            "model_request_status": contract.get("model_request_status"),
+            "robot_kinematics_status": contract.get("robot_kinematics_status"),
+            "robot_kinematics_initialization_status": contract.get(
+                "robot_kinematics_initialization_status"
+            ),
+            "artifacts": contract_artifacts,
+            "child_diagnostics": contract.get("child_diagnostics"),
+        },
+        "model_asset_preflight": {
+            "status": asset_preflight.get("status"),
+            "asset_roots": asset_preflight.get("asset_roots"),
+            "mesh_reference_count": asset_preflight.get("mesh_reference_count"),
+            "present_asset_count": asset_preflight.get("present_asset_count"),
+            "missing_asset_count": asset_preflight.get("missing_asset_count"),
+            "unresolved_reference_count": asset_preflight.get("unresolved_reference_count"),
+            "artifacts": asset_preflight_artifacts,
+            "diagnostics": asset_preflight.get("diagnostics"),
+            "limitations": asset_preflight.get("limitations"),
+        },
+        "missing_inputs": bundle.get("missing_inputs"),
+        "field_checks": field_checks,
+        "artifacts": {
+            "summary_json": artifacts.get("summary_json")
+            if isinstance(artifacts.get("summary_json"), str)
+            else str(summary_path),
+            "checklist_csv": artifacts.get("checklist_csv"),
+            "readme_md": artifacts.get("readme_md"),
+        },
+        "hardware_skipped": bundle.get("hardware_skipped"),
+        "gui_skipped": bundle.get("gui_skipped"),
+        "openai_skipped": bundle.get("openai_skipped"),
+        "limitations": bundle.get("limitations"),
+    }
+
+
 def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
     visual_review = visual_review if isinstance(visual_review, dict) else {}
     contact_sheets = visual_review.get("contact_sheets")
@@ -1428,18 +1819,68 @@ def main() -> int:
         expected_json_path=pose_fixture_summary_path,
     )
 
+    so101_model_bundle_manifest_dir = output_dir / "so101_model_bundle_manifest"
+    so101_model_bundle_manifest_summary_path = (
+        so101_model_bundle_manifest_dir / SO101_MODEL_BUNDLE_MANIFEST_SUMMARY_NAME
+    )
+    so101_bundle_config = so101_model_bundle_manifest_config(args)
+    so101_model_bundle_manifest_record, so101_model_bundle_manifest = run_child(
+        name="so101_model_bundle_manifest",
+        command=so101_model_bundle_manifest_command(
+            python=python,
+            bundle_dir=so101_model_bundle_manifest_dir,
+            args=args,
+        ),
+        output_dir=so101_model_bundle_manifest_dir,
+        expected_json_path=so101_model_bundle_manifest_summary_path,
+    )
+    so101_bundle_forwarding = so101_bundle_forwarding_decision(
+        args=args,
+        bundle=so101_model_bundle_manifest,
+    )
+    effective_ik_model_path = path_from_string(so101_bundle_forwarding.get("effective_ik_model_path"))
+    effective_ik_model_asset_roots = paths_from_strings(
+        so101_bundle_forwarding.get("effective_ik_model_asset_roots")
+    )
+    (
+        effective_model_source_roots,
+        effective_model_source_extra_roots,
+        effective_authoritative_model_paths,
+        effective_authoritative_model_roots,
+        so101_bundle_inventory_forwarding,
+    ) = so101_inventory_forwarding_decision(
+        args=args,
+        bundle_forwarding=so101_bundle_forwarding,
+    )
+
     so101_model_source_inventory_dir = output_dir / "so101_model_source_inventory"
     so101_model_source_inventory_summary_path = (
         so101_model_source_inventory_dir / SO101_MODEL_SOURCE_INVENTORY_SUMMARY_NAME
     )
-    so101_source_config = so101_model_source_inventory_config(args)
-    so101_contract_config = so101_model_contract_config(args)
+    so101_source_config = so101_model_source_inventory_config(
+        args,
+        model_source_roots=effective_model_source_roots,
+        model_source_extra_roots=effective_model_source_extra_roots,
+        authoritative_model_paths=effective_authoritative_model_paths,
+        authoritative_model_roots=effective_authoritative_model_roots,
+        bundle_inventory_forwarding=so101_bundle_inventory_forwarding,
+        effective_ik_model_path=effective_ik_model_path,
+    )
+    so101_contract_config = so101_model_contract_config(
+        args,
+        effective_ik_model_path=effective_ik_model_path,
+        effective_asset_roots=effective_ik_model_asset_roots,
+        bundle_forwarding=so101_bundle_forwarding,
+    )
     so101_model_source_inventory_record, so101_model_source_inventory = run_child(
         name="so101_model_source_inventory",
         command=so101_model_source_inventory_command(
             python=python,
             inventory_dir=so101_model_source_inventory_dir,
-            args=args,
+            model_source_roots=effective_model_source_roots,
+            model_source_extra_roots=effective_model_source_extra_roots,
+            authoritative_model_paths=effective_authoritative_model_paths,
+            authoritative_model_roots=effective_authoritative_model_roots,
         ),
         output_dir=so101_model_source_inventory_dir,
         expected_json_path=so101_model_source_inventory_summary_path,
@@ -1453,9 +1894,9 @@ def main() -> int:
         "--output-dir",
         str(so101_model_contract_dir),
     ]
-    if args.ik_model_path is not None:
-        so101_model_contract_command.extend(["--model-path", str(args.ik_model_path)])
-    for asset_root in args.ik_model_asset_root:
+    if effective_ik_model_path is not None:
+        so101_model_contract_command.extend(["--model-path", str(effective_ik_model_path)])
+    for asset_root in effective_ik_model_asset_roots:
         so101_model_contract_command.extend(["--model-asset-root", str(asset_root.expanduser())])
     so101_model_contract_record, so101_model_contract = run_child(
         name="so101_model_contract",
@@ -1472,8 +1913,8 @@ def main() -> int:
         "--output-dir",
         str(ik_reachability_dir),
     ]
-    if args.ik_model_path is not None:
-        ik_reachability_command.extend(["--model-path", str(args.ik_model_path)])
+    if effective_ik_model_path is not None:
+        ik_reachability_command.extend(["--model-path", str(effective_ik_model_path)])
     ik_reachability_record, ik_reachability = run_child(
         name="ik_reachability_drill",
         command=ik_reachability_command,
@@ -1553,6 +1994,7 @@ def main() -> int:
         "calibration_session_report": session_record,
         "perception_regression_fixture": fixture_record,
         "sim_camera_pose_fixture": pose_fixture_record,
+        "so101_model_bundle_manifest": so101_model_bundle_manifest_record,
         "so101_model_source_inventory": so101_model_source_inventory_record,
         "so101_model_contract": so101_model_contract_record,
         "ik_reachability_drill": ik_reachability_record,
@@ -1590,6 +2032,8 @@ def main() -> int:
             "openai": "Suite and child smokes exercise local simulator/tool paths only; no OpenAI credentials or network calls are required.",
         },
         "candidate_inputs": candidate_paths,
+        "so101_model_bundle_manifest_config": so101_bundle_config,
+        "so101_model_bundle_manifest_forwarding": so101_bundle_forwarding,
         "so101_model_source_inventory_config": so101_source_config,
         "so101_model_contract_config": so101_contract_config,
         "child_commands": child_records,
@@ -1634,6 +2078,12 @@ def main() -> int:
             so101_model_source_inventory,
             so101_model_source_inventory_summary_path,
             so101_source_config,
+        ),
+        "so101_model_bundle_manifest": so101_model_bundle_manifest_section(
+            so101_model_bundle_manifest,
+            so101_model_bundle_manifest_summary_path,
+            so101_bundle_config,
+            so101_bundle_forwarding,
         ),
         "so101_model_contract": so101_model_contract_section(
             so101_model_contract,

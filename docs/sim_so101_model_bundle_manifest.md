@@ -27,6 +27,36 @@ fields. A nonexistent manifest path reports
 `status: "model_bundle_manifest_unavailable"`. Invalid JSON reports
 `status: "model_bundle_manifest_parse_error"`.
 
+## Integrated Suite Mode
+
+The hardware-free simulator calibration regression suite runs this checker on
+every invocation. With no suite manifest option, it records no-manifest evidence
+under `so101_model_bundle_manifest/` without changing the existing fallback IK
+behavior:
+
+```bash
+python scripts/smoke_sim_calibration_regression_suite.py --output-dir /private/tmp/lerobot_sim/calibration_regression_suite --python "$(python -c 'import sys; print(sys.executable)')"
+```
+
+To supply a reviewed bundle to the suite, pass:
+
+```bash
+python scripts/smoke_sim_calibration_regression_suite.py --output-dir /private/tmp/lerobot_sim/calibration_regression_suite_bundle --python "$(python -c 'import sys; print(sys.executable)')" --so101-model-bundle-manifest /absolute/path/to/so101_model_bundle.json
+```
+
+The suite exposes the checker output under
+`calibration_regression_summary.json.so101_model_bundle_manifest`,
+indexes it in `artifact_index.json` as the
+`so101_model_bundle_manifest` category, and renders it in
+`artifact_index_report.md`. If `ready_for_model_backed_ik` is false, the
+manifest stays diagnostic-only. If readiness is true and no explicit
+`--ik-model-path` was supplied, the suite may derive the downstream model path
+for the contract checker and IK reachability drill from `manifest.model_path`.
+If no explicit `--ik-model-asset-root` values were supplied, the suite also
+forwards manifest `asset_roots` to the contract checker's nested asset
+preflight. Explicit suite CLI values take precedence and the forwarding reason
+is recorded in `so101_model_bundle_manifest.forwarding`.
+
 ## Manifest Shape
 
 The manifest is JSON only. Relative `model_path` and `asset_roots` values are
@@ -114,12 +144,12 @@ repeatable `--model-asset-root`, so the contract checker's nested
 diagnostics in the same output tree.
 
 Only after the bundle manifest is ready should the same reviewed model path be
-used as `--ik-model-path` in the calibration regression suite. The manifest does
-not change `RobotKinematics`, the IK solver, robot execution, camera/UI flows,
-or LLM/OpenAI paths; it is evidence that the inputs required to interpret future
-model-backed IK residuals have been declared together.
-
-The next integration step is to wire this checker into the calibration
-regression suite so one reviewed config can drive model-source inventory,
-contract checking, asset-root forwarding, and eventual model-backed residual
-checks.
+treated as more than diagnostic evidence. The manifest does not change
+`RobotKinematics`, the IK solver, robot execution, camera/UI flows, or
+LLM/OpenAI paths; it is evidence that the inputs required to interpret future
+model-backed IK residuals have been declared together. In integrated suite mode,
+a ready bundle can also supply the reviewed model path to the source inventory
+as a root/authoritative path when no explicit source-inventory options were
+passed; otherwise `--so101-model-source-root`,
+`--so101-model-source-extra-root`, `--so101-authoritative-model-path`, and
+`--so101-authoritative-model-root` keep precedence.
