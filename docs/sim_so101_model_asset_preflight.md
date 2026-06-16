@@ -76,6 +76,12 @@ evidence. The known blocker class is a URDF that looks structurally compatible
 with the simulator contract, but cannot enter model-backed IK because a
 referenced mesh such as `assets/base_motor_holder_so101_v1.stl` is missing.
 
+After review, use the
+[SO-101 model bundle manifest checker](sim_so101_model_bundle_manifest.md) to
+declare the selected model path and repeatable mesh asset roots together with
+authority/provenance, TCP offset, and base-to-board alignment inputs. That
+checker forwards the roots back through this preflight via the contract checker.
+
 ## Artifact Fields
 
 High-signal JSON fields:
