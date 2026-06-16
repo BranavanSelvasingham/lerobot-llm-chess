@@ -30,7 +30,18 @@ exits successfully and records a `missing_model` or `model_unavailable`
 diagnostic instead of turning the hardware-free gate red.
 
 Before treating `--ik-model-path` results as meaningful model-backed IK
-evidence, run the focused hardware-free contract checker:
+evidence, first run the focused hardware-free model-source inventory:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_so101_model_source_inventory.py --output-dir /private/tmp/lerobot_sim/so101_model_source_inventory_preflight
+```
+
+See [docs/sim_so101_model_source_inventory.md](sim_so101_model_source_inventory.md)
+for the inventory schema, default roots, external-root workflow, and missing
+provenance/alignment inputs. The inventory should identify an authoritative
+candidate before `--ik-model-path` results are treated as more than explicit
+missing-model or untrusted-model diagnostics. After selecting a candidate, run
+the focused hardware-free contract checker:
 
 ```bash
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_so101_model_contract.py --output-dir /private/tmp/lerobot_sim/so101_model_contract_preflight
