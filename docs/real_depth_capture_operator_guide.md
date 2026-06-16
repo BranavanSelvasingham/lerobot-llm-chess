@@ -20,7 +20,7 @@ Generate the synthetic positive fixture package that proves residual and scoreca
   --output-dir /private/tmp/lerobot_sim/real_depth_capture_plan_fixture
 ```
 
-The planner writes a Markdown operator plan and JSON report. It does not open cameras, move motors, start GUI code, call OpenAI, or modify SimCamera geometry.
+The planner writes a Markdown operator plan and JSON report. It does not open cameras, move motors, start GUI code, call OpenAI, or modify SimCamera geometry. In the default missing-input state, it does not validate the placeholder manifest path; it tells the operator to generate sidecars first, then validate the generated manifest under the capture-sidecar output directory.
 
 ## Physical Measurements Needed
 

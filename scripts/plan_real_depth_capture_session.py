@@ -235,6 +235,7 @@ def command_block(*parts: str) -> str:
 def build_commands(
     *,
     manifest_path: Path,
+    manifest: dict[str, Any],
     positive_manifest_path: Path,
     output_dir: Path,
     repo_root: Path,
@@ -243,12 +244,8 @@ def build_commands(
     manifest_text = repo_relative(manifest_path, repo_root) or str(manifest_path)
     positive_text = repo_relative(positive_manifest_path, repo_root) or str(positive_manifest_path)
     python_text = str(python)
-    return {
-        "validate_current_manifest": command_block(
-            f"{python_text} scripts/smoke_sim_real_calibration_sidecars.py",
-            f"--manifest {manifest_text}",
-            f"--output-dir {output_dir / 'sidecar_validation'}",
-        ),
+    real_capture_sidecars_dir = output_dir / "real_capture_sidecars"
+    commands = {
         "generate_capture_sidecars_after_measurement": command_block(
             f"{python_text} scripts/prepare_real_calibration_capture_sidecars.py",
             "--image-path path/to/real_so101_depth_capture.jpg",
@@ -261,7 +258,13 @@ def build_commands(
             "--distance board_center:0.500:x,y",
             "--real-capture",
             "--require intrinsics --require extrinsics --require board_pose --require depth",
-            f"--output-dir {output_dir / 'real_capture_sidecars'}",
+            f"--output-dir {real_capture_sidecars_dir}",
+        ),
+        "validate_generated_capture_manifest_after_measurement": command_block(
+            f"{python_text} scripts/smoke_sim_real_calibration_sidecars.py",
+            f"--manifest {real_capture_sidecars_dir / 'reference_media_manifest.generated_sidecars.json'}",
+            "--require-valid-count 4",
+            f"--output-dir {output_dir / 'generated_sidecar_validation'}",
         ),
         "run_default_missing_reference_suite": command_block(
             f"{python_text} scripts/smoke_sim_calibration_regression_suite.py",
@@ -275,6 +278,16 @@ def build_commands(
             f"--output-dir {output_dir / 'synthetic_real_capture_fixture_suite'}",
         ),
     }
+    if manifest.get("exists") is True:
+        return {
+            "validate_selected_manifest": command_block(
+                f"{python_text} scripts/smoke_sim_real_calibration_sidecars.py",
+                f"--manifest {manifest_text}",
+                f"--output-dir {output_dir / 'selected_manifest_sidecar_validation'}",
+            ),
+            **commands,
+        }
+    return commands
 
 
 def build_markdown(summary: dict[str, Any]) -> str:
@@ -293,9 +306,15 @@ def build_markdown(summary: dict[str, Any]) -> str:
         f"- Missing sidecars: `{', '.join(manifest['sidecar_summary']['missing']) or 'none'}`",
         f"- Synthetic positive fixture for regression only: `{positive_manifest['repo_relative_path'] or positive_manifest['path']}`",
         "",
-        "## Measurements To Collect",
-        "",
     ]
+    if manifest.get("exists") is not True:
+        lines.extend(
+            [
+                "There is no current manifest to validate yet. Generate real-capture sidecars first, then validate the generated manifest from `real_capture_sidecars/reference_media_manifest.generated_sidecars.json`.",
+                "",
+            ]
+        )
+    lines.extend(["## Measurements To Collect", ""])
     for task in summary["measurement_tasks"]:
         lines.extend(
             [
@@ -337,6 +356,7 @@ def build_summary(args: argparse.Namespace) -> dict[str, Any]:
     positive_manifest = analyze_manifest(positive_manifest_path, repo_root=repo_root)
     commands = build_commands(
         manifest_path=manifest_path,
+        manifest=manifest,
         positive_manifest_path=positive_manifest_path,
         output_dir=output_dir,
         repo_root=repo_root,
@@ -357,6 +377,15 @@ def build_summary(args: argparse.Namespace) -> dict[str, Any]:
         "openai_skipped": True,
         "manifest": manifest,
         "synthetic_positive_fixture_manifest": positive_manifest,
+        "current_manifest_validation": {
+            "available": manifest.get("exists") is True,
+            "status": "available" if manifest.get("exists") is True else "not_available_until_manifest_exists",
+            "note": (
+                "Validate the selected manifest before capture-sidecar generation."
+                if manifest.get("exists") is True
+                else "No selected manifest exists yet; validate the generated capture manifest after running prepare_real_calibration_capture_sidecars.py."
+            ),
+        },
         "measurement_tasks": measurement_tasks(),
         "commands": commands,
         "artifacts": {
