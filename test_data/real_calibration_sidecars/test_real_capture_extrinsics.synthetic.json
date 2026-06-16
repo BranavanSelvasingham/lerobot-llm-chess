@@ -1,0 +1,25 @@
+{
+  "schema": "lerobot.sim.real_calibration_sidecar.extrinsics.v1",
+  "sidecar_type": "extrinsics",
+  "example_only": false,
+  "real_capture": true,
+  "test_only_fixture": true,
+  "physical_calibration_truth": false,
+  "camera_id": "synthetic_real_capture_fixture_so101_gripper_camera",
+  "transform_convention": "board_to_camera",
+  "coordinate_frame_convention": "Synthetic OpenCV camera frame: +x right, +y down, +z forward; board frame origin at a1.",
+  "transform": {
+    "matrix_4x4": [
+      [1.0, 0.0, 0.0, -0.2],
+      [0.0, -1.0, 0.0, 0.2],
+      [0.0, 0.0, 1.0, 0.72],
+      [0.0, 0.0, 0.0, 1.0]
+    ],
+    "translation_m": [-0.2, 0.2, 0.72],
+    "rotation_representation": "matrix_4x4_board_to_camera"
+  },
+  "notes": [
+    "Synthetic fixture only. It mirrors the simulator metadata-native depth baseline for plumbing tests.",
+    "Do not treat this transform as physical SO-101 calibration truth."
+  ]
+}

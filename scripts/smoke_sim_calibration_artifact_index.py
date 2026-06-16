@@ -806,6 +806,12 @@ def collect_visual_review_artifacts(
     scorecard_pnp = scorecard_pnp if isinstance(scorecard_pnp, dict) else {}
     scorecard_gap = scorecard.get("real_camera_depth_gap")
     scorecard_gap = scorecard_gap if isinstance(scorecard_gap, dict) else {}
+    scorecard_real_depth = scorecard.get("real_depth_reference")
+    scorecard_real_depth = scorecard_real_depth if isinstance(scorecard_real_depth, dict) else scorecard_gap
+    scorecard_real_depth_residuals = scorecard_real_depth.get("residual_aggregate")
+    scorecard_real_depth_residuals = (
+        scorecard_real_depth_residuals if isinstance(scorecard_real_depth_residuals, dict) else {}
+    )
     scorecard_visual = scorecard.get("visual")
     scorecard_visual = scorecard_visual if isinstance(scorecard_visual, dict) else {}
     scorecard_artifact_summary = {
@@ -839,8 +845,20 @@ def collect_visual_review_artifacts(
         "not_geometrically_comparable_row_count": scorecard_pnp.get(
             "not_geometrically_comparable_row_count"
         ),
-        "real_camera_depth_status": scorecard_gap.get("status"),
-        "needs_real_depth_reference": scorecard_gap.get("needs_real_depth_reference"),
+        "real_camera_depth_status": scorecard_real_depth.get("status"),
+        "real_depth_comparable": scorecard_real_depth.get("real_depth_comparable"),
+        "needs_real_depth_reference": scorecard_real_depth.get("needs_real_depth_reference"),
+        "real_depth_reference_missing_inputs": scorecard_real_depth.get("missing_inputs"),
+        "real_depth_projection_row_count": scorecard_real_depth_residuals.get("projection_row_count"),
+        "real_depth_depth_row_count": scorecard_real_depth_residuals.get("depth_row_count"),
+        "mean_real_vs_sim_projection_residual_px": scorecard_real_depth_residuals.get(
+            "mean_real_vs_sim_projection_residual_px"
+        ),
+        "mean_abs_real_vs_sim_depth_residual_mm": scorecard_real_depth_residuals.get(
+            "mean_abs_real_vs_sim_depth_residual_mm"
+        ),
+        "real_projection_intake_summary_path": scorecard_real_depth.get("intake_summary_path"),
+        "real_projection_residual_paths": scorecard_real_depth.get("residual_paths"),
         "source_artifacts": scorecard.get("source_artifacts"),
         "output_dimensions": scorecard_visual.get("output_dimensions"),
     }

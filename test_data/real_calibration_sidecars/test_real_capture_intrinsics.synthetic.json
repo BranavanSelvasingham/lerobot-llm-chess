@@ -1,0 +1,23 @@
+{
+  "schema": "lerobot.sim.real_calibration_sidecar.intrinsics.v1",
+  "sidecar_type": "intrinsics",
+  "example_only": false,
+  "real_capture": true,
+  "test_only_fixture": true,
+  "physical_calibration_truth": false,
+  "camera_id": "synthetic_real_capture_fixture_so101_gripper_camera",
+  "calibration_source": "synthetic test-only fixture marked real_capture=true to exercise residual plumbing; not physical SO-101 calibration",
+  "image_size_px": [640, 480],
+  "camera_matrix_px": [
+    [640.0, 0.0, 319.5],
+    [0.0, 640.0, 239.5],
+    [0.0, 0.0, 1.0]
+  ],
+  "distortion_model": "opencv_plumb_bob",
+  "distortion_coefficients": [0.0, 0.0, 0.0, 0.0, 0.0],
+  "units": "pixels",
+  "notes": [
+    "Synthetic fixture only. It is real_capture=true solely to exercise the real-depth scorecard path.",
+    "Do not use as physical SO-101 camera calibration."
+  ]
+}

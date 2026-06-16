@@ -1,0 +1,43 @@
+{
+  "schema": "lerobot.sim.reference_media_manifest.v1",
+  "notes": [
+    "Synthetic test-only manifest for proving the real_depth_comparable scorecard/report path.",
+    "The media path is an existing repo image; the calibration sidecars are deterministic fixtures and not physical SO-101 calibration truth."
+  ],
+  "media": [
+    {
+      "relative_path": "archive/chess_test_images/current_view.jpg",
+      "capture_id": "synthetic_real_capture_depth_scorecard_fixture",
+      "camera_view": "Existing static reference image paired with synthetic real_capture=true sidecar fixtures.",
+      "board_visibility": "Used only to exercise scorecard/report residual propagation.",
+      "piece_layout": "Existing chess-test capture; sidecars are synthetic plumbing fixtures.",
+      "gripper_visibility": "Not used by the residual scorecard fixture.",
+      "calibration_targets": [
+        "camera_pov",
+        "board_corners",
+        "piece_scale",
+        "workspace_geometry"
+      ],
+      "failure_mode": "none_documented",
+      "sim_profiles": [
+        "current_gripper_reference"
+      ],
+      "real_intrinsics_path": "test_data/real_calibration_sidecars/test_real_capture_intrinsics.synthetic.json",
+      "real_extrinsics_path": "test_data/real_calibration_sidecars/test_real_capture_extrinsics.synthetic.json",
+      "board_corner_detections_path": "test_data/real_calibration_sidecars/test_real_capture_board_corners.synthetic.json",
+      "depth_reference_path": "test_data/real_calibration_sidecars/test_real_capture_depth_references.synthetic.json",
+      "declared_tags": [
+        "synthetic_real_capture_test_only",
+        "real_depth_scorecard_contract"
+      ],
+      "notes": [
+        "This fixture is capture/validation scaffolding only.",
+        "Do not treat these sidecars as physical SO-101 calibration."
+      ],
+      "limitations": [
+        "Synthetic real_capture=true sidecars are deliberately test-only.",
+        "No real depth map or measured physical camera-board pose is supplied."
+      ]
+    }
+  ]
+}

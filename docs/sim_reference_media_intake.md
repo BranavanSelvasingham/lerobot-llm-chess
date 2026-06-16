@@ -58,6 +58,13 @@ Validate the synthetic/example-only complete fixture set:
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_real_calibration_sidecars.py --manifest test_data/real_calibration_sidecars/reference_media_manifest.synthetic_sidecars.example.json --require-valid-count 4 --output-dir /private/tmp/lerobot_sim/real_calibration_sidecars_valid
 ```
 
+Validate the synthetic test-only `real_capture: true` fixture that exercises residual
+propagation without claiming physical calibration truth:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_real_calibration_sidecars.py --manifest test_data/real_calibration_sidecars/reference_media_manifest.synthetic_real_capture_test.json --require-valid-count 4 --output-dir /private/tmp/lerobot_sim/real_calibration_sidecars_real_capture_fixture
+```
+
 Validate a deliberate negative missing-field fixture:
 
 ```bash
@@ -119,10 +126,11 @@ The full regression suite also writes `real_projection_intake/real_projection_in
 `.csv`, and `real_projection_intake_contact_sheet.png`. That artifact links selected
 real reference media to `visual_review/pick_place_metadata_native_depth_view.json`.
 Until the optional calibration sidecars above are supplied, rows should report
-`status: "missing_real_calibration"`, `comparable: false`, missing real intrinsics,
-missing real board pose/corner detections, and missing real depth rather than inventing
-real-camera depth evidence. When sidecar paths are declared, the intake validates the
-sidecar JSON shape and reports `sidecar_validation`, `sidecar_valid_count`,
+top-level `status: "missing_real_depth_reference"`, row-level missing calibration or
+depth status, `comparable: false`, missing real intrinsics, missing real board
+pose/corner detections, and missing real depth rather than inventing real-camera depth
+evidence. When sidecar paths are declared, the intake validates the sidecar JSON shape
+and reports `sidecar_validation`, `sidecar_valid_count`,
 `sidecar_invalid_count`, and `sidecar_missing_count` so reviewers can distinguish valid
 schemas from missing or malformed inputs. Valid `example_only` sidecars are reported as
 `valid_example`; they do not satisfy real calibration availability.
@@ -135,6 +143,11 @@ projection/depth data against the metadata-native SimCamera expectation: project
 pixel residuals, ordered board-corner detection residuals, camera z/range residuals,
 metric depth-reference residuals, and camera-to-board-plane residuals. These residual
 artifacts are not emitted for `example_only: true` fixtures.
+
+The full suite refreshes `visual_review/pick_place_depth_distance_scorecard.json` after
+real projection intake runs. That scorecard includes `real_depth_reference.status`, which
+is `real_depth_comparable` when real_capture sidecars produce residual rows and
+`missing_real_depth_reference` with exact required inputs otherwise.
 
 To turn the current gap into a capture plan without adding hardware requirements, generate the reference capture checklist from an existing inventory or suite summary:
 

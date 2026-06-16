@@ -2254,6 +2254,209 @@ def pnp_vs_ground_truth_status(row: dict[str, Any]) -> str | None:
     return str(status) if isinstance(status, str) and status else None
 
 
+def load_real_projection_intake_summary(
+    suite: dict[str, Any],
+    *,
+    suite_summary_path: Path,
+    suite_output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    intake = suite.get("real_projection_intake")
+    intake = intake if isinstance(intake, dict) else {}
+    paths = intake.get("paths")
+    paths = paths if isinstance(paths, dict) else {}
+    candidates = [
+        intake.get("summary_path"),
+        paths.get("json"),
+        suite_output_dir / "real_projection_intake" / "real_projection_intake.json",
+    ]
+    for candidate in candidates:
+        if isinstance(candidate, Path):
+            path = candidate.expanduser().resolve()
+        elif isinstance(candidate, str) and candidate:
+            path = resolve_path(
+                candidate,
+                suite_summary_path=suite_summary_path,
+                output_dir=suite_output_dir,
+                repo_root=repo_root,
+            )
+        else:
+            continue
+        if not path.is_file():
+            continue
+        try:
+            return read_json_object(path, label="real projection intake")
+        except ValueError:
+            continue
+    return intake if intake.get("status") else {}
+
+
+def scorecard_real_depth_requirement_templates(missing_inputs: list[str]) -> list[dict[str, Any]]:
+    templates = {
+        "real_reference_media_file": {
+            "id": "real_reference_media_file",
+            "description": "Add repo-local SO-101 reference image or video media and declare it in the manifest.",
+            "manifest_fields": ["relative_path", "capture_id", "camera_view", "calibration_targets"],
+        },
+        "sim_metadata_native_depth_view_json": {
+            "id": "sim_metadata_native_depth_view_json",
+            "description": "Run visual review so pick_place_metadata_native_depth_view.json exists.",
+            "artifact": "visual_review/pick_place_metadata_native_depth_view.json",
+        },
+        "real_camera_intrinsics_json": {
+            "id": "real_camera_intrinsics_json",
+            "description": "Provide calibrated real camera intrinsics for the reference frame.",
+            "manifest_fields": ["real_intrinsics_path"],
+            "expected_contents": ["camera_matrix_px", "distortion_coefficients", "image_size_px"],
+        },
+        "real_camera_extrinsics_json": {
+            "id": "real_camera_extrinsics_json",
+            "description": "Provide calibrated real camera extrinsics or a camera-to-board pose for the reference frame.",
+            "manifest_fields": ["real_extrinsics_path"],
+            "expected_contents": ["board_to_camera or camera_to_board transform", "frame convention"],
+        },
+        "real_board_pose_or_corner_detections_json": {
+            "id": "real_board_pose_or_corner_detections_json",
+            "description": "Provide detected board corners or a solved board pose for the real frame.",
+            "manifest_fields": ["board_corner_detections_path", "real_board_pose_path"],
+            "expected_contents": ["a1,h1,h8,a8 image coordinates", "corner order", "detection confidence"],
+        },
+        "real_depth_map_or_metric_distance_reference": {
+            "id": "real_depth_map_or_metric_distance_reference",
+            "description": "Provide real metric depth or measured camera-to-board/piece distance references.",
+            "manifest_fields": ["real_depth_path", "depth_reference_path"],
+            "expected_contents": ["depth units", "depth scale", "camera frame convention"],
+        },
+    }
+    return [templates[key] for key in missing_inputs if key in templates]
+
+
+def sidecar_scorecard_source(sidecar: Any) -> dict[str, Any] | None:
+    if not isinstance(sidecar, dict):
+        return None
+    validation = sidecar.get("validation")
+    validation = validation if isinstance(validation, dict) else {}
+    return {
+        "status": sidecar.get("status"),
+        "field": sidecar.get("field"),
+        "path": sidecar.get("path"),
+        "repo_relative_path": sidecar.get("repo_relative_path"),
+        "kind": validation.get("kind"),
+        "schema": validation.get("schema"),
+        "real_capture": validation.get("real_capture"),
+        "example_only": validation.get("example_only"),
+        "validation_status": validation.get("status"),
+        "issues": validation.get("issues"),
+    }
+
+
+def real_depth_record_summary(record: dict[str, Any]) -> dict[str, Any]:
+    residuals = record.get("residuals")
+    residuals = residuals if isinstance(residuals, dict) else {}
+    aggregate = residuals.get("aggregate")
+    aggregate = aggregate if isinstance(aggregate, dict) else {}
+    return {
+        "id": record.get("id"),
+        "status": record.get("status"),
+        "real_reference_media_path": record.get("real_reference_media_path"),
+        "real_reference_media_relative_path": record.get("real_reference_media_relative_path"),
+        "comparable": record.get("comparable"),
+        "depth_comparable": record.get("depth_comparable"),
+        "missing_inputs": record.get("missing_inputs"),
+        "source_sidecars": {
+            "intrinsics": sidecar_scorecard_source(record.get("real_intrinsics")),
+            "extrinsics": sidecar_scorecard_source(record.get("real_extrinsics")),
+            "board_pose": sidecar_scorecard_source(record.get("real_board_pose")),
+            "depth": sidecar_scorecard_source(record.get("real_depth")),
+        },
+        "residual_aggregate": aggregate,
+    }
+
+
+def first_real_depth_sample_rows(real_projection_intake: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    residual_artifacts = real_projection_intake.get("residual_artifacts")
+    residual_artifacts = residual_artifacts if isinstance(residual_artifacts, dict) else {}
+    rows = residual_artifacts.get("rows")
+    rows = rows if isinstance(rows, dict) else {}
+    sample: dict[str, list[dict[str, Any]]] = {}
+    for key in ("projection", "board_corners", "depth", "board_plane"):
+        collection = rows.get(key)
+        sample[key] = [row for row in collection if isinstance(row, dict)][:8] if isinstance(collection, list) else []
+    return sample
+
+
+def build_real_depth_reference_summary(real_projection_intake: dict[str, Any] | None) -> dict[str, Any]:
+    intake = real_projection_intake if isinstance(real_projection_intake, dict) else {}
+    records = [record for record in intake.get("records", []) if isinstance(record, dict)] if isinstance(intake.get("records"), list) else []
+    residual_artifacts = intake.get("residual_artifacts")
+    residual_artifacts = residual_artifacts if isinstance(residual_artifacts, dict) else {}
+    residual_aggregate = residual_artifacts.get("aggregate")
+    residual_aggregate = residual_aggregate if isinstance(residual_aggregate, dict) else {}
+    paths = intake.get("paths")
+    paths = paths if isinstance(paths, dict) else {}
+    depth_comparable_count = int(intake.get("depth_comparable_count") or 0)
+    depth_row_count = int(residual_aggregate.get("depth_row_count") or 0)
+    real_depth_comparable = bool(
+        intake.get("status") == "real_depth_comparable"
+        or (depth_comparable_count > 0 and residual_artifacts.get("available") is True and depth_row_count > 0)
+    )
+    default_missing = [
+        "real_reference_media_file",
+        "real_camera_intrinsics_json",
+        "real_camera_extrinsics_json",
+        "real_board_pose_or_corner_detections_json",
+        "real_depth_map_or_metric_distance_reference",
+    ]
+    missing_inputs = intake.get("missing_inputs")
+    missing_inputs = [str(item) for item in missing_inputs if isinstance(item, str)] if isinstance(missing_inputs, list) else default_missing
+    status = "real_depth_comparable" if real_depth_comparable else "missing_real_depth_reference"
+    checklist = [] if real_depth_comparable else scorecard_real_depth_requirement_templates(missing_inputs)
+    if real_depth_comparable:
+        gap = (
+            "real_capture=true sidecars were compared against the metadata-native SimCamera "
+            "projection/depth baseline; inspect residual JSON/CSV for per-point rows."
+        )
+        next_follow_up = (
+            "Replace the test fixture, if used, with actual SO-101 capture sidecars from the "
+            "safe capture workflow before treating these residuals as physical calibration evidence."
+        )
+    else:
+        gap = (
+            "No complete real_capture=true intrinsics, board pose/extrinsics, and depth reference "
+            "set is available for this scorecard."
+        )
+        next_follow_up = (
+            "Run the safe capture helper with actual SO-101 image, intrinsics, board-corner or "
+            "board-pose data, and depth measurements, then rerun the suite."
+        )
+    return {
+        "implemented": real_depth_comparable,
+        "status": status,
+        "needs_real_depth_reference": not real_depth_comparable,
+        "real_depth_comparable": real_depth_comparable,
+        "real_reference_media_count": intake.get("real_reference_media_count", len(records)),
+        "projection_comparable_count": intake.get("projection_comparable_count"),
+        "depth_comparable_count": depth_comparable_count,
+        "missing_inputs": [] if real_depth_comparable else missing_inputs,
+        "next_capture_requirements": checklist,
+        "residual_artifacts_available": residual_artifacts.get("available", False),
+        "residual_artifacts_status": residual_artifacts.get("status"),
+        "residual_paths": residual_artifacts.get("paths"),
+        "residual_aggregate": residual_aggregate,
+        "sample_residual_rows": first_real_depth_sample_rows(intake),
+        "records": [real_depth_record_summary(record) for record in records],
+        "intake_status": intake.get("status"),
+        "intake_summary_path": intake.get("summary_path") or paths.get("json"),
+        "intake_paths": paths,
+        "gap": gap,
+        "next_follow_up": next_follow_up,
+        "notes": [
+            "This section is hardware-free reporting over supplied sidecars; it does not open camera, robot, GUI, or OpenAI paths.",
+            "Synthetic test-only real_capture fixtures exercise plumbing only and are not physical SO-101 calibration truth.",
+        ],
+    }
+
+
 def build_depth_distance_scorecard_payload(
     *,
     output_dir: Path,
@@ -2263,6 +2466,7 @@ def build_depth_distance_scorecard_payload(
     perceived_depth_comparison: dict[str, Any],
     pnp_residual_diagnostics: dict[str, Any],
     metadata_native_depth_view: dict[str, Any],
+    real_projection_intake: dict[str, Any] | None,
 ) -> dict[str, Any]:
     distance_rows = [
         row for row in distance_metrics.get("rows", []) if isinstance(row, dict)
@@ -2321,7 +2525,8 @@ def build_depth_distance_scorecard_payload(
         at_a_glance = "good_metadata_baseline_alignment"
     else:
         at_a_glance = "unknown_metadata_baseline_alignment"
-    review_status = "needs_real_depth_reference"
+    real_depth_reference = build_real_depth_reference_summary(real_projection_intake)
+    review_status = str(real_depth_reference.get("status") or "missing_real_depth_reference")
 
     pnp_status_counts: dict[str, int] = {}
     for row in pnp_rows:
@@ -2424,13 +2629,13 @@ def build_depth_distance_scorecard_payload(
                 "source": PERCEIVED_DEPTH_ESTIMATOR_SOURCE,
             },
             {
-                "label": "not_real_camera_depth",
-                "status": "not_implemented",
-                "source": "no real camera pixels or depth sensor are consumed",
+                "label": "real_depth_reference",
+                "status": real_depth_reference.get("status"),
+                "source": "real_projection_intake sidecars",
             },
             {
-                "label": "needs_real_depth_reference",
-                "status": "blocked_until_real_capture_sidecars_exist",
+                "label": "sidecar_checklist",
+                "status": "available" if real_depth_reference.get("real_depth_comparable") else "missing_real_depth_reference",
                 "source": "real SO-101 capture sidecars are required for real-vs-sim residuals",
             },
         ],
@@ -2552,24 +2757,21 @@ def build_depth_distance_scorecard_payload(
             "point_roles": metadata_native_depth_view.get("point_roles"),
             "paths": metadata_native_depth_view.get("paths"),
         },
+        "real_depth_reference": real_depth_reference,
         "real_camera_depth_gap": {
-            "implemented": False,
-            "status": "not_real_camera_depth",
-            "needs_real_depth_reference": True,
-            "gap": true_depth.get("gap") or (
-                "No true real-camera or depth-sensor estimate is implemented in this "
-                "hardware-free scorecard."
-            ),
-            "next_follow_up": (
-                "Use actual SO-101 capture sidecars to compare real camera/depth measurements "
-                "against this simulator scorecard and produce real-vs-sim residual overlays."
-            ),
+            **real_depth_reference,
+            "legacy_gap": true_depth.get("gap"),
         },
         "source_artifacts": {
             "pick_place_depth_distance_metrics": distance_metrics.get("paths"),
             "pick_place_perceived_depth_comparison": perceived_depth_comparison.get("paths"),
             "pick_place_pnp_residual_diagnostics": pnp_residual_diagnostics.get("paths"),
             "pick_place_metadata_native_depth_view": metadata_native_depth_view.get("paths"),
+            "real_projection_intake": {
+                "summary_path": real_depth_reference.get("intake_summary_path"),
+                "paths": real_depth_reference.get("intake_paths"),
+                "residual_paths": real_depth_reference.get("residual_paths"),
+            },
         },
         "units": {
             "distance": "millimeters",
@@ -2579,8 +2781,8 @@ def build_depth_distance_scorecard_payload(
         "review_note": (
             "This scorecard is hardware-free. It is good for simulator evidence and for "
             "spotting rendered-corner PnP baseline errors at a glance, but it explicitly "
-            "does not claim real robot/camera depth judgment until real capture sidecars "
-            "supply comparable depth or calibrated camera measurements."
+            "does not claim physical robot/camera depth judgment unless real_capture=true "
+            "sidecars supply comparable depth or calibrated camera measurements."
         ),
     }
 
@@ -2602,13 +2804,18 @@ SCORECARD_COLORS: dict[str, tuple[int, int, int]] = {
 
 def scorecard_color_for_status(status: Any) -> tuple[int, int, int]:
     value = str(status or "").lower()
-    if "good" in value or value == "available":
+    if "good" in value or value == "available" or "real_depth_comparable" in value:
         return SCORECARD_COLORS["good"]
     if "warning" in value:
         return SCORECARD_COLORS["warning"]
     if "bad" in value or "not_geometrically_comparable" in value:
         return SCORECARD_COLORS["bad"]
-    if "not_real_camera_depth" in value or "needs_real_depth_reference" in value or "blocked" in value:
+    if (
+        "not_real_camera_depth" in value
+        or "needs_real_depth_reference" in value
+        or "missing_real_depth_reference" in value
+        or "blocked" in value
+    ):
         return SCORECARD_COLORS["blocked"]
     return SCORECARD_COLORS["unknown"]
 
@@ -2626,6 +2833,8 @@ def scorecard_display_status(status: Any) -> str:
         "not_geometrically_comparable": "not comparable",
         "not_implemented": "not implemented",
         "blocked_until_real_capture_sidecars_exist": "needs real depth reference",
+        "missing_real_depth_reference": "missing real depth reference",
+        "real_depth_comparable": "real depth comparable",
     }.get(value)
     return display or value.replace("_", " ")
 
@@ -2801,6 +3010,27 @@ def render_depth_distance_scorecard_png(path: Path, scorecard: dict[str, Any]) -
     pnp = pnp if isinstance(pnp, dict) else {}
     gap = scorecard.get("real_camera_depth_gap")
     gap = gap if isinstance(gap, dict) else {}
+    real_depth = scorecard.get("real_depth_reference")
+    real_depth = real_depth if isinstance(real_depth, dict) else gap
+    real_residuals = real_depth.get("residual_aggregate")
+    real_residuals = real_residuals if isinstance(real_residuals, dict) else {}
+    real_depth_status = str(real_depth.get("status") or "missing_real_depth_reference")
+    if real_depth.get("real_depth_comparable"):
+        real_depth_value = scorecard_format_number(
+            real_residuals.get("mean_abs_real_vs_sim_depth_residual_mm"),
+            " mm",
+        )
+        real_depth_detail = (
+            f"depth rows={real_residuals.get('depth_row_count') or 0}, "
+            f"proj rows={real_residuals.get('projection_row_count') or 0}"
+        )
+        real_depth_card_status = "good"
+    else:
+        missing = real_depth.get("missing_inputs")
+        missing_count = len(missing) if isinstance(missing, list) else 0
+        real_depth_value = "missing"
+        real_depth_detail = f"required inputs={missing_count}"
+        real_depth_card_status = "blocked"
     cards = [
         (
             "GT camera-to-piece mean",
@@ -2855,10 +3085,10 @@ def render_depth_distance_scorecard_png(path: Path, scorecard: dict[str, Any]) -
             "bad" if pnp.get("not_geometrically_comparable_row_count") else "good",
         ),
         (
-            "Real camera/depth estimate",
-            "not implemented",
-            "Needs real capture sidecars",
-            "blocked",
+            "Real depth residual mean",
+            real_depth_value,
+            real_depth_detail,
+            real_depth_card_status,
         ),
     ]
     card_w = 340
@@ -2978,6 +3208,7 @@ def write_depth_distance_scorecard(
     perceived_depth_comparison: dict[str, Any],
     pnp_residual_diagnostics: dict[str, Any],
     metadata_native_depth_view: dict[str, Any],
+    real_projection_intake: dict[str, Any] | None,
 ) -> dict[str, Any]:
     summary = build_depth_distance_scorecard_payload(
         output_dir=output_dir,
@@ -2987,6 +3218,7 @@ def write_depth_distance_scorecard(
         perceived_depth_comparison=perceived_depth_comparison,
         pnp_residual_diagnostics=pnp_residual_diagnostics,
         metadata_native_depth_view=metadata_native_depth_view,
+        real_projection_intake=real_projection_intake,
     )
     paths = summary.get("paths")
     paths = paths if isinstance(paths, dict) else {}
@@ -3716,6 +3948,12 @@ def build_summary(
         distance_metrics=distance_metrics,
         pnp_residual_diagnostics=pnp_residual_diagnostics,
     )
+    real_projection_intake = load_real_projection_intake_summary(
+        suite,
+        suite_summary_path=suite_summary_path,
+        suite_output_dir=suite_output_dir,
+        repo_root=repo_root,
+    )
     depth_distance_scorecard = write_depth_distance_scorecard(
         output_dir=output_dir,
         suite_output_dir=suite_output_dir,
@@ -3724,6 +3962,7 @@ def build_summary(
         perceived_depth_comparison=perceived_depth_comparison,
         pnp_residual_diagnostics=pnp_residual_diagnostics,
         metadata_native_depth_view=metadata_native_depth_view,
+        real_projection_intake=real_projection_intake,
     )
     metrics_by_id = {
         str(metric.get("id")): metric

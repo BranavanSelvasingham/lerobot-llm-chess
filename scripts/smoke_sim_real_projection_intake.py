@@ -935,6 +935,8 @@ def build_record(
         status = "missing_sim_metadata_native_depth_view"
     elif not comparable:
         status = "missing_real_calibration"
+    elif depth_comparable:
+        status = "real_depth_comparable"
     else:
         status = "projection_comparable"
 
@@ -1020,8 +1022,9 @@ def build_record(
         "declared_metadata": declared_metadata or None,
         "manifest_validation": media.get("manifest_validation"),
         "notes": [
-            "This row links real reference media to simulator expected projections; it does not claim real depth is available.",
+            "This row links real reference media to simulator expected projections; it does not claim physical calibration truth.",
             "comparable is false until real intrinsics plus real board pose/extrinsics are supplied.",
+            "real_depth_comparable is true only when a selected media row supplies real_capture=true depth references.",
         ],
     }
 
@@ -1624,17 +1627,21 @@ def build_summary(args: argparse.Namespace) -> dict[str, Any]:
     )
 
     comparable_count = sum(1 for record in records if record.get("comparable") is True)
+    depth_comparable_count = sum(1 for record in records if record.get("depth_comparable") is True)
     if not sim_expected_points:
         status = "missing_sim_metadata_native_depth_view"
         ok = False
     elif not records:
         status = "missing_real_reference_media"
         ok = True
+    elif depth_comparable_count == len(records):
+        status = "real_depth_comparable"
+        ok = True
     elif comparable_count == len(records):
-        status = "projection_comparable"
+        status = "missing_real_depth_reference"
         ok = True
     else:
-        status = "missing_real_calibration"
+        status = "missing_real_depth_reference"
         ok = True
 
     aggregate_missing_inputs = sorted(
@@ -1691,7 +1698,7 @@ def build_summary(args: argparse.Namespace) -> dict[str, Any]:
         "real_reference_media_count": len(records),
         "comparable_count": comparable_count,
         "projection_comparable_count": comparable_count,
-        "depth_comparable_count": sum(1 for record in records if record.get("depth_comparable") is True),
+        "depth_comparable_count": depth_comparable_count,
         "sidecar_valid_count": sidecar_valid_count,
         "sidecar_invalid_count": sidecar_invalid_count,
         "sidecar_missing_count": sidecar_missing_count,
@@ -1714,7 +1721,7 @@ def build_summary(args: argparse.Namespace) -> dict[str, Any]:
         "records": records,
         "notes": [
             "This is a hardware-free intake artifact. It does not open a camera, connect motors, or infer real depth.",
-            "status=missing_real_calibration is expected until real intrinsics plus board pose/extrinsics are supplied.",
+            "status=missing_real_depth_reference is expected until real_capture=true intrinsics, board pose/extrinsics, and depth references are supplied.",
             "The PNG is a side-by-side contact sheet, not a calibrated overlay, when calibration inputs are missing.",
             "Residual JSON/CSV/overlay files are emitted only when non-example real_capture sidecars pass the gate.",
         ],
