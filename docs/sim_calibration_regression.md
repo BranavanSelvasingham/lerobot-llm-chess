@@ -47,6 +47,32 @@ simulator-only limitations in `mm` and `px`. It does not update calibration
 constants, run the full evidence bundle, open real cameras, move motors, or
 exercise UI/OpenAI paths.
 
+For a hardware-free inverse-kinematics and reachability feasibility drill around
+SO-101 chess pick waypoints without running motors:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_ik_reachability_drill.py --output-dir /private/tmp/lerobot_sim/ik_reachability_drill
+```
+
+That writes `/private/tmp/lerobot_sim/ik_reachability_drill/ik_reachability_drill_summary.json`,
+`/private/tmp/lerobot_sim/ik_reachability_drill/ik_reachability_drill_rows.csv`,
+and `/private/tmp/lerobot_sim/ik_reachability_drill/ik_reachability_drill_heatmap.png`.
+The drill samples deterministic absolute targets, `delta_xyz` moves, and radial
+end-effector commands around synthetic board/chess-piece pick waypoints. Rows
+report per-command feasibility, violated envelope or joint-limit checks,
+`unknown_fields`, and either model-backed IK residuals or explicit
+`model_unavailable`/`missing_model` diagnostics when no repo-local URDF-backed
+SO-101 kinematic model is available.
+
+When the repo has no usable SO-101 URDF or MuJoCo/MJCF source, the script still
+passes with `status: "model_unavailable_fallback_complete"` and records a
+structured `model_diagnostic` inventory plus `next_model_inputs_needed`. In
+that state, `unknown_model_unavailable` rows mean the command stayed inside the
+documented command envelope and joint-limit proxies, not that true physical IK,
+collision safety, or Cartesian reachability were solved. `blocked` rows are the
+ones that already fail the fallback envelope, z-range, step-size, or joint-limit
+checks before any future hardware execution should be attempted.
+
 ```bash
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_camera_pose_fixture.py --output-dir /private/tmp/lerobot_sim/sim_camera_pose_fixture
 ```
