@@ -10,6 +10,7 @@ from typing import Any
 
 SCHEMA = "lerobot.sim.calibration_artifact_index.v1"
 CATEGORY_ORDER = {
+    "evidence_bundle": 0,
     "real_reference_media": 0,
     "reference_capture_checklist": 1,
     "visual_review": 2,
@@ -1458,6 +1459,48 @@ def collect_log_artifacts(
             )
 
 
+def collect_evidence_bundle_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    evidence_bundle = suite.get("evidence_bundle")
+    evidence_bundle = evidence_bundle if isinstance(evidence_bundle, dict) else {}
+    metrics = {
+        "status": evidence_bundle.get("status"),
+        "ok": evidence_bundle.get("ok"),
+        "real_depth_reference_status": evidence_bundle.get("real_depth_reference_status"),
+        "missing_required_artifact_count": evidence_bundle.get("missing_required_artifact_count"),
+        "capture_plan": evidence_bundle.get("capture_plan"),
+    }
+    add_path(
+        artifacts,
+        category="evidence_bundle",
+        label="evidence_bundle:markdown",
+        value=evidence_bundle.get("markdown_path") or evidence_bundle.get("output_md"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="evidence_bundle.markdown_path",
+        metrics=metrics,
+    )
+    add_path(
+        artifacts,
+        category="evidence_bundle",
+        label="evidence_bundle:json",
+        value=evidence_bundle.get("summary_path") or evidence_bundle.get("output_json"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+        source="evidence_bundle.summary_path",
+        metrics=metrics,
+    )
+    return evidence_bundle
+
+
 def sort_artifacts(artifacts: list[dict[str, Any]]) -> list[dict[str, Any]]:
     unique: dict[tuple[str, str, str], dict[str, Any]] = {}
     for artifact in artifacts:
@@ -1491,6 +1534,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         repo_root=repo_root,
         source="suite_summary",
         metrics={"status": suite.get("status"), "ok": suite.get("ok")},
+    )
+    evidence_bundle = collect_evidence_bundle_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
     )
 
     comparison_set_summary = None
@@ -1634,6 +1684,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
             "aggregate_status": suite.get("aggregate_status"),
         },
         "reference_media_manifest": suite.get("reference_media_manifest"),
+        "evidence_bundle": evidence_bundle,
         "selected_real_reference_media": selected_media,
         "reference_capture_checklist": reference_capture_checklist,
         "real_projection_intake": real_projection_intake,
