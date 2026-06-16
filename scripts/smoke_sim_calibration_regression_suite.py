@@ -234,6 +234,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `so101_model_contract/so101_model_contract_summary.json`",
         "- `so101_model_contract/so101_model_contract_checklist.csv`",
         "- `so101_model_contract/README.md`",
+        "- `so101_model_contract/so101_model_asset_preflight/so101_model_asset_preflight_summary.json`",
+        "- `so101_model_contract/so101_model_asset_preflight/so101_model_asset_preflight_assets.csv`",
+        "- `so101_model_contract/so101_model_asset_preflight/README.md`",
         "- `ik_reachability_drill/ik_reachability_drill_summary.json`",
         "- `ik_reachability_drill/ik_reachability_drill_rows.csv`",
         "- `ik_reachability_drill/ik_reachability_drill_heatmap.png`",
@@ -928,6 +931,8 @@ def so101_model_contract_section(contract: dict[str, Any] | None, summary_path: 
     expected_contract = expected_contract if isinstance(expected_contract, dict) else {}
     artifacts = contract.get("artifacts")
     artifacts = artifacts if isinstance(artifacts, dict) else {}
+    asset_preflight = contract.get("model_asset_preflight")
+    asset_preflight = asset_preflight if isinstance(asset_preflight, dict) else {}
     missing_alignment_inputs = contract.get("model_to_sim_alignment_inputs_missing")
     missing_alignment_inputs = missing_alignment_inputs if isinstance(missing_alignment_inputs, list) else []
     return {
@@ -954,6 +959,19 @@ def so101_model_contract_section(contract: dict[str, Any] | None, summary_path: 
         },
         "target_frame": expected_contract.get("target_frame"),
         "body_joints": expected_contract.get("body_joints"),
+        "model_asset_preflight": {
+            "status": asset_preflight.get("status"),
+            "ok": asset_preflight.get("ok"),
+            "model_request_status": asset_preflight.get("model_request_status"),
+            "mesh_reference_count": asset_preflight.get("mesh_reference_count"),
+            "present_asset_count": asset_preflight.get("present_asset_count"),
+            "missing_asset_count": asset_preflight.get("missing_asset_count"),
+            "unresolved_reference_count": asset_preflight.get("unresolved_reference_count"),
+            "missing_assets": asset_preflight.get("missing_assets"),
+            "unresolved_references": asset_preflight.get("unresolved_references"),
+            "diagnostics": asset_preflight.get("diagnostics"),
+            "artifacts": asset_preflight.get("artifacts"),
+        },
         "missing_alignment_input_count": len(missing_alignment_inputs),
         "missing_alignment_inputs": missing_alignment_inputs,
         "artifacts": {

@@ -65,3 +65,9 @@ Missing or unresolved mesh assets are a contract blocker, not a failing smoke
 test. The checker records them as evidence and skips optional
 `RobotKinematics` initialization so the first reported cause is the asset
 preflight result rather than a later placo mesh-loading exception.
+
+When the full simulator calibration regression suite runs this checker, it
+mirrors `model_asset_preflight` into the suite summary and indexes the nested
+summary/CSV/README as `so101_model_asset_preflight` artifacts. The rendered
+artifact report shows this section before IK reachability with mesh, present,
+missing, and unresolved counts.

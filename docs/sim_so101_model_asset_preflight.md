@@ -82,3 +82,14 @@ High-signal JSON fields:
 The CSV is row-level evidence for each discovered mesh reference. A synthetic
 URDF with one present mesh and one missing mesh should produce one
 `resolution_status: "present"` row and one `resolution_status: "missing"` row.
+
+## Full Suite Surface
+
+The full simulator calibration regression suite does not rerun separate asset
+preflight work. It surfaces the model contract checker's nested
+`model_asset_preflight` block under
+`calibration_regression_summary.json.so101_model_contract.model_asset_preflight`
+and indexes the child summary/CSV/README in the
+`so101_model_asset_preflight` artifact category. In
+`artifact_index_report.md`, this category appears before IK reachability so
+missing mesh/assets are visible before model-backed residual evidence.
