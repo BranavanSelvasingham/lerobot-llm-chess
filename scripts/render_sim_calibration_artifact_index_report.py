@@ -14,6 +14,7 @@ DEFAULT_REPORT_NAME = "artifact_index_report.md"
 CATEGORY_ORDER = {
     "reference_media_inventory": 0,
     "real_reference_media": 1,
+    "reference_media_comparison": 2,
     "reference_capture_checklist": 2,
     "visual_review": 3,
     "real_reference_comparison": 4,
@@ -35,6 +36,7 @@ CATEGORY_ORDER = {
 CATEGORY_LABELS = {
     "reference_media_inventory": "Reference Media Inventory",
     "real_reference_media": "Real Reference Media",
+    "reference_media_comparison": "Reference Media Comparison",
     "reference_capture_checklist": "Reference Capture Checklist",
     "visual_review": "Visual Review Artifacts",
     "real_reference_comparison": "Real Reference Comparisons",
@@ -367,6 +369,40 @@ def selected_media_rows(index: dict[str, Any]) -> list[list[Any]]:
             ]
         )
     return rows
+
+
+def reference_media_comparison_signal(
+    index: dict[str, Any],
+    suite: dict[str, Any] | None,
+) -> dict[str, Any]:
+    comparison = index.get("reference_media_comparison")
+    if isinstance(comparison, dict) and comparison:
+        return comparison
+    if suite is not None and isinstance(suite.get("comparison_set"), dict):
+        return suite["comparison_set"]
+    return {}
+
+
+def reference_media_comparison_artifact_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("selected_candidate_count", ""),
+        metrics.get("selected_media_count", ""),
+        metrics.get("visual_comparison_count", ""),
+        metrics.get("contact_sheet_status", ""),
+        metrics.get("media_assets_copied_into_repo", ""),
+        metrics.get("external_selected_count", ""),
+        metrics.get("missing_depth_reference", ""),
+        metrics.get("missing_pick_place_video", ""),
+        metrics.get("no_videos", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
 
 
 def manifest_signal(index: dict[str, Any], suite: dict[str, Any] | None) -> dict[str, Any]:
@@ -1223,6 +1259,59 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
     else:
         lines.append("")
         lines.append("_No inventory visibility gaps were available from the suite summary._")
+
+    lines.extend(["", "## Reference Media Comparison"])
+    reference_comparison = reference_media_comparison_signal(index, suite)
+    reference_comparison_artifacts = grouped.get("reference_media_comparison", [])
+    lines.extend(
+        table(
+            ["Field", "Value"],
+            [
+                ["status", reference_comparison.get("status", "")],
+                ["selected_candidate_count", reference_comparison.get("selected_candidate_count", "")],
+                ["selected_media_count", reference_comparison.get("selected_media_count", "")],
+                ["visual_comparison_count", reference_comparison.get("visual_comparison_count", "")],
+                ["failed_comparison_count", reference_comparison.get("failed_comparison_count", "")],
+                ["contact_sheet_status", reference_comparison.get("contact_sheet_status", "")],
+                ["contact_sheet_path", reference_comparison.get("contact_sheet_path", "")],
+                [
+                    "media_assets_copied_into_repo",
+                    reference_comparison.get("media_assets_copied_into_repo", ""),
+                ],
+                ["external_selected_count", reference_comparison.get("external_selected_count", "")],
+                ["missing_depth_reference", reference_comparison.get("missing_depth_reference", "")],
+                ["missing_pick_place_video", reference_comparison.get("missing_pick_place_video", "")],
+                ["no_videos", reference_comparison.get("no_videos", "")],
+                ["summary_path", reference_comparison.get("summary_path", "")],
+                ["csv_path", reference_comparison.get("csv_path", "")],
+                ["readme_path", reference_comparison.get("readme_path", "")],
+            ],
+        )
+    )
+    lines.append("")
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Comparison Status",
+                "Selected Candidates",
+                "Selected Media",
+                "Visual Comparisons",
+                "Contact Sheet",
+                "Copied Into Repo",
+                "External Selected",
+                "Missing Depth",
+                "Missing Pick/Place Video",
+                "No Videos",
+                "Artifact Status",
+            ],
+            [reference_media_comparison_artifact_row(row) for row in reference_comparison_artifacts],
+        )
+        if reference_comparison_artifacts
+        else ["_No reference media comparison artifacts indexed._"]
+    )
 
     lines.extend(["", "## Reference Capture Checklist"])
     checklist = reference_capture_checklist_signal(index, suite)

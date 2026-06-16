@@ -609,6 +609,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         if isinstance(summary.get("inventory"), dict)
         else {}
     )
+    comparison_set = summary.get("comparison_set")
+    comparison_set = comparison_set if isinstance(comparison_set, dict) else {}
     reference_inventory_counts_row = reference_media_inventory_counts(reference_inventory)
     reference_gap_ids = {
         str(gap) for gap in reference_inventory_counts_row.get("reference_gaps", []) if gap
@@ -667,6 +669,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         f"- `{REFERENCE_MEDIA_INVENTORY_DIR_NAME}/{REFERENCE_MEDIA_INVENTORY_CSV_NAME}`",
         f"- `{REFERENCE_MEDIA_INVENTORY_DIR_NAME}/{REFERENCE_MEDIA_INVENTORY_README_NAME}`",
         "- `comparison_set/comparison_set_summary.json`",
+        "- `comparison_set/reference_media_comparison_rows.csv`",
+        "- `comparison_set/README.md`",
+        "- `comparison_set/reference_media_comparison_contact_sheet.png` when produced",
         "- `session/session_summary.json`",
         "- `fixture/fixture_summary.json`",
         "- `sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json`",
@@ -747,6 +752,22 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         (
             "- Reference media gaps: "
             f"`{markdown_list_value(reference_inventory_counts_row.get('reference_gaps'))}`."
+        ),
+        (
+            "- Reference media comparison: "
+            f"status `{comparison_set.get('status')}`; selected candidates "
+            f"`{comparison_set.get('selected_candidate_count')}`; selected media "
+            f"`{comparison_set.get('selected_media_count')}`; visual comparisons "
+            f"`{comparison_set.get('visual_comparison_count')}`; contact sheet "
+            f"`{comparison_set.get('contact_sheet_status')}`."
+        ),
+        (
+            "- Reference media comparison diagnostics: media assets copied into repo "
+            f"`{markdown_bool(comparison_set.get('media_assets_copied_into_repo'))}`; "
+            f"external selected `{comparison_set.get('external_selected_count')}`; "
+            f"missing depth `{markdown_bool(comparison_set.get('missing_depth_reference'))}`; "
+            f"missing pick/place video `{markdown_bool(comparison_set.get('missing_pick_place_video'))}`; "
+            f"no videos `{markdown_bool(comparison_set.get('no_videos'))}`."
         ),
         "- Reference capture checklist status: "
         f"`{summary.get('reference_capture_checklist', {}).get('status')}`.",
@@ -1035,6 +1056,92 @@ def comparison_artifacts(summary: dict[str, Any] | None) -> list[dict[str, Any]]
             }
         )
     return rows
+
+
+def reference_media_comparison_artifact_paths(
+    comparison: dict[str, Any] | None,
+    comparison_dir: Path,
+    summary_path: Path,
+) -> dict[str, str | None]:
+    comparison = comparison if isinstance(comparison, dict) else {}
+    artifacts = comparison.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    return {
+        "summary_json": str(artifacts.get("summary_json") or summary_path),
+        "csv_rows": str(artifacts.get("csv_rows") or comparison_dir / "reference_media_comparison_rows.csv"),
+        "readme_md": str(artifacts.get("readme_md") or comparison_dir / "README.md"),
+        "contact_sheet_png": (
+            str(artifacts.get("contact_sheet_png"))
+            if isinstance(artifacts.get("contact_sheet_png"), str)
+            else None
+        ),
+    }
+
+
+def reference_media_comparison_diagnostics(
+    comparison: dict[str, Any] | None,
+    comparison_dir: Path,
+    summary_path: Path,
+) -> dict[str, Any]:
+    comparison = comparison if isinstance(comparison, dict) else {}
+    diagnostics = comparison.get("diagnostics")
+    diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+    contact_sheet = comparison.get("contact_sheet")
+    contact_sheet = contact_sheet if isinstance(contact_sheet, dict) else {}
+    artifact_paths = reference_media_comparison_artifact_paths(
+        comparison,
+        comparison_dir,
+        summary_path,
+    )
+    return {
+        "summary_path": artifact_paths["summary_json"],
+        "csv_path": artifact_paths["csv_rows"],
+        "readme_path": artifact_paths["readme_md"],
+        "artifact_paths": artifact_paths,
+        "status": comparison.get("status"),
+        "ok": comparison.get("ok"),
+        "selected_candidate_count": comparison.get("selected_candidate_count"),
+        "selected_media_count": comparison.get("selected_media_count"),
+        "visual_comparison_count": comparison.get("visual_comparison_count"),
+        "failed_comparison_count": comparison.get("failed_comparison_count"),
+        "skipped_media_count": comparison.get("skipped_media_count"),
+        "contact_sheet_path": contact_sheet.get("path") or artifact_paths["contact_sheet_png"],
+        "contact_sheet_status": contact_sheet.get("status"),
+        "contact_sheet_produced": contact_sheet.get("produced"),
+        "media_assets_copied_into_repo": diagnostics.get("media_assets_copied_into_repo", False),
+        "external_selected_count": diagnostics.get("external_selected_count"),
+        "missing_depth_reference": diagnostics.get("missing_depth_reference"),
+        "missing_pick_place_video": diagnostics.get("missing_pick_place_video"),
+        "no_videos": diagnostics.get("no_videos"),
+        "videos_present": diagnostics.get("videos_present"),
+        "reference_gaps": diagnostics.get("reference_gaps"),
+        "render_dependencies": diagnostics.get("render_dependencies"),
+        "diagnostics": diagnostics,
+    }
+
+
+def reference_media_comparison_section(
+    comparison: dict[str, Any] | None,
+    comparison_dir: Path,
+    summary_path: Path,
+) -> dict[str, Any]:
+    comparison = comparison if isinstance(comparison, dict) else {}
+    diagnostics = reference_media_comparison_diagnostics(comparison, comparison_dir, summary_path)
+    return {
+        **diagnostics,
+        "output_dir": str(comparison_dir),
+        "inventory_json_path": comparison.get("inventory_json_path"),
+        "inventory_summary": comparison.get("inventory_summary"),
+        "selection_rules": comparison.get("selection_rules"),
+        "selected_candidates": comparison.get("selected_candidates"),
+        "selected_media": comparison.get("selected_media"),
+        "skipped_media": comparison.get("skipped_media"),
+        "visibility_gaps": comparison.get("visibility_gaps"),
+        "comparisons": comparison.get("comparisons"),
+        "contact_sheet": comparison.get("contact_sheet"),
+        "artifacts": comparison_artifacts(comparison),
+        "notes": comparison.get("notes"),
+    }
 
 
 def manifest_status_section(
@@ -1960,6 +2067,11 @@ def main() -> int:
     else:
         comparison_record = skipped_child("comparison_set", "inventory JSON was not available", comparison_summary_path)
         comparison = None
+    comparison_record["diagnostics"] = reference_media_comparison_diagnostics(
+        comparison,
+        comparison_dir,
+        comparison_summary_path,
+    )
 
     session_dir = output_dir / "session"
     session_summary_path = session_dir / "session_summary.json"
@@ -2267,11 +2379,11 @@ def main() -> int:
             config=reference_media_config,
         ),
         "comparison_set": {
-            "summary_path": str(comparison_summary_path),
-            "status": comparison.get("status") if comparison else None,
-            "selected_media_count": comparison.get("selected_media_count") if comparison else None,
-            "failed_comparison_count": comparison.get("failed_comparison_count") if comparison else None,
-            "artifacts": comparison_artifacts(comparison),
+            **reference_media_comparison_section(
+                comparison,
+                comparison_dir,
+                comparison_summary_path,
+            ),
         },
         "calibration_session": {
             "summary_path": str(session_summary_path),

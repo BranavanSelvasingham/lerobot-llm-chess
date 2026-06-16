@@ -13,6 +13,7 @@ CATEGORY_ORDER = {
     "evidence_bundle": 0,
     "reference_media_inventory": 0,
     "real_reference_media": 1,
+    "reference_media_comparison": 2,
     "reference_capture_checklist": 2,
     "visual_review": 3,
     "real_reference_comparison": 4,
@@ -266,6 +267,114 @@ def collect_real_reference_media(
             }
         )
     return sorted(rows, key=lambda row: str(row.get("relative_path") or ""))
+
+
+def comparison_set_metrics(comparison_set: dict[str, Any] | None) -> dict[str, Any]:
+    comparison_set = comparison_set if isinstance(comparison_set, dict) else {}
+    diagnostics = comparison_set.get("diagnostics")
+    diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+    contact_sheet = comparison_set.get("contact_sheet")
+    contact_sheet = contact_sheet if isinstance(contact_sheet, dict) else {}
+    return {
+        "status": comparison_set.get("status"),
+        "ok": comparison_set.get("ok"),
+        "selected_candidate_count": comparison_set.get("selected_candidate_count"),
+        "selected_media_count": comparison_set.get("selected_media_count"),
+        "visual_comparison_count": comparison_set.get("visual_comparison_count"),
+        "failed_comparison_count": comparison_set.get("failed_comparison_count"),
+        "skipped_media_count": comparison_set.get("skipped_media_count"),
+        "contact_sheet_status": comparison_set.get("contact_sheet_status")
+        or contact_sheet.get("status"),
+        "contact_sheet_produced": comparison_set.get("contact_sheet_produced")
+        if comparison_set.get("contact_sheet_produced") is not None
+        else contact_sheet.get("produced"),
+        "contact_sheet_path": comparison_set.get("contact_sheet_path") or contact_sheet.get("path"),
+        "media_assets_copied_into_repo": comparison_set.get(
+            "media_assets_copied_into_repo",
+            diagnostics.get("media_assets_copied_into_repo"),
+        ),
+        "external_selected_count": comparison_set.get(
+            "external_selected_count",
+            diagnostics.get("external_selected_count"),
+        ),
+        "missing_depth_reference": comparison_set.get(
+            "missing_depth_reference",
+            diagnostics.get("missing_depth_reference"),
+        ),
+        "missing_pick_place_video": comparison_set.get(
+            "missing_pick_place_video",
+            diagnostics.get("missing_pick_place_video"),
+        ),
+        "no_videos": comparison_set.get("no_videos", diagnostics.get("no_videos")),
+        "videos_present": comparison_set.get("videos_present", diagnostics.get("videos_present")),
+        "reference_gaps": comparison_set.get("reference_gaps", diagnostics.get("reference_gaps")),
+        "render_dependencies": comparison_set.get(
+            "render_dependencies",
+            diagnostics.get("render_dependencies"),
+        ),
+    }
+
+
+def collect_reference_media_comparison_artifacts(
+    *,
+    suite: dict[str, Any],
+    comparison_set_summary: dict[str, Any] | None,
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    suite_comparison = (
+        suite.get("comparison_set") if isinstance(suite.get("comparison_set"), dict) else {}
+    )
+    comparison_set = (
+        comparison_set_summary
+        if isinstance(comparison_set_summary, dict) and comparison_set_summary
+        else suite_comparison
+    )
+    artifact_paths = comparison_set.get("artifact_paths")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    if not artifact_paths and isinstance(comparison_set.get("artifacts"), dict):
+        artifact_paths = comparison_set["artifacts"]
+    metrics = comparison_set_metrics(comparison_set)
+    paths = {
+        "summary_json": comparison_set.get("summary_path")
+        or comparison_set.get("comparison_set_summary_path")
+        or artifact_paths.get("summary_json"),
+        "csv_rows": comparison_set.get("csv_path") or artifact_paths.get("csv_rows"),
+        "readme_md": comparison_set.get("readme_path") or artifact_paths.get("readme_md"),
+        "contact_sheet_png": (
+            artifact_paths.get("contact_sheet_png")
+            if metrics.get("contact_sheet_produced") is True
+            else None
+        ),
+    }
+    for key, label_suffix in (
+        ("summary_json", "summary"),
+        ("csv_rows", "rows"),
+        ("readme_md", "readme"),
+        ("contact_sheet_png", "contact_sheet"),
+    ):
+        add_path(
+            artifacts,
+            category="reference_media_comparison",
+            label=f"reference_media_comparison:{label_suffix}",
+            value=paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"comparison_set.artifact_paths.{key}",
+            metrics=metrics,
+        )
+    return {
+        **metrics,
+        "summary_path": paths.get("summary_json"),
+        "csv_path": paths.get("csv_rows"),
+        "readme_path": paths.get("readme_md"),
+        "contact_sheet_path": metrics.get("contact_sheet_path") or paths.get("contact_sheet_png"),
+        "artifact_paths": paths,
+        "diagnostics": comparison_set.get("diagnostics"),
+    }
 
 
 def reference_media_inventory_from_suite(suite: dict[str, Any]) -> dict[str, Any]:
@@ -2030,6 +2139,14 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    reference_media_comparison = collect_reference_media_comparison_artifacts(
+        suite=suite,
+        comparison_set_summary=comparison_set_summary,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
 
     reference_media_inventory = collect_reference_media_inventory_artifacts(
         suite=suite,
@@ -2207,6 +2324,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "reference_media_manifest": suite.get("reference_media_manifest"),
         "evidence_bundle": evidence_bundle,
         "reference_media_inventory": reference_media_inventory,
+        "reference_media_comparison": reference_media_comparison,
         "selected_real_reference_media": selected_media,
         "reference_capture_checklist": reference_capture_checklist,
         "real_projection_intake": real_projection_intake,
