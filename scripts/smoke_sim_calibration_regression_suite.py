@@ -19,6 +19,9 @@ ARTIFACT_REPORT_NAME = "artifact_index_report.md"
 VISUAL_REVIEW_SUMMARY_NAME = "visual_review_summary.json"
 REFERENCE_CAPTURE_CHECKLIST_NAME = "reference_capture_checklist.json"
 REAL_PROJECTION_INTAKE_NAME = "real_projection_intake.json"
+EVIDENCE_BUNDLE_DIR_NAME = "evidence_bundle"
+EVIDENCE_BUNDLE_MD_NAME = "sim_evidence_bundle.md"
+EVIDENCE_BUNDLE_JSON_NAME = "sim_evidence_bundle.json"
 BASELINE_CORNERS = [[32, 338], [594, 340], [540, 20], [86, 12]]
 PERTURBED_CORNERS = [[34, 337], [592, 342], [538, 22], [88, 14]]
 
@@ -96,6 +99,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "# Simulator Calibration Regression Artifacts",
         "",
         f"Open `{ARTIFACT_REPORT_NAME}` first. It is the review report for this artifact bundle.",
+        f"Open `{EVIDENCE_BUNDLE_DIR_NAME}/{EVIDENCE_BUNDLE_MD_NAME}` for the focused "
+        "depth-calibration evidence bundle.",
         "For image-first inspection, open `visual_review/gripper_camera_pov_annotated_contact_sheet.png` "
         "and `visual_review/pick_place_sequence_distance_annotated_contact_sheet.png`.",
         "",
@@ -103,6 +108,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "",
         "- `calibration_regression_summary.json`",
         "- `artifact_index.json`",
+        f"- `{EVIDENCE_BUNDLE_DIR_NAME}/{EVIDENCE_BUNDLE_MD_NAME}`",
+        f"- `{EVIDENCE_BUNDLE_DIR_NAME}/{EVIDENCE_BUNDLE_JSON_NAME}`",
         "- `inventory/reference_media_inventory.json`",
         "- `comparison_set/comparison_set_summary.json`",
         "- `session/session_summary.json`",
@@ -828,6 +835,51 @@ def real_projection_intake_section(intake: dict[str, Any] | None, summary_path: 
     }
 
 
+def evidence_bundle_section(bundle: dict[str, Any] | None, bundle_dir: Path) -> dict[str, Any]:
+    bundle = bundle if isinstance(bundle, dict) else {}
+    output_md = bundle.get("output_md")
+    output_json = bundle.get("output_json")
+    return {
+        "summary_path": str(bundle_dir / EVIDENCE_BUNDLE_JSON_NAME),
+        "markdown_path": str(bundle_dir / EVIDENCE_BUNDLE_MD_NAME),
+        "output_dir": str(bundle_dir),
+        "ok": bool(bundle.get("ok", False)),
+        "status": bundle.get("status"),
+        "output_md": output_md if isinstance(output_md, str) else str(bundle_dir / EVIDENCE_BUNDLE_MD_NAME),
+        "output_json": (
+            output_json
+            if isinstance(output_json, str)
+            else str(bundle_dir / EVIDENCE_BUNDLE_JSON_NAME)
+        ),
+        "real_depth_reference_status": (
+            bundle.get("summaries", {})
+            .get("real_depth_reference", {})
+            .get("status")
+            if isinstance(bundle.get("summaries"), dict)
+            else None
+        ),
+        "missing_required_artifact_count": len(bundle.get("missing_required_artifacts", []))
+        if isinstance(bundle.get("missing_required_artifacts"), list)
+        else None,
+        "capture_plan": {
+            "json_supplied": any(
+                row.get("key") == "capture_plan_json" and row.get("status") == "available"
+                for row in bundle.get("artifacts", [])
+                if isinstance(row, dict)
+            )
+            if isinstance(bundle.get("artifacts"), list)
+            else False,
+            "markdown_supplied": any(
+                row.get("key") == "capture_plan_md" and row.get("status") == "available"
+                for row in bundle.get("artifacts", [])
+                if isinstance(row, dict)
+            )
+            if isinstance(bundle.get("artifacts"), list)
+            else False,
+        },
+    }
+
+
 def run_negative_empty_inventory(
     *,
     args: argparse.Namespace,
@@ -1174,6 +1226,11 @@ def main() -> int:
             "real_reference_media_count": None,
             "comparable_count": None,
         },
+        "evidence_bundle": {
+            "summary_path": str(output_dir / EVIDENCE_BUNDLE_DIR_NAME / EVIDENCE_BUNDLE_JSON_NAME),
+            "markdown_path": str(output_dir / EVIDENCE_BUNDLE_DIR_NAME / EVIDENCE_BUNDLE_MD_NAME),
+            "status": None,
+        },
         "artifact_index": {
             "path": str(artifact_index_path),
             "status": None,
@@ -1305,6 +1362,34 @@ def main() -> int:
         visual_review_refresh,
         visual_review_summary_path,
     )
+    write_json(summary_path, summary)
+
+    evidence_bundle_dir = output_dir / EVIDENCE_BUNDLE_DIR_NAME
+    evidence_bundle_json_path = evidence_bundle_dir / EVIDENCE_BUNDLE_JSON_NAME
+    evidence_bundle_record, evidence_bundle = run_child(
+        name="evidence_bundle",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "render_sim_evidence_bundle.py"),
+            str(summary_path),
+            "--output-dir",
+            str(evidence_bundle_dir),
+        ],
+        output_dir=evidence_bundle_dir,
+        expected_json_path=evidence_bundle_json_path,
+    )
+    child_records["evidence_bundle"] = evidence_bundle_record
+    required_ok = all(record["ok"] for record in child_records.values())
+    summary["ok"] = required_ok
+    summary["status"] = "ok" if required_ok else "validation_failed"
+    summary["aggregate_status"] = {
+        "ok": required_ok,
+        "failed_children": [
+            name for name, record in child_records.items() if not bool(record.get("ok"))
+        ],
+    }
+    summary["child_commands"] = child_records
+    summary["evidence_bundle"] = evidence_bundle_section(evidence_bundle, evidence_bundle_dir)
     write_json(summary_path, summary)
 
     artifact_index_record, artifact_index = run_child(
