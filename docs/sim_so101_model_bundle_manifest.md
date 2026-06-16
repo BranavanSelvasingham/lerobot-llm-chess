@@ -181,6 +181,10 @@ license/provenance review. The manifest checker does not scan roots or infer
 authority from `--ik-model-path`; it consumes the reviewed result as a single
 declared bundle.
 
+Current local hardware-free evidence for the visible sibling SO-101 candidate is
+recorded in the
+[SO-101 real model probe report](sim_so101_real_model_probe_report.md).
+
 The probe/generator sits between the inventory and the reviewed manifest. Use
 the inventory to find likely local model files, use the probe to turn a selected
 candidate plus separate mesh roots into a reviewed-manifest draft with contract
