@@ -23,6 +23,7 @@ EVIDENCE_BUNDLE_DIR_NAME = "evidence_bundle"
 EVIDENCE_BUNDLE_MD_NAME = "sim_evidence_bundle.md"
 EVIDENCE_BUNDLE_JSON_NAME = "sim_evidence_bundle.json"
 IK_REACHABILITY_SUMMARY_NAME = "ik_reachability_drill_summary.json"
+SO101_MODEL_SOURCE_INVENTORY_SUMMARY_NAME = "so101_model_source_inventory_summary.json"
 SO101_MODEL_CONTRACT_SUMMARY_NAME = "so101_model_contract_summary.json"
 BASELINE_CORNERS = [[32, 338], [594, 340], [540, 20], [86, 12]]
 PERTURBED_CORNERS = [[34, 337], [592, 342], [538, 22], [88, 14]]
@@ -127,6 +128,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `session/session_summary.json`",
         "- `fixture/fixture_summary.json`",
         "- `sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json`",
+        "- `so101_model_source_inventory/so101_model_source_inventory_summary.json`",
+        "- `so101_model_source_inventory/so101_model_source_candidates.csv`",
+        "- `so101_model_source_inventory/README.md`",
         "- `so101_model_contract/so101_model_contract_summary.json`",
         "- `so101_model_contract/so101_model_contract_checklist.csv`",
         "- `so101_model_contract/README.md`",
@@ -193,6 +197,12 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         (
             "- Gripper-camera POV evidence records target center, projected square geometry, "
             "gripper opening, and synthetic visibility/occlusion/clearance rows."
+        ),
+        (
+            "- SO-101 model-source inventory evidence records repo-local model-source "
+            "candidate counts, authoritative-source status, provenance/license diagnostics, "
+            "and a recommended contract-check candidate only when one is discovered; "
+            "`--ik-model-path` is not treated as authoritative by this inventory gate."
         ),
         (
             "- SO-101 model contract evidence records model availability, direct "
@@ -849,6 +859,52 @@ def so101_model_contract_section(contract: dict[str, Any] | None, summary_path: 
     }
 
 
+def so101_model_source_inventory_section(
+    inventory: dict[str, Any] | None,
+    summary_path: Path,
+) -> dict[str, Any]:
+    inventory = inventory if isinstance(inventory, dict) else {}
+    artifacts = inventory.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    recommended_contract_check = inventory.get("recommended_contract_check")
+    recommended_contract_check = (
+        recommended_contract_check
+        if isinstance(recommended_contract_check, dict)
+        else None
+    )
+    diagnostics = inventory.get("diagnostics")
+    diagnostics = diagnostics if isinstance(diagnostics, list) else []
+    return {
+        "summary_path": str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(inventory.get("ok", False)),
+        "status": inventory.get("status"),
+        "candidate_count": inventory.get("candidate_count"),
+        "likely_candidate_count": inventory.get("likely_candidate_count"),
+        "direct_contract_candidate_count": inventory.get("direct_contract_candidate_count"),
+        "authoritative_candidate_count": inventory.get("authoritative_candidate_count"),
+        "root_count": inventory.get("root_count"),
+        "recommended_contract_check": recommended_contract_check,
+        "recommended_contract_check_path": (
+            recommended_contract_check.get("candidate_path")
+            if recommended_contract_check
+            else None
+        ),
+        "diagnostics": diagnostics,
+        "artifacts": {
+            "summary_json": artifacts.get("summary_json")
+            if isinstance(artifacts.get("summary_json"), str)
+            else str(summary_path),
+            "candidates_csv": artifacts.get("candidates_csv"),
+            "readme_md": artifacts.get("readme_md"),
+        },
+        "hardware_skipped": inventory.get("hardware_skipped"),
+        "gui_skipped": inventory.get("gui_skipped"),
+        "openai_skipped": inventory.get("openai_skipped"),
+        "limitations": inventory.get("limitations"),
+    }
+
+
 def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
     visual_review = visual_review if isinstance(visual_review, dict) else {}
     contact_sheets = visual_review.get("contact_sheets")
@@ -1181,6 +1237,22 @@ def main() -> int:
         expected_json_path=pose_fixture_summary_path,
     )
 
+    so101_model_source_inventory_dir = output_dir / "so101_model_source_inventory"
+    so101_model_source_inventory_summary_path = (
+        so101_model_source_inventory_dir / SO101_MODEL_SOURCE_INVENTORY_SUMMARY_NAME
+    )
+    so101_model_source_inventory_record, so101_model_source_inventory = run_child(
+        name="so101_model_source_inventory",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_so101_model_source_inventory.py"),
+            "--output-dir",
+            str(so101_model_source_inventory_dir),
+        ],
+        output_dir=so101_model_source_inventory_dir,
+        expected_json_path=so101_model_source_inventory_summary_path,
+    )
+
     so101_model_contract_dir = output_dir / "so101_model_contract"
     so101_model_contract_summary_path = so101_model_contract_dir / SO101_MODEL_CONTRACT_SUMMARY_NAME
     so101_model_contract_command = [
@@ -1287,6 +1359,7 @@ def main() -> int:
         "calibration_session_report": session_record,
         "perception_regression_fixture": fixture_record,
         "sim_camera_pose_fixture": pose_fixture_record,
+        "so101_model_source_inventory": so101_model_source_inventory_record,
         "so101_model_contract": so101_model_contract_record,
         "ik_reachability_drill": ik_reachability_record,
         "gripper_camera_pov_review": pov_record,
@@ -1360,6 +1433,10 @@ def main() -> int:
         "sim_camera_pose_fixture": sim_camera_pose_fixture_section(
             pose_fixture,
             pose_fixture_summary_path,
+        ),
+        "so101_model_source_inventory": so101_model_source_inventory_section(
+            so101_model_source_inventory,
+            so101_model_source_inventory_summary_path,
         ),
         "so101_model_contract": so101_model_contract_section(
             so101_model_contract,

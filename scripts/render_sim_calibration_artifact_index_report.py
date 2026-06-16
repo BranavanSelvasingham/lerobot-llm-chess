@@ -20,13 +20,14 @@ CATEGORY_ORDER = {
     "ranked_candidate": 5,
     "perception_fixture": 6,
     "sim_camera_pose_fixture": 7,
-    "so101_model_contract": 8,
-    "ik_reachability": 9,
-    "gripper_camera_pov": 10,
-    "app_entrypoint": 11,
-    "pick_place_scenario": 12,
-    "negative_check": 13,
-    "logs": 14,
+    "so101_model_source_inventory": 8,
+    "so101_model_contract": 9,
+    "ik_reachability": 10,
+    "gripper_camera_pov": 11,
+    "app_entrypoint": 12,
+    "pick_place_scenario": 13,
+    "negative_check": 14,
+    "logs": 15,
 }
 CATEGORY_LABELS = {
     "real_reference_media": "Real Reference Media",
@@ -37,6 +38,7 @@ CATEGORY_LABELS = {
     "ranked_candidate": "Ranked Candidate Captures",
     "perception_fixture": "Perception Fixture Evidence",
     "sim_camera_pose_fixture": "SimCamera Pose Fixture",
+    "so101_model_source_inventory": "SO-101 Model Source Inventory",
     "so101_model_contract": "SO-101 Model Contract",
     "ik_reachability": "IK Reachability Drill",
     "gripper_camera_pov": "Gripper-Camera POV Review",
@@ -763,6 +765,24 @@ def so101_model_contract_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("robot_kinematics_directly_usable", ""),
         metrics.get("target_frame", ""),
         metrics.get("missing_alignment_input_count", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def so101_model_source_inventory_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("candidate_count", ""),
+        metrics.get("likely_candidate_count", ""),
+        metrics.get("direct_contract_candidate_count", ""),
+        metrics.get("authoritative_candidate_count", ""),
+        metrics.get("recommended_contract_check_path", ""),
         "ok" if artifact.get("exists") is True else "missing",
     ]
 
@@ -1494,6 +1514,34 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         else ["_No SimCamera pose fixture artifacts indexed._"]
     )
 
+    so101_model_source_inventory = grouped.get("so101_model_source_inventory", [])
+    lines.extend(["", "### SO-101 Model Source Inventory"])
+    lines.append(
+        "This hardware-free child scans repo-local model-source roots before the model "
+        "contract checker, records candidate/provenance/authority counts, and keeps "
+        "`missing_authoritative_model` as a successful diagnostic when no reviewed "
+        "authoritative source exists."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Candidates",
+                "Likely",
+                "Direct Contract",
+                "Authoritative",
+                "Recommended Contract Path",
+                "Artifact Status",
+            ],
+            [so101_model_source_inventory_row(row) for row in so101_model_source_inventory],
+        )
+        if so101_model_source_inventory
+        else ["_No SO-101 model source inventory artifacts indexed._"]
+    )
+
     so101_model_contract = grouped.get("so101_model_contract", [])
     lines.extend(["", "### SO-101 Model Contract"])
     lines.append(
@@ -1652,6 +1700,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "- This report is a deterministic Markdown view of existing JSON artifacts only.",
             "- Visual review contact sheets are generated PNGs from existing suite frames and are the stable first-pass visual evidence.",
             "- The pick/place visual sequence is simulator-only evidence for approach, grasp/contact, lift/transfer, place/release, and retreat review.",
+            "- The SO-101 model-source inventory is a hardware-free provenance preflight; `missing_authoritative_model` is a successful explicit diagnostic, and `--ik-model-path` is not automatically treated as authoritative.",
             "- The SO-101 model contract checker is a hardware-free preflight for model availability, direct RobotKinematics usability, and joint/frame/TCP alignment inputs.",
             "- The IK reachability drill is a hardware-free feasibility gate; `model_unavailable_fallback_complete` remains a deliberate non-failing status until a repo-local SO-101 model is wired in.",
             "- The metadata-native projection/depth view is the simulator camera-model-aligned ground-truth artifact; rendered-overlay PnP diagnostics are source-mismatch evidence, not depth authority.",

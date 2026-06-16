@@ -14,6 +14,13 @@ The script writes:
 
 It exits `0` even when no candidates exist. In that state the JSON reports `ok: true`, `status: "missing_authoritative_model"`, `candidate_count: 0`, `authoritative_candidate_count: 0`, and a `missing_authoritative_model` diagnostic listing the source inputs still required.
 
+The full hardware-free simulator calibration regression suite now runs this
+inventory automatically under `so101_model_source_inventory/` before
+`smoke_sim_so101_model_contract.py` and `smoke_sim_ik_reachability_drill.py`.
+That integrated default scan is repo-local. A suite `--ik-model-path` value is
+forwarded only to the contract checker and IK drill; it is not treated as an
+authoritative inventory source.
+
 ## Scope
 
 By default the inventory scans repo-local roots: `models/`, `assets/`, `SO101/`, `src/`, `docs/`, `archive/`, `data/`, and the repo root. Missing roots are reported as roots with `exists: false`; they are not errors.

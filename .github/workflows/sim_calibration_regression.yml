@@ -148,6 +148,27 @@ jobs:
               assert Path(pose_fixture["metadata_paths"][case_id]).is_file(), (case_id, pose_fixture)
           assert pose_fixture["hardware_skipped"] is True, pose_fixture
           assert pose_fixture["gui_skipped"] is True, pose_fixture
+          source_inventory = summary["so101_model_source_inventory"]
+          assert source_inventory["ok"] is True, source_inventory
+          assert source_inventory["status"] in {
+              "missing_authoritative_model",
+              "authoritative_model_found",
+          }, source_inventory
+          assert isinstance(source_inventory["candidate_count"], int), source_inventory
+          assert isinstance(source_inventory["likely_candidate_count"], int), source_inventory
+          assert isinstance(source_inventory["direct_contract_candidate_count"], int), source_inventory
+          assert isinstance(source_inventory["authoritative_candidate_count"], int), source_inventory
+          assert source_inventory["candidate_count"] >= source_inventory["likely_candidate_count"], source_inventory
+          assert source_inventory["likely_candidate_count"] >= source_inventory["direct_contract_candidate_count"], source_inventory
+          if source_inventory["status"] == "missing_authoritative_model":
+              assert source_inventory["authoritative_candidate_count"] == 0, source_inventory
+              assert source_inventory["diagnostics"], source_inventory
+          source_inventory_artifacts = source_inventory["artifacts"]
+          for key in ("summary_json", "candidates_csv", "readme_md"):
+              assert isinstance(source_inventory_artifacts.get(key), str) and Path(source_inventory_artifacts[key]).is_file(), (
+                  key,
+                  source_inventory_artifacts,
+              )
           so101_contract = summary["so101_model_contract"]
           assert so101_contract["ok"] is True, so101_contract
           assert so101_contract["status"] in {
@@ -267,6 +288,7 @@ jobs:
               "ranked_candidate",
               "perception_fixture",
               "sim_camera_pose_fixture",
+              "so101_model_source_inventory",
               "so101_model_contract",
               "ik_reachability",
               "pick_place_scenario",
@@ -316,6 +338,23 @@ jobs:
               and row.get("scenario_id") == "nominal_gripper_open_e4"
               for row in artifacts_by_category["sim_camera_pose_fixture"]
           ), artifacts_by_category["sim_camera_pose_fixture"]
+          assert any(
+              row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("status") in {
+                  "missing_authoritative_model",
+                  "authoritative_model_found",
+              }
+              for row in artifacts_by_category["so101_model_source_inventory"]
+          ), artifacts_by_category["so101_model_source_inventory"]
+          assert any(
+              row.get("kind") == "csv" and row.get("exists") is True
+              for row in artifacts_by_category["so101_model_source_inventory"]
+          ), artifacts_by_category["so101_model_source_inventory"]
+          assert any(
+              row.get("label") == "so101_model_source_inventory:readme" and row.get("exists") is True
+              for row in artifacts_by_category["so101_model_source_inventory"]
+          ), artifacts_by_category["so101_model_source_inventory"]
           assert any(
               row.get("kind") == "json"
               and row.get("exists") is True
@@ -386,10 +425,14 @@ jobs:
           entrypoint_path = summary_path.parent / "README.md"
           assert report_path.is_file(), report_path
           assert entrypoint_path.is_file(), entrypoint_path
+          report_text = report_path.read_text()
+          assert "### SO-101 Model Source Inventory" in report_text, report_text
           entrypoint_text = entrypoint_path.read_text()
           assert "Open `artifact_index_report.md` first." in entrypoint_text, entrypoint_text
           assert "`calibration_regression_summary.json`" in entrypoint_text, entrypoint_text
           assert "`artifact_index.json`" in entrypoint_text, entrypoint_text
+          assert "`so101_model_source_inventory/so101_model_source_inventory_summary.json`" in entrypoint_text, entrypoint_text
+          assert "`so101_model_source_inventory/so101_model_source_candidates.csv`" in entrypoint_text, entrypoint_text
           assert "`hardware_skipped: true`" in entrypoint_text, entrypoint_text
           assert "`gui_skipped: true`" in entrypoint_text, entrypoint_text
           assert "Real-media gap:" in entrypoint_text, entrypoint_text
@@ -415,6 +458,14 @@ jobs:
                           "summary_path": pose_fixture["summary_path"],
                           "case_ids": pose_fixture["case_ids"],
                           "frame_paths": pose_fixture["frame_paths"],
+                      },
+                      "so101_model_source_inventory": {
+                          "summary_path": source_inventory["summary_path"],
+                          "status": source_inventory["status"],
+                          "candidate_count": source_inventory["candidate_count"],
+                          "authoritative_candidate_count": source_inventory["authoritative_candidate_count"],
+                          "recommended_contract_check_path": source_inventory["recommended_contract_check_path"],
+                          "artifacts": source_inventory_artifacts,
                       },
                       "so101_model_contract": {
                           "summary_path": so101_contract["summary_path"],
@@ -464,6 +515,7 @@ jobs:
               "session/session_summary.json",
               "fixture/fixture_summary.json",
               "sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json",
+              "so101_model_source_inventory/so101_model_source_inventory_summary.json",
               "so101_model_contract/so101_model_contract_summary.json",
               "ik_reachability_drill/ik_reachability_drill_summary.json",
               "pick_place_scenario_matrix/scenario_matrix_summary.json",
