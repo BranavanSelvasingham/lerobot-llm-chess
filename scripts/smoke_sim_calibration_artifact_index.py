@@ -17,23 +17,24 @@ CATEGORY_ORDER = {
     "reference_camera_tuning_diagnostics": 3,
     "sim_camera_profile_sweep": 4,
     "sim_camera_tuning_before_after": 5,
-    "reference_capture_checklist": 6,
-    "visual_review": 7,
-    "real_reference_comparison": 8,
-    "real_projection_intake": 9,
-    "ranked_candidate": 10,
-    "perception_fixture": 11,
-    "sim_camera_pose_fixture": 12,
-    "so101_model_source_inventory": 13,
-    "so101_model_bundle_manifest": 14,
-    "so101_model_contract": 15,
-    "so101_model_asset_preflight": 16,
-    "ik_reachability": 17,
-    "gripper_camera_pov": 18,
-    "app_entrypoint": 19,
-    "pick_place_scenario": 20,
-    "negative_check": 21,
-    "logs": 22,
+    "reference_capture_manifest": 6,
+    "reference_capture_checklist": 7,
+    "visual_review": 8,
+    "real_reference_comparison": 9,
+    "real_projection_intake": 10,
+    "ranked_candidate": 11,
+    "perception_fixture": 12,
+    "sim_camera_pose_fixture": 13,
+    "so101_model_source_inventory": 14,
+    "so101_model_bundle_manifest": 15,
+    "so101_model_contract": 16,
+    "so101_model_asset_preflight": 17,
+    "ik_reachability": 18,
+    "gripper_camera_pov": 19,
+    "app_entrypoint": 20,
+    "pick_place_scenario": 21,
+    "negative_check": 22,
+    "logs": 23,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -818,6 +819,109 @@ def collect_sim_camera_tuning_before_after_artifacts(
         "remaining_tuning_prompts": source.get("remaining_tuning_prompts"),
         "open_reference_gaps": source.get("open_reference_gaps"),
         "caveats": source.get("caveats"),
+    }
+
+
+def reference_capture_manifest_path_counts(source: dict[str, Any]) -> dict[str, int]:
+    path_checks = source.get("path_checks")
+    path_checks = [row for row in path_checks if isinstance(row, dict)] if isinstance(path_checks, list) else []
+    missing_path_checks = source.get("missing_path_checks")
+    missing_path_checks = (
+        [row for row in missing_path_checks if isinstance(row, dict)]
+        if isinstance(missing_path_checks, list)
+        else []
+    )
+    media_count = sum(1 for row in path_checks if row.get("category") == "media")
+    sidecar_count = sum(1 for row in path_checks if row.get("category") == "sidecar")
+    return {
+        "path_check_count": len(path_checks),
+        "media_path_check_count": media_count,
+        "sidecar_path_check_count": sidecar_count,
+        "missing_path_count": len(missing_path_checks),
+        "present_path_count": len(path_checks) - len(missing_path_checks),
+    }
+
+
+def collect_reference_capture_manifest_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    manifest = suite.get("reference_capture_manifest")
+    manifest = manifest if isinstance(manifest, dict) else {}
+    child_summary = load_optional_json(
+        manifest.get("summary_path"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
+    child_summary = child_summary if isinstance(child_summary, dict) else {}
+    source = child_summary if child_summary else manifest
+    artifact_paths = manifest.get("artifact_paths")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    diagnostics = source.get("diagnostics")
+    diagnostics = diagnostics if isinstance(diagnostics, list) else []
+    path_counts = reference_capture_manifest_path_counts(source)
+    paths = {
+        "summary_json": source.get("summary_path")
+        or manifest.get("summary_path")
+        or artifact_paths.get("summary_json"),
+        "csv": source.get("csv_path") or manifest.get("csv_path") or artifact_paths.get("csv"),
+        "readme_md": source.get("readme_path")
+        or manifest.get("readme_path")
+        or artifact_paths.get("readme_md"),
+    }
+    metrics = {
+        "status": source.get("status"),
+        "ok": source.get("ok"),
+        "manifest_path": source.get("manifest_path"),
+        "manifest_schema": source.get("manifest_schema"),
+        "ready_for_calibration_grade_simcamera_tuning": source.get(
+            "ready_for_calibration_grade_simcamera_tuning"
+        ),
+        "depth_reference_capture_count": source.get("depth_reference_capture_count", 0),
+        "pick_place_video_capture_count": source.get("pick_place_video_capture_count", 0),
+        "diagnostics": diagnostics,
+        "gaps": diagnostics,
+        "media_assets_copied_into_repo": source.get("media_assets_copied_into_repo", False),
+        "provenance_present": source.get("provenance_present"),
+        "review_present": source.get("review_present"),
+        **path_counts,
+    }
+    for key, label_suffix in (
+        ("summary_json", "summary"),
+        ("csv", "checklist"),
+        ("readme_md", "readme"),
+    ):
+        add_path(
+            artifacts,
+            category="reference_capture_manifest",
+            label=f"reference_capture_manifest:{label_suffix}",
+            value=paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"reference_capture_manifest.artifact_paths.{key}",
+            metrics=metrics,
+        )
+    return {
+        **metrics,
+        "summary_path": paths.get("summary_json"),
+        "csv_path": paths.get("csv"),
+        "readme_path": paths.get("readme_md"),
+        "artifact_paths": paths,
+        "source_configuration": manifest.get("source_configuration"),
+        "local_only_no_copy_policy": source.get("local_only_no_copy_policy"),
+        "path_checks": source.get("path_checks") if isinstance(source.get("path_checks"), list) else [],
+        "missing_path_checks": (
+            source.get("missing_path_checks")
+            if isinstance(source.get("missing_path_checks"), list)
+            else []
+        ),
+        "notes": source.get("notes"),
     }
 
 
@@ -2612,6 +2716,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    reference_capture_manifest = collect_reference_capture_manifest_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
 
     reference_media_inventory = collect_reference_media_inventory_artifacts(
         suite=suite,
@@ -2793,6 +2904,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "reference_camera_tuning_diagnostics": reference_camera_tuning_diagnostics,
         "sim_camera_profile_sweep": sim_camera_profile_sweep,
         "sim_camera_tuning_before_after": sim_camera_tuning_before_after,
+        "reference_capture_manifest": reference_capture_manifest,
         "selected_real_reference_media": selected_media,
         "reference_capture_checklist": reference_capture_checklist,
         "real_projection_intake": real_projection_intake,

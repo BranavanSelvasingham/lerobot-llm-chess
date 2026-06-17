@@ -23,6 +23,7 @@ on:
     paths:
       - "archive/chess_test_images/current_view.jpg"
       - "docs/sim_calibration_regression.md"
+      - "docs/sim_reference_capture_manifest.md"
       - "docs/sim_reference_media_inventory.md"
       - "docs/sim_so101_model_asset_preflight.md"
       - "docs/sim_so101_model_bundle_manifest.md"
@@ -46,6 +47,7 @@ on:
     paths:
       - "archive/chess_test_images/current_view.jpg"
       - "docs/sim_calibration_regression.md"
+      - "docs/sim_reference_capture_manifest.md"
       - "docs/sim_reference_media_inventory.md"
       - "docs/sim_so101_model_asset_preflight.md"
       - "docs/sim_so101_model_bundle_manifest.md"
@@ -71,6 +73,7 @@ env:
   CALIBRATION_REGRESSION_OUTPUT_DIR: "/tmp/lerobot_sim/calibration_regression_suite"
   CALIBRATION_REGRESSION_ARTIFACT_NAME: "sim-calibration-regression-${{ github.run_id }}"
   REFERENCE_MEDIA_ROOTS: ""
+  REFERENCE_CAPTURE_MANIFEST: ""
   IK_MODEL_PATH: ""
   IK_MODEL_ASSET_ROOTS: ""
   SO101_MODEL_BUNDLE_MANIFEST: ""
@@ -136,6 +139,9 @@ jobs:
             --include-negative-check
           )
           append_repeatable_args --reference-media-root "${REFERENCE_MEDIA_ROOTS}"
+          if [ -n "${REFERENCE_CAPTURE_MANIFEST}" ]; then
+            cmd+=(--reference-capture-manifest "${REFERENCE_CAPTURE_MANIFEST}")
+          fi
           if [ -n "${IK_MODEL_PATH}" ]; then
             cmd+=(--ik-model-path "${IK_MODEL_PATH}")
           fi
@@ -342,6 +348,38 @@ jobs:
           assert before_after_child["summary_status"] == "ok", before_after_child
           assert before_after_child["diagnostics"]["baseline_gripper_finger_width_px"] == 72, before_after_child
           assert before_after_child["diagnostics"]["media_assets_copied_into_repo"] is False, before_after_child
+          reference_capture_manifest = summary["reference_capture_manifest"]
+          assert reference_capture_manifest["ok"] is True, reference_capture_manifest
+          assert reference_capture_manifest["status"] in {
+              "reference_capture_manifest_not_supplied",
+              "reference_capture_manifest_unavailable",
+              "reference_capture_manifest_needs_follow_up",
+              "reference_capture_manifest_ready",
+          }, reference_capture_manifest
+          if os.environ["REFERENCE_CAPTURE_MANIFEST"].strip():
+              assert reference_capture_manifest["manifest_path"], reference_capture_manifest
+          else:
+              assert reference_capture_manifest["status"] == "reference_capture_manifest_not_supplied", reference_capture_manifest
+              assert "reference_capture_manifest_not_supplied" in reference_capture_manifest["diagnostics"], reference_capture_manifest
+          assert reference_capture_manifest["ready_for_calibration_grade_simcamera_tuning"] in {True, False}, reference_capture_manifest
+          assert isinstance(reference_capture_manifest["depth_reference_capture_count"], int), reference_capture_manifest
+          assert isinstance(reference_capture_manifest["pick_place_video_capture_count"], int), reference_capture_manifest
+          assert isinstance(reference_capture_manifest["path_check_count"], int), reference_capture_manifest
+          assert isinstance(reference_capture_manifest["missing_path_count"], int), reference_capture_manifest
+          assert reference_capture_manifest["media_assets_copied_into_repo"] is False, reference_capture_manifest
+          assert "missing_depth_reference" in reference_capture_manifest["diagnostics"] or reference_capture_manifest["ready_for_calibration_grade_simcamera_tuning"] is True, reference_capture_manifest
+          assert "missing_pick_place_video" in reference_capture_manifest["diagnostics"] or reference_capture_manifest["ready_for_calibration_grade_simcamera_tuning"] is True, reference_capture_manifest
+          reference_capture_manifest_artifacts = reference_capture_manifest["artifact_paths"]
+          for key in ("summary_json", "csv", "readme_md"):
+              assert isinstance(reference_capture_manifest_artifacts.get(key), str) and Path(reference_capture_manifest_artifacts[key]).is_file(), (
+                  key,
+                  reference_capture_manifest_artifacts,
+              )
+          manifest_child = summary["child_commands"]["reference_capture_manifest"]
+          assert manifest_child["ok"] is True, manifest_child
+          assert manifest_child["summary_status"] == reference_capture_manifest["status"], manifest_child
+          assert manifest_child["diagnostics"]["missing_path_count"] == reference_capture_manifest["missing_path_count"], manifest_child
+          assert manifest_child["diagnostics"]["media_assets_copied_into_repo"] is False, manifest_child
           assert summary["perception_fixture"]["status"] == "ok", summary["perception_fixture"]
           assert summary["perception_fixture"]["artifact_paths"], summary["perception_fixture"]
           pose_fixture = summary["sim_camera_pose_fixture"]
@@ -549,6 +587,7 @@ jobs:
               "reference_camera_tuning_diagnostics",
               "sim_camera_profile_sweep",
               "sim_camera_tuning_before_after",
+              "reference_capture_manifest",
               "real_reference_comparison",
               "ranked_candidate",
               "perception_fixture",
@@ -721,6 +760,28 @@ jobs:
                   and row.get("exists") is True
                   for row in artifacts_by_category["sim_camera_tuning_before_after"]
               ), (role, artifacts_by_category["sim_camera_tuning_before_after"])
+          assert any(
+              row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("status") == reference_capture_manifest["status"]
+              for row in artifacts_by_category["reference_capture_manifest"]
+          ), artifacts_by_category["reference_capture_manifest"]
+          assert any(
+              row.get("kind") == "csv" and row.get("exists") is True
+              for row in artifacts_by_category["reference_capture_manifest"]
+          ), artifacts_by_category["reference_capture_manifest"]
+          assert any(
+              row.get("label") == "reference_capture_manifest:readme"
+              and row.get("exists") is True
+              for row in artifacts_by_category["reference_capture_manifest"]
+          ), artifacts_by_category["reference_capture_manifest"]
+          assert any(
+              row.get("metrics", {}).get("ready_for_calibration_grade_simcamera_tuning")
+              == reference_capture_manifest["ready_for_calibration_grade_simcamera_tuning"]
+              and row.get("metrics", {}).get("missing_path_count")
+              == reference_capture_manifest["missing_path_count"]
+              for row in artifacts_by_category["reference_capture_manifest"]
+          ), artifacts_by_category["reference_capture_manifest"]
           if reference_inventory["candidate_count"] > 0:
               assert any(
                   row.get("kind") == "image" and row.get("exists") is True
@@ -853,6 +914,7 @@ jobs:
           assert "## Reference Camera Tuning Diagnostics" in report_text, report_text
           assert "## SimCamera Profile Sweep" in report_text, report_text
           assert "## SimCamera Tuning Before/After" in report_text, report_text
+          assert "## Reference Capture Manifest" in report_text, report_text
           assert "### SO-101 Model Source Inventory" in report_text, report_text
           assert "### SO-101 Model Bundle Manifest" in report_text, report_text
           entrypoint_text = entrypoint_path.read_text()
@@ -874,6 +936,11 @@ jobs:
           assert "`simcamera_tuning_before_after/README.md`" in entrypoint_text, entrypoint_text
           assert "SimCamera tuning before/after:" in entrypoint_text, entrypoint_text
           assert "baseline finger width `72` px" in entrypoint_text, entrypoint_text
+          assert "`reference_capture_manifest/reference_capture_manifest_check.json`" in entrypoint_text, entrypoint_text
+          assert "`reference_capture_manifest/reference_capture_manifest_checklist.csv`" in entrypoint_text, entrypoint_text
+          assert "`reference_capture_manifest/README.md`" in entrypoint_text, entrypoint_text
+          assert "Reference capture manifest:" in entrypoint_text, entrypoint_text
+          assert "Reference capture manifest diagnostics:" in entrypoint_text, entrypoint_text
           assert "`so101_model_bundle_manifest/so101_model_bundle_manifest_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_model_bundle_manifest/so101_model_bundle_manifest_checklist.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_inventory_summary.json`" in entrypoint_text, entrypoint_text
@@ -965,6 +1032,18 @@ jobs:
                           "missing_pick_place_video": before_after["missing_pick_place_video"],
                           "artifacts": before_after_paths,
                       },
+                      "reference_capture_manifest": {
+                          "summary_path": reference_capture_manifest["summary_path"],
+                          "status": reference_capture_manifest["status"],
+                          "ready_for_calibration_grade_simcamera_tuning": reference_capture_manifest["ready_for_calibration_grade_simcamera_tuning"],
+                          "depth_reference_capture_count": reference_capture_manifest["depth_reference_capture_count"],
+                          "pick_place_video_capture_count": reference_capture_manifest["pick_place_video_capture_count"],
+                          "path_check_count": reference_capture_manifest["path_check_count"],
+                          "missing_path_count": reference_capture_manifest["missing_path_count"],
+                          "media_assets_copied_into_repo": reference_capture_manifest["media_assets_copied_into_repo"],
+                          "diagnostics": reference_capture_manifest["diagnostics"],
+                          "artifacts": reference_capture_manifest_artifacts,
+                      },
                       "so101_model_source_inventory": {
                           "summary_path": source_inventory["summary_path"],
                           "status": source_inventory["status"],
@@ -1038,6 +1117,7 @@ jobs:
               "reference_camera_tuning_diagnostics/reference_camera_tuning_diagnostics.json",
               "sim_camera_profile_sweep/summary.json",
               "simcamera_tuning_before_after/simcamera_tuning_before_after_summary.json",
+              "reference_capture_manifest/reference_capture_manifest_check.json",
               "session/session_summary.json",
               "fixture/fixture_summary.json",
               "sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json",
@@ -1124,6 +1204,17 @@ jobs:
               f"- `media_assets_copied_into_repo`: `{summary['simcamera_tuning_before_after']['media_assets_copied_into_repo']}`",
               f"- `missing_real_depth_reference`: `{summary['simcamera_tuning_before_after']['missing_real_depth_reference']}`",
               f"- `missing_pick_place_video`: `{summary['simcamera_tuning_before_after']['missing_pick_place_video']}`",
+              "",
+              "Reference capture manifest:",
+              f"- `status`: `{summary['reference_capture_manifest']['status']}`",
+              f"- `ready_for_calibration_grade_simcamera_tuning`: `{summary['reference_capture_manifest']['ready_for_calibration_grade_simcamera_tuning']}`",
+              f"- `depth_reference_capture_count`: `{summary['reference_capture_manifest']['depth_reference_capture_count']}`",
+              f"- `pick_place_video_capture_count`: `{summary['reference_capture_manifest']['pick_place_video_capture_count']}`",
+              f"- `path_check_count`: `{summary['reference_capture_manifest']['path_check_count']}`",
+              f"- `missing_path_count`: `{summary['reference_capture_manifest']['missing_path_count']}`",
+              f"- `media_assets_copied_into_repo`: `{summary['reference_capture_manifest']['media_assets_copied_into_repo']}`",
+              f"- `diagnostics`: `{summary['reference_capture_manifest']['diagnostics']}`",
+              "- Readiness is an input gate only; it is not physical calibration truth.",
               "",
               "SO-101 model source inventory:",
               f"- `status`: `{summary['so101_model_source_inventory']['status']}`",

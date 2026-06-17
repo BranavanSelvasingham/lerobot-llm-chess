@@ -33,6 +33,10 @@ SIM_CAMERA_TUNING_BEFORE_AFTER_JSON_NAME = "simcamera_tuning_before_after_summar
 SIM_CAMERA_TUNING_BEFORE_AFTER_CSV_NAME = "simcamera_tuning_before_after_rows.csv"
 SIM_CAMERA_TUNING_BEFORE_AFTER_README_NAME = "README.md"
 SIM_CAMERA_TUNING_BEFORE_AFTER_BASELINE_WIDTH_PX = 72
+REFERENCE_CAPTURE_MANIFEST_DIR_NAME = "reference_capture_manifest"
+REFERENCE_CAPTURE_MANIFEST_JSON_NAME = "reference_capture_manifest_check.json"
+REFERENCE_CAPTURE_MANIFEST_CSV_NAME = "reference_capture_manifest_checklist.csv"
+REFERENCE_CAPTURE_MANIFEST_README_NAME = "README.md"
 VISUAL_REVIEW_SUMMARY_NAME = "visual_review_summary.json"
 REFERENCE_CAPTURE_CHECKLIST_NAME = "reference_capture_checklist.json"
 REAL_PROJECTION_INTAKE_NAME = "real_projection_intake.json"
@@ -81,6 +85,16 @@ def parse_args() -> argparse.Namespace:
             "Optional file or directory root forwarded to the reference-media inventory as "
             "--root. Repeatable. Supplying roots replaces the inventory child's default "
             "repo-root scan, so pass --reference-media-root . when adding sibling roots."
+        ),
+    )
+    parser.add_argument(
+        "--reference-capture-manifest",
+        type=Path,
+        default=None,
+        help=(
+            "Optional local-only real-reference capture manifest passed to the reference "
+            "capture manifest checker. Default suite and CI behavior remain no-manifest "
+            "diagnostic evidence."
         ),
     )
     parser.add_argument(
@@ -608,6 +622,124 @@ def reference_media_inventory_empty(inventory: dict[str, Any] | None) -> bool:
     return counts.get("status") == "media_inventory_empty" or int(counts.get("candidate_count") or 0) == 0
 
 
+def reference_capture_manifest_config(args: argparse.Namespace) -> dict[str, Any]:
+    return {
+        "supplied": args.reference_capture_manifest is not None,
+        "requested_path": (
+            str(args.reference_capture_manifest.expanduser())
+            if args.reference_capture_manifest is not None
+            else None
+        ),
+        "notes": [
+            "The capture manifest checker runs in every suite invocation.",
+            "No supplied manifest is recorded as explicit non-failing input-readiness evidence.",
+            "The checker validates local path/readiness metadata only and never copies media assets.",
+        ],
+    }
+
+
+def reference_capture_manifest_command(
+    *,
+    python: str,
+    manifest_dir: Path,
+    args: argparse.Namespace,
+) -> list[str]:
+    command = [
+        python,
+        str(REPO_ROOT / "scripts" / "smoke_sim_reference_capture_manifest.py"),
+        "--output-dir",
+        str(manifest_dir),
+    ]
+    if args.reference_capture_manifest is not None:
+        command.extend(["--manifest-path", str(args.reference_capture_manifest.expanduser())])
+    return command
+
+
+def reference_capture_manifest_artifact_paths(
+    manifest: dict[str, Any] | None,
+    manifest_dir: Path,
+) -> dict[str, str]:
+    manifest = manifest if isinstance(manifest, dict) else {}
+    return {
+        "summary_json": str(
+            manifest.get("summary_path") or manifest_dir / REFERENCE_CAPTURE_MANIFEST_JSON_NAME
+        ),
+        "csv": str(manifest.get("csv_path") or manifest_dir / REFERENCE_CAPTURE_MANIFEST_CSV_NAME),
+        "readme_md": str(
+            manifest.get("readme_path") or manifest_dir / REFERENCE_CAPTURE_MANIFEST_README_NAME
+        ),
+    }
+
+
+def reference_capture_manifest_path_check_counts(manifest: dict[str, Any]) -> dict[str, int]:
+    path_checks = manifest.get("path_checks")
+    path_checks = [row for row in path_checks if isinstance(row, dict)] if isinstance(path_checks, list) else []
+    missing_path_checks = manifest.get("missing_path_checks")
+    missing_path_checks = (
+        [row for row in missing_path_checks if isinstance(row, dict)]
+        if isinstance(missing_path_checks, list)
+        else []
+    )
+    media_count = sum(1 for row in path_checks if row.get("category") == "media")
+    sidecar_count = sum(1 for row in path_checks if row.get("category") == "sidecar")
+    return {
+        "path_check_count": len(path_checks),
+        "media_path_check_count": media_count,
+        "sidecar_path_check_count": sidecar_count,
+        "missing_path_count": len(missing_path_checks),
+        "present_path_count": len(path_checks) - len(missing_path_checks),
+    }
+
+
+def reference_capture_manifest_section(
+    *,
+    manifest: dict[str, Any] | None,
+    manifest_dir: Path,
+    config: dict[str, Any],
+) -> dict[str, Any]:
+    manifest = manifest if isinstance(manifest, dict) else {}
+    paths = reference_capture_manifest_artifact_paths(manifest, manifest_dir)
+    diagnostics = manifest.get("diagnostics")
+    diagnostics = diagnostics if isinstance(diagnostics, list) else []
+    path_counts = reference_capture_manifest_path_check_counts(manifest)
+    return {
+        "ok": bool(manifest.get("ok", False)),
+        "status": manifest.get("status"),
+        "summary_path": paths["summary_json"],
+        "csv_path": paths["csv"],
+        "readme_path": paths["readme_md"],
+        "output_dir": str(manifest_dir),
+        "artifact_paths": paths,
+        "source_configuration": config,
+        "manifest_path": manifest.get("manifest_path"),
+        "manifest_schema": manifest.get("manifest_schema"),
+        "expected_manifest_schema": manifest.get("expected_manifest_schema"),
+        "ready_for_calibration_grade_simcamera_tuning": bool(
+            manifest.get("ready_for_calibration_grade_simcamera_tuning", False)
+        ),
+        "depth_reference_capture_count": int(manifest.get("depth_reference_capture_count") or 0),
+        "pick_place_video_capture_count": int(manifest.get("pick_place_video_capture_count") or 0),
+        "diagnostics": diagnostics,
+        "gaps": diagnostics,
+        "media_assets_copied_into_repo": manifest.get("media_assets_copied_into_repo", False),
+        "local_only_no_copy_policy": manifest.get("local_only_no_copy_policy"),
+        "provenance_present": manifest.get("provenance_present"),
+        "review_present": manifest.get("review_present"),
+        "path_checks": manifest.get("path_checks") if isinstance(manifest.get("path_checks"), list) else [],
+        "missing_path_checks": (
+            manifest.get("missing_path_checks")
+            if isinstance(manifest.get("missing_path_checks"), list)
+            else []
+        ),
+        **path_counts,
+        "notes": [
+            "This is an input-readiness gate for local real-reference captures and sidecars.",
+            "Readiness does not claim physical calibration accuracy or mutate SimCamera tuning.",
+            "Media assets are never copied into the repository or suite artifact directory.",
+        ],
+    }
+
+
 def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) -> Path:
     markers = summary.get("skipped_markers")
     markers = markers if isinstance(markers, dict) else {}
@@ -645,6 +777,16 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
     )
     tuning_before_after_prompt_ids = sim_camera_tuning_prompt_ids(
         tuning_before_after.get("remaining_tuning_prompts")
+    )
+    reference_capture_manifest = summary.get("reference_capture_manifest")
+    reference_capture_manifest = (
+        reference_capture_manifest if isinstance(reference_capture_manifest, dict) else {}
+    )
+    reference_capture_manifest_paths = reference_capture_manifest.get("artifact_paths")
+    reference_capture_manifest_paths = (
+        reference_capture_manifest_paths
+        if isinstance(reference_capture_manifest_paths, dict)
+        else {}
     )
     reference_inventory_counts_row = reference_media_inventory_counts(reference_inventory)
     reference_gap_ids = {
@@ -740,6 +882,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/current_profile_sweep/best_absolute_difference_heatmap.jpg`",
         f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/current_profile_sweep/best_side_by_side.jpg`",
         f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/current_profile_sweep/candidates/`",
+        f"- `{REFERENCE_CAPTURE_MANIFEST_DIR_NAME}/{REFERENCE_CAPTURE_MANIFEST_JSON_NAME}`",
+        f"- `{REFERENCE_CAPTURE_MANIFEST_DIR_NAME}/{REFERENCE_CAPTURE_MANIFEST_CSV_NAME}`",
+        f"- `{REFERENCE_CAPTURE_MANIFEST_DIR_NAME}/{REFERENCE_CAPTURE_MANIFEST_README_NAME}`",
         "- `session/session_summary.json`",
         "- `fixture/fixture_summary.json`",
         "- `sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json`",
@@ -908,6 +1053,31 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         (
             "- SimCamera tuning before/after caveat: "
             f"{tuning_before_after.get('full_frame_image_delta_caveat') or 'Full-frame image delta is hardware-free coarse evidence only.'}"
+        ),
+        (
+            "- Reference capture manifest: "
+            f"status `{reference_capture_manifest.get('status')}`; ready_for_calibration_grade_simcamera_tuning "
+            f"`{markdown_bool(reference_capture_manifest.get('ready_for_calibration_grade_simcamera_tuning'))}`; "
+            f"depth captures `{reference_capture_manifest.get('depth_reference_capture_count')}`; "
+            f"pick/place videos `{reference_capture_manifest.get('pick_place_video_capture_count')}`; "
+            f"path checks `{reference_capture_manifest.get('path_check_count')}`; "
+            f"missing paths `{reference_capture_manifest.get('missing_path_count')}`."
+        ),
+        (
+            "- Reference capture manifest diagnostics: "
+            f"`{markdown_list_value(reference_capture_manifest.get('diagnostics'))}`; "
+            "media assets copied into repo "
+            f"`{markdown_bool(reference_capture_manifest.get('media_assets_copied_into_repo'))}`."
+        ),
+        (
+            "- Reference capture manifest artifacts: "
+            f"summary `{reference_capture_manifest_paths.get('summary_json')}`; rows "
+            f"`{reference_capture_manifest_paths.get('csv')}`; README "
+            f"`{reference_capture_manifest_paths.get('readme_md')}`."
+        ),
+        (
+            "- Reference capture manifest caveat: ready means operator-supplied local "
+            "capture inputs are present and reviewed; it is not physical calibration truth."
         ),
         "- Reference capture checklist status: "
         f"`{summary.get('reference_capture_checklist', {}).get('status')}`.",
@@ -2758,6 +2928,27 @@ def main() -> int:
         )
     )
 
+    reference_capture_manifest_dir = output_dir / REFERENCE_CAPTURE_MANIFEST_DIR_NAME
+    reference_capture_manifest_summary_path = (
+        reference_capture_manifest_dir / REFERENCE_CAPTURE_MANIFEST_JSON_NAME
+    )
+    reference_capture_manifest_config_row = reference_capture_manifest_config(args)
+    reference_capture_manifest_record, reference_capture_manifest = run_child(
+        name="reference_capture_manifest",
+        command=reference_capture_manifest_command(
+            python=python,
+            manifest_dir=reference_capture_manifest_dir,
+            args=args,
+        ),
+        output_dir=reference_capture_manifest_dir,
+        expected_json_path=reference_capture_manifest_summary_path,
+    )
+    reference_capture_manifest_record["diagnostics"] = reference_capture_manifest_section(
+        manifest=reference_capture_manifest,
+        manifest_dir=reference_capture_manifest_dir,
+        config=reference_capture_manifest_config_row,
+    )
+
     session_dir = output_dir / "session"
     session_summary_path = session_dir / "session_summary.json"
     session_record, session = run_child(
@@ -3004,6 +3195,7 @@ def main() -> int:
         "reference_camera_tuning_diagnostics": tuning_record,
         "sim_camera_profile_sweep": sim_camera_profile_sweep_record,
         "simcamera_tuning_before_after": sim_camera_tuning_before_after_record,
+        "reference_capture_manifest": reference_capture_manifest_record,
         "calibration_session_report": session_record,
         "perception_regression_fixture": fixture_record,
         "sim_camera_pose_fixture": pose_fixture_record,
@@ -3048,6 +3240,7 @@ def main() -> int:
         "so101_model_bundle_manifest_config": so101_bundle_config,
         "so101_model_bundle_manifest_forwarding": so101_bundle_forwarding,
         "reference_media_inventory_config": reference_media_config,
+        "reference_capture_manifest_config": reference_capture_manifest_config_row,
         "so101_model_source_inventory_config": so101_source_config,
         "so101_model_contract_config": so101_contract_config,
         "child_commands": child_records,
@@ -3087,6 +3280,11 @@ def main() -> int:
             sim_camera_tuning_before_after,
             sim_camera_tuning_before_after_dir,
             sim_camera_tuning_before_after_summary_path,
+        ),
+        "reference_capture_manifest": reference_capture_manifest_section(
+            manifest=reference_capture_manifest,
+            manifest_dir=reference_capture_manifest_dir,
+            config=reference_capture_manifest_config_row,
         ),
         "calibration_session": {
             "summary_path": str(session_summary_path),

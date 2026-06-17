@@ -1,8 +1,31 @@
 # Simulator Reference Capture Manifest
 
-Use this hardware-free checker after the reference media inventory and capture checklist have identified the current real-media gap. It validates an operator-maintained manifest for the missing real depth-reference and pick/place-video inputs needed before future SimCamera tuning should be described as calibration-grade.
+Use this hardware-free checker after the reference media inventory, reference media comparison, reference camera tuning diagnostics, SimCamera before/after evidence, and capture checklist have identified the current real-media gap. It validates an operator-maintained manifest for the missing real depth-reference and pick/place-video inputs needed before future SimCamera tuning should be described as calibration-grade.
 
 The checker does not open cameras, move SO-101 hardware, modify simulator constants, run robot execution paths, call OpenAI, or copy photos/videos into the repository.
+
+## Integrated Suite Path
+
+The calibration regression suite runs this checker every time under `reference_capture_manifest/`. The default no-manifest run is green and records `reference_capture_manifest_not_supplied` with the open gaps:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_calibration_regression_suite.py \
+  --output-dir /private/tmp/lerobot_sim/calibration_regression_suite \
+  --python /Library/Frameworks/Python.framework/Versions/3.12/bin/python3
+```
+
+To check a local operator manifest through the full artifact path:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_calibration_regression_suite.py \
+  --output-dir /private/tmp/lerobot_sim/calibration_regression_suite_capture_manifest \
+  --python /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 \
+  --reference-capture-manifest /absolute/path/to/reference_capture_manifest.json
+```
+
+The suite exposes the result in `calibration_regression_summary.json.reference_capture_manifest`, `child_commands.reference_capture_manifest`, `artifact_index.json.reference_capture_manifest`, and the `Reference Capture Manifest` section of `artifact_index_report.md`. A nonexistent manifest path stays non-failing and records `reference_capture_manifest_unavailable`.
+
+## Focused Checker
 
 No-manifest diagnostic run:
 
@@ -97,6 +120,6 @@ Otherwise it reports `reference_capture_manifest_needs_follow_up` with diagnosti
 
 ## Relation To Existing Evidence
 
-The reference media inventory finds and classifies available local evidence, then preserves gaps such as missing real depth and missing pick/place video. The reference comparison and reference camera tuning diagnostics can select images and produce hardware-free image/metadata review artifacts, but they still carry those gaps forward. The SimCamera tuning before/after smoke compares synthetic baseline/current evidence and explicitly reports `media_assets_copied_into_repo: false`, missing real depth, and missing pick/place-video inputs.
+The reference media inventory finds and classifies available local evidence, then preserves gaps such as missing real depth and missing pick/place video. The reference comparison and reference camera tuning diagnostics can select images and produce hardware-free image/metadata review artifacts, but they still carry those gaps forward. The SimCamera profile sweep and SimCamera tuning before/after smoke compare synthetic baseline/current evidence and explicitly report `media_assets_copied_into_repo: false`, missing real depth, and missing pick/place-video inputs.
 
-This manifest checker is the operator-facing bridge after those diagnostics: it verifies that the missing real captures and sidecars have been produced locally and reviewed, without adding media assets or changing runtime behavior. Even a ready manifest is still an input-readiness signal. Physical calibration claims require subsequent real sidecar comparison/residual evidence from the existing intake path, not just the manifest check.
+This manifest checker is the operator-facing bridge after those diagnostics: it verifies that the missing real captures and sidecars have been produced locally and reviewed, without adding media assets or changing runtime behavior. In the integrated suite it appears beside reference media inventory, reference comparison, camera tuning diagnostics, SimCamera before/after evidence, the capture checklist, and SimCamera pose evidence so reviewers can see input readiness and remaining gaps in one artifact bundle. Even a ready manifest is still an input-readiness signal. Physical calibration claims require subsequent real sidecar comparison/residual evidence from the existing intake path, not just the manifest check.
