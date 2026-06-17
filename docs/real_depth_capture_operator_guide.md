@@ -66,6 +66,27 @@ The smoke creates deterministic JSON, CSV, README, and text placeholder files on
 
 The ready case is still only input-readiness bridge evidence. The placeholder paths are not photos or videos, and the smoke does not copy, open, decode, or validate media.
 
+## Index The Bridge Artifacts
+
+Use the standalone artifact index when you want one operator-side entrypoint for the bridge-smoke summary, planner JSON reports, planner Markdown reports, and child stdout/stderr logs:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_real_depth_capture_plan_artifact_index.py \
+  --output-dir /private/tmp/lerobot_sim/real_depth_capture_plan_artifact_index
+```
+
+If `--bridge-smoke-summary-json` is omitted, the index runs `scripts/smoke_real_depth_capture_plan_manifest_bridge.py` as a child under `bridge_smoke/` in the output directory, then reads the generated bridge summary and referenced planner artifacts. To index an existing bridge-smoke run instead:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_real_depth_capture_plan_artifact_index.py \
+  --bridge-smoke-summary-json /private/tmp/lerobot_sim/real_depth_capture_plan_bridge_smoke/real_depth_capture_plan_manifest_bridge_smoke_summary.json \
+  --output-dir /private/tmp/lerobot_sim/real_depth_capture_plan_artifact_index_from_existing
+```
+
+The index writes `real_depth_capture_plan_artifact_index.json`, `real_depth_capture_plan_artifact_index_cases.csv`, and `README.md`. Each case records evidence source/status, input readiness, depth and pick/place counts, missing path count, no-copy status, next operator actions, planner JSON/Markdown paths, child stdout/stderr paths, and explicit `media_assets_copied_into_repo: false` plus `media_assets_opened_or_decoded: false` markers. Missing referenced planner artifacts are listed as diagnostics when possible. If the index itself runs the bridge smoke and that child fails, the index exits nonzero.
+
+This is a review convenience for the planner bridge only. It does not run the full calibration suite, does not copy/open/decode photos or videos, and does not turn ready input evidence into physical calibration truth.
+
 ## Physical Measurements Needed
 
 - Reference media: repo-local SO-101 gripper-camera chessboard image, `capture_id`, `camera_id`, and image resolution.
