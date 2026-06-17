@@ -89,6 +89,28 @@ The index writes `real_depth_capture_plan_artifact_index.json`, `real_depth_capt
 
 This is a review convenience for the planner bridge. In the integrated suite it appears beside Reference Capture Manifest, Reference Capture Checklist, intake, and artifact report evidence; standalone it does not run the full calibration suite. Neither path copies, opens, or decodes photos or videos, and neither path turns ready input evidence into physical calibration truth.
 
+## Render The Operator Action Checklist
+
+After the suite-indexed plan artifact index exists, render the narrow operator action checklist when you only need the next capture/review steps:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/render_real_depth_capture_operator_action_checklist.py \
+  --calibration-suite-summary-json /private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json \
+  --output-dir /private/tmp/lerobot_sim/real_depth_capture_operator_action_checklist
+```
+
+Or render directly from a focused plan artifact index:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/render_real_depth_capture_operator_action_checklist.py \
+  --plan-artifact-index-json /private/tmp/lerobot_sim/real_depth_capture_plan_artifact_index/real_depth_capture_plan_artifact_index.json \
+  --output-dir /private/tmp/lerobot_sim/real_depth_capture_operator_action_checklist
+```
+
+The renderer writes `real_depth_capture_operator_action_checklist.json`, `real_depth_capture_operator_action_checklist_actions.csv`, and `README.md`. It summarizes evidence source/status, ready and not-ready case counts, depth-reference and pick/place counts, missing path count, no-copy statuses, next operator action IDs/text grouped by missing-input versus ready-input cases, recommended next commands, and explicit `media_assets_copied_into_repo: false` plus `media_assets_opened_or_decoded: false` markers.
+
+With no input, it still exits `0` and writes a deterministic missing-evidence checklist telling the operator to run the suite or focused plan artifact index first. An explicitly supplied unreadable or invalid JSON input exits nonzero and writes an error JSON artifact. The renderer reads JSON only; it does not copy, open, decode, modify, or commit media, and ready input remains only input readiness.
+
 ## Physical Measurements Needed
 
 - Reference media: repo-local SO-101 gripper-camera chessboard image, `capture_id`, `camera_id`, and image resolution.
