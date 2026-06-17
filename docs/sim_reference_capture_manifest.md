@@ -25,6 +25,18 @@ To check a local operator manifest through the full artifact path:
 
 The suite exposes the result in `calibration_regression_summary.json.reference_capture_manifest`, `child_commands.reference_capture_manifest`, `artifact_index.json.reference_capture_manifest`, and the `Reference Capture Manifest` section of `artifact_index_report.md`. A nonexistent manifest path stays non-failing and records `reference_capture_manifest_unavailable`.
 
+## Use In The Real Depth Operator Plan
+
+The existing [real depth capture operator plan](real_depth_capture_operator_guide.md) can consume either the focused checker JSON or the full suite summary:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/plan_real_depth_capture_session.py \
+  --calibration-suite-summary-json /private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json \
+  --output-dir /private/tmp/lerobot_sim/real_depth_capture_plan_from_suite
+```
+
+That bridge copies no media and opens no media. It carries the suite-indexed capture-manifest status, readiness flag, capture counts, missing path count, diagnostics/gaps, manifest path, and local-only/no-copy status into the operator plan. Not-ready evidence becomes explicit next actions for depth reference capture, pick/place video capture, sidecars, provenance/review, and local-only no-copy policy. Ready evidence is still only input readiness; physical calibration claims require later sidecar/intake validation and residual comparison evidence.
+
 ## Focused Checker
 
 No-manifest diagnostic run:

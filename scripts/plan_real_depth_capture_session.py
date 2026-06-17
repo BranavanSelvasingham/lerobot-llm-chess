@@ -48,6 +48,24 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_REAL_CAPTURE_FIXTURE_MANIFEST,
         help="Synthetic positive fixture manifest used only as a regression command example.",
     )
+    parser.add_argument(
+        "--capture-manifest-check-json",
+        type=Path,
+        default=None,
+        help=(
+            "Optional reference_capture_manifest_check.json, or a full calibration_regression_summary.json "
+            "containing reference_capture_manifest, to fold into the operator plan."
+        ),
+    )
+    parser.add_argument(
+        "--calibration-suite-summary-json",
+        type=Path,
+        default=None,
+        help=(
+            "Optional full calibration_regression_summary.json containing reference_capture_manifest. "
+            "Equivalent to --capture-manifest-check-json when a suite summary is supplied."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -97,6 +115,21 @@ def slugify(value: str) -> str:
     chars = [char.lower() if char.isalnum() else "_" for char in value.strip()]
     slug = "_".join("".join(chars).split("_"))
     return slug or "real_depth_capture"
+
+
+def string_list(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value] if value.strip() else []
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str) and item.strip()]
+    return []
+
+
+def int_value(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def sidecar_fields(entry: dict[str, Any]) -> dict[str, Any]:
@@ -228,6 +261,189 @@ def measurement_tasks() -> list[dict[str, Any]]:
     ]
 
 
+def reference_capture_manifest_actions(*, ready: bool, manifest_path: str | None) -> list[dict[str, str]]:
+    if ready:
+        manifest_text = manifest_path or "/absolute/path/to/reference_capture_manifest.json"
+        return [
+            {
+                "id": "validate_sidecars_and_intake",
+                "label": "Validate sidecars and intake",
+                "operator_action": (
+                    "Review the referenced depth, camera, board-pose, and pick/place sidecars through the "
+                    "existing real-calibration intake before treating them as comparable residual inputs."
+                ),
+            },
+            {
+                "id": "run_suite_with_reference_capture_manifest",
+                "label": "Run suite with capture manifest",
+                "operator_action": (
+                    "Run the calibration regression suite with "
+                    f"`--reference-capture-manifest {manifest_text}` so the suite-indexed readiness evidence "
+                    "stays beside the real-depth planning artifacts."
+                ),
+            },
+            {
+                "id": "compare_residuals_before_calibration_claims",
+                "label": "Compare residual evidence",
+                "operator_action": (
+                    "Use subsequent sidecar validation, real projection intake, and residual comparison artifacts "
+                    "before making any physical calibration accuracy claim."
+                ),
+            },
+        ]
+    return [
+        {
+            "id": "collect_depth_reference",
+            "label": "Depth reference",
+            "operator_action": (
+                "Capture or attach a local real SO-101 depth/distance reference with measured metric targets "
+                "and camera/board pose context."
+            ),
+        },
+        {
+            "id": "collect_pick_place_video",
+            "label": "Pick/place video",
+            "operator_action": (
+                "Capture or attach a local pick/place video that shows fingers, wrist/arm, pickup, release, "
+                "and occlusion context."
+            ),
+        },
+        {
+            "id": "prepare_sidecars",
+            "label": "Sidecars",
+            "operator_action": (
+                "Provide sidecars for depth measurements, capture metadata, camera intrinsics/extrinsics, "
+                "board pose, and reviewed event markers as applicable."
+            ),
+        },
+        {
+            "id": "record_provenance_review",
+            "label": "Provenance and review",
+            "operator_action": (
+                "Record operator, capture date/source, camera id, reviewer, review date, and review status "
+                "in the manifest or capture entries."
+            ),
+        },
+        {
+            "id": "preserve_local_only_no_copy_policy",
+            "label": "Local-only no-copy policy",
+            "operator_action": (
+                "Declare `media_assets_copied_into_repo: false` and a local-only no-copy policy; keep media "
+                "outside commits and suite artifact directories."
+            ),
+        },
+    ]
+
+
+def no_copy_status(evidence: dict[str, Any]) -> dict[str, Any]:
+    policy = evidence.get("local_only_no_copy_policy")
+    policy = policy if isinstance(policy, dict) else None
+    copied = evidence.get("media_assets_copied_into_repo")
+    policy_ok = policy.get("ok") if policy is not None else None
+    if copied is None and policy is None:
+        status = "no_copy_evidence_not_available"
+    elif copied is not False:
+        status = "missing_media_assets_copied_into_repo_false"
+    elif policy_ok is True:
+        status = "local_only_no_copy_policy_confirmed"
+    elif policy is None:
+        status = "local_only_no_copy_policy_not_available"
+    else:
+        status = "local_only_no_copy_policy_needs_review"
+    return {
+        "status": status,
+        "media_assets_copied_into_repo": copied,
+        "local_only_no_copy_policy_ok": policy_ok,
+        "local_only_no_copy_policy": policy,
+    }
+
+
+def compact_reference_capture_manifest_payload(payload: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    suite_section = payload.get("reference_capture_manifest")
+    if isinstance(suite_section, dict):
+        return suite_section, "calibration_regression_summary"
+    if (
+        payload.get("schema") == "lerobot.sim.reference_capture_manifest_check.v1"
+        or "ready_for_calibration_grade_simcamera_tuning" in payload
+        or str(payload.get("status") or "").startswith("reference_capture_manifest_")
+    ):
+        return payload, "reference_capture_manifest_check"
+    raise ValueError(
+        "capture manifest evidence JSON must be a reference_capture_manifest_check.json "
+        "or a calibration_regression_summary.json containing reference_capture_manifest."
+    )
+
+
+def normalize_reference_capture_manifest_evidence(
+    *,
+    evidence_path: Path | None,
+    repo_root: Path,
+) -> dict[str, Any]:
+    if evidence_path is None:
+        evidence = {
+            "status": "capture_manifest_evidence_not_supplied",
+            "ready_for_calibration_grade_simcamera_tuning": False,
+            "manifest_path": None,
+            "depth_reference_capture_count": 0,
+            "pick_place_video_capture_count": 0,
+            "missing_path_count": 0,
+            "diagnostics": ["reference_capture_manifest_not_supplied"],
+            "gaps": ["reference_capture_manifest_not_supplied"],
+            "media_assets_copied_into_repo": None,
+            "local_only_no_copy_policy": None,
+        }
+        source_kind = "not_supplied"
+        source_path = None
+    else:
+        source_path_obj = resolve_path(evidence_path, repo_root=repo_root)
+        payload = read_json_object(source_path_obj, label="capture manifest evidence JSON")
+        evidence, source_kind = compact_reference_capture_manifest_payload(payload)
+        source_path = str(source_path_obj)
+
+    diagnostics = string_list(evidence.get("diagnostics"))
+    gaps = string_list(evidence.get("gaps")) or diagnostics
+    missing_path_count = int_value(evidence.get("missing_path_count"))
+    if not missing_path_count and isinstance(evidence.get("missing_path_checks"), list):
+        missing_path_count = len([row for row in evidence["missing_path_checks"] if isinstance(row, dict)])
+    ready = bool(evidence.get("ready_for_calibration_grade_simcamera_tuning", False))
+    manifest_path = evidence.get("manifest_path") if isinstance(evidence.get("manifest_path"), str) else None
+    normalized = {
+        "source_path": source_path,
+        "source_kind": source_kind,
+        "supplied_to_planner": evidence_path is not None,
+        "status": evidence.get("status"),
+        "manifest_path": manifest_path,
+        "summary_path": evidence.get("summary_path"),
+        "csv_path": evidence.get("csv_path"),
+        "readme_path": evidence.get("readme_path"),
+        "ready_for_calibration_grade_simcamera_tuning": ready,
+        "depth_reference_capture_count": int_value(evidence.get("depth_reference_capture_count")),
+        "pick_place_video_capture_count": int_value(evidence.get("pick_place_video_capture_count")),
+        "path_check_count": int_value(evidence.get("path_check_count")),
+        "media_path_check_count": int_value(evidence.get("media_path_check_count")),
+        "sidecar_path_check_count": int_value(evidence.get("sidecar_path_check_count")),
+        "missing_path_count": missing_path_count,
+        "diagnostics": diagnostics,
+        "gaps": gaps,
+        "media_assets_copied_into_repo": evidence.get("media_assets_copied_into_repo"),
+        "local_only_no_copy_policy": evidence.get("local_only_no_copy_policy"),
+        "provenance_present": evidence.get("provenance_present"),
+        "review_present": evidence.get("review_present"),
+        "input_readiness_only": True,
+        "physical_calibration_truth": False,
+        "caveat": (
+            "Reference capture manifest readiness is an input-readiness gate only; physical calibration "
+            "claims still require subsequent sidecar validation, intake, and residual comparison evidence."
+        ),
+    }
+    normalized["no_copy_status"] = no_copy_status(normalized)
+    normalized["next_operator_actions"] = reference_capture_manifest_actions(
+        ready=ready,
+        manifest_path=manifest_path,
+    )
+    return normalized
+
+
 def command_block(*parts: str) -> str:
     return " \\\n  ".join(parts)
 
@@ -240,9 +456,15 @@ def build_commands(
     output_dir: Path,
     repo_root: Path,
     python: Path,
+    reference_capture_manifest_evidence: dict[str, Any],
 ) -> dict[str, str]:
     manifest_text = repo_relative(manifest_path, repo_root) or str(manifest_path)
     positive_text = repo_relative(positive_manifest_path, repo_root) or str(positive_manifest_path)
+    capture_manifest_text = (
+        reference_capture_manifest_evidence.get("manifest_path")
+        if isinstance(reference_capture_manifest_evidence.get("manifest_path"), str)
+        else "/absolute/path/to/reference_capture_manifest.json"
+    )
     python_text = str(python)
     real_capture_sidecars_dir = output_dir / "real_capture_sidecars"
     commands = {
@@ -277,6 +499,12 @@ def build_commands(
             f"--reference-media-manifest {positive_text}",
             f"--output-dir {output_dir / 'synthetic_real_capture_fixture_suite'}",
         ),
+        "run_reference_capture_manifest_suite_after_manifest_review": command_block(
+            f"{python_text} scripts/smoke_sim_calibration_regression_suite.py",
+            f"--python {python_text}",
+            f"--reference-capture-manifest {capture_manifest_text}",
+            f"--output-dir {output_dir / 'reference_capture_manifest_suite'}",
+        ),
     }
     if manifest.get("exists") is True:
         return {
@@ -293,6 +521,8 @@ def build_commands(
 def build_markdown(summary: dict[str, Any]) -> str:
     manifest = summary["manifest"]
     positive_manifest = summary["synthetic_positive_fixture_manifest"]
+    capture_manifest = summary["reference_capture_manifest_evidence"]
+    no_copy = capture_manifest["no_copy_status"]
     lines = [
         "# Real Depth Capture Operator Plan",
         "",
@@ -311,6 +541,38 @@ def build_markdown(summary: dict[str, Any]) -> str:
         lines.extend(
             [
                 "There is no current manifest to validate yet. Generate real-capture sidecars first, then validate the generated manifest from `real_capture_sidecars/reference_media_manifest.generated_sidecars.json`.",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Reference Capture Manifest Evidence",
+            "",
+            f"- Source: `{capture_manifest['source_path'] or 'not supplied'}`",
+            f"- Source kind: `{capture_manifest['source_kind']}`",
+            f"- Status: `{capture_manifest['status']}`",
+            "- Ready for calibration-grade SimCamera tuning inputs: "
+            f"`{capture_manifest['ready_for_calibration_grade_simcamera_tuning']}`",
+            f"- Depth reference captures: `{capture_manifest['depth_reference_capture_count']}`",
+            f"- Pick/place video captures: `{capture_manifest['pick_place_video_capture_count']}`",
+            f"- Missing referenced paths: `{capture_manifest['missing_path_count']}`",
+            f"- Manifest path: `{capture_manifest['manifest_path'] or 'not available'}`",
+            f"- Diagnostics: `{', '.join(capture_manifest['diagnostics']) or 'none'}`",
+            f"- Gaps: `{', '.join(capture_manifest['gaps']) or 'none'}`",
+            f"- No-copy status: `{no_copy['status']}`",
+            f"- Media assets copied into repo: `{capture_manifest['media_assets_copied_into_repo']}`",
+            f"- Caveat: {capture_manifest['caveat']}",
+            "",
+            "## Reference Capture Manifest Next Actions",
+            "",
+        ]
+    )
+    for action in capture_manifest["next_operator_actions"]:
+        lines.extend(
+            [
+                f"### {action['label']}",
+                "",
+                f"- Action: {action['operator_action']}",
                 "",
             ]
         )
@@ -345,15 +607,24 @@ def build_markdown(summary: dict[str, Any]) -> str:
 
 
 def build_summary(args: argparse.Namespace) -> dict[str, Any]:
+    if args.capture_manifest_check_json is not None and args.calibration_suite_summary_json is not None:
+        raise ValueError(
+            "Pass only one of --capture-manifest-check-json or --calibration-suite-summary-json."
+        )
     repo_root = args.repo_root.expanduser().resolve()
     output_dir = args.output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = resolve_path(args.manifest, repo_root=repo_root)
     positive_manifest_path = resolve_path(args.real_capture_fixture_manifest, repo_root=repo_root)
     scenario_label = slugify(args.scenario_label or manifest_path.stem)
+    capture_manifest_evidence_path = args.capture_manifest_check_json or args.calibration_suite_summary_json
 
     manifest = analyze_manifest(manifest_path, repo_root=repo_root)
     positive_manifest = analyze_manifest(positive_manifest_path, repo_root=repo_root)
+    reference_capture_manifest_evidence = normalize_reference_capture_manifest_evidence(
+        evidence_path=capture_manifest_evidence_path,
+        repo_root=repo_root,
+    )
     commands = build_commands(
         manifest_path=manifest_path,
         manifest=manifest,
@@ -361,6 +632,7 @@ def build_summary(args: argparse.Namespace) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
         python=args.python.expanduser().resolve(),
+        reference_capture_manifest_evidence=reference_capture_manifest_evidence,
     )
     summary = {
         "schema": SCHEMA,
@@ -377,6 +649,7 @@ def build_summary(args: argparse.Namespace) -> dict[str, Any]:
         "openai_skipped": True,
         "manifest": manifest,
         "synthetic_positive_fixture_manifest": positive_manifest,
+        "reference_capture_manifest_evidence": reference_capture_manifest_evidence,
         "current_manifest_validation": {
             "available": manifest.get("exists") is True,
             "status": "available" if manifest.get("exists") is True else "not_available_until_manifest_exists",

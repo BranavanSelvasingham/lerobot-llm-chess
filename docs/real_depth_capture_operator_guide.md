@@ -22,6 +22,37 @@ Generate the synthetic positive fixture package that proves residual and scoreca
 
 The planner writes a Markdown operator plan and JSON report. It does not open cameras, move motors, start GUI code, call OpenAI, or modify SimCamera geometry. In the default missing-input state, it does not validate the placeholder manifest path; it tells the operator to generate sidecars first, then validate the generated manifest under the capture-sidecar output directory.
 
+## Fold In Reference Capture Manifest Evidence
+
+If the calibration suite has already run the reference capture manifest checker, pass the suite summary into the same planner:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/plan_real_depth_capture_session.py \
+  --calibration-suite-summary-json /private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json \
+  --output-dir /private/tmp/lerobot_sim/real_depth_capture_plan_from_suite
+```
+
+You can also pass the focused checker output directly:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/plan_real_depth_capture_session.py \
+  --capture-manifest-check-json /private/tmp/lerobot_sim/calibration_regression_suite/reference_capture_manifest/reference_capture_manifest_check.json \
+  --output-dir /private/tmp/lerobot_sim/real_depth_capture_plan_from_manifest_check
+```
+
+The plan records the capture-manifest status, `ready_for_calibration_grade_simcamera_tuning`, depth-reference and pick/place counts, missing referenced path count, diagnostics/gaps, source manifest path, and local-only/no-copy status. If evidence is missing, not supplied, unavailable, or not ready, the plan lists the next operator actions for depth reference capture, pick/place video capture, sidecars, provenance/review, and `media_assets_copied_into_repo: false`.
+
+If the manifest is ready, treat that as input readiness only. The next step is still to validate the sidecars/intake and rerun the suite with the reviewed manifest:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_calibration_regression_suite.py \
+  --python /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 \
+  --reference-capture-manifest /absolute/path/to/reference_capture_manifest.json \
+  --output-dir /private/tmp/lerobot_sim/calibration_regression_suite_capture_manifest
+```
+
+Physical calibration claims still require later sidecar validation, real projection intake, and residual comparison evidence. The reference capture manifest does not copy, decode, or validate media content by itself.
+
 ## Physical Measurements Needed
 
 - Reference media: repo-local SO-101 gripper-camera chessboard image, `capture_id`, `camera_id`, and image resolution.
