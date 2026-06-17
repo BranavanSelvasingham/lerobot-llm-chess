@@ -18,23 +18,24 @@ CATEGORY_ORDER = {
     "reference_camera_tuning_diagnostics": 3,
     "sim_camera_profile_sweep": 4,
     "sim_camera_tuning_before_after": 5,
-    "reference_capture_checklist": 6,
-    "visual_review": 7,
-    "real_reference_comparison": 8,
-    "real_projection_intake": 9,
-    "ranked_candidate": 10,
-    "perception_fixture": 11,
-    "sim_camera_pose_fixture": 12,
-    "so101_model_source_inventory": 13,
-    "so101_model_bundle_manifest": 14,
-    "so101_model_contract": 15,
-    "so101_model_asset_preflight": 16,
-    "ik_reachability": 17,
-    "gripper_camera_pov": 18,
-    "app_entrypoint": 19,
-    "pick_place_scenario": 20,
-    "negative_check": 21,
-    "logs": 22,
+    "reference_capture_manifest": 6,
+    "reference_capture_checklist": 7,
+    "visual_review": 8,
+    "real_reference_comparison": 9,
+    "real_projection_intake": 10,
+    "ranked_candidate": 11,
+    "perception_fixture": 12,
+    "sim_camera_pose_fixture": 13,
+    "so101_model_source_inventory": 14,
+    "so101_model_bundle_manifest": 15,
+    "so101_model_contract": 16,
+    "so101_model_asset_preflight": 17,
+    "ik_reachability": 18,
+    "gripper_camera_pov": 19,
+    "app_entrypoint": 20,
+    "pick_place_scenario": 21,
+    "negative_check": 22,
+    "logs": 23,
 }
 CATEGORY_LABELS = {
     "reference_media_inventory": "Reference Media Inventory",
@@ -43,6 +44,7 @@ CATEGORY_LABELS = {
     "reference_camera_tuning_diagnostics": "Reference Camera Tuning Diagnostics",
     "sim_camera_profile_sweep": "SimCamera Profile Sweep",
     "sim_camera_tuning_before_after": "SimCamera Tuning Before/After",
+    "reference_capture_manifest": "Reference Capture Manifest",
     "reference_capture_checklist": "Reference Capture Checklist",
     "visual_review": "Visual Review Artifacts",
     "real_reference_comparison": "Real Reference Comparisons",
@@ -591,6 +593,38 @@ def sim_camera_tuning_before_after_prompt_rows(tuning: dict[str, Any]) -> list[l
             ]
         )
     return rows
+
+
+def reference_capture_manifest_signal(
+    index: dict[str, Any],
+    suite: dict[str, Any] | None,
+) -> dict[str, Any]:
+    manifest = index.get("reference_capture_manifest")
+    if isinstance(manifest, dict) and manifest:
+        return manifest
+    if suite is not None and isinstance(suite.get("reference_capture_manifest"), dict):
+        return suite["reference_capture_manifest"]
+    return {}
+
+
+def reference_capture_manifest_artifact_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("ready_for_calibration_grade_simcamera_tuning", ""),
+        metrics.get("depth_reference_capture_count", ""),
+        metrics.get("pick_place_video_capture_count", ""),
+        metrics.get("path_check_count", ""),
+        metrics.get("missing_path_count", ""),
+        metrics.get("media_assets_copied_into_repo", ""),
+        compact_list(metrics.get("diagnostics")),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
 
 
 def manifest_signal(index: dict[str, Any], suite: dict[str, Any] | None) -> dict[str, Any]:
@@ -1811,6 +1845,77 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         else ["_No SimCamera tuning before/after artifacts indexed._"]
     )
 
+    lines.extend(["", "## Reference Capture Manifest"])
+    reference_capture_manifest = reference_capture_manifest_signal(index, suite)
+    reference_capture_manifest_artifacts = grouped.get("reference_capture_manifest", [])
+    lines.append(
+        "This hardware-free child checks a local-only operator manifest for real "
+        "depth-reference captures, pick/place videos, provenance/review fields, and "
+        "referenced sidecar path availability. It is an input-readiness gate only, not "
+        "physical calibration truth."
+    )
+    lines.extend(
+        table(
+            ["Field", "Value"],
+            [
+                ["status", reference_capture_manifest.get("status", "")],
+                [
+                    "ready_for_calibration_grade_simcamera_tuning",
+                    reference_capture_manifest.get("ready_for_calibration_grade_simcamera_tuning", ""),
+                ],
+                [
+                    "depth_reference_capture_count",
+                    reference_capture_manifest.get("depth_reference_capture_count", ""),
+                ],
+                [
+                    "pick_place_video_capture_count",
+                    reference_capture_manifest.get("pick_place_video_capture_count", ""),
+                ],
+                ["path_check_count", reference_capture_manifest.get("path_check_count", "")],
+                ["media_path_check_count", reference_capture_manifest.get("media_path_check_count", "")],
+                [
+                    "sidecar_path_check_count",
+                    reference_capture_manifest.get("sidecar_path_check_count", ""),
+                ],
+                ["missing_path_count", reference_capture_manifest.get("missing_path_count", "")],
+                [
+                    "media_assets_copied_into_repo",
+                    reference_capture_manifest.get("media_assets_copied_into_repo", ""),
+                ],
+                ["diagnostics", compact_list(reference_capture_manifest.get("diagnostics"))],
+                ["manifest_path", reference_capture_manifest.get("manifest_path", "")],
+                ["summary_path", reference_capture_manifest.get("summary_path", "")],
+                ["csv_path", reference_capture_manifest.get("csv_path", "")],
+                ["readme_path", reference_capture_manifest.get("readme_path", "")],
+            ],
+        )
+    )
+    lines.append("")
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Ready",
+                "Depth Captures",
+                "Pick/Place Videos",
+                "Path Checks",
+                "Missing Paths",
+                "Copied Into Repo",
+                "Diagnostics",
+                "Artifact Status",
+            ],
+            [
+                reference_capture_manifest_artifact_row(row)
+                for row in reference_capture_manifest_artifacts
+            ],
+        )
+        if reference_capture_manifest_artifacts
+        else ["_No reference capture manifest artifacts indexed._"]
+    )
+
     lines.extend(["", "## Reference Capture Checklist"])
     checklist = reference_capture_checklist_signal(index, suite)
     checklist_artifacts = grouped.get("reference_capture_checklist", [])
@@ -2556,6 +2661,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "- The IK reachability drill is a hardware-free feasibility gate; `model_unavailable_fallback_complete` remains a deliberate non-failing status until a repo-local SO-101 model is wired in.",
             "- The SimCamera profile sweep is deterministic synthetic review evidence; its full-frame image deltas are coarse prompts, not physical calibration truth.",
             "- The SimCamera tuning before/after section compares the documented 72px baseline against the current canonical profile and keeps missing real depth and pick/place video gaps open.",
+            "- The reference capture manifest section records local input readiness for real depth-reference and pick/place-video captures; readiness is not physical calibration truth.",
             "- The metadata-native projection/depth view is the simulator camera-model-aligned ground-truth artifact; rendered-overlay PnP diagnostics are source-mismatch evidence, not depth authority.",
             "- SimCamera pose fixture intrinsics/extrinsics are simulator reference metadata, not physical calibration truth.",
             "- Gripper-camera POV visibility and clearance values are synthetic metadata evidence, not real-camera segmentation or physical contact proof.",
