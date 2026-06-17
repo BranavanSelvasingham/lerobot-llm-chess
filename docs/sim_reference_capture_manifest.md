@@ -37,6 +37,15 @@ The existing [real depth capture operator plan](real_depth_capture_operator_guid
 
 That bridge copies no media and opens no media. It carries the suite-indexed capture-manifest status, readiness flag, capture counts, missing path count, diagnostics/gaps, manifest path, and local-only/no-copy status into the operator plan. Not-ready evidence becomes explicit next actions for depth reference capture, pick/place video capture, sidecars, provenance/review, and local-only no-copy policy. Ready evidence is still only input readiness; physical calibration claims require later sidecar/intake validation and residual comparison evidence.
 
+For a narrow regression of that planner bridge without running the full suite, use:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_real_depth_capture_plan_manifest_bridge.py \
+  --output-dir /private/tmp/lerobot_sim/real_depth_capture_plan_bridge_smoke
+```
+
+The bridge smoke creates a no-manifest checker JSON with `reference_capture_manifest_not_supplied`, a ready synthetic manifest/checker result, and a minimal ready suite summary under its output directory only. It invokes `scripts/plan_real_depth_capture_session.py` for the missing direct-check JSON and ready suite-summary paths, then writes JSON/CSV/README artifacts summarizing planner exits, evidence status, readiness, capture counts, no-copy status, caveats, and next operator actions. Its ready case uses text placeholders for path-existence checks; it does not copy, open, decode, modify, or commit photos/videos.
+
 ## Focused Checker
 
 No-manifest diagnostic run:
