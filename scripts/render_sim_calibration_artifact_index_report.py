@@ -17,23 +17,24 @@ CATEGORY_ORDER = {
     "reference_media_comparison": 2,
     "reference_camera_tuning_diagnostics": 3,
     "sim_camera_profile_sweep": 4,
-    "reference_capture_checklist": 5,
-    "visual_review": 6,
-    "real_reference_comparison": 7,
-    "real_projection_intake": 8,
-    "ranked_candidate": 9,
-    "perception_fixture": 10,
-    "sim_camera_pose_fixture": 11,
-    "so101_model_source_inventory": 12,
-    "so101_model_bundle_manifest": 13,
-    "so101_model_contract": 14,
-    "so101_model_asset_preflight": 15,
-    "ik_reachability": 16,
-    "gripper_camera_pov": 17,
-    "app_entrypoint": 18,
-    "pick_place_scenario": 19,
-    "negative_check": 20,
-    "logs": 21,
+    "sim_camera_tuning_before_after": 5,
+    "reference_capture_checklist": 6,
+    "visual_review": 7,
+    "real_reference_comparison": 8,
+    "real_projection_intake": 9,
+    "ranked_candidate": 10,
+    "perception_fixture": 11,
+    "sim_camera_pose_fixture": 12,
+    "so101_model_source_inventory": 13,
+    "so101_model_bundle_manifest": 14,
+    "so101_model_contract": 15,
+    "so101_model_asset_preflight": 16,
+    "ik_reachability": 17,
+    "gripper_camera_pov": 18,
+    "app_entrypoint": 19,
+    "pick_place_scenario": 20,
+    "negative_check": 21,
+    "logs": 22,
 }
 CATEGORY_LABELS = {
     "reference_media_inventory": "Reference Media Inventory",
@@ -41,6 +42,7 @@ CATEGORY_LABELS = {
     "reference_media_comparison": "Reference Media Comparison",
     "reference_camera_tuning_diagnostics": "Reference Camera Tuning Diagnostics",
     "sim_camera_profile_sweep": "SimCamera Profile Sweep",
+    "sim_camera_tuning_before_after": "SimCamera Tuning Before/After",
     "reference_capture_checklist": "Reference Capture Checklist",
     "visual_review": "Visual Review Artifacts",
     "real_reference_comparison": "Real Reference Comparisons",
@@ -523,6 +525,69 @@ def sim_camera_profile_sweep_prompt_rows(sweep: dict[str, Any]) -> list[list[Any
                 prompt.get("description", ""),
                 prompt.get("mean_abs_delta_delta_vs_current", ""),
                 prompt.get("rmse_delta_vs_current", ""),
+            ]
+        )
+    return rows
+
+
+def sim_camera_tuning_before_after_signal(
+    index: dict[str, Any],
+    suite: dict[str, Any] | None,
+) -> dict[str, Any]:
+    tuning = index.get("sim_camera_tuning_before_after")
+    if isinstance(tuning, dict) and tuning:
+        return tuning
+    if suite is not None and isinstance(suite.get("simcamera_tuning_before_after"), dict):
+        return suite["simcamera_tuning_before_after"]
+    return {}
+
+
+def sim_camera_tuning_before_after_artifact_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("sweep_role", ""),
+        metrics.get("profile_name", ""),
+        metrics.get("baseline_gripper_finger_width_px", ""),
+        metrics.get("current_gripper_finger_width_px", ""),
+        metrics.get("marker_time_seconds", ""),
+        metrics.get("baseline_candidate_count", ""),
+        metrics.get("current_candidate_count", ""),
+        metrics.get("current_vs_baseline_mean_abs_delta", ""),
+        metrics.get("current_vs_baseline_rmse", ""),
+        metrics.get("best_vs_baseline_best_mean_abs_delta", ""),
+        metrics.get("best_vs_baseline_best_rmse", ""),
+        metrics.get("remaining_tuning_prompt_count", ""),
+        metrics.get("media_assets_copied_into_repo", ""),
+        metrics.get("missing_real_depth_reference", ""),
+        metrics.get("missing_pick_place_video", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def sim_camera_tuning_before_after_prompt_rows(tuning: dict[str, Any]) -> list[list[Any]]:
+    prompts = tuning.get("remaining_tuning_prompts")
+    prompt_rows = prompts if isinstance(prompts, list) else []
+    rows: list[list[Any]] = []
+    for prompt in prompt_rows:
+        if not isinstance(prompt, dict):
+            continue
+        delta = prompt.get("delta_vs_current")
+        delta = delta if isinstance(delta, dict) else {}
+        rows.append(
+            [
+                prompt.get("sweep", ""),
+                prompt.get("candidate", ""),
+                prompt.get("description", ""),
+                prompt.get("mean_abs_delta", ""),
+                prompt.get("rmse", ""),
+                delta.get("mean_abs_delta", ""),
+                delta.get("rmse", ""),
             ]
         )
     return rows
@@ -1614,6 +1679,138 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         else ["_No SimCamera profile sweep artifacts indexed._"]
     )
 
+    lines.extend(["", "## SimCamera Tuning Before/After"])
+    tuning_before_after = sim_camera_tuning_before_after_signal(index, suite)
+    tuning_before_after_artifacts = grouped.get("sim_camera_tuning_before_after", [])
+    lines.append(
+        "This deterministic hardware-free child compares the documented 72px baseline "
+        "gripper-reference width against the current canonical SimCamera profile. "
+        "Full-frame image deltas are coarse review evidence, not physical calibration truth."
+    )
+    lines.extend(
+        table(
+            ["Field", "Value"],
+            [
+                ["status", tuning_before_after.get("status", "")],
+                ["profile_name", tuning_before_after.get("profile_name", "")],
+                [
+                    "baseline_gripper_finger_width_px",
+                    tuning_before_after.get("baseline_gripper_finger_width_px", ""),
+                ],
+                [
+                    "current_gripper_finger_width_px",
+                    tuning_before_after.get("current_gripper_finger_width_px", ""),
+                ],
+                ["marker_time_seconds", tuning_before_after.get("marker_time_seconds", "")],
+                [
+                    "baseline_candidate_count",
+                    tuning_before_after.get("baseline_candidate_count", ""),
+                ],
+                [
+                    "current_candidate_count",
+                    tuning_before_after.get("current_candidate_count", ""),
+                ],
+                [
+                    "baseline_current_mean_abs_delta",
+                    tuning_before_after.get("baseline_current_mean_abs_delta", ""),
+                ],
+                ["baseline_current_rmse", tuning_before_after.get("baseline_current_rmse", "")],
+                [
+                    "current_profile_mean_abs_delta",
+                    tuning_before_after.get("current_profile_mean_abs_delta", ""),
+                ],
+                ["current_profile_rmse", tuning_before_after.get("current_profile_rmse", "")],
+                [
+                    "current_vs_baseline_mean_abs_delta",
+                    tuning_before_after.get("current_vs_baseline_mean_abs_delta", ""),
+                ],
+                [
+                    "current_vs_baseline_rmse",
+                    tuning_before_after.get("current_vs_baseline_rmse", ""),
+                ],
+                [
+                    "baseline_best_candidate",
+                    tuning_before_after.get("baseline_best_candidate", ""),
+                ],
+                ["current_best_candidate", tuning_before_after.get("current_best_candidate", "")],
+                [
+                    "best_vs_baseline_best_mean_abs_delta",
+                    tuning_before_after.get("best_vs_baseline_best_mean_abs_delta", ""),
+                ],
+                [
+                    "best_vs_baseline_best_rmse",
+                    tuning_before_after.get("best_vs_baseline_best_rmse", ""),
+                ],
+                [
+                    "remaining_tuning_prompt_count",
+                    tuning_before_after.get("remaining_tuning_prompt_count", ""),
+                ],
+                [
+                    "media_assets_copied_into_repo",
+                    tuning_before_after.get("media_assets_copied_into_repo", ""),
+                ],
+                [
+                    "missing_real_depth_reference",
+                    tuning_before_after.get("missing_real_depth_reference", ""),
+                ],
+                [
+                    "missing_pick_place_video",
+                    tuning_before_after.get("missing_pick_place_video", ""),
+                ],
+                [
+                    "full_frame_image_delta_caveat",
+                    tuning_before_after.get("full_frame_image_delta_caveat", ""),
+                ],
+                ["summary_path", tuning_before_after.get("summary_path", "")],
+                ["csv_path", tuning_before_after.get("csv_path", "")],
+                ["readme_path", tuning_before_after.get("readme_path", "")],
+            ],
+        )
+    )
+    lines.extend(["", "### Before/After Remaining Prompts"])
+    before_after_prompt_rows = sim_camera_tuning_before_after_prompt_rows(tuning_before_after)
+    lines.extend(
+        table(
+            ["Sweep", "Candidate", "Description", "MAD", "RMSE", "MAD Delta", "RMSE Delta"],
+            before_after_prompt_rows,
+        )
+        if before_after_prompt_rows
+        else ["_No before/after remaining tuning prompts were available._"]
+    )
+    lines.extend(["", "### Before/After Artifacts"])
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Sweep",
+                "Profile",
+                "Baseline Width",
+                "Current Width",
+                "Marker Time",
+                "Baseline Candidates",
+                "Current Candidates",
+                "Current-vs-Baseline MAD",
+                "Current-vs-Baseline RMSE",
+                "Best-vs-Baseline MAD",
+                "Best-vs-Baseline RMSE",
+                "Prompts",
+                "Copied Into Repo",
+                "Missing Real Depth",
+                "Missing Pick/Place Video",
+                "Artifact Status",
+            ],
+            [
+                sim_camera_tuning_before_after_artifact_row(row)
+                for row in tuning_before_after_artifacts
+            ],
+        )
+        if tuning_before_after_artifacts
+        else ["_No SimCamera tuning before/after artifacts indexed._"]
+    )
+
     lines.extend(["", "## Reference Capture Checklist"])
     checklist = reference_capture_checklist_signal(index, suite)
     checklist_artifacts = grouped.get("reference_capture_checklist", [])
@@ -2358,6 +2555,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "- The SO-101 model contract checker is a hardware-free preflight for model availability, direct RobotKinematics usability, and joint/frame/TCP alignment inputs.",
             "- The IK reachability drill is a hardware-free feasibility gate; `model_unavailable_fallback_complete` remains a deliberate non-failing status until a repo-local SO-101 model is wired in.",
             "- The SimCamera profile sweep is deterministic synthetic review evidence; its full-frame image deltas are coarse prompts, not physical calibration truth.",
+            "- The SimCamera tuning before/after section compares the documented 72px baseline against the current canonical profile and keeps missing real depth and pick/place video gaps open.",
             "- The metadata-native projection/depth view is the simulator camera-model-aligned ground-truth artifact; rendered-overlay PnP diagnostics are source-mismatch evidence, not depth authority.",
             "- SimCamera pose fixture intrinsics/extrinsics are simulator reference metadata, not physical calibration truth.",
             "- Gripper-camera POV visibility and clearance values are synthetic metadata evidence, not real-camera segmentation or physical contact proof.",

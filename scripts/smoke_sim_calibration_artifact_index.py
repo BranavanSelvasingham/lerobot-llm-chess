@@ -16,23 +16,24 @@ CATEGORY_ORDER = {
     "reference_media_comparison": 2,
     "reference_camera_tuning_diagnostics": 3,
     "sim_camera_profile_sweep": 4,
-    "reference_capture_checklist": 5,
-    "visual_review": 6,
-    "real_reference_comparison": 7,
-    "real_projection_intake": 8,
-    "ranked_candidate": 9,
-    "perception_fixture": 10,
-    "sim_camera_pose_fixture": 11,
-    "so101_model_source_inventory": 12,
-    "so101_model_bundle_manifest": 13,
-    "so101_model_contract": 14,
-    "so101_model_asset_preflight": 15,
-    "ik_reachability": 16,
-    "gripper_camera_pov": 17,
-    "app_entrypoint": 18,
-    "pick_place_scenario": 19,
-    "negative_check": 20,
-    "logs": 21,
+    "sim_camera_tuning_before_after": 5,
+    "reference_capture_checklist": 6,
+    "visual_review": 7,
+    "real_reference_comparison": 8,
+    "real_projection_intake": 9,
+    "ranked_candidate": 10,
+    "perception_fixture": 11,
+    "sim_camera_pose_fixture": 12,
+    "so101_model_source_inventory": 13,
+    "so101_model_bundle_manifest": 14,
+    "so101_model_contract": 15,
+    "so101_model_asset_preflight": 16,
+    "ik_reachability": 17,
+    "gripper_camera_pov": 18,
+    "app_entrypoint": 19,
+    "pick_place_scenario": 20,
+    "negative_check": 21,
+    "logs": 22,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -611,6 +612,212 @@ def collect_sim_camera_profile_sweep_artifacts(
         "candidate_ranking": ranking_rows,
         "remaining_tuning_prompts": sweep.get("remaining_tuning_prompts"),
         "current_vs_best_metrics": current_vs_best,
+    }
+
+
+def sim_camera_tuning_before_after_metric(
+    source: dict[str, Any],
+    direct_key: str,
+    delta_key: str | None = None,
+    metric_key: str | None = None,
+) -> Any:
+    if direct_key in source:
+        return source.get(direct_key)
+    if delta_key is None or metric_key is None:
+        return None
+    deltas = source.get("deltas")
+    deltas = deltas if isinstance(deltas, dict) else {}
+    row = deltas.get(delta_key)
+    row = row if isinstance(row, dict) else {}
+    return row.get(metric_key)
+
+
+def sim_camera_tuning_sweep_artifacts(source: dict[str, Any], role: str) -> dict[str, Any]:
+    paths = source.get("artifact_paths")
+    paths = paths if isinstance(paths, dict) else {}
+    sweeps = paths.get("sweeps")
+    sweeps = sweeps if isinstance(sweeps, dict) else {}
+    role_paths = sweeps.get(role)
+    if isinstance(role_paths, dict) and role_paths:
+        return role_paths
+
+    raw_sweeps = source.get("sweeps")
+    raw_sweeps = raw_sweeps if isinstance(raw_sweeps, dict) else {}
+    sweep = raw_sweeps.get(role)
+    sweep = sweep if isinstance(sweep, dict) else {}
+    artifacts = sweep.get("artifacts")
+    return artifacts if isinstance(artifacts, dict) else {}
+
+
+def sim_camera_tuning_before_after_metrics(source: dict[str, Any]) -> dict[str, Any]:
+    gaps = source.get("open_reference_gaps")
+    gaps = gaps if isinstance(gaps, dict) else {}
+    prompts = source.get("remaining_tuning_prompts")
+    prompts = prompts if isinstance(prompts, list) else []
+    return {
+        "status": source.get("status"),
+        "ok": source.get("ok"),
+        "profile_name": source.get("profile_name") or source.get("profile"),
+        "baseline_gripper_finger_width_px": source.get("baseline_gripper_finger_width_px"),
+        "current_gripper_finger_width_px": source.get("current_gripper_finger_width_px"),
+        "marker_time_seconds": source.get("marker_time_seconds"),
+        "baseline_candidate_count": source.get("baseline_candidate_count"),
+        "current_candidate_count": source.get("current_candidate_count"),
+        "baseline_current_mean_abs_delta": source.get("baseline_current_mean_abs_delta"),
+        "baseline_current_rmse": source.get("baseline_current_rmse"),
+        "current_profile_mean_abs_delta": source.get("current_profile_mean_abs_delta"),
+        "current_profile_rmse": source.get("current_profile_rmse"),
+        "baseline_best_candidate": source.get("baseline_best_candidate"),
+        "current_best_candidate": source.get("current_best_candidate"),
+        "baseline_best_mean_abs_delta": source.get("baseline_best_mean_abs_delta"),
+        "baseline_best_rmse": source.get("baseline_best_rmse"),
+        "current_best_mean_abs_delta": source.get("current_best_mean_abs_delta"),
+        "current_best_rmse": source.get("current_best_rmse"),
+        "current_vs_baseline_mean_abs_delta": sim_camera_tuning_before_after_metric(
+            source,
+            "current_vs_baseline_mean_abs_delta",
+            "current_profile_delta_vs_baseline_current_candidate",
+            "mean_abs_delta",
+        ),
+        "current_vs_baseline_rmse": sim_camera_tuning_before_after_metric(
+            source,
+            "current_vs_baseline_rmse",
+            "current_profile_delta_vs_baseline_current_candidate",
+            "rmse",
+        ),
+        "best_vs_baseline_best_mean_abs_delta": sim_camera_tuning_before_after_metric(
+            source,
+            "best_vs_baseline_best_mean_abs_delta",
+            "current_best_delta_vs_baseline_best_candidate",
+            "mean_abs_delta",
+        ),
+        "best_vs_baseline_best_rmse": sim_camera_tuning_before_after_metric(
+            source,
+            "best_vs_baseline_best_rmse",
+            "current_best_delta_vs_baseline_best_candidate",
+            "rmse",
+        ),
+        "best_vs_baseline_current_mean_abs_delta": sim_camera_tuning_before_after_metric(
+            source,
+            "best_vs_baseline_current_mean_abs_delta",
+            "current_best_delta_vs_baseline_current_candidate",
+            "mean_abs_delta",
+        ),
+        "best_vs_baseline_current_rmse": sim_camera_tuning_before_after_metric(
+            source,
+            "best_vs_baseline_current_rmse",
+            "current_best_delta_vs_baseline_current_candidate",
+            "rmse",
+        ),
+        "remaining_tuning_prompt_count": source.get(
+            "remaining_tuning_prompt_count",
+            len(prompts),
+        ),
+        "remaining_tuning_prompt_ids": source.get("remaining_tuning_prompt_ids"),
+        "media_assets_copied_into_repo": source.get("media_assets_copied_into_repo", False),
+        "missing_real_depth_reference": source.get(
+            "missing_real_depth_reference",
+            gaps.get("missing_real_depth_reference"),
+        ),
+        "missing_pick_place_video": source.get(
+            "missing_pick_place_video",
+            gaps.get("missing_pick_place_video"),
+        ),
+        "full_frame_image_delta_caveat": source.get("full_frame_image_delta_caveat"),
+    }
+
+
+def collect_sim_camera_tuning_before_after_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    tuning = suite.get("simcamera_tuning_before_after")
+    tuning = tuning if isinstance(tuning, dict) else {}
+    child_summary = load_optional_json(
+        tuning.get("summary_path"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
+    child_summary = child_summary if isinstance(child_summary, dict) else {}
+    source = tuning if tuning else child_summary
+    artifact_paths = source.get("artifact_paths")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    if not artifact_paths:
+        child_artifacts = child_summary.get("artifacts")
+        child_artifacts = child_artifacts if isinstance(child_artifacts, dict) else {}
+        artifact_paths = {
+            "summary_json": source.get("summary_path") or child_artifacts.get("summary_path"),
+            "csv_rows": source.get("csv_path") or child_artifacts.get("csv_path"),
+            "readme_md": source.get("readme_path") or child_artifacts.get("readme_path"),
+            "baseline_profile_sweep_dir": child_artifacts.get("baseline_profile_sweep_dir"),
+            "current_profile_sweep_dir": child_artifacts.get("current_profile_sweep_dir"),
+        }
+    metrics = sim_camera_tuning_before_after_metrics(source)
+
+    for key, label_suffix in (
+        ("summary_json", "summary"),
+        ("csv_rows", "rows"),
+        ("readme_md", "readme"),
+        ("baseline_profile_sweep_dir", "baseline_profile_sweep_dir"),
+        ("current_profile_sweep_dir", "current_profile_sweep_dir"),
+    ):
+        add_path(
+            artifacts,
+            category="sim_camera_tuning_before_after",
+            label=f"sim_camera_tuning_before_after:{label_suffix}",
+            value=artifact_paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"simcamera_tuning_before_after.artifact_paths.{key}",
+            metrics=metrics,
+        )
+
+    child_key_map = {
+        "summary_path": "summary",
+        "candidate_montage_path": "candidate_montage",
+        "candidate_dir": "candidate_dir",
+        "current_overlay_path": "current_overlay",
+        "current_absolute_difference_path": "current_absolute_difference",
+        "current_side_by_side_path": "current_side_by_side",
+        "best_overlay_path": "best_overlay",
+        "best_absolute_difference_path": "best_absolute_difference",
+        "best_side_by_side_path": "best_side_by_side",
+    }
+    for role in ("baseline", "current"):
+        role_artifacts = sim_camera_tuning_sweep_artifacts(source, role)
+        for key, label_suffix in child_key_map.items():
+            add_path(
+                artifacts,
+                category="sim_camera_tuning_before_after",
+                label=f"sim_camera_tuning_before_after:{role}:{label_suffix}",
+                value=role_artifacts.get(key),
+                suite_summary_path=suite_summary_path,
+                output_dir=output_dir,
+                repo_root=repo_root,
+                source=f"simcamera_tuning_before_after.sweeps.{role}.artifacts.{key}",
+                metrics={**metrics, "sweep_role": role},
+            )
+
+    return {
+        **metrics,
+        "summary_path": artifact_paths.get("summary_json") or source.get("summary_path"),
+        "csv_path": artifact_paths.get("csv_rows") or source.get("csv_path"),
+        "readme_path": artifact_paths.get("readme_md") or source.get("readme_path"),
+        "artifact_paths": artifact_paths,
+        "sweep_artifact_paths": {
+            role: sim_camera_tuning_sweep_artifacts(source, role)
+            for role in ("baseline", "current")
+        },
+        "deltas": source.get("deltas"),
+        "remaining_tuning_prompts": source.get("remaining_tuning_prompts"),
+        "open_reference_gaps": source.get("open_reference_gaps"),
+        "caveats": source.get("caveats"),
     }
 
 
@@ -2398,6 +2605,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    sim_camera_tuning_before_after = collect_sim_camera_tuning_before_after_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
 
     reference_media_inventory = collect_reference_media_inventory_artifacts(
         suite=suite,
@@ -2578,6 +2792,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "reference_media_comparison": reference_media_comparison,
         "reference_camera_tuning_diagnostics": reference_camera_tuning_diagnostics,
         "sim_camera_profile_sweep": sim_camera_profile_sweep,
+        "sim_camera_tuning_before_after": sim_camera_tuning_before_after,
         "selected_real_reference_media": selected_media,
         "reference_capture_checklist": reference_capture_checklist,
         "real_projection_intake": real_projection_intake,
