@@ -57,6 +57,16 @@ With no supplied summary, the index runs the bridge smoke as a child under its o
 
 The integrated suite runs the same index as reporting evidence, while the focused command remains a narrow review surface for the planner bridge and bridge smoke. Both paths record `media_assets_copied_into_repo: false`, `media_assets_opened_or_decoded: false`, and the caveat that ready evidence is input readiness only. The rest of the suite remains the place for sidecar/intake validation and residual comparison before any physical calibration claim.
 
+For a concise next-action review artifact after that index exists, render the operator action checklist:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/render_real_depth_capture_operator_action_checklist.py \
+  --calibration-suite-summary-json /private/tmp/lerobot_sim/calibration_regression_suite/calibration_regression_summary.json \
+  --output-dir /private/tmp/lerobot_sim/real_depth_capture_operator_action_checklist
+```
+
+The checklist renderer consumes either the suite summary or a direct `real_depth_capture_plan_artifact_index.json`, writes JSON/CSV/README review artifacts, groups next operator actions by missing-input versus ready-input cases, and preserves the same `media_assets_copied_into_repo: false`, `media_assets_opened_or_decoded: false`, and input-readiness-only caveats. It reads JSON only and does not copy, open, or decode media.
+
 ## Focused Checker
 
 No-manifest diagnostic run:
