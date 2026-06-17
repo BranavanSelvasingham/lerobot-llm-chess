@@ -32,6 +32,8 @@ This before/after smoke is a formal review path for the suite-indexed SimCamera 
 
 The suggested dimensions are review prompts for future simulator tuning only: camera framing/board scale/board crop, board color/texture/lighting, gripper overlay geometry/occlusion, piece size/contrast, and missing depth/video capture needs. This diagnostics path does not update SimCamera constants, renderer behavior, camera/UI runtime, robot execution, OpenAI/LLM paths, IK behavior, or media assets. Synthetic comparison evidence remains hardware-free review evidence and does not close missing real depth-reference or pick/place-video gaps.
 
+When operators produce the missing real depth-reference and pick/place-video inputs, run the standalone [reference capture manifest checker](sim_reference_capture_manifest.md) against a local manifest. It writes deterministic JSON/CSV/README diagnostics, checks referenced media and sidecar paths without copying assets, and keeps capture readiness separate from this regression suite's hardware-free evidence.
+
 To scan optional sibling evidence without committing media assets, pass repeatable roots:
 
 ```bash
