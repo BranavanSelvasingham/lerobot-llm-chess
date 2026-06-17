@@ -23,7 +23,7 @@ To check a local operator manifest through the full artifact path:
   --reference-capture-manifest /absolute/path/to/reference_capture_manifest.json
 ```
 
-The suite exposes the result in `calibration_regression_summary.json.reference_capture_manifest`, `child_commands.reference_capture_manifest`, `artifact_index.json.reference_capture_manifest`, and the `Reference Capture Manifest` section of `artifact_index_report.md`. A nonexistent manifest path stays non-failing and records `reference_capture_manifest_unavailable`.
+The suite exposes the result in `calibration_regression_summary.json.reference_capture_manifest`, `child_commands.reference_capture_manifest`, `artifact_index.json.reference_capture_manifest`, and the `Reference Capture Manifest` section of `artifact_index_report.md`. Immediately after that child, it runs the Real Depth Capture Plan Artifact Index under `real_depth_capture_plan_artifact_index/`, so `child_commands.real_depth_capture_plan_artifact_index`, `calibration_regression_summary.json.real_depth_capture_plan_artifact_index`, `artifact_index.json.real_depth_capture_plan_artifact_index`, and the report section of the same name show the bridge-smoke/operator-plan evidence beside the manifest checker. A nonexistent manifest path stays non-failing and records `reference_capture_manifest_unavailable`; the operator-plan index still runs because it is hardware-free bridge evidence.
 
 ## Use In The Real Depth Operator Plan
 
@@ -46,7 +46,7 @@ For a narrow regression of that planner bridge without running the full suite, u
 
 The bridge smoke creates a no-manifest checker JSON with `reference_capture_manifest_not_supplied`, a ready synthetic manifest/checker result, and a minimal ready suite summary under its output directory only. It invokes `scripts/plan_real_depth_capture_session.py` for the missing direct-check JSON and ready suite-summary paths, then writes JSON/CSV/README artifacts summarizing planner exits, evidence status, readiness, capture counts, no-copy status, caveats, and next operator actions. Its ready case uses text placeholders for path-existence checks; it does not copy, open, decode, modify, or commit photos/videos.
 
-To review those bridge-smoke and planner artifacts without opening each child directory, run the standalone operator-side index:
+To review those bridge-smoke and planner artifacts without opening each child directory or running the full suite, run the focused operator-side index:
 
 ```bash
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_real_depth_capture_plan_artifact_index.py \
@@ -55,7 +55,7 @@ To review those bridge-smoke and planner artifacts without opening each child di
 
 With no supplied summary, the index runs the bridge smoke as a child under its output directory. With `--bridge-smoke-summary-json`, it reads an existing bridge-smoke summary and the referenced planner JSON/Markdown outputs. It writes `real_depth_capture_plan_artifact_index.json`, `real_depth_capture_plan_artifact_index_cases.csv`, and `README.md` with per-case evidence source/status, readiness, depth and pick/place counts, missing path count, no-copy status, next operator actions, planner artifact paths, child stdout/stderr paths, `media_assets_copied_into_repo: false`, `media_assets_opened_or_decoded: false`, and the caveat that ready evidence is only input readiness.
 
-This index is intentionally not a calibration-suite step. The suite remains the place for integrated manifest evidence, artifact indexing, sidecar/intake validation, and residual comparison. The standalone index is only a narrow review surface for the planner bridge and bridge smoke.
+The integrated suite runs the same index as reporting evidence, while the focused command remains a narrow review surface for the planner bridge and bridge smoke. Both paths record `media_assets_copied_into_repo: false`, `media_assets_opened_or_decoded: false`, and the caveat that ready evidence is input readiness only. The rest of the suite remains the place for sidecar/intake validation and residual comparison before any physical calibration claim.
 
 ## Focused Checker
 

@@ -18,23 +18,24 @@ CATEGORY_ORDER = {
     "sim_camera_profile_sweep": 4,
     "sim_camera_tuning_before_after": 5,
     "reference_capture_manifest": 6,
-    "reference_capture_checklist": 7,
-    "visual_review": 8,
-    "real_reference_comparison": 9,
-    "real_projection_intake": 10,
-    "ranked_candidate": 11,
-    "perception_fixture": 12,
-    "sim_camera_pose_fixture": 13,
-    "so101_model_source_inventory": 14,
-    "so101_model_bundle_manifest": 15,
-    "so101_model_contract": 16,
-    "so101_model_asset_preflight": 17,
-    "ik_reachability": 18,
-    "gripper_camera_pov": 19,
-    "app_entrypoint": 20,
-    "pick_place_scenario": 21,
-    "negative_check": 22,
-    "logs": 23,
+    "real_depth_capture_plan_artifact_index": 7,
+    "reference_capture_checklist": 8,
+    "visual_review": 9,
+    "real_reference_comparison": 10,
+    "real_projection_intake": 11,
+    "ranked_candidate": 12,
+    "perception_fixture": 13,
+    "sim_camera_pose_fixture": 14,
+    "so101_model_source_inventory": 15,
+    "so101_model_bundle_manifest": 16,
+    "so101_model_contract": 17,
+    "so101_model_asset_preflight": 18,
+    "ik_reachability": 19,
+    "gripper_camera_pov": 20,
+    "app_entrypoint": 21,
+    "pick_place_scenario": 22,
+    "negative_check": 23,
+    "logs": 24,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -922,6 +923,209 @@ def collect_reference_capture_manifest_artifacts(
             else []
         ),
         "notes": source.get("notes"),
+    }
+
+
+def int_count(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def unique_string_values(values: list[Any]) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if not isinstance(value, str) or not value:
+            continue
+        if value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
+
+
+def real_depth_capture_plan_case_metrics(
+    case: dict[str, Any],
+    aggregate_metrics: dict[str, Any],
+) -> dict[str, Any]:
+    next_action_ids = (
+        case.get("next_operator_action_ids")
+        if isinstance(case.get("next_operator_action_ids"), list)
+        else []
+    )
+    return {
+        **aggregate_metrics,
+        "case_id": case.get("case_id"),
+        "scenario_label": case.get("scenario_label"),
+        "evidence_source_kind": case.get("evidence_source_kind"),
+        "evidence_status": case.get("evidence_status"),
+        "ready_for_calibration_grade_simcamera_tuning": case.get(
+            "ready_for_calibration_grade_simcamera_tuning"
+        ),
+        "case_depth_reference_capture_count": int_count(
+            case.get("depth_reference_capture_count")
+        ),
+        "case_pick_place_video_capture_count": int_count(
+            case.get("pick_place_video_capture_count")
+        ),
+        "case_missing_path_count": int_count(case.get("missing_path_count")),
+        "no_copy_status": case.get("no_copy_status"),
+        "case_next_operator_action_count": len(next_action_ids),
+        "case_next_operator_action_ids": next_action_ids,
+        "planner_json_path": case.get("planner_json_path"),
+        "planner_markdown_path": case.get("planner_markdown_path"),
+    }
+
+
+def collect_real_depth_capture_plan_artifact_index_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    plan_index = suite.get("real_depth_capture_plan_artifact_index")
+    plan_index = plan_index if isinstance(plan_index, dict) else {}
+    child_summary = load_optional_json(
+        plan_index.get("summary_path"),
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
+    child_summary = child_summary if isinstance(child_summary, dict) else {}
+    source = child_summary if child_summary else plan_index
+    artifact_paths = plan_index.get("artifact_paths")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    cases = source.get("cases")
+    cases = [case for case in cases if isinstance(case, dict)] if isinstance(cases, list) else []
+    evidence_statuses = unique_string_values([case.get("evidence_status") for case in cases])
+    no_copy_statuses = unique_string_values([case.get("no_copy_status") for case in cases])
+    next_operator_action_ids = unique_string_values(
+        [
+            action_id
+            for case in cases
+            for action_id in (
+                case.get("next_operator_action_ids")
+                if isinstance(case.get("next_operator_action_ids"), list)
+                else []
+            )
+        ]
+    )
+    ready_case_ids = [
+        str(case.get("case_id"))
+        for case in cases
+        if case.get("ready_for_calibration_grade_simcamera_tuning") is True and case.get("case_id")
+    ]
+    not_ready_case_ids = [
+        str(case.get("case_id"))
+        for case in cases
+        if case.get("ready_for_calibration_grade_simcamera_tuning") is not True
+        and case.get("case_id")
+    ]
+    paths = {
+        "summary_json": source.get("artifact_index_path")
+        or source.get("summary_path")
+        or plan_index.get("summary_path")
+        or artifact_paths.get("summary_json"),
+        "csv": source.get("csv_path") or plan_index.get("csv_path") or artifact_paths.get("csv"),
+        "readme_md": source.get("readme_path")
+        or plan_index.get("readme_path")
+        or artifact_paths.get("readme_md"),
+        "bridge_smoke_summary_json": source.get("bridge_smoke_summary_json")
+        or plan_index.get("bridge_smoke_summary_json"),
+    }
+    caveats = unique_string_values(
+        [
+            *(
+                source.get("caveats")
+                if isinstance(source.get("caveats"), list)
+                else []
+            ),
+            *(
+                plan_index.get("caveats")
+                if isinstance(plan_index.get("caveats"), list)
+                else []
+            ),
+        ]
+    )
+    bridge_smoke = source.get("bridge_smoke")
+    bridge_smoke = bridge_smoke if isinstance(bridge_smoke, dict) else {}
+    aggregate_metrics = {
+        "status": source.get("status"),
+        "ok": source.get("ok"),
+        "source_mode": source.get("source_mode"),
+        "case_count": int_count(source.get("case_count", len(cases))),
+        "evidence_statuses": evidence_statuses,
+        "ready_case_count": len(ready_case_ids),
+        "not_ready_case_count": len(not_ready_case_ids),
+        "ready_case_ids": ready_case_ids,
+        "not_ready_case_ids": not_ready_case_ids,
+        "depth_reference_capture_count": sum(
+            int_count(case.get("depth_reference_capture_count")) for case in cases
+        ),
+        "pick_place_video_capture_count": sum(
+            int_count(case.get("pick_place_video_capture_count")) for case in cases
+        ),
+        "missing_path_count": sum(int_count(case.get("missing_path_count")) for case in cases),
+        "no_copy_statuses": no_copy_statuses,
+        "next_operator_action_count": len(next_operator_action_ids),
+        "next_operator_action_ids": next_operator_action_ids,
+        "bridge_smoke_summary_json": paths.get("bridge_smoke_summary_json"),
+        "bridge_smoke_status": bridge_smoke.get("status"),
+        "media_assets_copied_into_repo": source.get("media_assets_copied_into_repo", False),
+        "media_assets_opened_or_decoded": source.get("media_assets_opened_or_decoded", False),
+        "input_readiness_only": True,
+        "physical_calibration_truth": False,
+        "caveats": caveats,
+    }
+    for key, label_suffix in (
+        ("summary_json", "summary"),
+        ("csv", "cases"),
+        ("readme_md", "readme"),
+        ("bridge_smoke_summary_json", "bridge_smoke_summary"),
+    ):
+        add_path(
+            artifacts,
+            category="real_depth_capture_plan_artifact_index",
+            label=f"real_depth_capture_plan_artifact_index:{label_suffix}",
+            value=paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"real_depth_capture_plan_artifact_index.artifact_paths.{key}",
+            metrics=aggregate_metrics,
+        )
+    for case in cases:
+        case_id = str(case.get("case_id") or "unknown_case")
+        case_metrics = real_depth_capture_plan_case_metrics(case, aggregate_metrics)
+        for key, label_suffix in (
+            ("planner_json_path", "planner_json"),
+            ("planner_markdown_path", "planner_markdown"),
+        ):
+            add_path(
+                artifacts,
+                category="real_depth_capture_plan_artifact_index",
+                label=f"real_depth_capture_plan_artifact_index:{case_id}:{label_suffix}",
+                value=case.get(key),
+                suite_summary_path=suite_summary_path,
+                output_dir=output_dir,
+                repo_root=repo_root,
+                source=f"real_depth_capture_plan_artifact_index.cases.{case_id}.{key}",
+                metrics=case_metrics,
+            )
+    return {
+        **aggregate_metrics,
+        "summary_path": paths.get("summary_json"),
+        "csv_path": paths.get("csv"),
+        "readme_path": paths.get("readme_md"),
+        "artifact_paths": paths,
+        "bridge_smoke": bridge_smoke,
+        "cases": cases,
+        "case_summaries": plan_index.get("case_summaries"),
+        "notes": source.get("notes") or plan_index.get("notes"),
     }
 
 
@@ -2723,6 +2927,15 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    real_depth_capture_plan_artifact_index = (
+        collect_real_depth_capture_plan_artifact_index_artifacts(
+            suite=suite,
+            artifacts=artifacts,
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+        )
+    )
 
     reference_media_inventory = collect_reference_media_inventory_artifacts(
         suite=suite,
@@ -2905,6 +3118,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "sim_camera_profile_sweep": sim_camera_profile_sweep,
         "sim_camera_tuning_before_after": sim_camera_tuning_before_after,
         "reference_capture_manifest": reference_capture_manifest,
+        "real_depth_capture_plan_artifact_index": real_depth_capture_plan_artifact_index,
         "selected_real_reference_media": selected_media,
         "reference_capture_checklist": reference_capture_checklist,
         "real_projection_intake": real_projection_intake,

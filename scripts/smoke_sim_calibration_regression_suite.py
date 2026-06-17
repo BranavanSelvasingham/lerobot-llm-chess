@@ -37,6 +37,14 @@ REFERENCE_CAPTURE_MANIFEST_DIR_NAME = "reference_capture_manifest"
 REFERENCE_CAPTURE_MANIFEST_JSON_NAME = "reference_capture_manifest_check.json"
 REFERENCE_CAPTURE_MANIFEST_CSV_NAME = "reference_capture_manifest_checklist.csv"
 REFERENCE_CAPTURE_MANIFEST_README_NAME = "README.md"
+REAL_DEPTH_CAPTURE_PLAN_ARTIFACT_INDEX_DIR_NAME = "real_depth_capture_plan_artifact_index"
+REAL_DEPTH_CAPTURE_PLAN_ARTIFACT_INDEX_JSON_NAME = "real_depth_capture_plan_artifact_index.json"
+REAL_DEPTH_CAPTURE_PLAN_ARTIFACT_INDEX_CSV_NAME = "real_depth_capture_plan_artifact_index_cases.csv"
+REAL_DEPTH_CAPTURE_PLAN_ARTIFACT_INDEX_README_NAME = "README.md"
+REAL_DEPTH_CAPTURE_PLAN_INPUT_READINESS_CAVEAT = (
+    "Ready reference-capture-manifest evidence is input readiness only; physical calibration "
+    "truth still requires subsequent sidecar validation, intake, and residual comparison artifacts."
+)
 VISUAL_REVIEW_SUMMARY_NAME = "visual_review_summary.json"
 REFERENCE_CAPTURE_CHECKLIST_NAME = "reference_capture_checklist.json"
 REAL_PROJECTION_INTAKE_NAME = "real_projection_intake.json"
@@ -740,6 +748,178 @@ def reference_capture_manifest_section(
     }
 
 
+def real_depth_capture_plan_artifact_index_command(*, python: str, index_dir: Path) -> list[str]:
+    return [
+        python,
+        str(REPO_ROOT / "scripts" / "smoke_real_depth_capture_plan_artifact_index.py"),
+        "--output-dir",
+        str(index_dir),
+        "--python",
+        python,
+    ]
+
+
+def real_depth_capture_plan_artifact_paths(
+    index: dict[str, Any] | None,
+    index_dir: Path,
+) -> dict[str, str]:
+    index = index if isinstance(index, dict) else {}
+    return {
+        "summary_json": str(
+            index.get("artifact_index_path")
+            or index_dir / REAL_DEPTH_CAPTURE_PLAN_ARTIFACT_INDEX_JSON_NAME
+        ),
+        "csv": str(
+            index.get("csv_path") or index_dir / REAL_DEPTH_CAPTURE_PLAN_ARTIFACT_INDEX_CSV_NAME
+        ),
+        "readme_md": str(
+            index.get("readme_path")
+            or index_dir / REAL_DEPTH_CAPTURE_PLAN_ARTIFACT_INDEX_README_NAME
+        ),
+    }
+
+
+def int_count(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def unique_strings(values: list[Any]) -> list[str]:
+    unique: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if not isinstance(value, str) or not value:
+            continue
+        if value in seen:
+            continue
+        seen.add(value)
+        unique.append(value)
+    return unique
+
+
+def real_depth_capture_plan_artifact_index_section(
+    index: dict[str, Any] | None,
+    index_dir: Path,
+) -> dict[str, Any]:
+    index = index if isinstance(index, dict) else {}
+    paths = real_depth_capture_plan_artifact_paths(index, index_dir)
+    cases = index.get("cases")
+    cases = [case for case in cases if isinstance(case, dict)] if isinstance(cases, list) else []
+    ready_cases = [
+        str(case.get("case_id"))
+        for case in cases
+        if case.get("ready_for_calibration_grade_simcamera_tuning") is True and case.get("case_id")
+    ]
+    not_ready_cases = [
+        str(case.get("case_id"))
+        for case in cases
+        if case.get("ready_for_calibration_grade_simcamera_tuning") is not True
+        and case.get("case_id")
+    ]
+    evidence_statuses = unique_strings([case.get("evidence_status") for case in cases])
+    no_copy_statuses = unique_strings([case.get("no_copy_status") for case in cases])
+    next_operator_action_ids = unique_strings(
+        [
+            action_id
+            for case in cases
+            for action_id in (
+                case.get("next_operator_action_ids")
+                if isinstance(case.get("next_operator_action_ids"), list)
+                else []
+            )
+        ]
+    )
+    bridge_smoke = index.get("bridge_smoke")
+    bridge_smoke = bridge_smoke if isinstance(bridge_smoke, dict) else {}
+    caveats = unique_strings(
+        [
+            *(
+                index.get("caveats")
+                if isinstance(index.get("caveats"), list)
+                else []
+            ),
+            REAL_DEPTH_CAPTURE_PLAN_INPUT_READINESS_CAVEAT,
+        ]
+    )
+    case_summaries = [
+        {
+            "case_id": case.get("case_id"),
+            "scenario_label": case.get("scenario_label"),
+            "evidence_source_kind": case.get("evidence_source_kind"),
+            "evidence_status": case.get("evidence_status"),
+            "ready_for_calibration_grade_simcamera_tuning": bool(
+                case.get("ready_for_calibration_grade_simcamera_tuning")
+            ),
+            "depth_reference_capture_count": int_count(
+                case.get("depth_reference_capture_count")
+            ),
+            "pick_place_video_capture_count": int_count(
+                case.get("pick_place_video_capture_count")
+            ),
+            "missing_path_count": int_count(case.get("missing_path_count")),
+            "no_copy_status": case.get("no_copy_status"),
+            "next_operator_action_count": len(
+                case.get("next_operator_action_ids")
+                if isinstance(case.get("next_operator_action_ids"), list)
+                else []
+            ),
+            "next_operator_action_ids": (
+                case.get("next_operator_action_ids")
+                if isinstance(case.get("next_operator_action_ids"), list)
+                else []
+            ),
+            "planner_json_path": case.get("planner_json_path"),
+            "planner_markdown_path": case.get("planner_markdown_path"),
+        }
+        for case in cases
+    ]
+    return {
+        "ok": bool(index.get("ok", False)),
+        "status": index.get("status"),
+        "summary_path": paths["summary_json"],
+        "csv_path": paths["csv"],
+        "readme_path": paths["readme_md"],
+        "output_dir": str(index_dir),
+        "artifact_paths": paths,
+        "source_mode": index.get("source_mode"),
+        "case_count": int_count(index.get("case_count", len(cases))),
+        "evidence_statuses": evidence_statuses,
+        "ready_case_count": len(ready_cases),
+        "not_ready_case_count": len(not_ready_cases),
+        "ready_case_ids": ready_cases,
+        "not_ready_case_ids": not_ready_cases,
+        "depth_reference_capture_count": sum(
+            int_count(case.get("depth_reference_capture_count")) for case in cases
+        ),
+        "pick_place_video_capture_count": sum(
+            int_count(case.get("pick_place_video_capture_count")) for case in cases
+        ),
+        "missing_path_count": sum(int_count(case.get("missing_path_count")) for case in cases),
+        "no_copy_statuses": no_copy_statuses,
+        "next_operator_action_count": len(next_operator_action_ids),
+        "next_operator_action_ids": next_operator_action_ids,
+        "bridge_smoke_summary_json": index.get("bridge_smoke_summary_json"),
+        "bridge_smoke_status": bridge_smoke.get("status"),
+        "bridge_smoke_ok": bridge_smoke.get("ok"),
+        "bridge_smoke_child_run": index.get("bridge_smoke_child_run"),
+        "bridge_smoke": bridge_smoke,
+        "media_assets_copied_into_repo": index.get("media_assets_copied_into_repo", False),
+        "media_assets_opened_or_decoded": index.get("media_assets_opened_or_decoded", False),
+        "input_readiness_only": True,
+        "physical_calibration_truth": False,
+        "case_summaries": case_summaries,
+        "cases": cases,
+        "caveats": caveats,
+        "notes": [
+            "This hardware-free child runs the real-depth operator plan artifact index under the suite output directory.",
+            "Ready evidence is input readiness only, not physical calibration truth.",
+            "Photos and videos are not copied, opened, decoded, modified, or committed by this child.",
+        ],
+    }
+
+
 def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) -> Path:
     markers = summary.get("skipped_markers")
     markers = markers if isinstance(markers, dict) else {}
@@ -787,6 +967,12 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         reference_capture_manifest_paths
         if isinstance(reference_capture_manifest_paths, dict)
         else {}
+    )
+    real_depth_plan_index = summary.get("real_depth_capture_plan_artifact_index")
+    real_depth_plan_index = real_depth_plan_index if isinstance(real_depth_plan_index, dict) else {}
+    real_depth_plan_index_paths = real_depth_plan_index.get("artifact_paths")
+    real_depth_plan_index_paths = (
+        real_depth_plan_index_paths if isinstance(real_depth_plan_index_paths, dict) else {}
     )
     reference_inventory_counts_row = reference_media_inventory_counts(reference_inventory)
     reference_gap_ids = {
@@ -885,6 +1071,10 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         f"- `{REFERENCE_CAPTURE_MANIFEST_DIR_NAME}/{REFERENCE_CAPTURE_MANIFEST_JSON_NAME}`",
         f"- `{REFERENCE_CAPTURE_MANIFEST_DIR_NAME}/{REFERENCE_CAPTURE_MANIFEST_CSV_NAME}`",
         f"- `{REFERENCE_CAPTURE_MANIFEST_DIR_NAME}/{REFERENCE_CAPTURE_MANIFEST_README_NAME}`",
+        f"- `{REAL_DEPTH_CAPTURE_PLAN_ARTIFACT_INDEX_DIR_NAME}/{REAL_DEPTH_CAPTURE_PLAN_ARTIFACT_INDEX_JSON_NAME}`",
+        f"- `{REAL_DEPTH_CAPTURE_PLAN_ARTIFACT_INDEX_DIR_NAME}/{REAL_DEPTH_CAPTURE_PLAN_ARTIFACT_INDEX_CSV_NAME}`",
+        f"- `{REAL_DEPTH_CAPTURE_PLAN_ARTIFACT_INDEX_DIR_NAME}/{REAL_DEPTH_CAPTURE_PLAN_ARTIFACT_INDEX_README_NAME}`",
+        f"- `{REAL_DEPTH_CAPTURE_PLAN_ARTIFACT_INDEX_DIR_NAME}/bridge_smoke/real_depth_capture_plan_manifest_bridge_smoke_summary.json`",
         "- `session/session_summary.json`",
         "- `fixture/fixture_summary.json`",
         "- `sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json`",
@@ -1078,6 +1268,37 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         (
             "- Reference capture manifest caveat: ready means operator-supplied local "
             "capture inputs are present and reviewed; it is not physical calibration truth."
+        ),
+        (
+            "- Real depth capture plan artifact index: "
+            f"status `{real_depth_plan_index.get('status')}`; source mode "
+            f"`{real_depth_plan_index.get('source_mode')}`; cases "
+            f"`{real_depth_plan_index.get('case_count')}`; ready/not-ready "
+            f"`{real_depth_plan_index.get('ready_case_count')}`/"
+            f"`{real_depth_plan_index.get('not_ready_case_count')}`; evidence statuses "
+            f"`{markdown_list_value(real_depth_plan_index.get('evidence_statuses'))}`."
+        ),
+        (
+            "- Real depth capture plan action evidence: "
+            f"next actions `{real_depth_plan_index.get('next_operator_action_count')}` "
+            f"`{markdown_list_value(real_depth_plan_index.get('next_operator_action_ids'))}`; "
+            f"depth captures `{real_depth_plan_index.get('depth_reference_capture_count')}`; "
+            f"pick/place videos `{real_depth_plan_index.get('pick_place_video_capture_count')}`; "
+            f"missing paths `{real_depth_plan_index.get('missing_path_count')}`; no-copy statuses "
+            f"`{markdown_list_value(real_depth_plan_index.get('no_copy_statuses'))}`."
+        ),
+        (
+            "- Real depth capture plan artifacts: "
+            f"summary `{real_depth_plan_index_paths.get('summary_json')}`; rows "
+            f"`{real_depth_plan_index_paths.get('csv')}`; README "
+            f"`{real_depth_plan_index_paths.get('readme_md')}`; bridge smoke summary "
+            f"`{real_depth_plan_index.get('bridge_smoke_summary_json')}`."
+        ),
+        (
+            "- Real depth capture plan caveat: ready evidence is input readiness only, "
+            "not physical calibration truth; media assets copied/opened/decoded are "
+            f"`{markdown_bool(real_depth_plan_index.get('media_assets_copied_into_repo'))}`/"
+            f"`{markdown_bool(real_depth_plan_index.get('media_assets_opened_or_decoded'))}`."
         ),
         "- Reference capture checklist status: "
         f"`{summary.get('reference_capture_checklist', {}).get('status')}`.",
@@ -2949,6 +3170,30 @@ def main() -> int:
         config=reference_capture_manifest_config_row,
     )
 
+    real_depth_capture_plan_artifact_index_dir = (
+        output_dir / REAL_DEPTH_CAPTURE_PLAN_ARTIFACT_INDEX_DIR_NAME
+    )
+    real_depth_capture_plan_artifact_index_summary_path = (
+        real_depth_capture_plan_artifact_index_dir / REAL_DEPTH_CAPTURE_PLAN_ARTIFACT_INDEX_JSON_NAME
+    )
+    real_depth_capture_plan_artifact_index_record, real_depth_capture_plan_artifact_index = (
+        run_child(
+            name="real_depth_capture_plan_artifact_index",
+            command=real_depth_capture_plan_artifact_index_command(
+                python=python,
+                index_dir=real_depth_capture_plan_artifact_index_dir,
+            ),
+            output_dir=real_depth_capture_plan_artifact_index_dir,
+            expected_json_path=real_depth_capture_plan_artifact_index_summary_path,
+        )
+    )
+    real_depth_capture_plan_artifact_index_record["diagnostics"] = (
+        real_depth_capture_plan_artifact_index_section(
+            real_depth_capture_plan_artifact_index,
+            real_depth_capture_plan_artifact_index_dir,
+        )
+    )
+
     session_dir = output_dir / "session"
     session_summary_path = session_dir / "session_summary.json"
     session_record, session = run_child(
@@ -3196,6 +3441,7 @@ def main() -> int:
         "sim_camera_profile_sweep": sim_camera_profile_sweep_record,
         "simcamera_tuning_before_after": sim_camera_tuning_before_after_record,
         "reference_capture_manifest": reference_capture_manifest_record,
+        "real_depth_capture_plan_artifact_index": real_depth_capture_plan_artifact_index_record,
         "calibration_session_report": session_record,
         "perception_regression_fixture": fixture_record,
         "sim_camera_pose_fixture": pose_fixture_record,
@@ -3285,6 +3531,10 @@ def main() -> int:
             manifest=reference_capture_manifest,
             manifest_dir=reference_capture_manifest_dir,
             config=reference_capture_manifest_config_row,
+        ),
+        "real_depth_capture_plan_artifact_index": real_depth_capture_plan_artifact_index_section(
+            real_depth_capture_plan_artifact_index,
+            real_depth_capture_plan_artifact_index_dir,
         ),
         "calibration_session": {
             "summary_path": str(session_summary_path),
