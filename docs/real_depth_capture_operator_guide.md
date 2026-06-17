@@ -53,6 +53,19 @@ If the manifest is ready, treat that as input readiness only. The next step is s
 
 Physical calibration claims still require later sidecar validation, real projection intake, and residual comparison evidence. The reference capture manifest does not copy, decode, or validate media content by itself.
 
+## Smoke The Planner Bridge
+
+Use the focused bridge smoke when reviewing changes to the planner-side capture-manifest ingestion without running the full calibration suite or using real media:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_real_depth_capture_plan_manifest_bridge.py \
+  --output-dir /private/tmp/lerobot_sim/real_depth_capture_plan_bridge_smoke
+```
+
+The smoke creates deterministic JSON, CSV, README, and text placeholder files only under its output directory. It runs the reference-capture-manifest checker for the no-manifest and ready-input cases, feeds the missing direct checker JSON and a synthetic ready suite summary into `scripts/plan_real_depth_capture_session.py`, and records planner exits, evidence status, `ready_for_calibration_grade_simcamera_tuning`, depth/pick-place counts, missing path count, no-copy status, caveats, and next operator actions.
+
+The ready case is still only input-readiness bridge evidence. The placeholder paths are not photos or videos, and the smoke does not copy, open, decode, or validate media.
+
 ## Physical Measurements Needed
 
 - Reference media: repo-local SO-101 gripper-camera chessboard image, `capture_id`, `camera_id`, and image resolution.
