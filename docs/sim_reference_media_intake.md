@@ -156,3 +156,5 @@ To turn the current gap into a capture plan without adding hardware requirements
 ```
 
 The checklist writes `reference_capture_checklist.json` and `reference_capture_checklist.md`. It marks the current `archive/chess_test_images/current_view.jpg` frame as the only represented real-media baseline, lists missing overhead, calibration-target, approach/release video, occlusion/failure-mode, lighting-variant, and post-pick verification captures, and includes suggested filenames plus manifest fields for future SO-101 media.
+
+After collecting the missing real depth-reference and pick/place-video inputs locally, use [docs/sim_reference_capture_manifest.md](sim_reference_capture_manifest.md) to validate a local-only capture manifest. That checker verifies required capture/sidecar fields and referenced path existence without copying media assets into this repository.
