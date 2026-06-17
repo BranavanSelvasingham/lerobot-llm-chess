@@ -19,23 +19,24 @@ CATEGORY_ORDER = {
     "sim_camera_profile_sweep": 4,
     "sim_camera_tuning_before_after": 5,
     "reference_capture_manifest": 6,
-    "reference_capture_checklist": 7,
-    "visual_review": 8,
-    "real_reference_comparison": 9,
-    "real_projection_intake": 10,
-    "ranked_candidate": 11,
-    "perception_fixture": 12,
-    "sim_camera_pose_fixture": 13,
-    "so101_model_source_inventory": 14,
-    "so101_model_bundle_manifest": 15,
-    "so101_model_contract": 16,
-    "so101_model_asset_preflight": 17,
-    "ik_reachability": 18,
-    "gripper_camera_pov": 19,
-    "app_entrypoint": 20,
-    "pick_place_scenario": 21,
-    "negative_check": 22,
-    "logs": 23,
+    "real_depth_capture_plan_artifact_index": 7,
+    "reference_capture_checklist": 8,
+    "visual_review": 9,
+    "real_reference_comparison": 10,
+    "real_projection_intake": 11,
+    "ranked_candidate": 12,
+    "perception_fixture": 13,
+    "sim_camera_pose_fixture": 14,
+    "so101_model_source_inventory": 15,
+    "so101_model_bundle_manifest": 16,
+    "so101_model_contract": 17,
+    "so101_model_asset_preflight": 18,
+    "ik_reachability": 19,
+    "gripper_camera_pov": 20,
+    "app_entrypoint": 21,
+    "pick_place_scenario": 22,
+    "negative_check": 23,
+    "logs": 24,
 }
 CATEGORY_LABELS = {
     "reference_media_inventory": "Reference Media Inventory",
@@ -45,6 +46,7 @@ CATEGORY_LABELS = {
     "sim_camera_profile_sweep": "SimCamera Profile Sweep",
     "sim_camera_tuning_before_after": "SimCamera Tuning Before/After",
     "reference_capture_manifest": "Reference Capture Manifest",
+    "real_depth_capture_plan_artifact_index": "Real Depth Capture Plan Artifact Index",
     "reference_capture_checklist": "Reference Capture Checklist",
     "visual_review": "Visual Review Artifacts",
     "real_reference_comparison": "Real Reference Comparisons",
@@ -625,6 +627,84 @@ def reference_capture_manifest_artifact_row(artifact: dict[str, Any]) -> list[An
         compact_list(metrics.get("diagnostics")),
         "ok" if artifact.get("exists") is True else "missing",
     ]
+
+
+def real_depth_capture_plan_artifact_index_signal(
+    index: dict[str, Any],
+    suite: dict[str, Any] | None,
+) -> dict[str, Any]:
+    plan_index = index.get("real_depth_capture_plan_artifact_index")
+    if isinstance(plan_index, dict) and plan_index:
+        return plan_index
+    if suite is not None and isinstance(suite.get("real_depth_capture_plan_artifact_index"), dict):
+        return suite["real_depth_capture_plan_artifact_index"]
+    return {}
+
+
+def real_depth_capture_plan_artifact_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("source_mode", ""),
+        metrics.get("case_id", ""),
+        metrics.get("evidence_status", compact_list(metrics.get("evidence_statuses"))),
+        metrics.get("ready_for_calibration_grade_simcamera_tuning", ""),
+        metrics.get("ready_case_count", ""),
+        metrics.get("not_ready_case_count", ""),
+        metrics.get("case_depth_reference_capture_count", metrics.get("depth_reference_capture_count", "")),
+        metrics.get(
+            "case_pick_place_video_capture_count",
+            metrics.get("pick_place_video_capture_count", ""),
+        ),
+        metrics.get("case_missing_path_count", metrics.get("missing_path_count", "")),
+        metrics.get("no_copy_status", compact_list(metrics.get("no_copy_statuses"))),
+        metrics.get("case_next_operator_action_count", metrics.get("next_operator_action_count", "")),
+        compact_list(
+            metrics.get("case_next_operator_action_ids")
+            or metrics.get("next_operator_action_ids")
+        ),
+        metrics.get("media_assets_copied_into_repo", ""),
+        metrics.get("media_assets_opened_or_decoded", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def real_depth_capture_plan_case_rows(plan_index: dict[str, Any]) -> list[list[Any]]:
+    cases = plan_index.get("cases")
+    cases = cases if isinstance(cases, list) else plan_index.get("case_summaries")
+    cases = cases if isinstance(cases, list) else []
+    rows: list[list[Any]] = []
+    for case in cases:
+        if not isinstance(case, dict):
+            continue
+        rows.append(
+            [
+                case.get("case_id", ""),
+                case.get("evidence_source_kind", ""),
+                case.get("evidence_status", ""),
+                case.get("ready_for_calibration_grade_simcamera_tuning", ""),
+                case.get("depth_reference_capture_count", ""),
+                case.get("pick_place_video_capture_count", ""),
+                case.get("missing_path_count", ""),
+                case.get("no_copy_status", ""),
+                compact_list(case.get("next_operator_action_ids")),
+                markdown_link(str(case.get("planner_json_path")), str(case.get("planner_json_path")))
+                if case.get("planner_json_path")
+                else "",
+                markdown_link(
+                    str(case.get("planner_markdown_path")),
+                    str(case.get("planner_markdown_path")),
+                )
+                if case.get("planner_markdown_path")
+                else "",
+            ]
+        )
+    return rows
 
 
 def manifest_signal(index: dict[str, Any], suite: dict[str, Any] | None) -> dict[str, Any]:
@@ -1916,6 +1996,117 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         else ["_No reference capture manifest artifacts indexed._"]
     )
 
+    lines.extend(["", "## Real Depth Capture Plan Artifact Index"])
+    real_depth_plan_index = real_depth_capture_plan_artifact_index_signal(index, suite)
+    real_depth_plan_artifacts = grouped.get("real_depth_capture_plan_artifact_index", [])
+    lines.append(
+        "This hardware-free child indexes the real-depth operator plan bridge smoke, "
+        "planner JSON/Markdown outputs, and next operator actions. Ready evidence is "
+        "input readiness only, not physical calibration truth."
+    )
+    lines.extend(
+        table(
+            ["Field", "Value"],
+            [
+                ["status", real_depth_plan_index.get("status", "")],
+                ["source_mode", real_depth_plan_index.get("source_mode", "")],
+                ["case_count", real_depth_plan_index.get("case_count", "")],
+                ["ready_case_count", real_depth_plan_index.get("ready_case_count", "")],
+                ["not_ready_case_count", real_depth_plan_index.get("not_ready_case_count", "")],
+                ["evidence_statuses", compact_list(real_depth_plan_index.get("evidence_statuses"))],
+                [
+                    "depth_reference_capture_count",
+                    real_depth_plan_index.get("depth_reference_capture_count", ""),
+                ],
+                [
+                    "pick_place_video_capture_count",
+                    real_depth_plan_index.get("pick_place_video_capture_count", ""),
+                ],
+                ["missing_path_count", real_depth_plan_index.get("missing_path_count", "")],
+                ["no_copy_statuses", compact_list(real_depth_plan_index.get("no_copy_statuses"))],
+                [
+                    "next_operator_action_count",
+                    real_depth_plan_index.get("next_operator_action_count", ""),
+                ],
+                [
+                    "next_operator_action_ids",
+                    compact_list(real_depth_plan_index.get("next_operator_action_ids")),
+                ],
+                ["bridge_smoke_status", real_depth_plan_index.get("bridge_smoke_status", "")],
+                [
+                    "bridge_smoke_summary_json",
+                    real_depth_plan_index.get("bridge_smoke_summary_json", ""),
+                ],
+                [
+                    "media_assets_copied_into_repo",
+                    real_depth_plan_index.get("media_assets_copied_into_repo", ""),
+                ],
+                [
+                    "media_assets_opened_or_decoded",
+                    real_depth_plan_index.get("media_assets_opened_or_decoded", ""),
+                ],
+                [
+                    "input_readiness_caveat",
+                    compact_list(real_depth_plan_index.get("caveats")),
+                ],
+                ["summary_path", real_depth_plan_index.get("summary_path", "")],
+                ["csv_path", real_depth_plan_index.get("csv_path", "")],
+                ["readme_path", real_depth_plan_index.get("readme_path", "")],
+            ],
+        )
+    )
+    lines.extend(["", "### Operator Plan Cases"])
+    plan_case_rows = real_depth_capture_plan_case_rows(real_depth_plan_index)
+    lines.extend(
+        linked_table(
+            [
+                "Case",
+                "Evidence",
+                "Status",
+                "Ready",
+                "Depth Captures",
+                "Pick/Place Videos",
+                "Missing Paths",
+                "No-Copy",
+                "Next Actions",
+                "Planner JSON",
+                "Planner Markdown",
+            ],
+            plan_case_rows,
+        )
+        if plan_case_rows
+        else ["_No real-depth operator plan cases were available._"]
+    )
+    lines.extend(["", "### Operator Plan Artifacts"])
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Source Mode",
+                "Case",
+                "Evidence Status",
+                "Ready",
+                "Ready Cases",
+                "Not-Ready Cases",
+                "Depth Captures",
+                "Pick/Place Videos",
+                "Missing Paths",
+                "No-Copy",
+                "Next Actions",
+                "Next Action IDs",
+                "Copied Into Repo",
+                "Opened Or Decoded",
+                "Artifact Status",
+            ],
+            [real_depth_capture_plan_artifact_row(row) for row in real_depth_plan_artifacts],
+        )
+        if real_depth_plan_artifacts
+        else ["_No real-depth operator plan artifacts indexed._"]
+    )
+
     lines.extend(["", "## Reference Capture Checklist"])
     checklist = reference_capture_checklist_signal(index, suite)
     checklist_artifacts = grouped.get("reference_capture_checklist", [])
@@ -2662,6 +2853,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "- The SimCamera profile sweep is deterministic synthetic review evidence; its full-frame image deltas are coarse prompts, not physical calibration truth.",
             "- The SimCamera tuning before/after section compares the documented 72px baseline against the current canonical profile and keeps missing real depth and pick/place video gaps open.",
             "- The reference capture manifest section records local input readiness for real depth-reference and pick/place-video captures; readiness is not physical calibration truth.",
+            "- The real depth capture plan artifact index is hardware-free operator-planning evidence; ready cases are input readiness only and do not claim physical calibration truth.",
             "- The metadata-native projection/depth view is the simulator camera-model-aligned ground-truth artifact; rendered-overlay PnP diagnostics are source-mismatch evidence, not depth authority.",
             "- SimCamera pose fixture intrinsics/extrinsics are simulator reference metadata, not physical calibration truth.",
             "- Gripper-camera POV visibility and clearance values are synthetic metadata evidence, not real-camera segmentation or physical contact proof.",

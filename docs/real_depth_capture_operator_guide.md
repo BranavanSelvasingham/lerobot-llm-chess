@@ -68,7 +68,9 @@ The ready case is still only input-readiness bridge evidence. The placeholder pa
 
 ## Index The Bridge Artifacts
 
-Use the standalone artifact index when you want one operator-side entrypoint for the bridge-smoke summary, planner JSON reports, planner Markdown reports, and child stdout/stderr logs:
+The full simulator calibration regression suite runs the artifact index automatically under `real_depth_capture_plan_artifact_index/`, immediately after `reference_capture_manifest/`. The suite summary, `child_commands`, root `README.md`, `artifact_index.json`, and `artifact_index_report.md` expose the index status, source mode, case count, evidence statuses, ready/not-ready counts, depth and pick/place counts, missing path count, no-copy statuses, next operator action IDs, JSON/CSV/README paths, nested `bridge_smoke_summary_json`, and explicit `media_assets_copied_into_repo: false` plus `media_assets_opened_or_decoded: false` markers.
+
+Use the focused artifact index directly when you want one operator-side entrypoint for the bridge-smoke summary, planner JSON reports, planner Markdown reports, and child stdout/stderr logs without running the full suite:
 
 ```bash
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_real_depth_capture_plan_artifact_index.py \
@@ -85,7 +87,7 @@ If `--bridge-smoke-summary-json` is omitted, the index runs `scripts/smoke_real_
 
 The index writes `real_depth_capture_plan_artifact_index.json`, `real_depth_capture_plan_artifact_index_cases.csv`, and `README.md`. Each case records evidence source/status, input readiness, depth and pick/place counts, missing path count, no-copy status, next operator actions, planner JSON/Markdown paths, child stdout/stderr paths, and explicit `media_assets_copied_into_repo: false` plus `media_assets_opened_or_decoded: false` markers. Missing referenced planner artifacts are listed as diagnostics when possible. If the index itself runs the bridge smoke and that child fails, the index exits nonzero.
 
-This is a review convenience for the planner bridge only. It does not run the full calibration suite, does not copy/open/decode photos or videos, and does not turn ready input evidence into physical calibration truth.
+This is a review convenience for the planner bridge. In the integrated suite it appears beside Reference Capture Manifest, Reference Capture Checklist, intake, and artifact report evidence; standalone it does not run the full calibration suite. Neither path copies, opens, or decodes photos or videos, and neither path turns ready input evidence into physical calibration truth.
 
 ## Physical Measurements Needed
 
