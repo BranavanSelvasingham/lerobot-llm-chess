@@ -28,6 +28,11 @@ REFERENCE_CAMERA_TUNING_SCORECARD_NAME = "reference_camera_tuning_scorecard.png"
 SIM_CAMERA_PROFILE_SWEEP_DIR_NAME = "sim_camera_profile_sweep"
 SIM_CAMERA_PROFILE_SWEEP_JSON_NAME = "summary.json"
 SIM_CAMERA_PROFILE_SWEEP_MARKER_TIME_SECONDS = 0.0
+SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME = "simcamera_tuning_before_after"
+SIM_CAMERA_TUNING_BEFORE_AFTER_JSON_NAME = "simcamera_tuning_before_after_summary.json"
+SIM_CAMERA_TUNING_BEFORE_AFTER_CSV_NAME = "simcamera_tuning_before_after_rows.csv"
+SIM_CAMERA_TUNING_BEFORE_AFTER_README_NAME = "README.md"
+SIM_CAMERA_TUNING_BEFORE_AFTER_BASELINE_WIDTH_PX = 72
 VISUAL_REVIEW_SUMMARY_NAME = "visual_review_summary.json"
 REFERENCE_CAPTURE_CHECKLIST_NAME = "reference_capture_checklist.json"
 REAL_PROJECTION_INTAKE_NAME = "real_projection_intake.json"
@@ -632,6 +637,15 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         for prompt in profile_sweep_prompts
         if isinstance(prompt, dict) and prompt.get("candidate_id")
     ]
+    tuning_before_after = summary.get("simcamera_tuning_before_after")
+    tuning_before_after = tuning_before_after if isinstance(tuning_before_after, dict) else {}
+    tuning_before_after_paths = tuning_before_after.get("artifact_paths")
+    tuning_before_after_paths = (
+        tuning_before_after_paths if isinstance(tuning_before_after_paths, dict) else {}
+    )
+    tuning_before_after_prompt_ids = sim_camera_tuning_prompt_ids(
+        tuning_before_after.get("remaining_tuning_prompts")
+    )
     reference_inventory_counts_row = reference_media_inventory_counts(reference_inventory)
     reference_gap_ids = {
         str(gap) for gap in reference_inventory_counts_row.get("reference_gaps", []) if gap
@@ -705,6 +719,27 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         f"- `{SIM_CAMERA_PROFILE_SWEEP_DIR_NAME}/best_overlay.jpg`",
         f"- `{SIM_CAMERA_PROFILE_SWEEP_DIR_NAME}/best_absolute_difference_heatmap.jpg`",
         f"- `{SIM_CAMERA_PROFILE_SWEEP_DIR_NAME}/best_side_by_side.jpg`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/{SIM_CAMERA_TUNING_BEFORE_AFTER_JSON_NAME}`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/{SIM_CAMERA_TUNING_BEFORE_AFTER_CSV_NAME}`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/{SIM_CAMERA_TUNING_BEFORE_AFTER_README_NAME}`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/baseline_profile_sweep/summary.json`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/baseline_profile_sweep/candidate_montage.jpg`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/baseline_profile_sweep/current_overlay.jpg`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/baseline_profile_sweep/current_absolute_difference_heatmap.jpg`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/baseline_profile_sweep/current_side_by_side.jpg`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/baseline_profile_sweep/best_overlay.jpg`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/baseline_profile_sweep/best_absolute_difference_heatmap.jpg`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/baseline_profile_sweep/best_side_by_side.jpg`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/baseline_profile_sweep/candidates/`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/current_profile_sweep/summary.json`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/current_profile_sweep/candidate_montage.jpg`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/current_profile_sweep/current_overlay.jpg`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/current_profile_sweep/current_absolute_difference_heatmap.jpg`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/current_profile_sweep/current_side_by_side.jpg`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/current_profile_sweep/best_overlay.jpg`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/current_profile_sweep/best_absolute_difference_heatmap.jpg`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/current_profile_sweep/best_side_by_side.jpg`",
+        f"- `{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/current_profile_sweep/candidates/`",
         "- `session/session_summary.json`",
         "- `fixture/fixture_summary.json`",
         "- `sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json`",
@@ -838,6 +873,41 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         (
             "- SimCamera profile sweep caveat: "
             f"{profile_sweep.get('full_frame_image_delta_caveat') or 'Full-frame image delta is hardware-free coarse evidence only.'}"
+        ),
+        (
+            "- SimCamera tuning before/after: "
+            f"status `{tuning_before_after.get('status')}`; profile "
+            f"`{tuning_before_after.get('profile_name')}`; baseline finger width "
+            f"`{tuning_before_after.get('baseline_gripper_finger_width_px')}` px; "
+            f"current finger width `{tuning_before_after.get('current_gripper_finger_width_px')}` px; "
+            f"marker time `{tuning_before_after.get('marker_time_seconds')}`; baseline/current "
+            f"candidate counts `{tuning_before_after.get('baseline_candidate_count')}`/"
+            f"`{tuning_before_after.get('current_candidate_count')}`; current-vs-baseline "
+            "MAD/RMSE "
+            f"`{tuning_before_after.get('current_vs_baseline_mean_abs_delta')}`/"
+            f"`{tuning_before_after.get('current_vs_baseline_rmse')}`; best-vs-baseline-best "
+            "MAD/RMSE "
+            f"`{tuning_before_after.get('best_vs_baseline_best_mean_abs_delta')}`/"
+            f"`{tuning_before_after.get('best_vs_baseline_best_rmse')}`."
+        ),
+        (
+            "- SimCamera tuning before/after diagnostics: media assets copied into repo "
+            f"`{markdown_bool(tuning_before_after.get('media_assets_copied_into_repo'))}`; "
+            f"missing real depth `{markdown_bool(tuning_before_after.get('missing_real_depth_reference'))}`; "
+            f"missing pick/place video `{markdown_bool(tuning_before_after.get('missing_pick_place_video'))}`; "
+            f"remaining prompts `{markdown_list_value(tuning_before_after_prompt_ids)}`."
+        ),
+        (
+            "- SimCamera tuning before/after artifacts: "
+            f"summary `{tuning_before_after_paths.get('summary_json')}`; rows "
+            f"`{tuning_before_after_paths.get('csv_rows')}`; README "
+            f"`{tuning_before_after_paths.get('readme_md')}`; child sweep artifacts stay under "
+            f"`{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/baseline_profile_sweep/` and "
+            f"`{SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME}/current_profile_sweep/`."
+        ),
+        (
+            "- SimCamera tuning before/after caveat: "
+            f"{tuning_before_after.get('full_frame_image_delta_caveat') or 'Full-frame image delta is hardware-free coarse evidence only.'}"
         ),
         "- Reference capture checklist status: "
         f"`{summary.get('reference_capture_checklist', {}).get('status')}`.",
@@ -1496,6 +1566,175 @@ def sim_camera_profile_sweep_section(
             "This sweep is deterministic simulator-only review evidence and does not mutate SimCamera constants.",
             "Full-frame image delta is a coarse hardware-free ranking signal, not physical calibration truth.",
         ],
+    }
+
+
+def sim_camera_tuning_prompt_ids(prompts: Any) -> list[str]:
+    prompt_rows = prompts if isinstance(prompts, list) else []
+    ids: list[str] = []
+    for prompt in prompt_rows:
+        if not isinstance(prompt, dict):
+            continue
+        sweep = prompt.get("sweep")
+        candidate = prompt.get("candidate")
+        if isinstance(sweep, str) and isinstance(candidate, str):
+            ids.append(f"{sweep}:{candidate}")
+    return ids
+
+
+def sim_camera_tuning_before_after_artifact_paths(
+    tuning: dict[str, Any] | None,
+    output_dir: Path,
+    summary_path: Path,
+) -> dict[str, Any]:
+    tuning = tuning if isinstance(tuning, dict) else {}
+    artifacts = tuning.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    sweeps = tuning.get("sweeps")
+    sweeps = sweeps if isinstance(sweeps, dict) else {}
+
+    sweep_artifacts: dict[str, dict[str, Any]] = {}
+    for role in ("baseline", "current"):
+        sweep = sweeps.get(role)
+        sweep = sweep if isinstance(sweep, dict) else {}
+        role_artifacts = sweep.get("artifacts")
+        sweep_artifacts[role] = role_artifacts if isinstance(role_artifacts, dict) else {}
+
+    return {
+        "summary_json": str(artifacts.get("summary_path") or summary_path),
+        "csv_rows": str(artifacts.get("csv_path") or output_dir / SIM_CAMERA_TUNING_BEFORE_AFTER_CSV_NAME),
+        "readme_md": str(artifacts.get("readme_path") or output_dir / SIM_CAMERA_TUNING_BEFORE_AFTER_README_NAME),
+        "baseline_profile_sweep_dir": str(
+            artifacts.get("baseline_profile_sweep_dir") or output_dir / "baseline_profile_sweep"
+        ),
+        "current_profile_sweep_dir": str(
+            artifacts.get("current_profile_sweep_dir") or output_dir / "current_profile_sweep"
+        ),
+        "sweeps": sweep_artifacts,
+    }
+
+
+def metric_delta_value(deltas: dict[str, Any], key: str, metric: str) -> float | None:
+    row = deltas.get(key)
+    row = row if isinstance(row, dict) else {}
+    return metric_number(row.get(metric))
+
+
+def sweep_metric_value(sweep: dict[str, Any], candidate_key: str, metric: str) -> float | None:
+    candidate = sweep.get(candidate_key)
+    candidate = candidate if isinstance(candidate, dict) else {}
+    metrics = candidate.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    return metric_number(metrics.get(metric))
+
+
+def sim_camera_tuning_before_after_section(
+    tuning: dict[str, Any] | None,
+    output_dir: Path,
+    summary_path: Path,
+) -> dict[str, Any]:
+    tuning = tuning if isinstance(tuning, dict) else {}
+    paths = sim_camera_tuning_before_after_artifact_paths(tuning, output_dir, summary_path)
+    sweeps = tuning.get("sweeps")
+    sweeps = sweeps if isinstance(sweeps, dict) else {}
+    baseline = sweeps.get("baseline")
+    baseline = baseline if isinstance(baseline, dict) else {}
+    current = sweeps.get("current")
+    current = current if isinstance(current, dict) else {}
+    deltas = tuning.get("deltas")
+    deltas = deltas if isinstance(deltas, dict) else {}
+    gaps = tuning.get("open_reference_gaps")
+    gaps = gaps if isinstance(gaps, dict) else {}
+    caveats = tuning.get("caveats")
+    caveats = caveats if isinstance(caveats, list) else []
+    prompts = tuning.get("remaining_tuning_prompts")
+    prompts = prompts if isinstance(prompts, list) else []
+    return {
+        "summary_path": paths["summary_json"],
+        "csv_path": paths["csv_rows"],
+        "readme_path": paths["readme_md"],
+        "output_dir": str(output_dir),
+        "artifact_paths": paths,
+        "ok": bool(tuning.get("ok", False)),
+        "status": tuning.get("status"),
+        "profile_name": tuning.get("profile"),
+        "reference_image_path": tuning.get("reference_image_path"),
+        "baseline_gripper_finger_width_px": tuning.get("baseline_gripper_finger_width_px"),
+        "current_gripper_finger_width_px": tuning.get("current_gripper_finger_width_px"),
+        "marker_time_seconds": tuning.get("marker_time_seconds"),
+        "baseline_candidate_count": baseline.get("candidate_count"),
+        "current_candidate_count": current.get("candidate_count"),
+        "baseline_current_mean_abs_delta": sweep_metric_value(
+            baseline, "current_candidate", "mean_abs_delta"
+        ),
+        "baseline_current_rmse": sweep_metric_value(baseline, "current_candidate", "rmse"),
+        "current_profile_mean_abs_delta": sweep_metric_value(
+            current, "current_candidate", "mean_abs_delta"
+        ),
+        "current_profile_rmse": sweep_metric_value(current, "current_candidate", "rmse"),
+        "baseline_best_candidate": (
+            baseline.get("best_candidate", {}).get("name")
+            if isinstance(baseline.get("best_candidate"), dict)
+            else None
+        ),
+        "current_best_candidate": (
+            current.get("best_candidate", {}).get("name")
+            if isinstance(current.get("best_candidate"), dict)
+            else None
+        ),
+        "baseline_best_mean_abs_delta": sweep_metric_value(
+            baseline, "best_candidate", "mean_abs_delta"
+        ),
+        "baseline_best_rmse": sweep_metric_value(baseline, "best_candidate", "rmse"),
+        "current_best_mean_abs_delta": sweep_metric_value(
+            current, "best_candidate", "mean_abs_delta"
+        ),
+        "current_best_rmse": sweep_metric_value(current, "best_candidate", "rmse"),
+        "current_vs_baseline_mean_abs_delta": metric_delta_value(
+            deltas,
+            "current_profile_delta_vs_baseline_current_candidate",
+            "mean_abs_delta",
+        ),
+        "current_vs_baseline_rmse": metric_delta_value(
+            deltas,
+            "current_profile_delta_vs_baseline_current_candidate",
+            "rmse",
+        ),
+        "best_vs_baseline_best_mean_abs_delta": metric_delta_value(
+            deltas,
+            "current_best_delta_vs_baseline_best_candidate",
+            "mean_abs_delta",
+        ),
+        "best_vs_baseline_best_rmse": metric_delta_value(
+            deltas,
+            "current_best_delta_vs_baseline_best_candidate",
+            "rmse",
+        ),
+        "best_vs_baseline_current_mean_abs_delta": metric_delta_value(
+            deltas,
+            "current_best_delta_vs_baseline_current_candidate",
+            "mean_abs_delta",
+        ),
+        "best_vs_baseline_current_rmse": metric_delta_value(
+            deltas,
+            "current_best_delta_vs_baseline_current_candidate",
+            "rmse",
+        ),
+        "deltas": deltas,
+        "remaining_tuning_prompts": prompts,
+        "remaining_tuning_prompt_count": len(prompts),
+        "remaining_tuning_prompt_ids": sim_camera_tuning_prompt_ids(prompts),
+        "media_assets_copied_into_repo": tuning.get("media_assets_copied_into_repo", False),
+        "open_reference_gaps": gaps,
+        "missing_real_depth_reference": gaps.get("missing_real_depth_reference"),
+        "missing_pick_place_video": gaps.get("missing_pick_place_video"),
+        "full_frame_image_delta_caveat": (
+            next((str(caveat) for caveat in caveats if "Full-frame image delta" in str(caveat)), None)
+            or "Full-frame image delta is hardware-free coarse review evidence only."
+        ),
+        "caveats": caveats,
+        "child_commands": tuning.get("child_commands"),
+        "sweeps": sweeps,
     }
 
 
@@ -2485,6 +2724,40 @@ def main() -> int:
         sim_camera_profile_sweep_summary_path,
     )
 
+    sim_camera_tuning_before_after_dir = output_dir / SIM_CAMERA_TUNING_BEFORE_AFTER_DIR_NAME
+    sim_camera_tuning_before_after_summary_path = (
+        sim_camera_tuning_before_after_dir / SIM_CAMERA_TUNING_BEFORE_AFTER_JSON_NAME
+    )
+    sim_camera_tuning_before_after_record, sim_camera_tuning_before_after = run_child(
+        name="simcamera_tuning_before_after",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_simcamera_tuning_before_after.py"),
+            "--output-dir",
+            str(sim_camera_tuning_before_after_dir),
+            "--reference-image",
+            str(args.reference_image.expanduser()),
+            "--profile",
+            str(args.base_profile),
+            "--python",
+            python,
+            "--baseline-gripper-finger-width-px",
+            str(SIM_CAMERA_TUNING_BEFORE_AFTER_BASELINE_WIDTH_PX),
+            "--marker-time-seconds",
+            str(SIM_CAMERA_PROFILE_SWEEP_MARKER_TIME_SECONDS),
+        ],
+        output_dir=sim_camera_tuning_before_after_dir,
+        expected_json_path=sim_camera_tuning_before_after_summary_path,
+        non_failing_statuses={"dependency_unavailable"},
+    )
+    sim_camera_tuning_before_after_record["diagnostics"] = (
+        sim_camera_tuning_before_after_section(
+            sim_camera_tuning_before_after,
+            sim_camera_tuning_before_after_dir,
+            sim_camera_tuning_before_after_summary_path,
+        )
+    )
+
     session_dir = output_dir / "session"
     session_summary_path = session_dir / "session_summary.json"
     session_record, session = run_child(
@@ -2730,6 +3003,7 @@ def main() -> int:
         "comparison_set": comparison_record,
         "reference_camera_tuning_diagnostics": tuning_record,
         "sim_camera_profile_sweep": sim_camera_profile_sweep_record,
+        "simcamera_tuning_before_after": sim_camera_tuning_before_after_record,
         "calibration_session_report": session_record,
         "perception_regression_fixture": fixture_record,
         "sim_camera_pose_fixture": pose_fixture_record,
@@ -2808,6 +3082,11 @@ def main() -> int:
             sim_camera_profile_sweep,
             sim_camera_profile_sweep_dir,
             sim_camera_profile_sweep_summary_path,
+        ),
+        "simcamera_tuning_before_after": sim_camera_tuning_before_after_section(
+            sim_camera_tuning_before_after,
+            sim_camera_tuning_before_after_dir,
+            sim_camera_tuning_before_after_summary_path,
         ),
         "calibration_session": {
             "summary_path": str(session_summary_path),
