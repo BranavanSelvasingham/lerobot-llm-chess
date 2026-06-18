@@ -2622,10 +2622,30 @@ def collect_so101_model_source_inventory_artifacts(
         "next_required_for_goal": inventory.get("next_required_for_goal") or [],
         "next_required_action_ids": inventory.get("next_required_action_ids") or [],
         "next_required_action_count": len(inventory.get("next_required_for_goal") or []),
+        "review_packet_status": inventory.get("review_packet_status"),
+        "review_packet_model_authority": inventory.get("review_packet_model_authority"),
+        "review_packet_item_count": inventory.get("review_packet_item_count"),
+        "review_packet_item_ids": inventory.get("review_packet_item_ids") or [],
+        "review_packet_needs_operator_review_item_ids": inventory.get(
+            "review_packet_needs_operator_review_item_ids"
+        )
+        or [],
+        "review_packet_action_ids": inventory.get("review_packet_action_ids") or [],
+        "review_packet_observed_evidence_is_authority": inventory.get(
+            "review_packet_observed_evidence_is_authority"
+        ),
+        "review_packet_development_fixture_evidence_not_physical_so101_truth": inventory.get(
+            "review_packet_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "review_packet_physical_so101_model_authority_ready": inventory.get(
+            "review_packet_physical_so101_model_authority_ready"
+        ),
     }
     for key, label_suffix in (
         ("summary_json", "summary"),
         ("candidates_csv", "candidates"),
+        ("review_packet_json", "review_packet"),
+        ("review_packet_csv", "review_packet_rows"),
         ("readme_md", "readme"),
     ):
         add_path(
@@ -2644,6 +2664,8 @@ def collect_so101_model_source_inventory_artifacts(
         "ok": inventory.get("ok"),
         "summary_path": artifact_paths.get("summary_json") or inventory.get("summary_path"),
         "candidates_csv_path": artifact_paths.get("candidates_csv"),
+        "review_packet_json_path": artifact_paths.get("review_packet_json"),
+        "review_packet_csv_path": artifact_paths.get("review_packet_csv"),
         "readme_md_path": artifact_paths.get("readme_md"),
         "candidate_count": inventory.get("candidate_count"),
         "likely_candidate_count": inventory.get("likely_candidate_count"),
@@ -2660,6 +2682,23 @@ def collect_so101_model_source_inventory_artifacts(
         "next_required_for_goal": inventory.get("next_required_for_goal") or [],
         "next_required_action_ids": inventory.get("next_required_action_ids") or [],
         "next_required_action_count": metrics["next_required_action_count"],
+        "review_packet_status": metrics["review_packet_status"],
+        "review_packet_model_authority": metrics["review_packet_model_authority"],
+        "review_packet_item_count": metrics["review_packet_item_count"],
+        "review_packet_item_ids": metrics["review_packet_item_ids"],
+        "review_packet_needs_operator_review_item_ids": metrics[
+            "review_packet_needs_operator_review_item_ids"
+        ],
+        "review_packet_action_ids": metrics["review_packet_action_ids"],
+        "review_packet_observed_evidence_is_authority": metrics[
+            "review_packet_observed_evidence_is_authority"
+        ],
+        "review_packet_development_fixture_evidence_not_physical_so101_truth": metrics[
+            "review_packet_development_fixture_evidence_not_physical_so101_truth"
+        ],
+        "review_packet_physical_so101_model_authority_ready": metrics[
+            "review_packet_physical_so101_model_authority_ready"
+        ],
         "diagnostics": inventory.get("diagnostics"),
     }
 

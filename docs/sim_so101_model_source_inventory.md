@@ -10,9 +10,18 @@ The script writes:
 
 - `so101_model_source_inventory_summary.json`
 - `so101_model_source_candidates.csv`
+- `so101_model_source_inventory_review_packet.json`
+- `so101_model_source_inventory_review_packet.csv`
 - `README.md`
 
 It exits `0` even when no candidates exist. In that state the JSON reports `ok: true`, `status: "missing_authoritative_model"`, `candidate_count: 0`, `authoritative_candidate_count: 0`, `source_authority_gate_status: "source_authority_blocked_missing_authoritative_model"`, a `source_authority_blockers` list for the missing source-authority work, a `missing_authoritative_model` diagnostic listing the source inputs still required, and `next_required_for_goal`/`next_required_action_ids` entries that keep the operator sequence explicit.
+The review packet mirrors that operator sequence with `review_packet_status`,
+`review_packet_model_authority: "review_packet_not_authority"`,
+`review_packet_item_count`, `review_packet_action_ids`, and false
+`review_packet_observed_evidence_is_authority` /
+`review_packet_physical_so101_model_authority_ready` flags. It is intake for
+human review; it does not make candidate filenames, joint names, provenance
+hints, or local fixture evidence reviewed physical SO-101 truth.
 
 The full hardware-free simulator calibration regression suite now runs this
 inventory automatically under `so101_model_source_inventory/` before
@@ -109,6 +118,8 @@ Key fields:
 - `source_authority_blockers: ["scan_or_supply_so101_model_source_root", "review_and_declare_authoritative_so101_model_source"]`
 - `artifacts.summary_json: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_inventory_summary.json`
 - `artifacts.candidates_csv: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_candidates.csv`
+- `artifacts.review_packet_json: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_inventory_review_packet.json`
+- `artifacts.review_packet_csv: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_inventory_review_packet.csv`
 
 Empty-root validation:
 

@@ -54,6 +54,12 @@ EVIDENCE_BUNDLE_MD_NAME = "sim_evidence_bundle.md"
 EVIDENCE_BUNDLE_JSON_NAME = "sim_evidence_bundle.json"
 IK_REACHABILITY_SUMMARY_NAME = "ik_reachability_drill_summary.json"
 SO101_MODEL_SOURCE_INVENTORY_SUMMARY_NAME = "so101_model_source_inventory_summary.json"
+SO101_MODEL_SOURCE_INVENTORY_REVIEW_PACKET_JSON_NAME = (
+    "so101_model_source_inventory_review_packet.json"
+)
+SO101_MODEL_SOURCE_INVENTORY_REVIEW_PACKET_CSV_NAME = (
+    "so101_model_source_inventory_review_packet.csv"
+)
 SO101_MODEL_BUNDLE_PROBE_DIR_NAME = "so101_model_bundle_probe"
 SO101_MODEL_BUNDLE_PROBE_SUMMARY_NAME = "so101_model_bundle_probe_summary.json"
 SO101_MODEL_BUNDLE_MANIFEST_SUMMARY_NAME = "so101_model_bundle_manifest_summary.json"
@@ -1379,6 +1385,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/README.md`",
         "- `so101_model_source_inventory/so101_model_source_inventory_summary.json`",
         "- `so101_model_source_inventory/so101_model_source_candidates.csv`",
+        f"- `so101_model_source_inventory/{SO101_MODEL_SOURCE_INVENTORY_REVIEW_PACKET_JSON_NAME}`",
+        f"- `so101_model_source_inventory/{SO101_MODEL_SOURCE_INVENTORY_REVIEW_PACKET_CSV_NAME}`",
         "- `so101_model_source_inventory/README.md`",
         f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/{SO101_MODEL_BUNDLE_PROBE_SUMMARY_NAME}`",
         f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/so101_model_bundle.candidate.json`",
@@ -3160,12 +3168,32 @@ def so101_model_source_inventory_section(
         ),
         "next_required_for_goal": inventory.get("next_required_for_goal") or [],
         "next_required_action_ids": inventory.get("next_required_action_ids") or [],
+        "review_packet_status": inventory.get("review_packet_status"),
+        "review_packet_model_authority": inventory.get("review_packet_model_authority"),
+        "review_packet_item_count": inventory.get("review_packet_item_count"),
+        "review_packet_item_ids": inventory.get("review_packet_item_ids") or [],
+        "review_packet_needs_operator_review_item_ids": inventory.get(
+            "review_packet_needs_operator_review_item_ids"
+        )
+        or [],
+        "review_packet_action_ids": inventory.get("review_packet_action_ids") or [],
+        "review_packet_observed_evidence_is_authority": inventory.get(
+            "review_packet_observed_evidence_is_authority"
+        ),
+        "review_packet_development_fixture_evidence_not_physical_so101_truth": inventory.get(
+            "review_packet_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "review_packet_physical_so101_model_authority_ready": inventory.get(
+            "review_packet_physical_so101_model_authority_ready"
+        ),
         "diagnostics": diagnostics,
         "artifacts": {
             "summary_json": artifacts.get("summary_json")
             if isinstance(artifacts.get("summary_json"), str)
             else str(summary_path),
             "candidates_csv": artifacts.get("candidates_csv"),
+            "review_packet_json": artifacts.get("review_packet_json"),
+            "review_packet_csv": artifacts.get("review_packet_csv"),
             "readme_md": artifacts.get("readme_md"),
         },
         "hardware_skipped": inventory.get("hardware_skipped"),
