@@ -93,6 +93,7 @@ env:
   SO101_MUJOCO_SCENE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_mujoco_scene_matrix"
   SO101_CHESS_ENV_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_chess_env_matrix"
   SO101_BOARD_PICK_PROBE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_mujoco_board_pick_probe_matrix"
+  SO101_TRAINING_ROLLOUTS_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_training_rollouts_matrix"
   SO101_TRAINING_READINESS_GATE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_training_readiness_gate_matrix"
   CALIBRATION_REGRESSION_ARTIFACT_NAME: "sim-calibration-regression-${{ github.run_id }}"
   REFERENCE_MEDIA_ROOTS: ""
@@ -535,6 +536,83 @@ jobs:
           for relative_path in (
               "so101_mujoco_board_pick_probe_matrix_summary.json",
               "so101_mujoco_board_pick_probe_matrix_cases.csv",
+              "README.md",
+          ):
+              assert (summary_path.parent / relative_path).is_file(), relative_path
+          PY
+
+      - name: Run SO-101 training rollouts matrix
+        run: |
+          python scripts/smoke_sim_so101_training_rollouts_matrix.py \
+            --output-dir "${SO101_TRAINING_ROLLOUTS_MATRIX_OUTPUT_DIR}" \
+            --python "$(python -c 'import sys; print(sys.executable)')"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          summary_path = Path(os.environ["SO101_TRAINING_ROLLOUTS_MATRIX_OUTPUT_DIR"]) / "so101_training_rollouts_matrix_summary.json"
+          summary = json.loads(summary_path.read_text())
+          assert summary["ok"] is True, summary
+          assert summary["status"] == "ok", summary
+          assert summary["model_authority"] == "so101_training_rollouts_matrix_not_authority", summary
+          assert summary["observed_evidence_is_physical_so101_authority"] is False, summary
+          assert summary["observed_evidence_is_policy_training_authority"] is False, summary
+          assert summary["ready_for_model_backed_ik"] is False, summary
+          assert summary["ready_for_policy_training"] is False, summary
+          assert summary["hardware_skipped"] is True, summary
+          assert summary["gui_skipped"] is True, summary
+          assert summary["openai_skipped"] is True, summary
+          assert summary["case_ids"] == [
+              "valid_development_default_curriculum_debug_rollouts",
+              "missing_board_pick_prerequisite_fails_closed",
+              "failed_board_pick_prerequisite_fails_closed",
+              "short_budget_records_incomplete_rollout",
+          ], summary["case_ids"]
+          assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
+          assert summary["passed_rollout_case_ids"] == [
+              "valid_development_default_curriculum_debug_rollouts",
+          ], summary["passed_rollout_case_ids"]
+          assert summary["expected_failure_case_ids"] == [
+              "missing_board_pick_prerequisite_fails_closed",
+              "failed_board_pick_prerequisite_fails_closed",
+              "short_budget_records_incomplete_rollout",
+          ], summary["expected_failure_case_ids"]
+          by_case = {case["case_id"]: case for case in summary["cases"]}
+          valid = by_case["valid_development_default_curriculum_debug_rollouts"]
+          assert valid["observations"]["status"] == "ok", valid
+          assert valid["observations"]["ok"] is True, valid
+          assert valid["observations"]["episode_count"] == 5, valid
+          assert valid["observations"]["transition_count"] > 0, valid
+          assert valid["observations"]["all_scripted_pick_place_complete"] is True, valid
+          assert valid["observations"]["development_prerequisites_satisfied"] is True, valid
+          missing = by_case["missing_board_pick_prerequisite_fails_closed"]
+          assert missing["record"]["return_code"] == 1, missing
+          assert missing["observations"]["ok"] is False, missing
+          assert missing["observations"]["board_pick_prerequisite_status"] == "missing", missing
+          assert missing["observations"]["development_prerequisites_satisfied"] is False, missing
+          failed = by_case["failed_board_pick_prerequisite_fails_closed"]
+          assert failed["record"]["return_code"] == 1, failed
+          assert failed["observations"]["ok"] is False, failed
+          assert failed["observations"]["board_pick_prerequisite_status"] == "development_board_pick_prerequisite_failed", failed
+          assert failed["observations"]["development_prerequisites_satisfied"] is False, failed
+          short = by_case["short_budget_records_incomplete_rollout"]
+          assert short["record"]["return_code"] == 1, short
+          assert short["observations"]["ok"] is False, short
+          assert short["observations"]["development_prerequisites_satisfied"] is True, short
+          assert short["observations"]["all_scripted_pick_place_complete"] is False, short
+          assert short["observations"]["all_mujoco_piece_release_synced"] is False, short
+          for case in summary["cases"]:
+              obs = case["observations"]
+              assert obs["observed_evidence_is_physical_so101_authority"] is False, case
+              assert obs["observed_evidence_is_policy_training_authority"] is False, case
+              assert obs["ready_for_model_backed_ik"] is False, case
+              assert obs["ready_for_policy_training"] is False, case
+              assert obs["rollout_use"] == "debug_imitation_curriculum_only", case
+              assert "reviewed_model_backed_board_source_pick_place" in obs["serious_policy_training_blockers"], case
+          for relative_path in (
+              "so101_training_rollouts_matrix_summary.json",
+              "so101_training_rollouts_matrix_cases.csv",
               "README.md",
           ):
               assert (summary_path.parent / relative_path).is_file(), relative_path
@@ -1468,6 +1546,7 @@ jobs:
           assert so101_mujoco_board_pick_probe["status"] == "development_board_source_pick_place_verified", so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["model_authority"] == "development_scaffold_not_reviewed", so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["observed_evidence_is_physical_so101_authority"] is False, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["observed_evidence_is_policy_training_authority"] is False, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["ready_for_model_backed_ik"] is False, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["ready_for_policy_training"] is False, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["source_pick_started_at_source"] is True, so101_mujoco_board_pick_probe
@@ -1493,6 +1572,10 @@ jobs:
           so101_training_rollouts = summary["so101_training_rollouts"]
           assert so101_training_rollouts["ok"] is True, so101_training_rollouts
           assert so101_training_rollouts["status"] == "ok", so101_training_rollouts
+          assert so101_training_rollouts["model_authority"] == "development_scaffold_not_reviewed", so101_training_rollouts
+          assert so101_training_rollouts["observed_evidence_is_physical_so101_authority"] is False, so101_training_rollouts
+          assert so101_training_rollouts["observed_evidence_is_policy_training_authority"] is False, so101_training_rollouts
+          assert so101_training_rollouts["ready_for_model_backed_ik"] is False, so101_training_rollouts
           assert so101_training_rollouts["all_scripted_pick_place_complete"] is True, so101_training_rollouts
           assert so101_training_rollouts["all_mujoco_fallback_free"] is True, so101_training_rollouts
           assert so101_training_rollouts["all_mujoco_piece_release_synced"] is True, so101_training_rollouts
@@ -2804,5 +2887,6 @@ jobs:
             ${{ env.SO101_MUJOCO_SCENE_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_CHESS_ENV_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_BOARD_PICK_PROBE_MATRIX_OUTPUT_DIR }}
+            ${{ env.SO101_TRAINING_ROLLOUTS_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_TRAINING_READINESS_GATE_MATRIX_OUTPUT_DIR }}
           if-no-files-found: warn

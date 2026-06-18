@@ -2211,6 +2211,9 @@ def collect_so101_mujoco_smoke_artifacts(
         "observed_evidence_is_physical_so101_authority": smoke.get(
             "observed_evidence_is_physical_so101_authority"
         ),
+        "observed_evidence_is_policy_training_authority": smoke.get(
+            "observed_evidence_is_policy_training_authority"
+        ),
         "ready_for_model_backed_ik": smoke.get("ready_for_model_backed_ik"),
         "ready_for_policy_training": smoke.get("ready_for_policy_training"),
         "contact_model": smoke.get("contact_model"),

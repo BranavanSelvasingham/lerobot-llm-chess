@@ -3099,6 +3099,9 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "observed_evidence_is_physical_so101_authority": smoke.get(
             "observed_evidence_is_physical_so101_authority"
         ),
+        "observed_evidence_is_policy_training_authority": smoke.get(
+            "observed_evidence_is_policy_training_authority"
+        ),
         "ready_for_model_backed_ik": smoke.get("ready_for_model_backed_ik"),
         "limitations": smoke.get("limitations"),
         "next_required_for_goal": smoke.get("next_required_for_goal"),

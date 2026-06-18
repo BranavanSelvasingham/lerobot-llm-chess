@@ -20,6 +20,19 @@ The script writes:
 - `so101_chess_development_manifest.json`
 - `README.md`
 
+For focused rollout-boundary coverage, run:
+
+```bash
+python scripts/smoke_sim_so101_training_rollouts_matrix.py --output-dir /private/tmp/lerobot_sim/so101_training_rollouts_matrix --python .venv/bin/python
+```
+
+The matrix writes `so101_training_rollouts_matrix_summary.json`,
+`so101_training_rollouts_matrix_cases.csv`, and `README.md`. It verifies the
+default development rollout curriculum, missing and failed board-pick
+prerequisite fail-closed behavior, and a short-budget incomplete rollout. The
+matrix must keep `observed_evidence_is_policy_training_authority: false` and
+`ready_for_policy_training: false`.
+
 Each JSONL transition contains:
 
 - task source/target square
@@ -50,6 +63,8 @@ The summary must report:
 - `development_prerequisites_satisfied: true`
 - `training_authority_status: "development_rollouts_prerequisites_verified_not_policy_ready"`
 - `model_authority: "development_scaffold_not_reviewed"`
+- `observed_evidence_is_physical_so101_authority: false`
+- `observed_evidence_is_policy_training_authority: false`
 - `ready_for_model_backed_ik: false`
 - `ready_for_policy_training: false`
 - `serious_policy_training_blockers` includes `reviewed_model_backed_board_source_pick_place`
