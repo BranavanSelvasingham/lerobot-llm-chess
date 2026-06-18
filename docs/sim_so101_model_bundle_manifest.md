@@ -175,6 +175,9 @@ Placeholder strings such as `TODO`, `TBD`, `unknown`, `placeholder`, or
 `review required` are reported as `review_evidence_placeholder` diagnostics and
 do not satisfy authority readiness, even when the review status itself is an
 accepted value.
+The same placeholder rule applies to provenance source, export-tool, and
+license-basis fields: a ready-shaped manifest with placeholder provenance stays
+`model_bundle_manifest_needs_follow_up` and remains diagnostic-only.
 Each authority section reports `review_evidence_required_groups`,
 `review_evidence_satisfied_required_groups`, and
 `review_evidence_missing_required_groups` in the JSON summary. The

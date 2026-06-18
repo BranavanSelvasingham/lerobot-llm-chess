@@ -996,9 +996,29 @@ def inspect_provenance(manifest: dict[str, Any] | None) -> dict[str, Any]:
             },
         }
 
-    source_field, source_value = first_non_empty_field(value, PROVENANCE_SOURCE_FIELDS)
-    export_field, export_value = first_non_empty_field(value, PROVENANCE_EXPORT_FIELDS)
-    license_field, license_value = first_non_empty_field(value, PROVENANCE_LICENSE_FIELDS)
+    def first_valid_provenance_field(
+        field_names: tuple[str, ...],
+    ) -> tuple[str | None, Any, list[str]]:
+        placeholder_fields: list[str] = []
+        for field_name in field_names:
+            field_value = value.get(field_name)
+            if not non_empty(field_value):
+                continue
+            if placeholder_review_evidence(field_value):
+                placeholder_fields.append(field_name)
+                continue
+            return field_name, field_value, placeholder_fields
+        return None, None, placeholder_fields
+
+    source_field, source_value, source_placeholder_fields = first_valid_provenance_field(
+        PROVENANCE_SOURCE_FIELDS
+    )
+    export_field, export_value, export_placeholder_fields = first_valid_provenance_field(
+        PROVENANCE_EXPORT_FIELDS
+    )
+    license_field, license_value, license_placeholder_fields = first_valid_provenance_field(
+        PROVENANCE_LICENSE_FIELDS
+    )
     diagnostics: list[str] = []
     if source_field is None:
         diagnostics.append("provenance_source_reference_missing")
@@ -1006,23 +1026,35 @@ def inspect_provenance(manifest: dict[str, Any] | None) -> dict[str, Any]:
         diagnostics.append("provenance_export_tool_missing")
     if license_field is None:
         diagnostics.append("provenance_license_basis_missing")
+    for field_name in source_placeholder_fields:
+        diagnostics.append(f"provenance_source_reference_placeholder:{field_name}")
+    for field_name in export_placeholder_fields:
+        diagnostics.append(f"provenance_export_tool_placeholder:{field_name}")
+    for field_name in license_placeholder_fields:
+        diagnostics.append(f"provenance_license_basis_placeholder:{field_name}")
 
     return {
         "status": "present" if not diagnostics else "needs_review",
         "value": value,
         "source_field": source_field,
         "source_value": source_value,
+        "source_placeholder_fields": source_placeholder_fields,
         "export_field": export_field,
         "export_value": export_value,
+        "export_placeholder_fields": export_placeholder_fields,
         "license_field": license_field,
         "license_value": license_value,
+        "license_placeholder_fields": license_placeholder_fields,
         "diagnostics": diagnostics,
         "required_field_groups": {
             "source": list(PROVENANCE_SOURCE_FIELDS),
             "export": list(PROVENANCE_EXPORT_FIELDS),
             "license": list(PROVENANCE_LICENSE_FIELDS),
         },
-        "notes": "Provenance requires source reference, export tool, and license basis fields.",
+        "notes": (
+            "Provenance requires source reference, export tool, and license basis fields. "
+            "Placeholder values such as TODO/TBD/unknown do not satisfy provenance readiness."
+        ),
     }
 
 

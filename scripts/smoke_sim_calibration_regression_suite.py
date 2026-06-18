@@ -3675,6 +3675,13 @@ def so101_model_bundle_manifest_section(
         "authority_review_evidence_valid_fields": authority.get("review_evidence_valid_fields"),
         "authority_review_evidence_placeholder_fields": authority.get("review_evidence_placeholder_fields"),
         "provenance_status": provenance.get("status"),
+        "provenance_diagnostics": provenance.get("diagnostics"),
+        "provenance_source_field": provenance.get("source_field"),
+        "provenance_export_field": provenance.get("export_field"),
+        "provenance_license_field": provenance.get("license_field"),
+        "provenance_source_placeholder_fields": provenance.get("source_placeholder_fields"),
+        "provenance_export_placeholder_fields": provenance.get("export_placeholder_fields"),
+        "provenance_license_placeholder_fields": provenance.get("license_placeholder_fields"),
         "joint_limits": {
             "status": joint_limits.get("status"),
             "field": joint_limits.get("field"),
