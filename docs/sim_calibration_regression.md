@@ -384,8 +384,9 @@ fixture while preserving `hardware_free_fixture_motion_checked` as non-physical
 SO-101 authority, requires explicit `--ik-model-path` to take precedence and
 leave the ready manifest diagnostic-only for downstream IK/contract forwarding,
 requires an incomplete placeholder-alignment manifest to remain not ready and
-not forward, and requires `artifact_index.missing_artifact_count: 0` for every
-suite case.
+not forward, requires a manifest-declared target frame to be visible in the
+actual model before forwarding, and requires
+`artifact_index.missing_artifact_count: 0` for every suite case.
 
 To exercise the same suite with declared reference-media metadata, pass an optional manifest:
 
