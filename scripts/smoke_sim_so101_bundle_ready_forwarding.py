@@ -83,6 +83,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "missing_inputs",
         "reviewed_mujoco_status",
         "reviewed_model_motion_checked",
+        "motion_authority_status",
+        "physical_reviewed_model_motion_checked",
+        "hardware_free_fixture_motion_checked",
+        "motion_evidence_not_physical_so101_authority",
         "forwarding_diagnostic_only",
         "diagnostic_only_reason",
         "ik_model_path_source",
@@ -126,14 +130,14 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         "",
         "## Cases",
         "",
-        "| Case | Status | Authority | Provenance | Joint Limits | Mesh Assets | Target Frame | TCP | Alignment | Reviewed MuJoCo | Forwarding | Artifact index missing | Summary |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Case | Status | Authority | Provenance | Joint Limits | Mesh Assets | Target Frame | TCP | Alignment | Reviewed MuJoCo | Motion Authority | Forwarding | Artifact index missing | Summary |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for case in summary["cases"]:
         forwarding = case["observations"]["bundle_forwarding"]
         reviewed_mujoco = case["observations"]["reviewed_mujoco_bundle"]
         lines.append(
-            "| `{case_id}` | `{status}` | `{authority}` | `{provenance}` | `{joint_limits}` | `{mesh_assets}` | `{target_frame}` | `{tcp}` | `{alignment}` | `{reviewed_status}`, motion `{motion}` | source `{source}`, diagnostic `{diagnostic}` | `{missing}` | `{summary_path}` |".format(
+            "| `{case_id}` | `{status}` | `{authority}` | `{provenance}` | `{joint_limits}` | `{mesh_assets}` | `{target_frame}` | `{tcp}` | `{alignment}` | `{reviewed_status}`, motion `{motion}` | `{motion_authority}` | source `{source}`, diagnostic `{diagnostic}` | `{missing}` | `{summary_path}` |".format(
                 case_id=case["case_id"],
                 status=case["status"],
                 authority=case["observations"].get("bundle_authority_status"),
@@ -145,6 +149,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
                 alignment=case["observations"].get("bundle_alignment_status"),
                 reviewed_status=reviewed_mujoco.get("status"),
                 motion=reviewed_mujoco.get("reviewed_model_motion_checked"),
+                motion_authority=reviewed_mujoco.get("motion_authority_status"),
                 source=forwarding.get("ik_model_path_source"),
                 diagnostic=forwarding.get("diagnostic_only"),
                 missing=case["observations"].get("artifact_index_missing_count"),
@@ -536,6 +541,34 @@ def assert_false(errors: list[str], label: str, value: Any) -> None:
         errors.append(f"{label}: expected false, got {value!r}")
 
 
+def assert_not_ready_motion_authority(
+    errors: list[str],
+    case_id: str,
+    reviewed_mujoco: dict[str, Any],
+) -> None:
+    assert_equal(
+        errors,
+        f"{case_id}.reviewed_mujoco_motion_authority_status",
+        reviewed_mujoco.get("motion_authority_status"),
+        "not_checked_manifest_not_ready",
+    )
+    assert_false(
+        errors,
+        f"{case_id}.reviewed_mujoco_physical_reviewed_model_motion_checked",
+        reviewed_mujoco.get("physical_reviewed_model_motion_checked"),
+    )
+    assert_false(
+        errors,
+        f"{case_id}.reviewed_mujoco_hardware_free_fixture_motion_checked",
+        reviewed_mujoco.get("hardware_free_fixture_motion_checked"),
+    )
+    assert_false(
+        errors,
+        f"{case_id}.reviewed_mujoco_motion_evidence_not_physical",
+        reviewed_mujoco.get("motion_evidence_not_physical_so101_authority"),
+    )
+
+
 def summarize_case(
     *,
     record: dict[str, Any],
@@ -612,6 +645,27 @@ def summarize_case(
             reviewed_mujoco.get("hardware_free_regression_fixture_ready"),
         )
         assert_true(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_motion_authority_status",
+            reviewed_mujoco.get("motion_authority_status"),
+            "hardware_free_fixture_motion_checked_not_physical_so101_authority",
+        )
+        assert_false(
+            errors,
+            f"{case_id}.reviewed_mujoco_physical_reviewed_model_motion_checked",
+            reviewed_mujoco.get("physical_reviewed_model_motion_checked"),
+        )
+        assert_true(
+            errors,
+            f"{case_id}.reviewed_mujoco_hardware_free_fixture_motion_checked",
+            reviewed_mujoco.get("hardware_free_fixture_motion_checked"),
+        )
+        assert_true(
+            errors,
+            f"{case_id}.reviewed_mujoco_motion_evidence_not_physical",
+            reviewed_mujoco.get("motion_evidence_not_physical_so101_authority"),
+        )
         assert_false(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
         assert_true(errors, f"{case_id}.used_for_downstream_contract", forwarding.get("used_for_downstream_contract"))
         assert_equal(errors, f"{case_id}.ik_model_path_source", forwarding.get("ik_model_path_source"), "so101_model_bundle_manifest")
@@ -678,6 +732,27 @@ def summarize_case(
             reviewed_mujoco.get("hardware_free_regression_fixture_ready"),
         )
         assert_true(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_motion_authority_status",
+            reviewed_mujoco.get("motion_authority_status"),
+            "hardware_free_fixture_motion_checked_not_physical_so101_authority",
+        )
+        assert_false(
+            errors,
+            f"{case_id}.reviewed_mujoco_physical_reviewed_model_motion_checked",
+            reviewed_mujoco.get("physical_reviewed_model_motion_checked"),
+        )
+        assert_true(
+            errors,
+            f"{case_id}.reviewed_mujoco_hardware_free_fixture_motion_checked",
+            reviewed_mujoco.get("hardware_free_fixture_motion_checked"),
+        )
+        assert_true(
+            errors,
+            f"{case_id}.reviewed_mujoco_motion_evidence_not_physical",
+            reviewed_mujoco.get("motion_evidence_not_physical_so101_authority"),
+        )
         assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
         assert_equal(errors, f"{case_id}.diagnostic_reason", forwarding.get("diagnostic_only_reason"), "explicit_ik_model_path_supplied")
         assert_false(errors, f"{case_id}.used_for_downstream_contract", forwarding.get("used_for_downstream_contract"))
@@ -700,6 +775,7 @@ def summarize_case(
             "reviewed_mujoco_bundle_not_ready",
         )
         assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
         assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
         assert_equal(
             errors,
@@ -730,6 +806,7 @@ def summarize_case(
             "reviewed_mujoco_bundle_not_ready",
         )
         assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
         assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
         assert_equal(
             errors,
@@ -756,6 +833,7 @@ def summarize_case(
             "reviewed_mujoco_bundle_not_ready",
         )
         assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
         assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
         assert_equal(
             errors,
@@ -782,6 +860,7 @@ def summarize_case(
             "reviewed_mujoco_bundle_not_ready",
         )
         assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
         assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
         assert_equal(
             errors,
@@ -808,6 +887,7 @@ def summarize_case(
             "reviewed_mujoco_bundle_not_ready",
         )
         assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
         assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
         assert_equal(
             errors,
@@ -834,6 +914,7 @@ def summarize_case(
             "reviewed_mujoco_bundle_not_ready",
         )
         assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
         assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
         assert_equal(
             errors,
@@ -860,6 +941,7 @@ def summarize_case(
             "reviewed_mujoco_bundle_not_ready",
         )
         assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
         assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
         assert_equal(
             errors,
@@ -932,6 +1014,7 @@ def flatten_case_rows(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for case in cases:
         forwarding = case["observations"]["bundle_forwarding"]
+        reviewed_mujoco = case["observations"]["reviewed_mujoco_bundle"]
         rows.append(
             {
                 "case_id": case["case_id"],
@@ -946,9 +1029,15 @@ def flatten_case_rows(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "tcp_offset_status": case["observations"].get("bundle_tcp_offset_status"),
                 "alignment_status": case["observations"].get("bundle_alignment_status"),
                 "missing_inputs": case["observations"].get("bundle_missing_inputs"),
-                "reviewed_mujoco_status": case["observations"]["reviewed_mujoco_bundle"].get("status"),
-                "reviewed_model_motion_checked": case["observations"]["reviewed_mujoco_bundle"].get(
-                    "reviewed_model_motion_checked"
+                "reviewed_mujoco_status": reviewed_mujoco.get("status"),
+                "reviewed_model_motion_checked": reviewed_mujoco.get("reviewed_model_motion_checked"),
+                "motion_authority_status": reviewed_mujoco.get("motion_authority_status"),
+                "physical_reviewed_model_motion_checked": reviewed_mujoco.get(
+                    "physical_reviewed_model_motion_checked"
+                ),
+                "hardware_free_fixture_motion_checked": reviewed_mujoco.get("hardware_free_fixture_motion_checked"),
+                "motion_evidence_not_physical_so101_authority": reviewed_mujoco.get(
+                    "motion_evidence_not_physical_so101_authority"
                 ),
                 "forwarding_diagnostic_only": forwarding.get("diagnostic_only"),
                 "diagnostic_only_reason": forwarding.get("diagnostic_only_reason"),

@@ -20,13 +20,20 @@ The summary carries the manifest checker's `model_authority`,
 `hardware_free_regression_fixture_ready`, and
 `synthetic_fixture_authority_fields` fields. A hardware-free synthetic fixture
 may exercise the positive MuJoCo motion path, but it stays labeled as
-`hardware_free_regression_fixture_not_physical_so101_authority`.
+`hardware_free_regression_fixture_not_physical_so101_authority`. Motion evidence
+also carries `motion_authority_status`,
+`physical_reviewed_model_motion_checked`,
+`hardware_free_fixture_motion_checked`, and
+`motion_evidence_not_physical_so101_authority` so fixture-only motion cannot be
+mistaken for reviewed physical SO-101 authority.
 
 With no manifest, or with a manifest whose bundle checker does not report
 `ready_for_model_backed_ik: true` after checking reviewed joint limits, mesh
 evidence, target-frame authority, TCP offset, and base-to-board alignment, the
 smoke exits `0` with `status: "reviewed_mujoco_bundle_not_ready"` and
-`reviewed_model_motion_checked: false`.
+`reviewed_model_motion_checked: false`. In that not-ready state,
+`motion_authority_status` is `not_checked_manifest_not_ready`, and all motion
+authority booleans are `false`.
 
 To reuse the integrated suite's manifest result:
 
@@ -57,9 +64,15 @@ The positive path is covered without hardware by the focused forwarding smoke:
 
 That smoke creates a fixture-only ready MJCF model bundle, verifies the
 integrated suite forwards it, and requires this gate to report
-`reviewed_mujoco_bundle_motion_checked`. The fixture is automation coverage and
-must also report `physical_so101_model_authority_ready: false`; it is not
-physical SO-101 model authority.
+`reviewed_mujoco_bundle_motion_checked`. The compatibility field
+`reviewed_model_motion_checked` is `true` for that fixture-positive path, but
+`motion_authority_status` must be
+`hardware_free_fixture_motion_checked_not_physical_so101_authority`,
+`hardware_free_fixture_motion_checked` must be `true`, and
+`physical_reviewed_model_motion_checked` must remain `false`. The fixture is
+automation coverage and must also report
+`physical_so101_model_authority_ready: false`; it is not physical SO-101 model
+authority.
 
 Passing this gate is still not full physical readiness. It proves reviewed-model
 handoff into MuJoCo and SimRobot joint motion. Contact-validated gripper

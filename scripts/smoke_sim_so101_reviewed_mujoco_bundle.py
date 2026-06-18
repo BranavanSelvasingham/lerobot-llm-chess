@@ -37,6 +37,15 @@ BODY_JOINT_TARGETS_DEG: dict[str, float] = {
     "wrist_flex": -20.0,
     "wrist_roll": 22.0,
 }
+MOTION_AUTHORITY_STATUSES = {
+    "not_checked_manifest_not_ready",
+    "physical_reviewed_model_motion_checked",
+    "hardware_free_fixture_motion_checked_not_physical_so101_authority",
+    "motion_checked_authority_incomplete",
+    "physical_reviewed_model_motion_failed",
+    "hardware_free_fixture_motion_failed",
+    "motion_failed_authority_incomplete",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -408,6 +417,40 @@ def manifest_value(summary: dict[str, Any], key: str) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def motion_authority(
+    *,
+    motion_checked: bool,
+    physical_authority_ready: bool,
+    fixture_ready: bool,
+    manifest_ready: bool,
+) -> dict[str, Any]:
+    if not manifest_ready:
+        status = "not_checked_manifest_not_ready"
+    elif motion_checked and physical_authority_ready:
+        status = "physical_reviewed_model_motion_checked"
+    elif motion_checked and fixture_ready:
+        status = "hardware_free_fixture_motion_checked_not_physical_so101_authority"
+    elif motion_checked:
+        status = "motion_checked_authority_incomplete"
+    elif physical_authority_ready:
+        status = "physical_reviewed_model_motion_failed"
+    elif fixture_ready:
+        status = "hardware_free_fixture_motion_failed"
+    else:
+        status = "motion_failed_authority_incomplete"
+    return {
+        "status": status,
+        "physical_reviewed_model_motion_checked": bool(motion_checked and physical_authority_ready),
+        "hardware_free_fixture_motion_checked": bool(motion_checked and fixture_ready),
+        "motion_evidence_not_physical_so101_authority": bool(motion_checked and not physical_authority_ready),
+        "notes": [
+            "reviewed_model_motion_checked is the compatibility flag for MuJoCo/SimRobot motion.",
+            "physical_reviewed_model_motion_checked is true only when the manifest authority is physical SO-101 authority.",
+            "hardware_free_fixture_motion_checked is automation coverage only and is not physical SO-101 truth.",
+        ],
+    }
+
+
 def build_not_ready_summary(
     *,
     args: argparse.Namespace,
@@ -419,6 +462,14 @@ def build_not_ready_summary(
     manifest_request = manifest_value(manifest_summary, "manifest_request")
     model_path = manifest_value(manifest_summary, "model_path")
     ready = manifest_summary.get("ready_for_model_backed_ik") is True
+    physical_authority_ready = bool(manifest_summary.get("physical_so101_model_authority_ready"))
+    fixture_ready = bool(manifest_summary.get("hardware_free_regression_fixture_ready"))
+    motion_authority_summary = motion_authority(
+        motion_checked=False,
+        physical_authority_ready=physical_authority_ready,
+        fixture_ready=fixture_ready,
+        manifest_ready=ready,
+    )
     missing_inputs = manifest_summary.get("missing_inputs")
     missing_inputs = missing_inputs if isinstance(missing_inputs, list) else ["ready_reviewed_model_bundle"]
     ok = not args.require_ready_reviewed_model
@@ -442,15 +493,22 @@ def build_not_ready_summary(
         "tcp_offset": manifest_value(manifest_summary, "tcp_offset"),
         "base_to_board_alignment": manifest_value(manifest_summary, "base_to_board_alignment"),
         "model_authority": manifest_summary.get("model_authority") or "reviewed_bundle_required",
-        "physical_so101_model_authority_ready": bool(
-            manifest_summary.get("physical_so101_model_authority_ready")
-        ),
-        "hardware_free_regression_fixture_ready": bool(
-            manifest_summary.get("hardware_free_regression_fixture_ready")
-        ),
+        "physical_so101_model_authority_ready": physical_authority_ready,
+        "hardware_free_regression_fixture_ready": fixture_ready,
         "synthetic_fixture_authority_fields": manifest_summary.get("synthetic_fixture_authority_fields") or [],
         "ready_for_model_backed_ik": ready,
         "reviewed_model_motion_checked": False,
+        "motion_authority_status": motion_authority_summary["status"],
+        "physical_reviewed_model_motion_checked": motion_authority_summary[
+            "physical_reviewed_model_motion_checked"
+        ],
+        "hardware_free_fixture_motion_checked": motion_authority_summary[
+            "hardware_free_fixture_motion_checked"
+        ],
+        "motion_evidence_not_physical_so101_authority": motion_authority_summary[
+            "motion_evidence_not_physical_so101_authority"
+        ],
+        "motion_authority": motion_authority_summary,
         "require_ready_reviewed_model": bool(args.require_ready_reviewed_model),
         "missing_inputs": sorted(set(str(item) for item in missing_inputs)),
         "dependencies": {
@@ -530,6 +588,14 @@ def build_ready_summary(
         "diagnostics": ["mujoco_model_load_not_ok"],
     }
     motion_ok = bool(model_load.get("ok")) and bool(simrobot_motion.get("ok"))
+    physical_authority_ready = bool(manifest_summary.get("physical_so101_model_authority_ready"))
+    fixture_ready = bool(manifest_summary.get("hardware_free_regression_fixture_ready"))
+    motion_authority_summary = motion_authority(
+        motion_checked=motion_ok,
+        physical_authority_ready=physical_authority_ready,
+        fixture_ready=fixture_ready,
+        manifest_ready=True,
+    )
     missing_inputs = []
     if not dependencies["mujoco"]:
         missing_inputs.append("mujoco")
@@ -555,15 +621,22 @@ def build_ready_summary(
         "tcp_offset": manifest_value(manifest_summary, "tcp_offset"),
         "base_to_board_alignment": manifest_value(manifest_summary, "base_to_board_alignment"),
         "model_authority": manifest_summary.get("model_authority") or "reviewed_so101_model_bundle_manifest",
-        "physical_so101_model_authority_ready": bool(
-            manifest_summary.get("physical_so101_model_authority_ready")
-        ),
-        "hardware_free_regression_fixture_ready": bool(
-            manifest_summary.get("hardware_free_regression_fixture_ready")
-        ),
+        "physical_so101_model_authority_ready": physical_authority_ready,
+        "hardware_free_regression_fixture_ready": fixture_ready,
         "synthetic_fixture_authority_fields": manifest_summary.get("synthetic_fixture_authority_fields") or [],
         "ready_for_model_backed_ik": True,
         "reviewed_model_motion_checked": motion_ok,
+        "motion_authority_status": motion_authority_summary["status"],
+        "physical_reviewed_model_motion_checked": motion_authority_summary[
+            "physical_reviewed_model_motion_checked"
+        ],
+        "hardware_free_fixture_motion_checked": motion_authority_summary[
+            "hardware_free_fixture_motion_checked"
+        ],
+        "motion_evidence_not_physical_so101_authority": motion_authority_summary[
+            "motion_evidence_not_physical_so101_authority"
+        ],
+        "motion_authority": motion_authority_summary,
         "require_ready_reviewed_model": bool(args.require_ready_reviewed_model),
         "dependencies": dependencies,
         "mujoco_model_load": model_load,
@@ -651,6 +724,10 @@ def write_readme(path: Path, summary: dict[str, Any], rows: list[dict[str, Any]]
         f"- `hardware_free_regression_fixture_ready`: `{str(summary.get('hardware_free_regression_fixture_ready')).lower()}`",
         f"- `ready_for_model_backed_ik`: `{str(summary.get('ready_for_model_backed_ik')).lower()}`",
         f"- `reviewed_model_motion_checked`: `{str(summary.get('reviewed_model_motion_checked')).lower()}`",
+        f"- `motion_authority_status`: `{summary.get('motion_authority_status')}`",
+        f"- `physical_reviewed_model_motion_checked`: `{str(summary.get('physical_reviewed_model_motion_checked')).lower()}`",
+        f"- `hardware_free_fixture_motion_checked`: `{str(summary.get('hardware_free_fixture_motion_checked')).lower()}`",
+        f"- `motion_evidence_not_physical_so101_authority`: `{str(summary.get('motion_evidence_not_physical_so101_authority')).lower()}`",
         f"- `model_path`: `{summary.get('model_path', {}).get('path') if isinstance(summary.get('model_path'), dict) else None}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `checklist_csv`: `{summary['artifacts']['checklist_csv']}`",
@@ -724,6 +801,12 @@ def main() -> int:
                 "hardware_free_regression_fixture_ready": summary["hardware_free_regression_fixture_ready"],
                 "ready_for_model_backed_ik": summary["ready_for_model_backed_ik"],
                 "reviewed_model_motion_checked": summary["reviewed_model_motion_checked"],
+                "motion_authority_status": summary["motion_authority_status"],
+                "physical_reviewed_model_motion_checked": summary["physical_reviewed_model_motion_checked"],
+                "hardware_free_fixture_motion_checked": summary["hardware_free_fixture_motion_checked"],
+                "motion_evidence_not_physical_so101_authority": summary[
+                    "motion_evidence_not_physical_so101_authority"
+                ],
                 "summary_json": str(summary_path),
             },
             sort_keys=True,

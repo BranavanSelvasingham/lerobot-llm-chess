@@ -2848,6 +2848,11 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "tcp_offset",
         "base_to_board_alignment",
         "reviewed_model_motion_checked",
+        "motion_authority_status",
+        "physical_reviewed_model_motion_checked",
+        "hardware_free_fixture_motion_checked",
+        "motion_evidence_not_physical_so101_authority",
+        "motion_authority",
         "require_ready_reviewed_model",
         "missing_inputs",
     ):

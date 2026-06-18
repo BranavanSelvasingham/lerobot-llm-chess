@@ -480,12 +480,38 @@ jobs:
           assert reviewed_mujoco_bundle["model_authority"] == bundle_manifest["model_authority"], reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["physical_so101_model_authority_ready"] == bundle_manifest["physical_so101_model_authority_ready"], reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["hardware_free_regression_fixture_ready"] == bundle_manifest["hardware_free_regression_fixture_ready"], reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["motion_authority_status"] in {
+              "not_checked_manifest_not_ready",
+              "physical_reviewed_model_motion_checked",
+              "hardware_free_fixture_motion_checked_not_physical_so101_authority",
+              "motion_checked_authority_incomplete",
+              "physical_reviewed_model_motion_failed",
+              "hardware_free_fixture_motion_failed",
+              "motion_failed_authority_incomplete",
+          }, reviewed_mujoco_bundle
+          assert isinstance(reviewed_mujoco_bundle["physical_reviewed_model_motion_checked"], bool), reviewed_mujoco_bundle
+          assert isinstance(reviewed_mujoco_bundle["hardware_free_fixture_motion_checked"], bool), reviewed_mujoco_bundle
+          assert isinstance(reviewed_mujoco_bundle["motion_evidence_not_physical_so101_authority"], bool), reviewed_mujoco_bundle
+          assert isinstance(reviewed_mujoco_bundle["motion_authority"], dict), reviewed_mujoco_bundle
           if bundle_manifest["ready_for_model_backed_ik"] is True:
               assert reviewed_mujoco_bundle["reviewed_model_motion_checked"] is True, reviewed_mujoco_bundle
               assert reviewed_mujoco_bundle["status"] == "reviewed_mujoco_bundle_motion_checked", reviewed_mujoco_bundle
+              assert reviewed_mujoco_bundle["physical_reviewed_model_motion_checked"] == (
+                  reviewed_mujoco_bundle["physical_so101_model_authority_ready"] is True
+              ), reviewed_mujoco_bundle
+              assert reviewed_mujoco_bundle["hardware_free_fixture_motion_checked"] == (
+                  reviewed_mujoco_bundle["hardware_free_regression_fixture_ready"] is True
+              ), reviewed_mujoco_bundle
+              assert reviewed_mujoco_bundle["motion_evidence_not_physical_so101_authority"] == (
+                  reviewed_mujoco_bundle["physical_so101_model_authority_ready"] is False
+              ), reviewed_mujoco_bundle
           else:
               assert reviewed_mujoco_bundle["reviewed_model_motion_checked"] is False, reviewed_mujoco_bundle
               assert reviewed_mujoco_bundle["status"] == "reviewed_mujoco_bundle_not_ready", reviewed_mujoco_bundle
+              assert reviewed_mujoco_bundle["motion_authority_status"] == "not_checked_manifest_not_ready", reviewed_mujoco_bundle
+              assert reviewed_mujoco_bundle["physical_reviewed_model_motion_checked"] is False, reviewed_mujoco_bundle
+              assert reviewed_mujoco_bundle["hardware_free_fixture_motion_checked"] is False, reviewed_mujoco_bundle
+              assert reviewed_mujoco_bundle["motion_evidence_not_physical_so101_authority"] is False, reviewed_mujoco_bundle
           reviewed_mujoco_artifacts = reviewed_mujoco_bundle["artifacts"]
           for key in ("summary_json", "checklist_csv", "readme"):
               assert isinstance(reviewed_mujoco_artifacts.get(key), str) and Path(reviewed_mujoco_artifacts[key]).is_file(), (
@@ -1097,6 +1123,26 @@ jobs:
               }, metrics
               assert metrics.get("physical_so101_model_authority_ready") in {True, False, None}, metrics
               assert metrics.get("hardware_free_regression_fixture_ready") in {True, False, None}, metrics
+              assert metrics.get("motion_authority_status") in {
+                  "not_checked_manifest_not_ready",
+                  "physical_reviewed_model_motion_checked",
+                  "hardware_free_fixture_motion_checked_not_physical_so101_authority",
+                  "motion_checked_authority_incomplete",
+                  "physical_reviewed_model_motion_failed",
+                  "hardware_free_fixture_motion_failed",
+                  "motion_failed_authority_incomplete",
+                  None,
+              }, metrics
+              assert metrics.get("physical_reviewed_model_motion_checked") in {True, False, None}, metrics
+              assert metrics.get("hardware_free_fixture_motion_checked") in {True, False, None}, metrics
+              assert metrics.get("motion_evidence_not_physical_so101_authority") in {True, False, None}, metrics
+              if metrics.get("ready_for_model_backed_ik") is True and metrics.get("reviewed_model_motion_checked") is True:
+                  assert metrics.get("physical_reviewed_model_motion_checked") == (
+                      metrics.get("physical_so101_model_authority_ready") is True
+                  ), metrics
+                  assert metrics.get("hardware_free_fixture_motion_checked") == (
+                      metrics.get("hardware_free_regression_fixture_ready") is True
+                  ), metrics
           assert any(
               row.get("kind") == "json"
               and row.get("exists") is True
