@@ -306,6 +306,8 @@ jobs:
               "source_ready_physical_bundle_motion_status_inconsistent",
               "source_ready_hardware_free_bundle_fixture",
               "source_ready_physical_bundle_fixture_motion_not_physical",
+              "source_ready_physical_bundle_with_fixture_ready_conflict",
+              "source_ready_physical_motion_with_fixture_motion_conflict",
               "all_ready_contract_state",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -363,6 +365,22 @@ jobs:
           assert fixture_motion["source_bundle_consistency"]["selected_authoritative_candidate_sha256_matches_bundle"] is True, fixture_motion
           assert fixture_motion["physical_reviewed_model_motion_checked"] is False, fixture_motion
           assert fixture_motion["development_fixture_evidence_not_physical_so101_truth"] is True, fixture_motion
+          bundle_fixture_conflict_case = by_case["source_ready_physical_bundle_with_fixture_ready_conflict"]
+          bundle_fixture_conflict = bundle_fixture_conflict_case["gate"]
+          assert bundle_fixture_conflict["ready"] is False, bundle_fixture_conflict
+          assert bundle_fixture_conflict["source_bundle_consistency_status"] == "source_bundle_model_path_and_digest_consistent", bundle_fixture_conflict
+          assert bundle_fixture_conflict["development_fixture_evidence_present"] is True, bundle_fixture_conflict
+          assert "replace_development_fixture_evidence_with_reviewed_physical_so101_authority" in bundle_fixture_conflict["next_required_action_ids"], bundle_fixture_conflict
+          assert "development_fixture_authority_boundary" in bundle_fixture_conflict_case["blocker_packet"]["action_required_item_ids"], bundle_fixture_conflict_case
+          assert "replace_development_fixture_evidence_with_reviewed_physical_so101_authority" in bundle_fixture_conflict_case["blocker_packet"]["next_action_ids"], bundle_fixture_conflict_case
+          motion_fixture_conflict_case = by_case["source_ready_physical_motion_with_fixture_motion_conflict"]
+          motion_fixture_conflict = motion_fixture_conflict_case["gate"]
+          assert motion_fixture_conflict["ready"] is False, motion_fixture_conflict
+          assert motion_fixture_conflict["source_bundle_consistency_status"] == "source_bundle_model_path_and_digest_consistent", motion_fixture_conflict
+          assert motion_fixture_conflict["development_fixture_evidence_present"] is True, motion_fixture_conflict
+          assert "replace_development_fixture_evidence_with_reviewed_physical_so101_authority" in motion_fixture_conflict["next_required_action_ids"], motion_fixture_conflict
+          assert "development_fixture_authority_boundary" in motion_fixture_conflict_case["blocker_packet"]["action_required_item_ids"], motion_fixture_conflict_case
+          assert "replace_development_fixture_evidence_with_reviewed_physical_so101_authority" in motion_fixture_conflict_case["blocker_packet"]["next_action_ids"], motion_fixture_conflict_case
           ready = by_case["all_ready_contract_state"]["gate"]
           assert ready["ready"] is True, ready
           assert ready["source_bundle_consistency_status"] == "source_bundle_model_path_and_digest_consistent", ready
