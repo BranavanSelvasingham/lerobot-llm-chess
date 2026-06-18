@@ -230,6 +230,7 @@ jobs:
               "authoritative_missing_review_metadata",
               "authoritative_placeholder_review_metadata",
               "authoritative_thin_review_metadata",
+              "authoritative_placeholder_source_metadata",
               "authoritative_complete_source_review",
               "authoritative_single_root_complete_source_review",
               "authoritative_root_ambiguous",
@@ -243,6 +244,14 @@ jobs:
           assert "authority_reviewed_by" in thin_review["observations"]["source_authority_review_evidence_valid_fields"], thin_review
           assert "review_trace" in thin_review["observations"]["source_authority_review_evidence_missing_required_groups"], thin_review
           assert "record_source_authority_review_metadata" in thin_review["observations"]["next_required_action_ids"], thin_review
+          placeholder_source_metadata = by_case["authoritative_placeholder_source_metadata"]
+          assert placeholder_source_metadata["observations"]["source_authority_gate_status"] == "source_authority_blocked_review_metadata", placeholder_source_metadata
+          assert placeholder_source_metadata["observations"]["source_authority_review_status"] == "review_metadata_missing", placeholder_source_metadata
+          assert placeholder_source_metadata["observations"]["source_authority_review_ready"] is False, placeholder_source_metadata
+          assert placeholder_source_metadata["observations"]["source_authority_missing_review_scope_ids"] == [], placeholder_source_metadata
+          assert "authority_source_reference" in placeholder_source_metadata["observations"]["source_authority_required_metadata_placeholder_fields"], placeholder_source_metadata
+          assert "authority_license_basis" in placeholder_source_metadata["observations"]["source_authority_required_metadata_placeholder_fields"], placeholder_source_metadata
+          assert "record_source_authority_review_metadata" in placeholder_source_metadata["observations"]["next_required_action_ids"], placeholder_source_metadata
           assert by_case["authoritative_complete_source_review"]["observations"]["source_authority_gate_status"] == "source_authority_ready", by_case["authoritative_complete_source_review"]
           assert by_case["authoritative_complete_source_review"]["observations"]["source_intake_status"] == "source_authority_ready_waiting_for_bundle_manifest", by_case["authoritative_complete_source_review"]
           assert by_case["authoritative_single_root_complete_source_review"]["observations"]["source_authority_gate_status"] == "source_authority_ready", by_case["authoritative_single_root_complete_source_review"]
