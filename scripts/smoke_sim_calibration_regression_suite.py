@@ -561,6 +561,27 @@ def so101_source_authority_review_forwarding(
     ]
     missing_required_fields = []
     diagnostics = [f"authority_review_evidence_placeholder:{field}" for field in placeholder_review_fields]
+    required_metadata = {
+        "authority_source_reference": values.get("authority_source_reference"),
+        "authority_license_basis": values.get("authority_license_basis"),
+    }
+    supplied_required_metadata = {
+        key: value for key, value in required_metadata.items() if value
+    }
+    required_metadata_placeholder_fields = [
+        key
+        for key, value in supplied_required_metadata.items()
+        if placeholder_review_evidence(value)
+    ]
+    valid_required_metadata_fields = [
+        key
+        for key in supplied_required_metadata
+        if key not in required_metadata_placeholder_fields
+    ]
+    diagnostics.extend(
+        f"authority_required_metadata_placeholder:{field}"
+        for field in required_metadata_placeholder_fields
+    )
     diagnostics.extend(
         f"authority_review_evidence_missing_required_group:{group}"
         for group in review_evidence_groups["missing_required_groups"]
@@ -575,11 +596,16 @@ def so101_source_authority_review_forwarding(
     missing_required_fields.extend(
         f"authority_review_scope:{scope}" for scope in missing_review_scope_ids
     )
-    if not values.get("authority_license_basis"):
-        missing_required_fields.append("authority_license_basis")
+    for field in required_metadata:
+        if field not in valid_required_metadata_fields:
+            missing_required_fields.append(field)
     return {
         "source": source,
-        "ready_if_authoritative_source_declared": not missing_required_fields and not placeholder_review_fields,
+        "ready_if_authoritative_source_declared": (
+            not missing_required_fields
+            and not placeholder_review_fields
+            and not required_metadata_placeholder_fields
+        ),
         "missing_required_fields": missing_required_fields,
         "required_review_scope_ids": list(SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS),
         "supplied_review_scope_ids": supplied_review_scope_ids,
@@ -587,6 +613,9 @@ def so101_source_authority_review_forwarding(
         "review_scope_ready": not missing_review_scope_ids,
         "review_evidence_valid_fields": valid_review_fields,
         "review_evidence_placeholder_fields": placeholder_review_fields,
+        "required_metadata_fields": sorted(required_metadata),
+        "required_metadata_valid_fields": sorted(valid_required_metadata_fields),
+        "required_metadata_placeholder_fields": sorted(required_metadata_placeholder_fields),
         "review_evidence_required_groups": review_evidence_groups["required_groups"],
         "review_evidence_satisfied_required_groups": review_evidence_groups[
             "satisfied_required_groups"
@@ -598,9 +627,9 @@ def so101_source_authority_review_forwarding(
         **values,
         "notes": [
             "These values are forwarded only to the SO-101 model-source inventory.",
-            "Placeholder review evidence such as TODO/TBD/unknown does not satisfy source-authority readiness.",
+            "Placeholder review evidence, source references, or license bases such as TODO/TBD/unknown do not satisfy source-authority readiness.",
             "Source-authority review evidence requires reviewer identity plus at least one trace field: authority_reviewed_at, authority_review_id, or authority_review_url.",
-            "Source-authority readiness also requires explicit review scopes for model identity, provenance, and license.",
+            "Source-authority readiness also requires explicit review scopes for model identity, provenance, and license, plus a non-placeholder source reference and license basis.",
             "They do not replace the bundle manifest's reviewed authority/provenance/readiness gate.",
         ],
     }

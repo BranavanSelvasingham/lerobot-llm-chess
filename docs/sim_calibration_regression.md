@@ -134,6 +134,7 @@ repo-local roots and append an additional root. Use
 `--so101-authoritative-model-path` or `--so101-authoritative-model-root` only
 after provenance, license, mesh dependencies, and source authority have been
 reviewed. Pair authoritative declarations with
+`--so101-source-authority-source-reference`,
 `--so101-source-authority-license-basis`, all three
 `--so101-source-authority-review-scope` values (`model_identity`, `provenance`,
 and `license`), `--so101-source-authority-reviewed-by`, and at least one
@@ -143,8 +144,10 @@ trace field: `--so101-source-authority-reviewed-at`,
 as `source_authority_review.review_evidence_required_groups`,
 `review_evidence_satisfied_required_groups`, and
 `review_evidence_missing_required_groups`; a reviewer identity without a trace
-field is still blocked as `authority_review_evidence:review_trace`. The scope
-fields are recorded as
+field is still blocked as `authority_review_evidence:review_trace`. Placeholder
+source references or license bases are recorded as
+`required_metadata_placeholder_fields` and do not satisfy source-authority
+readiness. The scope fields are recorded as
 `source_authority_review_scope_ready`,
 `source_authority_required_review_scope_ids`,
 `source_authority_supplied_review_scope_ids`, and
@@ -368,8 +371,9 @@ SO-101 assets, run the focused source-authority matrix smoke:
 The smoke creates synthetic URDF fixtures under the output directory, invokes
 `scripts/smoke_sim_so101_model_source_inventory.py` for missing-root,
 unverified-candidate, missing-review-metadata, placeholder-review-metadata,
-thin-review-metadata, complete-source-review, single-authoritative-root review,
-and ambiguous-authoritative-root cases, and writes
+thin-review-metadata, placeholder-source/license-metadata,
+complete-source-review, single-authoritative-root review, and
+ambiguous-authoritative-root cases, and writes
 `so101_source_authority_matrix_summary.json`,
 `so101_source_authority_matrix_cases.csv`, and `README.md`. The
 source-authority-ready fixture case proves only the inventory state transition

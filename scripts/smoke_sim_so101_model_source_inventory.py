@@ -717,8 +717,9 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
         "authority_review_id": args.authority_review_id,
         "authority_review_url": args.authority_review_url,
     }
-    other_optional = {
+    required_metadata = {
         "authority_source_reference": args.authority_source_reference,
+        "authority_license_basis": args.authority_license_basis,
     }
     supplied_review_evidence = {key: value for key, value in review_evidence.items() if non_empty(value)}
     placeholder_review_fields = sorted(
@@ -730,9 +731,19 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
         if key not in placeholder_review_fields
     }
     review_evidence_groups = review_evidence_group_summary(set(valid_review_evidence))
-    supplied_optional = {key: value for key, value in other_optional.items() if value}
-    if args.authority_license_basis:
-        supplied_optional["authority_license_basis"] = args.authority_license_basis
+    supplied_required_metadata = {
+        key: value for key, value in required_metadata.items() if non_empty(value)
+    }
+    required_metadata_placeholder_fields = sorted(
+        key
+        for key, value in supplied_required_metadata.items()
+        if placeholder_review_evidence(value)
+    )
+    valid_required_metadata = {
+        key: value
+        for key, value in supplied_required_metadata.items()
+        if key not in required_metadata_placeholder_fields
+    }
     supplied_review_scope_ids = normalized_review_scope_ids(args.authority_review_scope)
     missing_review_scope_ids = [
         scope
@@ -741,6 +752,10 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
     ]
     missing_required = []
     diagnostics = [f"authority_review_evidence_placeholder:{field}" for field in placeholder_review_fields]
+    diagnostics.extend(
+        f"authority_required_metadata_placeholder:{field}"
+        for field in required_metadata_placeholder_fields
+    )
     diagnostics.extend(
         f"authority_review_evidence_missing_required_group:{group}"
         for group in review_evidence_groups["missing_required_groups"]
@@ -755,8 +770,9 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
     missing_required.extend(
         f"authority_review_scope:{scope}" for scope in missing_review_scope_ids
     )
-    if not args.authority_license_basis:
-        missing_required.append("authority_license_basis")
+    for field in required_metadata:
+        if field not in valid_required_metadata:
+            missing_required.append(field)
     return {
         "required_fields": [
             "authority_review_evidence",
@@ -764,6 +780,7 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
                 f"authority_review_scope:{scope}"
                 for scope in SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS
             ],
+            "authority_source_reference",
             "authority_license_basis",
         ],
         "required_review_scope_ids": list(SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS),
@@ -781,18 +798,24 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
         "review_evidence_missing_required_groups": review_evidence_groups[
             "missing_required_groups"
         ],
+        "required_metadata_fields": sorted(required_metadata),
+        "required_metadata_valid_fields": sorted(valid_required_metadata),
+        "required_metadata_placeholder_fields": required_metadata_placeholder_fields,
         "diagnostics": diagnostics,
-        "optional_fields": sorted(other_optional),
         "missing_required_fields": missing_required,
         "supplied_required_fields": valid_review_evidence,
         "supplied_review_evidence_fields": supplied_review_evidence,
-        "supplied_optional_fields": supplied_optional,
-        "ready_if_authoritative_source_declared": not missing_required and not placeholder_review_fields,
+        "supplied_required_metadata_fields": valid_required_metadata,
+        "ready_if_authoritative_source_declared": (
+            not missing_required
+            and not placeholder_review_fields
+            and not required_metadata_placeholder_fields
+        ),
         "notes": [
             "This metadata describes the inventory-level source-authority review declaration only.",
-            "Placeholder review evidence such as TODO/TBD/unknown does not satisfy source-authority readiness.",
+            "Placeholder review evidence, source references, or license bases such as TODO/TBD/unknown do not satisfy source-authority readiness.",
             "Source-authority review evidence requires reviewer identity plus at least one trace field: authority_reviewed_at, authority_review_id, or authority_review_url.",
-            "Source-authority readiness also requires explicit review scopes for model identity, provenance, and license.",
+            "Source-authority readiness also requires explicit review scopes for model identity, provenance, and license, plus a non-placeholder source reference and license basis.",
             "The bundle manifest still must declare reviewed provenance, mesh authority, joint limits, target frame, TCP offset, and base-to-board alignment before model-backed IK is trusted.",
         ],
     }
@@ -838,6 +861,9 @@ def source_authority_review_summary(
         "diagnostics": review_input.get("diagnostics", []),
         "review_evidence_valid_fields": review_input.get("review_evidence_valid_fields", []),
         "review_evidence_placeholder_fields": review_input.get("review_evidence_placeholder_fields", []),
+        "required_metadata_fields": review_input.get("required_metadata_fields", []),
+        "required_metadata_valid_fields": review_input.get("required_metadata_valid_fields", []),
+        "required_metadata_placeholder_fields": review_input.get("required_metadata_placeholder_fields", []),
         "review_evidence_required_groups": review_input.get("review_evidence_required_groups", []),
         "review_evidence_satisfied_required_groups": review_input.get(
             "review_evidence_satisfied_required_groups", []
@@ -847,7 +873,7 @@ def source_authority_review_summary(
         ),
         "supplied_required_fields": review_input.get("supplied_required_fields", {}),
         "supplied_review_evidence_fields": review_input.get("supplied_review_evidence_fields", {}),
-        "supplied_optional_fields": review_input.get("supplied_optional_fields", {}),
+        "supplied_required_metadata_fields": review_input.get("supplied_required_metadata_fields", {}),
         "notes": review_input.get("notes", []),
     }
 
@@ -1408,6 +1434,14 @@ def build_source_intake_checklist(summary: dict[str, Any]) -> dict[str, Any]:
         or [],
         "review_evidence_placeholder_fields": source_authority_review.get(
             "review_evidence_placeholder_fields"
+        )
+        or [],
+        "required_metadata_valid_fields": source_authority_review.get(
+            "required_metadata_valid_fields"
+        )
+        or [],
+        "required_metadata_placeholder_fields": source_authority_review.get(
+            "required_metadata_placeholder_fields"
         )
         or [],
         "next_required_for_goal": summary.get("next_required_for_goal") or [],

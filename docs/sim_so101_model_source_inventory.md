@@ -51,7 +51,8 @@ suite-level names:
 
 Use the authoritative flags only after source provenance, license, mesh
 dependencies, and authority have been reviewed. When an authoritative path/root
-is declared, also pass `--so101-source-authority-license-basis`, every required
+is declared, also pass `--so101-source-authority-source-reference`,
+`--so101-source-authority-license-basis`, every required
 `--so101-source-authority-review-scope` value (`model_identity`, `provenance`,
 and `license`), `--so101-source-authority-reviewed-by`, plus at least one
 trace field: `--so101-source-authority-reviewed-at`,
@@ -72,9 +73,10 @@ If an authoritative root matches multiple model files, the inventory reports
 and queues `select_single_authoritative_so101_model_source` rather than
 implicitly choosing one.
 
-Review evidence must be non-placeholder metadata. Values such as `TODO`, `TBD`,
-`unknown`, `placeholder`, or `review required` are preserved in the summary as
-`review_evidence_placeholder_fields`, but they keep
+Review evidence, source reference, and license basis must be non-placeholder
+metadata. Values such as `TODO`, `TBD`, `unknown`, `placeholder`, or `review
+required` are preserved in the summary as `review_evidence_placeholder_fields`
+or `required_metadata_placeholder_fields`, but they keep
 `source_authority_review_ready: false` and do not satisfy source-authority
 readiness. A non-placeholder reviewer identity alone is also insufficient; the
 inventory reports `review_evidence_required_groups`,
@@ -127,8 +129,8 @@ python scripts/smoke_sim_so101_model_source_inventory.py --root /absolute/path/t
 
 Use `--authoritative-path` or `--authoritative-root` only after the model source,
 license, and authority have been reviewed. Pair them with
-`--authority-license-basis`, all three required `--authority-review-scope`
-values (`model_identity`, `provenance`, and `license`),
+`--authority-source-reference`, `--authority-license-basis`, all three required
+`--authority-review-scope` values (`model_identity`, `provenance`, and `license`),
 `--authority-reviewed-by`, and at least one trace field:
 `--authority-reviewed-at`, `--authority-review-id`, or
 `--authority-review-url` so the artifact distinguishes a bare
@@ -147,12 +149,13 @@ python scripts/smoke_sim_so101_source_authority_matrix.py --output-dir /private/
 ```
 
 The smoke generates synthetic URDF fixtures under the output directory and runs
-the inventory through eight non-hardware cases: missing source root, unverified
+the inventory through nine non-hardware cases: missing source root, unverified
 candidate, authoritative path without review metadata, authoritative path with
 placeholder review metadata, authoritative path with reviewer-only thin review
-metadata, authoritative path with complete source-review metadata, single
-authoritative root with complete source-review metadata, and ambiguous
-authoritative root. It writes:
+metadata, authoritative path with placeholder source/license metadata,
+authoritative path with complete source-review metadata, single authoritative
+root with complete source-review metadata, and ambiguous authoritative root. It
+writes:
 
 - `so101_source_authority_matrix_summary.json`
 - `so101_source_authority_matrix_cases.csv`
