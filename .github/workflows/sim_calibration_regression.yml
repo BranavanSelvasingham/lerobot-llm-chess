@@ -88,6 +88,7 @@ env:
   PYTHON_VERSION: "3.12"
   CALIBRATION_REGRESSION_OUTPUT_DIR: "/tmp/lerobot_sim/calibration_regression_suite"
   SO101_SOURCE_AUTHORITY_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_source_authority_matrix"
+  SO101_REVIEWED_AUTHORITY_GATE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_reviewed_authority_gate_matrix"
   CALIBRATION_REGRESSION_ARTIFACT_NAME: "sim-calibration-regression-${{ github.run_id }}"
   REFERENCE_MEDIA_ROOTS: ""
   REFERENCE_CAPTURE_MANIFEST: ""
@@ -240,6 +241,61 @@ jobs:
           for relative_path in (
               "so101_source_authority_matrix_summary.json",
               "so101_source_authority_matrix_cases.csv",
+              "README.md",
+          ):
+              assert (summary_path.parent / relative_path).is_file(), relative_path
+          PY
+
+      - name: Run SO-101 reviewed authority gate matrix
+        run: |
+          python scripts/smoke_sim_so101_reviewed_authority_gate_matrix.py \
+            --output-dir "${SO101_REVIEWED_AUTHORITY_GATE_MATRIX_OUTPUT_DIR}"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          summary_path = Path(os.environ["SO101_REVIEWED_AUTHORITY_GATE_MATRIX_OUTPUT_DIR"]) / "so101_reviewed_authority_gate_matrix_summary.json"
+          summary = json.loads(summary_path.read_text())
+          assert summary["ok"] is True, summary
+          assert summary["status"] == "ok", summary
+          assert summary["model_authority"] == "contract_matrix_not_authority", summary
+          assert summary["observed_evidence_is_authority"] is False, summary
+          assert summary["physical_so101_model_authority_ready"] is False, summary
+          assert summary["hardware_skipped"] is True, summary
+          assert summary["gui_skipped"] is True, summary
+          assert summary["openai_skipped"] is True, summary
+          assert summary["case_ids"] == [
+              "source_missing_bundle_missing_motion_missing",
+              "source_ready_bundle_missing",
+              "source_missing_physical_bundle_ready",
+              "source_ready_physical_bundle_missing_model_path",
+              "source_ready_physical_bundle_path_mismatch",
+              "source_ready_physical_bundle_path_match_motion_missing",
+              "source_ready_hardware_free_bundle_fixture",
+              "source_ready_physical_bundle_fixture_motion_not_physical",
+              "all_ready_contract_state",
+          ], summary["case_ids"]
+          assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
+          by_case = {case["case_id"]: case for case in summary["cases"]}
+          mismatch = by_case["source_ready_physical_bundle_path_mismatch"]["gate"]
+          assert mismatch["ready"] is False, mismatch
+          assert mismatch["source_bundle_consistency_status"] == "source_bundle_model_path_mismatch", mismatch
+          assert "align_source_inventory_with_bundle_manifest_model_path" in mismatch["next_required_action_ids"], mismatch
+          fixture_motion = by_case["source_ready_physical_bundle_fixture_motion_not_physical"]["gate"]
+          assert fixture_motion["ready"] is False, fixture_motion
+          assert fixture_motion["source_bundle_consistency_status"] == "source_bundle_model_path_consistent", fixture_motion
+          assert fixture_motion["physical_reviewed_model_motion_checked"] is False, fixture_motion
+          assert fixture_motion["development_fixture_evidence_not_physical_so101_truth"] is True, fixture_motion
+          ready = by_case["all_ready_contract_state"]["gate"]
+          assert ready["ready"] is True, ready
+          assert ready["source_bundle_consistency_status"] == "source_bundle_model_path_consistent", ready
+          assert ready["development_fixture_evidence_not_physical_so101_truth"] is False, ready
+          for case in summary["cases"]:
+              assert case["blocker_packet"]["model_authority"] == "blocker_packet_not_authority", case
+          for relative_path in (
+              "so101_reviewed_authority_gate_matrix_summary.json",
+              "so101_reviewed_authority_gate_matrix_cases.csv",
               "README.md",
           ):
               assert (summary_path.parent / relative_path).is_file(), relative_path
@@ -2426,4 +2482,5 @@ jobs:
           path: |
             ${{ env.CALIBRATION_REGRESSION_OUTPUT_DIR }}
             ${{ env.SO101_SOURCE_AUTHORITY_MATRIX_OUTPUT_DIR }}
+            ${{ env.SO101_REVIEWED_AUTHORITY_GATE_MATRIX_OUTPUT_DIR }}
           if-no-files-found: warn

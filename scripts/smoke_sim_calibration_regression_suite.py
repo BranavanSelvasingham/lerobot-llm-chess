@@ -3784,8 +3784,9 @@ def so101_reviewed_model_authority_gate_section(
             ),
         ]
     )
-    consistency_actions = (
-        [
+    consistency_status = source_bundle_consistency.get("status")
+    if consistency_status == "source_bundle_model_path_mismatch":
+        consistency_actions = [
             {
                 "action_id": "align_source_inventory_with_bundle_manifest_model_path",
                 "gate": "reviewed_model_authority",
@@ -3796,9 +3797,20 @@ def so101_reviewed_model_authority_gate_section(
                 ),
             }
         ]
-        if source_bundle_consistency.get("status") == "source_bundle_model_path_mismatch"
-        else []
-    )
+    elif consistency_status == "bundle_model_path_missing":
+        consistency_actions = [
+            {
+                "action_id": "select_reviewed_so101_model_path",
+                "gate": "reviewed_model_authority",
+                "title": "Select reviewed SO-101 bundle model path",
+                "detail": (
+                    "Record the reviewed SO-101 model path in the bundle manifest "
+                    "before checking source-to-bundle path consistency."
+                ),
+            }
+        ]
+    else:
+        consistency_actions = []
     motion_actions = (
         [
             {
@@ -3895,6 +3907,11 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
         source_bundle_consistency if isinstance(source_bundle_consistency, dict) else {}
     )
     source_bundle_consistency_ready = gate.get("source_bundle_consistency_ready") is True
+    source_bundle_consistency_next_action_id = (
+        "select_reviewed_so101_model_path"
+        if source_bundle_consistency.get("status") == "bundle_model_path_missing"
+        else "align_source_inventory_with_bundle_manifest_model_path"
+    )
     physical_bundle_authority_ready = (
         gate.get("physical_so101_model_authority_ready") is True
     )
@@ -3960,7 +3977,7 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
                 "physical_bundle_authority_ready",
             ],
             "evidence_artifact_path": gate.get("summary_path"),
-            "next_action_id": "align_source_inventory_with_bundle_manifest_model_path",
+            "next_action_id": source_bundle_consistency_next_action_id,
             "operator_action": (
                 "Use the same reviewed SO-101 model path in the source inventory and "
                 "bundle manifest, or declare an authoritative source root containing the "
