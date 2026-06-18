@@ -120,6 +120,12 @@ fixture authority, but that readiness is classified as
 `hardware_free_regression_fixture_not_physical_so101_authority` and does not
 close the reviewed physical SO-101 model-authority gate.
 
+Review evidence fields must be actual identifiers, dates, tickets, or URLs.
+Placeholder strings such as `TODO`, `TBD`, `unknown`, `placeholder`, or
+`review required` are reported as `review_evidence_placeholder` diagnostics and
+do not satisfy authority readiness, even when the review status itself is an
+accepted value.
+
 ## Integrated Suite Mode
 
 The hardware-free simulator calibration regression suite runs this checker on

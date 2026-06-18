@@ -118,6 +118,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `status`: `{summary['status']}`",
         f"- `ready_manifest`: `{summary['fixtures']['ready_manifest_path']}`",
         f"- `placeholder_manifest`: `{summary['fixtures']['placeholder_manifest_path']}`",
+        f"- `placeholder_review_manifest`: `{summary['fixtures']['placeholder_review_manifest_path']}`",
         f"- `weak_review_manifest`: `{summary['fixtures']['weak_review_manifest_path']}`",
         f"- `weak_joint_limits_manifest`: `{summary['fixtures']['weak_joint_limits_manifest_path']}`",
         f"- `weak_mesh_manifest`: `{summary['fixtures']['weak_mesh_manifest_path']}`",
@@ -325,6 +326,21 @@ def weak_review_manifest_payload(model_filename: str) -> dict[str, Any]:
     return payload
 
 
+def placeholder_review_metadata_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    for review_field in (
+        "authority",
+        "target_frame_authority",
+        "joint_limit_authority",
+        "mesh_asset_authority",
+        "tcp_offset_authority",
+        "base_to_board_alignment_authority",
+    ):
+        payload[review_field]["reviewed_by"] = "TODO"
+        payload[review_field]["reviewed_at"] = "TBD"
+    return payload
+
+
 def weak_joint_limit_authority_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload.pop("joint_limit_authority", None)
@@ -359,6 +375,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     fixture_dir = output_dir / "fixtures"
     bundle_dir = fixture_dir / "ready_bundle"
     placeholder_dir = fixture_dir / "placeholder_bundle"
+    placeholder_review_dir = fixture_dir / "placeholder_review_bundle"
     weak_review_dir = fixture_dir / "weak_review_bundle"
     weak_joint_limits_dir = fixture_dir / "weak_joint_limits_bundle"
     weak_mesh_dir = fixture_dir / "weak_mesh_bundle"
@@ -370,6 +387,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     for root in (
         bundle_dir,
         placeholder_dir,
+        placeholder_review_dir,
         weak_review_dir,
         weak_joint_limits_dir,
         weak_mesh_dir,
@@ -386,6 +404,8 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
 
     ready_model_path = bundle_dir / "model" / "synthetic_so101_mujoco.xml"
     ready_model_path.write_text(mjcf_with_mesh_reference())
+    placeholder_review_model_path = placeholder_review_dir / "model" / "synthetic_so101_mujoco.xml"
+    placeholder_review_model_path.write_text(mjcf_with_mesh_reference())
     weak_review_model_path = weak_review_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_review_model_path.write_text(mjcf_with_mesh_reference())
     weak_joint_limits_model_path = weak_joint_limits_dir / "model" / "synthetic_so101_mujoco.xml"
@@ -405,6 +425,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
 
     ready_manifest_path = bundle_dir / "so101_model_bundle.ready.json"
     placeholder_manifest_path = placeholder_dir / "so101_model_bundle.placeholder.json"
+    placeholder_review_manifest_path = placeholder_review_dir / "so101_model_bundle.placeholder_review.json"
     weak_review_manifest_path = weak_review_dir / "so101_model_bundle.weak_review.json"
     weak_joint_limits_manifest_path = weak_joint_limits_dir / "so101_model_bundle.weak_joint_limits.json"
     weak_mesh_manifest_path = weak_mesh_dir / "so101_model_bundle.weak_mesh_assets.json"
@@ -413,6 +434,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_alignment_manifest_path = weak_alignment_dir / "so101_model_bundle.weak_alignment.json"
     write_json(ready_manifest_path, manifest_payload(ready=True, model_filename=ready_model_path.name))
     write_json(placeholder_manifest_path, manifest_payload(ready=False))
+    write_json(
+        placeholder_review_manifest_path,
+        placeholder_review_metadata_manifest_payload(model_filename=placeholder_review_model_path.name),
+    )
     write_json(
         weak_review_manifest_path,
         weak_review_manifest_payload(model_filename=weak_review_model_path.name),
@@ -441,6 +466,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     return {
         "ready_manifest_path": ready_manifest_path,
         "placeholder_manifest_path": placeholder_manifest_path,
+        "placeholder_review_manifest_path": placeholder_review_manifest_path,
         "weak_review_manifest_path": weak_review_manifest_path,
         "weak_joint_limits_manifest_path": weak_joint_limits_manifest_path,
         "weak_mesh_manifest_path": weak_mesh_manifest_path,
@@ -449,6 +475,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "weak_alignment_manifest_path": weak_alignment_manifest_path,
         "ready_model_path": ready_model_path,
         "ready_asset_root": bundle_dir / "assets",
+        "placeholder_review_model_path": placeholder_review_model_path,
         "weak_review_model_path": weak_review_model_path,
         "weak_joint_limits_model_path": weak_joint_limits_model_path,
         "weak_mesh_model_path": weak_mesh_model_path,
@@ -797,6 +824,58 @@ def summarize_case(
         assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
         assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
         assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
+    elif expectation == "placeholder_review_metadata_not_forwarded":
+        assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_not_ready",
+        )
+        assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
+        assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
+        assert_equal(
+            errors,
+            f"{case_id}.diagnostic_reason",
+            forwarding.get("diagnostic_only_reason"),
+            "bundle_not_ready_for_model_backed_ik:model_bundle_manifest_needs_follow_up",
+        )
+        assert_false(errors, f"{case_id}.used_for_downstream_contract", forwarding.get("used_for_downstream_contract"))
+        missing_inputs = set(bundle.get("missing_inputs") or [])
+        expected_missing = {
+            "authority",
+            "joint_limit_authority",
+            "mesh_asset_authority",
+            "target_frame_authority",
+            "tcp_offset_authority",
+            "base_to_board_alignment_authority",
+        }
+        if not expected_missing.issubset(missing_inputs):
+            errors.append(
+                f"{case_id}.missing_inputs: expected {sorted(expected_missing)!r} subset, got {sorted(missing_inputs)!r}"
+            )
+        assert_equal(errors, f"{case_id}.authority_status", bundle.get("authority_status"), "needs_review")
+        assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "needs_review")
+        assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "needs_review")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "needs_review")
+        assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "needs_review")
+        assert_equal(
+            errors,
+            f"{case_id}.alignment_status",
+            get_nested(bundle, ("base_to_board_alignment", "status")),
+            "needs_review",
+        )
+        for label, diagnostics in (
+            ("authority", bundle.get("authority_diagnostics")),
+            ("joint_limits", get_nested(bundle, ("joint_limits", "diagnostics"), [])),
+            ("mesh_assets", get_nested(bundle, ("mesh_assets", "diagnostics"), [])),
+            ("target_frame", get_nested(bundle, ("target_frame", "diagnostics"), [])),
+            ("tcp_offset", get_nested(bundle, ("tcp_offset", "diagnostics"), [])),
+            ("alignment", get_nested(bundle, ("base_to_board_alignment", "diagnostics"), [])),
+        ):
+            if not any("review_evidence_placeholder" in str(item) for item in (diagnostics or [])):
+                errors.append(f"{case_id}.{label}_placeholder_diagnostic_missing:{diagnostics!r}")
     elif expectation == "weak_review_not_forwarded":
         assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
         assert_equal(
@@ -1078,6 +1157,12 @@ def main() -> int:
             "manifest_path": fixtures["placeholder_manifest_path"],
             "explicit_model_path": None,
             "expectation": "placeholder_not_forwarded",
+        },
+        {
+            "case_id": "placeholder_review_metadata_not_forwarded",
+            "manifest_path": fixtures["placeholder_review_manifest_path"],
+            "explicit_model_path": None,
+            "expectation": "placeholder_review_metadata_not_forwarded",
         },
         {
             "case_id": "weak_review_manifest_not_forwarded",

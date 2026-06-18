@@ -41,6 +41,12 @@ inventory can report an authoritative candidate, but it also reports
 `source_authority_review_status: "review_metadata_missing"` and queues
 `record_source_authority_review_metadata`.
 
+Review evidence must be non-placeholder metadata. Values such as `TODO`, `TBD`,
+`unknown`, `placeholder`, or `review required` are preserved in the summary as
+`review_evidence_placeholder_fields`, but they keep
+`source_authority_review_ready: false` and do not satisfy source-authority
+readiness.
+
 Supplying an empty reviewed root or authority root is still a non-failing
 diagnostic: the suite should report `missing_authoritative_model`,
 `candidate_count: 0`, and `authoritative_candidate_count: 0` rather than

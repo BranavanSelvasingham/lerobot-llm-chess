@@ -209,6 +209,11 @@ joint limits, TCP, and base-to-board alignment, and therefore remains
 diagnostic-only until the manifest checker reports
 `ready_for_model_backed_ik: true`.
 
+The model-source inventory and bundle manifest checker reject placeholder review
+evidence. Non-empty values such as `TODO`, `TBD`, `unknown`, or `placeholder`
+are recorded as diagnostics and do not satisfy source-authority, joint-limit,
+mesh-asset, target-frame, TCP-offset, or base-to-board authority readiness.
+
 To supply a reviewed bundle to the suite:
 
 ```bash

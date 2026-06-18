@@ -535,6 +535,10 @@ jobs:
           }, source_inventory
           assert isinstance(source_inventory["source_authority_review_ready"], bool), source_inventory
           assert isinstance(source_inventory["source_authority_review"], dict), source_inventory
+          source_authority_review = source_inventory["source_authority_review"]
+          assert isinstance(source_authority_review.get("diagnostics"), list), source_authority_review
+          assert isinstance(source_authority_review.get("review_evidence_valid_fields"), list), source_authority_review
+          assert isinstance(source_authority_review.get("review_evidence_placeholder_fields"), list), source_authority_review
           assert isinstance(source_inventory["next_required_for_goal"], list), source_inventory
           assert isinstance(source_inventory["next_required_action_ids"], list), source_inventory
           assert source_inventory["next_required_action_ids"], source_inventory
@@ -1050,6 +1054,10 @@ jobs:
               }, metrics
               assert isinstance(metrics.get("source_authority_review_ready"), bool), metrics
               assert isinstance(metrics.get("source_authority_review"), dict), metrics
+              source_authority_review = metrics.get("source_authority_review")
+              assert isinstance(source_authority_review.get("diagnostics"), list), source_authority_review
+              assert isinstance(source_authority_review.get("review_evidence_valid_fields"), list), source_authority_review
+              assert isinstance(source_authority_review.get("review_evidence_placeholder_fields"), list), source_authority_review
               assert isinstance(metrics.get("next_required_for_goal"), list), metrics
               assert isinstance(metrics.get("next_required_action_ids"), list), metrics
               assert metrics.get("next_required_action_count") == len(metrics.get("next_required_for_goal")), metrics

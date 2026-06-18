@@ -150,6 +150,51 @@ def action_ids(actions: list[dict[str, Any]]) -> list[str]:
     return [action["action_id"] for action in actions if action.get("action_id")]
 
 
+PLACEHOLDER_REVIEW_EVIDENCE_VALUES = {
+    "na",
+    "n/a",
+    "none",
+    "not applicable",
+    "not supplied",
+    "null",
+    "required",
+    "review required",
+    "tbd",
+    "todo",
+    "unknown",
+}
+PLACEHOLDER_REVIEW_EVIDENCE_PREFIXES = (
+    "fixme",
+    "placeholder",
+    "tbd",
+    "todo",
+    "unknown",
+)
+
+
+def non_empty(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, tuple, dict)):
+        return bool(value)
+    return True
+
+
+def normalized_review_text(value: Any) -> str:
+    return " ".join(str(value).strip().lower().replace("_", " ").replace("-", " ").split())
+
+
+def placeholder_review_evidence(value: Any) -> bool:
+    if not non_empty(value) or not isinstance(value, str):
+        return False
+    normalized = normalized_review_text(value)
+    return normalized in PLACEHOLDER_REVIEW_EVIDENCE_VALUES or any(
+        normalized.startswith(prefix) for prefix in PLACEHOLDER_REVIEW_EVIDENCE_PREFIXES
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -508,25 +553,39 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
     other_optional = {
         "authority_source_reference": args.authority_source_reference,
     }
-    supplied_review_evidence = {key: value for key, value in review_evidence.items() if value}
+    supplied_review_evidence = {key: value for key, value in review_evidence.items() if non_empty(value)}
+    placeholder_review_fields = sorted(
+        key for key, value in supplied_review_evidence.items() if placeholder_review_evidence(value)
+    )
+    valid_review_evidence = {
+        key: value
+        for key, value in supplied_review_evidence.items()
+        if key not in placeholder_review_fields
+    }
     supplied_optional = {key: value for key, value in other_optional.items() if value}
     if args.authority_license_basis:
         supplied_optional["authority_license_basis"] = args.authority_license_basis
     missing_required = []
-    if not supplied_review_evidence:
+    diagnostics = [f"authority_review_evidence_placeholder:{field}" for field in placeholder_review_fields]
+    if not valid_review_evidence:
         missing_required.append("authority_review_evidence")
     if not args.authority_license_basis:
         missing_required.append("authority_license_basis")
     return {
         "required_fields": ["authority_review_evidence", "authority_license_basis"],
         "review_evidence_fields": sorted(review_evidence),
+        "review_evidence_valid_fields": sorted(valid_review_evidence),
+        "review_evidence_placeholder_fields": placeholder_review_fields,
+        "diagnostics": diagnostics,
         "optional_fields": sorted(other_optional),
         "missing_required_fields": missing_required,
-        "supplied_required_fields": supplied_review_evidence,
+        "supplied_required_fields": valid_review_evidence,
+        "supplied_review_evidence_fields": supplied_review_evidence,
         "supplied_optional_fields": supplied_optional,
-        "ready_if_authoritative_source_declared": not missing_required,
+        "ready_if_authoritative_source_declared": not missing_required and not placeholder_review_fields,
         "notes": [
             "This metadata describes the inventory-level source-authority review declaration only.",
+            "Placeholder review evidence such as TODO/TBD/unknown does not satisfy source-authority readiness.",
             "The bundle manifest still must declare reviewed provenance, mesh authority, joint limits, target frame, TCP offset, and base-to-board alignment before model-backed IK is trusted.",
         ],
     }
@@ -564,7 +623,11 @@ def source_authority_review_summary(
         "required_fields": review_input.get("required_fields", []),
         "optional_fields": review_input.get("optional_fields", []),
         "missing_required_fields": review_input.get("missing_required_fields", []),
+        "diagnostics": review_input.get("diagnostics", []),
+        "review_evidence_valid_fields": review_input.get("review_evidence_valid_fields", []),
+        "review_evidence_placeholder_fields": review_input.get("review_evidence_placeholder_fields", []),
         "supplied_required_fields": review_input.get("supplied_required_fields", {}),
+        "supplied_review_evidence_fields": review_input.get("supplied_review_evidence_fields", {}),
         "supplied_optional_fields": review_input.get("supplied_optional_fields", {}),
         "notes": review_input.get("notes", []),
     }

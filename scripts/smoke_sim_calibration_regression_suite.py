@@ -278,6 +278,47 @@ def first_non_empty_mapping_value(value: dict[str, Any], field_names: tuple[str,
     return None
 
 
+PLACEHOLDER_REVIEW_EVIDENCE_VALUES = {
+    "na",
+    "n/a",
+    "none",
+    "not applicable",
+    "not supplied",
+    "null",
+    "required",
+    "review required",
+    "tbd",
+    "todo",
+    "unknown",
+}
+PLACEHOLDER_REVIEW_EVIDENCE_PREFIXES = (
+    "fixme",
+    "placeholder",
+    "tbd",
+    "todo",
+    "unknown",
+)
+SOURCE_AUTHORITY_REVIEW_EVIDENCE_KEYS = (
+    "authority_reviewed_by",
+    "authority_reviewed_at",
+    "authority_review_id",
+    "authority_review_url",
+)
+
+
+def normalized_review_text(value: Any) -> str:
+    return " ".join(str(value).strip().lower().replace("_", " ").replace("-", " ").split())
+
+
+def placeholder_review_evidence(value: Any) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    normalized = normalized_review_text(value)
+    return normalized in PLACEHOLDER_REVIEW_EVIDENCE_VALUES or any(
+        normalized.startswith(prefix) for prefix in PLACEHOLDER_REVIEW_EVIDENCE_PREFIXES
+    )
+
+
 def so101_source_authority_review_forwarding(
     *,
     args: argparse.Namespace,
@@ -321,27 +362,32 @@ def so101_source_authority_review_forwarding(
         }
         source = "so101_model_bundle_manifest"
 
-    review_evidence_present = any(
-        values.get(key)
-        for key in (
-            "authority_reviewed_by",
-            "authority_reviewed_at",
-            "authority_review_id",
-            "authority_review_url",
-        )
-    )
+    supplied_review_fields = [
+        key for key in SOURCE_AUTHORITY_REVIEW_EVIDENCE_KEYS if values.get(key)
+    ]
+    placeholder_review_fields = [
+        key for key in supplied_review_fields if placeholder_review_evidence(values.get(key))
+    ]
+    valid_review_fields = [
+        key for key in supplied_review_fields if key not in placeholder_review_fields
+    ]
     missing_required_fields = []
-    if not review_evidence_present:
+    diagnostics = [f"authority_review_evidence_placeholder:{field}" for field in placeholder_review_fields]
+    if not valid_review_fields:
         missing_required_fields.append("authority_review_evidence")
     if not values.get("authority_license_basis"):
         missing_required_fields.append("authority_license_basis")
     return {
         "source": source,
-        "ready_if_authoritative_source_declared": not missing_required_fields,
+        "ready_if_authoritative_source_declared": not missing_required_fields and not placeholder_review_fields,
         "missing_required_fields": missing_required_fields,
+        "review_evidence_valid_fields": valid_review_fields,
+        "review_evidence_placeholder_fields": placeholder_review_fields,
+        "diagnostics": diagnostics,
         **values,
         "notes": [
             "These values are forwarded only to the SO-101 model-source inventory.",
+            "Placeholder review evidence such as TODO/TBD/unknown does not satisfy source-authority readiness.",
             "They do not replace the bundle manifest's reviewed authority/provenance/readiness gate.",
         ],
     }
@@ -3069,6 +3115,9 @@ def so101_model_bundle_manifest_section(
             "diagnostics": asset_roots.get("diagnostics"),
         },
         "authority_status": authority.get("status"),
+        "authority_diagnostics": authority.get("diagnostics"),
+        "authority_review_evidence_valid_fields": authority.get("review_evidence_valid_fields"),
+        "authority_review_evidence_placeholder_fields": authority.get("review_evidence_placeholder_fields"),
         "provenance_status": provenance.get("status"),
         "joint_limits": {
             "status": joint_limits.get("status"),

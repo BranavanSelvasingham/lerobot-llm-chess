@@ -109,6 +109,26 @@ AUTHORITY_REVIEW_FIELDS = (
     "review_id",
     "review_url",
 )
+PLACEHOLDER_REVIEW_EVIDENCE_VALUES = {
+    "na",
+    "n/a",
+    "none",
+    "not applicable",
+    "not supplied",
+    "null",
+    "required",
+    "review required",
+    "tbd",
+    "todo",
+    "unknown",
+}
+PLACEHOLDER_REVIEW_EVIDENCE_PREFIXES = (
+    "fixme",
+    "placeholder",
+    "tbd",
+    "todo",
+    "unknown",
+)
 REVIEWED_AUTHORITY_STATUSES = {
     "reviewed",
     "operator_reviewed",
@@ -467,6 +487,43 @@ def has_any_non_empty_field(value: dict[str, Any], field_names: tuple[str, ...])
     return any(non_empty(value.get(field_name)) for field_name in field_names)
 
 
+def normalized_review_text(value: Any) -> str:
+    return " ".join(str(value).strip().lower().replace("_", " ").replace("-", " ").split())
+
+
+def placeholder_review_evidence(value: Any) -> bool:
+    if not non_empty(value):
+        return False
+    if not isinstance(value, str):
+        return False
+    normalized = normalized_review_text(value)
+    return normalized in PLACEHOLDER_REVIEW_EVIDENCE_VALUES or any(
+        normalized.startswith(prefix) for prefix in PLACEHOLDER_REVIEW_EVIDENCE_PREFIXES
+    )
+
+
+def review_evidence_summary(value: dict[str, Any], field_names: tuple[str, ...] = AUTHORITY_REVIEW_FIELDS) -> dict[str, Any]:
+    supplied_fields: list[str] = []
+    valid_fields: list[str] = []
+    placeholder_fields: list[str] = []
+    for field_name in field_names:
+        field_value = value.get(field_name)
+        if not non_empty(field_value):
+            continue
+        supplied_fields.append(field_name)
+        if placeholder_review_evidence(field_value):
+            placeholder_fields.append(field_name)
+        else:
+            valid_fields.append(field_name)
+    return {
+        "supplied_fields": supplied_fields,
+        "valid_fields": valid_fields,
+        "placeholder_fields": placeholder_fields,
+        "present": bool(valid_fields),
+        "ok": bool(valid_fields) and not placeholder_fields,
+    }
+
+
 def first_non_empty_field(value: dict[str, Any], field_names: tuple[str, ...]) -> tuple[str | None, Any]:
     for field_name in field_names:
         field_value = value.get(field_name)
@@ -694,14 +751,16 @@ def inspect_authority(manifest: dict[str, Any] | None) -> dict[str, Any]:
 
     status_field, raw_status = first_non_empty_field(value, AUTHORITY_STATUS_FIELDS)
     status_value = str(raw_status).strip().lower() if raw_status is not None else ""
-    review_field_present = has_any_non_empty_field(value, AUTHORITY_REVIEW_FIELDS)
+    review_evidence = review_evidence_summary(value)
     diagnostics: list[str] = []
     if not status_value:
         diagnostics.append("authority_review_status_missing")
     elif status_value not in REVIEWED_AUTHORITY_STATUSES and status_value != SYNTHETIC_FIXTURE_AUTHORITY_STATUS:
         diagnostics.append(f"authority_review_status_not_accepted:{status_value}")
-    if not review_field_present:
+    if not review_evidence["present"]:
         diagnostics.append("authority_review_evidence_missing")
+    for field_name in review_evidence["placeholder_fields"]:
+        diagnostics.append(f"authority_review_evidence_placeholder:{field_name}")
 
     is_synthetic_fixture = status_value == SYNTHETIC_FIXTURE_AUTHORITY_STATUS
     if is_synthetic_fixture and "hardware-free" not in str(value.get("scope", "")).lower():
@@ -710,13 +769,15 @@ def inspect_authority(manifest: dict[str, Any] | None) -> dict[str, Any]:
     review_status_ok = status_value in REVIEWED_AUTHORITY_STATUSES or (
         is_synthetic_fixture and "synthetic_fixture_scope_missing_hardware_free" not in diagnostics
     )
-    status = "present" if review_status_ok and review_field_present else "needs_review"
+    status = "present" if review_status_ok and review_evidence["ok"] else "needs_review"
     return {
         "status": status,
         "value": value,
         "review_status_field": status_field,
         "review_status": status_value or None,
-        "review_evidence_present": review_field_present,
+        "review_evidence_present": review_evidence["present"],
+        "review_evidence_valid_fields": review_evidence["valid_fields"],
+        "review_evidence_placeholder_fields": review_evidence["placeholder_fields"],
         "synthetic_fixture_only": is_synthetic_fixture,
         "diagnostics": diagnostics,
         "accepted_review_statuses": sorted(REVIEWED_AUTHORITY_STATUSES),
@@ -829,7 +890,7 @@ def inspect_joint_limit_review(
         if not isinstance(candidate_value, dict):
             continue
         has_status = has_any_non_empty_field(candidate_value, JOINT_LIMIT_STATUS_FIELDS)
-        has_review = has_any_non_empty_field(candidate_value, AUTHORITY_REVIEW_FIELDS)
+        has_review = bool(review_evidence_summary(candidate_value)["supplied_fields"])
         if has_status or has_review:
             review_source = candidate_value
             review_source_field = candidate_field
@@ -849,7 +910,7 @@ def inspect_joint_limit_review(
 
     status_field, raw_status = first_non_empty_field(review_source, JOINT_LIMIT_STATUS_FIELDS)
     status_value = str(raw_status).strip().lower() if raw_status is not None else ""
-    review_field_present = has_any_non_empty_field(review_source, AUTHORITY_REVIEW_FIELDS)
+    review_evidence = review_evidence_summary(review_source)
     diagnostics: list[str] = []
     if not status_value:
         diagnostics.append("joint_limit_authority_review_status_missing")
@@ -858,8 +919,10 @@ def inspect_joint_limit_review(
         and status_value != SYNTHETIC_FIXTURE_JOINT_LIMIT_STATUS
     ):
         diagnostics.append(f"joint_limit_authority_review_status_not_accepted:{status_value}")
-    if not review_field_present:
+    if not review_evidence["present"]:
         diagnostics.append("joint_limit_authority_review_evidence_missing")
+    for field_name in review_evidence["placeholder_fields"]:
+        diagnostics.append(f"joint_limit_authority_review_evidence_placeholder:{field_name}")
 
     is_synthetic_fixture = status_value == SYNTHETIC_FIXTURE_JOINT_LIMIT_STATUS
     if is_synthetic_fixture and "hardware-free" not in str(review_source.get("scope", "")).lower():
@@ -869,12 +932,14 @@ def inspect_joint_limit_review(
         is_synthetic_fixture and "synthetic_joint_limit_scope_missing_hardware_free" not in diagnostics
     )
     return {
-        "status": "present" if review_status_ok and review_field_present else "needs_review",
+        "status": "present" if review_status_ok and review_evidence["ok"] else "needs_review",
         "field": review_source_field,
         "value": review_source,
         "review_status_field": status_field,
         "review_status": status_value or None,
-        "review_evidence_present": review_field_present,
+        "review_evidence_present": review_evidence["present"],
+        "review_evidence_valid_fields": review_evidence["valid_fields"],
+        "review_evidence_placeholder_fields": review_evidence["placeholder_fields"],
         "synthetic_fixture_only": is_synthetic_fixture,
         "accepted_review_statuses": sorted(REVIEWED_JOINT_LIMIT_STATUSES),
         "diagnostics": diagnostics,
@@ -1009,7 +1074,7 @@ def inspect_review_metadata(
         if not isinstance(candidate_value, dict):
             continue
         has_status = has_any_non_empty_field(candidate_value, status_fields)
-        has_review = has_any_non_empty_field(candidate_value, AUTHORITY_REVIEW_FIELDS)
+        has_review = bool(review_evidence_summary(candidate_value)["supplied_fields"])
         if has_status or has_review:
             review_source = candidate_value
             review_source_field = candidate_field
@@ -1029,14 +1094,16 @@ def inspect_review_metadata(
 
     status_field, raw_status = first_non_empty_field(review_source, status_fields)
     status_value = str(raw_status).strip().lower() if raw_status is not None else ""
-    review_field_present = has_any_non_empty_field(review_source, AUTHORITY_REVIEW_FIELDS)
+    review_evidence = review_evidence_summary(review_source)
     diagnostics: list[str] = []
     if not status_value:
         diagnostics.append(f"{diagnostic_prefix}_review_status_missing")
     elif status_value not in accepted_statuses and status_value != synthetic_status:
         diagnostics.append(f"{diagnostic_prefix}_review_status_not_accepted:{status_value}")
-    if not review_field_present:
+    if not review_evidence["present"]:
         diagnostics.append(f"{diagnostic_prefix}_review_evidence_missing")
+    for field_name in review_evidence["placeholder_fields"]:
+        diagnostics.append(f"{diagnostic_prefix}_review_evidence_placeholder:{field_name}")
 
     is_synthetic_fixture = status_value == synthetic_status
     if is_synthetic_fixture and "hardware-free" not in str(review_source.get("scope", "")).lower():
@@ -1046,12 +1113,14 @@ def inspect_review_metadata(
         is_synthetic_fixture and synthetic_scope_diagnostic not in diagnostics
     )
     return {
-        "status": "present" if review_status_ok and review_field_present else "needs_review",
+        "status": "present" if review_status_ok and review_evidence["ok"] else "needs_review",
         "field": review_source_field,
         "value": review_source,
         "review_status_field": status_field,
         "review_status": status_value or None,
-        "review_evidence_present": review_field_present,
+        "review_evidence_present": review_evidence["present"],
+        "review_evidence_valid_fields": review_evidence["valid_fields"],
+        "review_evidence_placeholder_fields": review_evidence["placeholder_fields"],
         "synthetic_fixture_only": is_synthetic_fixture,
         "accepted_review_statuses": sorted(accepted_statuses),
         "diagnostics": diagnostics,
@@ -1428,7 +1497,7 @@ def inspect_mesh_asset_review(manifest: dict[str, Any] | None) -> dict[str, Any]
         if not isinstance(candidate, dict):
             continue
         has_status = has_any_non_empty_field(candidate, MESH_ASSET_STATUS_FIELDS)
-        has_review = has_any_non_empty_field(candidate, AUTHORITY_REVIEW_FIELDS)
+        has_review = bool(review_evidence_summary(candidate)["supplied_fields"])
         if has_status or has_review:
             review_source = candidate
             review_source_field = review_field
@@ -1448,7 +1517,7 @@ def inspect_mesh_asset_review(manifest: dict[str, Any] | None) -> dict[str, Any]
 
     status_field, raw_status = first_non_empty_field(review_source, MESH_ASSET_STATUS_FIELDS)
     status_value = str(raw_status).strip().lower() if raw_status is not None else ""
-    review_field_present = has_any_non_empty_field(review_source, AUTHORITY_REVIEW_FIELDS)
+    review_evidence = review_evidence_summary(review_source)
     diagnostics: list[str] = []
     if not status_value:
         diagnostics.append("mesh_asset_authority_review_status_missing")
@@ -1457,8 +1526,10 @@ def inspect_mesh_asset_review(manifest: dict[str, Any] | None) -> dict[str, Any]
         and status_value != SYNTHETIC_FIXTURE_MESH_ASSET_STATUS
     ):
         diagnostics.append(f"mesh_asset_authority_review_status_not_accepted:{status_value}")
-    if not review_field_present:
+    if not review_evidence["present"]:
         diagnostics.append("mesh_asset_authority_review_evidence_missing")
+    for field_name in review_evidence["placeholder_fields"]:
+        diagnostics.append(f"mesh_asset_authority_review_evidence_placeholder:{field_name}")
 
     is_synthetic_fixture = status_value == SYNTHETIC_FIXTURE_MESH_ASSET_STATUS
     if is_synthetic_fixture and "hardware-free" not in str(review_source.get("scope", "")).lower():
@@ -1468,12 +1539,14 @@ def inspect_mesh_asset_review(manifest: dict[str, Any] | None) -> dict[str, Any]
         is_synthetic_fixture and "synthetic_mesh_asset_scope_missing_hardware_free" not in diagnostics
     )
     return {
-        "status": "present" if review_status_ok and review_field_present else "needs_review",
+        "status": "present" if review_status_ok and review_evidence["ok"] else "needs_review",
         "field": review_source_field,
         "value": review_source,
         "review_status_field": status_field,
         "review_status": status_value or None,
-        "review_evidence_present": review_field_present,
+        "review_evidence_present": review_evidence["present"],
+        "review_evidence_valid_fields": review_evidence["valid_fields"],
+        "review_evidence_placeholder_fields": review_evidence["placeholder_fields"],
         "synthetic_fixture_only": is_synthetic_fixture,
         "accepted_review_statuses": sorted(REVIEWED_MESH_ASSET_STATUSES),
         "diagnostics": diagnostics,
