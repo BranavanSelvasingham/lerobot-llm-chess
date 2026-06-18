@@ -460,6 +460,37 @@ def mapping_review_scope_ids(mapping: dict[str, Any]) -> list[str]:
     return []
 
 
+SOURCE_AUTHORITY_REVIEW_EVIDENCE_REQUIRED_GROUPS = (
+    ("review_actor", ("authority_reviewed_by",)),
+    (
+        "review_trace",
+        ("authority_reviewed_at", "authority_review_id", "authority_review_url"),
+    ),
+)
+
+
+def source_authority_review_evidence_group_summary(valid_review_fields: set[str]) -> dict[str, Any]:
+    required_groups = [
+        {"group": group_name, "fields": list(group_fields)}
+        for group_name, group_fields in SOURCE_AUTHORITY_REVIEW_EVIDENCE_REQUIRED_GROUPS
+    ]
+    missing_required_groups = [
+        group["group"]
+        for group in required_groups
+        if not any(field in valid_review_fields for field in group["fields"])
+    ]
+    satisfied_required_groups = [
+        group["group"]
+        for group in required_groups
+        if any(field in valid_review_fields for field in group["fields"])
+    ]
+    return {
+        "required_groups": required_groups,
+        "missing_required_groups": missing_required_groups,
+        "satisfied_required_groups": satisfied_required_groups,
+    }
+
+
 def so101_source_authority_review_forwarding(
     *,
     args: argparse.Namespace,
@@ -517,6 +548,9 @@ def so101_source_authority_review_forwarding(
     valid_review_fields = [
         key for key in supplied_review_fields if key not in placeholder_review_fields
     ]
+    review_evidence_groups = source_authority_review_evidence_group_summary(
+        set(valid_review_fields)
+    )
     supplied_review_scope_ids = normalized_review_scope_ids(
         values.get("authority_review_scope_ids")
     )
@@ -527,8 +561,17 @@ def so101_source_authority_review_forwarding(
     ]
     missing_required_fields = []
     diagnostics = [f"authority_review_evidence_placeholder:{field}" for field in placeholder_review_fields]
+    diagnostics.extend(
+        f"authority_review_evidence_missing_required_group:{group}"
+        for group in review_evidence_groups["missing_required_groups"]
+    )
     if not valid_review_fields:
         missing_required_fields.append("authority_review_evidence")
+    else:
+        missing_required_fields.extend(
+            f"authority_review_evidence:{group}"
+            for group in review_evidence_groups["missing_required_groups"]
+        )
     missing_required_fields.extend(
         f"authority_review_scope:{scope}" for scope in missing_review_scope_ids
     )
@@ -544,11 +587,19 @@ def so101_source_authority_review_forwarding(
         "review_scope_ready": not missing_review_scope_ids,
         "review_evidence_valid_fields": valid_review_fields,
         "review_evidence_placeholder_fields": placeholder_review_fields,
+        "review_evidence_required_groups": review_evidence_groups["required_groups"],
+        "review_evidence_satisfied_required_groups": review_evidence_groups[
+            "satisfied_required_groups"
+        ],
+        "review_evidence_missing_required_groups": review_evidence_groups[
+            "missing_required_groups"
+        ],
         "diagnostics": diagnostics,
         **values,
         "notes": [
             "These values are forwarded only to the SO-101 model-source inventory.",
             "Placeholder review evidence such as TODO/TBD/unknown does not satisfy source-authority readiness.",
+            "Source-authority review evidence requires reviewer identity plus at least one trace field: authority_reviewed_at, authority_review_id, or authority_review_url.",
             "Source-authority readiness also requires explicit review scopes for model identity, provenance, and license.",
             "They do not replace the bundle manifest's reviewed authority/provenance/readiness gate.",
         ],

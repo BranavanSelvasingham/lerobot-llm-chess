@@ -53,9 +53,9 @@ Use the authoritative flags only after source provenance, license, mesh
 dependencies, and authority have been reviewed. When an authoritative path/root
 is declared, also pass `--so101-source-authority-license-basis`, every required
 `--so101-source-authority-review-scope` value (`model_identity`, `provenance`,
-and `license`), plus at least one review-evidence field:
-`--so101-source-authority-reviewed-by`,
-`--so101-source-authority-reviewed-at`, `--so101-source-authority-review-id`, or
+and `license`), `--so101-source-authority-reviewed-by`, plus at least one
+trace field: `--so101-source-authority-reviewed-at`,
+`--so101-source-authority-review-id`, or
 `--so101-source-authority-review-url`. Without those metadata fields the
 inventory can report an authoritative candidate, but it also reports
 `source_authority_review_status: "review_metadata_missing"` and queues
@@ -76,7 +76,13 @@ Review evidence must be non-placeholder metadata. Values such as `TODO`, `TBD`,
 `unknown`, `placeholder`, or `review required` are preserved in the summary as
 `review_evidence_placeholder_fields`, but they keep
 `source_authority_review_ready: false` and do not satisfy source-authority
-readiness. The inventory also reports `source_authority_review_scope_ready`,
+readiness. A non-placeholder reviewer identity alone is also insufficient; the
+inventory reports `review_evidence_required_groups`,
+`review_evidence_satisfied_required_groups`, and
+`review_evidence_missing_required_groups`, and blocks thin metadata as
+`authority_review_evidence:review_trace` until `reviewed_at`, `review_id`, or
+`review_url` is supplied. The inventory also reports
+`source_authority_review_scope_ready`,
 `source_authority_required_review_scope_ids`,
 `source_authority_supplied_review_scope_ids`, and
 `source_authority_missing_review_scope_ids` so a generic reviewer token cannot
@@ -122,9 +128,10 @@ python scripts/smoke_sim_so101_model_source_inventory.py --root /absolute/path/t
 Use `--authoritative-path` or `--authoritative-root` only after the model source,
 license, and authority have been reviewed. Pair them with
 `--authority-license-basis`, all three required `--authority-review-scope`
-values (`model_identity`, `provenance`, and `license`), plus at least one of
-`--authority-reviewed-by`, `--authority-reviewed-at`, `--authority-review-id`,
-or `--authority-review-url` so the artifact distinguishes a bare
+values (`model_identity`, `provenance`, and `license`),
+`--authority-reviewed-by`, and at least one trace field:
+`--authority-reviewed-at`, `--authority-review-id`, or
+`--authority-review-url` so the artifact distinguishes a bare
 authoritative-path declaration from a reviewed source-authority declaration.
 Without authoritative flags, a SO-101-looking file remains
 `source_authority_status: "unverified"` and does not count as authoritative.
@@ -140,11 +147,12 @@ python scripts/smoke_sim_so101_source_authority_matrix.py --output-dir /private/
 ```
 
 The smoke generates synthetic URDF fixtures under the output directory and runs
-the inventory through seven non-hardware cases: missing source root, unverified
+the inventory through eight non-hardware cases: missing source root, unverified
 candidate, authoritative path without review metadata, authoritative path with
-placeholder review metadata, authoritative path with complete source-review
-metadata, single authoritative root with complete source-review metadata, and
-ambiguous authoritative root. It writes:
+placeholder review metadata, authoritative path with reviewer-only thin review
+metadata, authoritative path with complete source-review metadata, single
+authoritative root with complete source-review metadata, and ambiguous
+authoritative root. It writes:
 
 - `so101_source_authority_matrix_summary.json`
 - `so101_source_authority_matrix_cases.csv`
