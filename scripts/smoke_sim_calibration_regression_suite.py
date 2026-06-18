@@ -3958,6 +3958,7 @@ def so101_reviewed_model_authority_gate_section(
         if ready
         else "reviewed_model_authority_blocked",
         "ready": ready,
+        "reviewed_model_authority_ready": ready,
         "source_authority_ready": source_authority_ready,
         "source_authority_gate_status": source_inventory.get("source_authority_gate_status"),
         "physical_so101_model_authority_ready": physical_authority_ready,

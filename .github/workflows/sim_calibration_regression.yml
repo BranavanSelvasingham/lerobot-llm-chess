@@ -1376,6 +1376,7 @@ jobs:
               "reviewed_model_authority_ready",
           }, reviewed_model_authority_gate
           assert isinstance(reviewed_model_authority_gate["ready"], bool), reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["reviewed_model_authority_ready"] == reviewed_model_authority_gate["ready"], reviewed_model_authority_gate
           assert reviewed_model_authority_gate["source_authority_ready"] == (
               source_inventory["source_authority_gate_status"] == "source_authority_ready"
           ), reviewed_model_authority_gate
@@ -2178,6 +2179,7 @@ jobs:
           for row in artifacts_by_category["so101_reviewed_model_authority_gate"]:
               metrics = row.get("metrics", {})
               assert metrics.get("ready") in {True, False}, metrics
+              assert metrics.get("reviewed_model_authority_ready") == metrics.get("ready"), metrics
               assert metrics.get("source_authority_ready") in {True, False, None}, metrics
               assert metrics.get("physical_so101_model_authority_ready") in {True, False, None}, metrics
               assert metrics.get("source_bundle_consistency_ready") in {True, False, None}, metrics

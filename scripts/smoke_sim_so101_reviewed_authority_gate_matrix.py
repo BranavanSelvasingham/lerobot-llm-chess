@@ -66,6 +66,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "ok",
         "gate_status",
         "gate_ready",
+        "reviewed_model_authority_ready",
         "source_authority_ready",
         "physical_bundle_ready",
         "source_bundle_consistency_status",
@@ -565,6 +566,12 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
     add_error(errors, "ready", gate.get("ready"), expect["ready"])
     add_error(
         errors,
+        "reviewed_model_authority_ready",
+        gate.get("reviewed_model_authority_ready"),
+        expect["ready"],
+    )
+    add_error(
+        errors,
         "status",
         gate.get("status"),
         "reviewed_model_authority_ready"
@@ -731,6 +738,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "ok": case["ok"],
         "gate_status": gate.get("status"),
         "gate_ready": gate.get("ready"),
+        "reviewed_model_authority_ready": gate.get("reviewed_model_authority_ready"),
         "source_authority_ready": gate.get("source_authority_ready"),
         "physical_bundle_ready": gate.get("physical_so101_model_authority_ready"),
         "source_bundle_consistency_status": gate.get("source_bundle_consistency_status"),

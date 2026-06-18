@@ -2827,6 +2827,7 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
         "status": gate.get("status"),
         "ok": gate.get("ok"),
         "ready": gate.get("ready"),
+        "reviewed_model_authority_ready": gate.get("reviewed_model_authority_ready"),
         "review_status": gate.get("review_status"),
         "source_authority_ready": gate.get("source_authority_ready"),
         "source_authority_gate_status": gate.get("source_authority_gate_status"),
