@@ -93,6 +93,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "physical_reviewed_model_motion_checked",
         "hardware_free_fixture_motion_checked",
         "motion_evidence_not_physical_so101_authority",
+        "tcp_offset_status",
+        "alignment_status",
         "expected_status",
         "summary_path",
         "errors",
@@ -153,6 +155,44 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "physical_reviewed_model_motion_checked": False,
                 "hardware_free_fixture_motion_checked": False,
                 "motion_evidence_not_physical_so101_authority": False,
+            },
+        },
+        {
+            "case_id": "invalid_tcp_offset_shape_not_ready",
+            "manifest_path": fixtures["invalid_tcp_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "tcp_offset_status": "invalid",
+                "missing_inputs_contains": ["tcp_offset_m"],
+                "tcp_offset_diagnostics_contains": ["missing_axis:z"],
+            },
+        },
+        {
+            "case_id": "invalid_base_to_board_transform_not_ready",
+            "manifest_path": fixtures["invalid_alignment_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "alignment_status": "invalid",
+                "missing_inputs_contains": ["base_to_board_transform"],
+                "alignment_diagnostics_contains": ["base_to_board_rotation_rpy_missing"],
             },
         },
         {
@@ -285,6 +325,44 @@ def summarize_case(
             summary.get("hardware_free_fixture_motion_checked"),
         )
 
+    if "missing_inputs_contains" in expect:
+        missing_inputs = summary.get("missing_inputs")
+        if not isinstance(missing_inputs, list):
+            errors.append(f"{case_id}.missing_inputs: expected list, got {missing_inputs!r}")
+        else:
+            for expected_input in expect["missing_inputs_contains"]:
+                if expected_input not in missing_inputs:
+                    errors.append(
+                        f"{case_id}.missing_inputs: missing {expected_input!r} in {missing_inputs!r}"
+                    )
+    if "tcp_offset_status" in expect:
+        add_error(
+            errors,
+            f"{case_id}.tcp_offset_status",
+            (summary.get("tcp_offset") or {}).get("status"),
+            expect["tcp_offset_status"],
+        )
+    if "alignment_status" in expect:
+        add_error(
+            errors,
+            f"{case_id}.alignment_status",
+            (summary.get("base_to_board_alignment") or {}).get("status"),
+            expect["alignment_status"],
+        )
+    for diagnostics_key, summary_key in (
+        ("tcp_offset_diagnostics_contains", "tcp_offset"),
+        ("alignment_diagnostics_contains", "base_to_board_alignment"),
+    ):
+        if diagnostics_key not in expect:
+            continue
+        diagnostics = (summary.get(summary_key) or {}).get("diagnostics")
+        diagnostics_text = "\n".join(str(item) for item in diagnostics or [])
+        for expected_diagnostic in expect[diagnostics_key]:
+            if expected_diagnostic not in diagnostics_text:
+                errors.append(
+                    f"{case_id}.{summary_key}.diagnostics: missing {expected_diagnostic!r} in {diagnostics!r}"
+                )
+
     if summary.get("ready_for_model_backed_ik") is not True:
         add_error(
             errors,
@@ -338,6 +416,10 @@ def summarize_case(
                 "motion_evidence_not_physical_so101_authority"
             ),
             "missing_inputs": summary.get("missing_inputs"),
+            "tcp_offset_status": (summary.get("tcp_offset") or {}).get("status"),
+            "tcp_offset_diagnostics": (summary.get("tcp_offset") or {}).get("diagnostics"),
+            "alignment_status": (summary.get("base_to_board_alignment") or {}).get("status"),
+            "alignment_diagnostics": (summary.get("base_to_board_alignment") or {}).get("diagnostics"),
             "artifacts": summary.get("artifacts"),
         },
     }
@@ -373,6 +455,8 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "motion_evidence_not_physical_so101_authority": observations.get(
             "motion_evidence_not_physical_so101_authority"
         ),
+        "tcp_offset_status": observations.get("tcp_offset_status"),
+        "alignment_status": observations.get("alignment_status"),
         "expected_status": expected.get("status"),
         "summary_path": case["summary_path"],
         "errors": case["errors"],

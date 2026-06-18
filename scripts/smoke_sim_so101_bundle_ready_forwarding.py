@@ -124,7 +124,9 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `weak_mesh_manifest`: `{summary['fixtures']['weak_mesh_manifest_path']}`",
         f"- `weak_target_frame_manifest`: `{summary['fixtures']['weak_target_frame_manifest_path']}`",
         f"- `weak_tcp_manifest`: `{summary['fixtures']['weak_tcp_manifest_path']}`",
+        f"- `invalid_tcp_manifest`: `{summary['fixtures']['invalid_tcp_manifest_path']}`",
         f"- `weak_alignment_manifest`: `{summary['fixtures']['weak_alignment_manifest_path']}`",
+        f"- `invalid_alignment_manifest`: `{summary['fixtures']['invalid_alignment_manifest_path']}`",
         f"- `explicit_model_path`: `{summary['fixtures']['explicit_model_path']}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `cases_csv`: `{summary['artifacts']['cases_csv']}`",
@@ -365,9 +367,23 @@ def weak_tcp_offset_authority_manifest_payload(model_filename: str) -> dict[str,
     return payload
 
 
+def invalid_tcp_offset_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["tcp_offset_m"] = {"x": 0.0, "y": 0.0}
+    return payload
+
+
 def weak_alignment_authority_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload.pop("base_to_board_alignment_authority", None)
+    return payload
+
+
+def invalid_alignment_transform_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["base_to_board_transform"] = {
+        "translation_m": {"x": 0.10, "y": -0.175, "z": 0.09},
+    }
     return payload
 
 
@@ -381,7 +397,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_mesh_dir = fixture_dir / "weak_mesh_bundle"
     weak_target_frame_dir = fixture_dir / "weak_target_frame_bundle"
     weak_tcp_dir = fixture_dir / "weak_tcp_bundle"
+    invalid_tcp_dir = fixture_dir / "invalid_tcp_bundle"
     weak_alignment_dir = fixture_dir / "weak_alignment_bundle"
+    invalid_alignment_dir = fixture_dir / "invalid_alignment_bundle"
     explicit_dir = fixture_dir / "explicit_cli"
 
     for root in (
@@ -393,7 +411,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_mesh_dir,
         weak_target_frame_dir,
         weak_tcp_dir,
+        invalid_tcp_dir,
         weak_alignment_dir,
+        invalid_alignment_dir,
     ):
         (root / "model").mkdir(parents=True, exist_ok=True)
         (root / "model" / "meshes").mkdir(parents=True, exist_ok=True)
@@ -416,8 +436,12 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_target_frame_model_path.write_text(mjcf_with_mesh_reference())
     weak_tcp_model_path = weak_tcp_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_tcp_model_path.write_text(mjcf_with_mesh_reference())
+    invalid_tcp_model_path = invalid_tcp_dir / "model" / "synthetic_so101_mujoco.xml"
+    invalid_tcp_model_path.write_text(mjcf_with_mesh_reference())
     weak_alignment_model_path = weak_alignment_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_alignment_model_path.write_text(mjcf_with_mesh_reference())
+    invalid_alignment_model_path = invalid_alignment_dir / "model" / "synthetic_so101_mujoco.xml"
+    invalid_alignment_model_path.write_text(mjcf_with_mesh_reference())
 
     explicit_dir.mkdir(parents=True, exist_ok=True)
     explicit_model_path = explicit_dir / "explicit_cli_so101.urdf"
@@ -431,7 +455,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_mesh_manifest_path = weak_mesh_dir / "so101_model_bundle.weak_mesh_assets.json"
     weak_target_frame_manifest_path = weak_target_frame_dir / "so101_model_bundle.weak_target_frame.json"
     weak_tcp_manifest_path = weak_tcp_dir / "so101_model_bundle.weak_tcp_offset.json"
+    invalid_tcp_manifest_path = invalid_tcp_dir / "so101_model_bundle.invalid_tcp_offset.json"
     weak_alignment_manifest_path = weak_alignment_dir / "so101_model_bundle.weak_alignment.json"
+    invalid_alignment_manifest_path = invalid_alignment_dir / "so101_model_bundle.invalid_alignment.json"
     write_json(ready_manifest_path, manifest_payload(ready=True, model_filename=ready_model_path.name))
     write_json(placeholder_manifest_path, manifest_payload(ready=False))
     write_json(
@@ -459,8 +485,16 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_tcp_offset_authority_manifest_payload(model_filename=weak_tcp_model_path.name),
     )
     write_json(
+        invalid_tcp_manifest_path,
+        invalid_tcp_offset_manifest_payload(model_filename=invalid_tcp_model_path.name),
+    )
+    write_json(
         weak_alignment_manifest_path,
         weak_alignment_authority_manifest_payload(model_filename=weak_alignment_model_path.name),
+    )
+    write_json(
+        invalid_alignment_manifest_path,
+        invalid_alignment_transform_manifest_payload(model_filename=invalid_alignment_model_path.name),
     )
 
     return {
@@ -472,7 +506,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "weak_mesh_manifest_path": weak_mesh_manifest_path,
         "weak_target_frame_manifest_path": weak_target_frame_manifest_path,
         "weak_tcp_manifest_path": weak_tcp_manifest_path,
+        "invalid_tcp_manifest_path": invalid_tcp_manifest_path,
         "weak_alignment_manifest_path": weak_alignment_manifest_path,
+        "invalid_alignment_manifest_path": invalid_alignment_manifest_path,
         "ready_model_path": ready_model_path,
         "ready_asset_root": bundle_dir / "assets",
         "placeholder_review_model_path": placeholder_review_model_path,
@@ -481,7 +517,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "weak_mesh_model_path": weak_mesh_model_path,
         "weak_target_frame_model_path": weak_target_frame_model_path,
         "weak_tcp_model_path": weak_tcp_model_path,
+        "invalid_tcp_model_path": invalid_tcp_model_path,
         "weak_alignment_model_path": weak_alignment_model_path,
+        "invalid_alignment_model_path": invalid_alignment_model_path,
         "explicit_model_path": explicit_model_path,
     }
 

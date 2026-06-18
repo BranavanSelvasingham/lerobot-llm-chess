@@ -330,6 +330,8 @@ jobs:
               "missing_manifest_nonfailing",
               "missing_manifest_require_ready_fails",
               "placeholder_manifest_not_ready",
+              "invalid_tcp_offset_shape_not_ready",
+              "invalid_base_to_board_transform_not_ready",
               "ready_synthetic_fixture_motion_not_physical",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -342,6 +344,18 @@ jobs:
           assert require_ready["record"]["return_code"] == 1, require_ready
           assert require_ready["observations"]["gate_ok"] is False, require_ready
           assert require_ready["observations"]["status"] == "reviewed_mujoco_bundle_required_but_not_ready", require_ready
+          invalid_tcp = by_case["invalid_tcp_offset_shape_not_ready"]
+          assert invalid_tcp["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", invalid_tcp
+          assert invalid_tcp["observations"]["ready_for_model_backed_ik"] is False, invalid_tcp
+          assert invalid_tcp["observations"]["tcp_offset_status"] == "invalid", invalid_tcp
+          assert "tcp_offset_m" in invalid_tcp["observations"]["missing_inputs"], invalid_tcp
+          assert invalid_tcp["observations"]["reviewed_model_motion_checked"] is False, invalid_tcp
+          invalid_alignment = by_case["invalid_base_to_board_transform_not_ready"]
+          assert invalid_alignment["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", invalid_alignment
+          assert invalid_alignment["observations"]["ready_for_model_backed_ik"] is False, invalid_alignment
+          assert invalid_alignment["observations"]["alignment_status"] == "invalid", invalid_alignment
+          assert "base_to_board_transform" in invalid_alignment["observations"]["missing_inputs"], invalid_alignment
+          assert invalid_alignment["observations"]["reviewed_model_motion_checked"] is False, invalid_alignment
           ready_fixture = by_case["ready_synthetic_fixture_motion_not_physical"]
           assert ready_fixture["observations"]["status"] == "reviewed_mujoco_bundle_motion_checked", ready_fixture
           assert ready_fixture["observations"]["reviewed_model_motion_checked"] is True, ready_fixture
