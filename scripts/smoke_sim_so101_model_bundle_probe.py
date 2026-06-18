@@ -17,6 +17,14 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_CHECKER_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_contract.py"
 MANIFEST_CHECKER_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_bundle_manifest.py"
 EXPECTED_TARGET_FRAME = "gripper_frame_link"
+EXPECTED_SO101_JOINTS = (
+    "shoulder_pan",
+    "shoulder_lift",
+    "elbow_flex",
+    "wrist_flex",
+    "wrist_roll",
+    "gripper",
+)
 
 CSV_FIELDNAMES = (
     "requirement_id",
@@ -333,6 +341,48 @@ def inspect_asset_roots(asset_roots: list[Path]) -> dict[str, Any]:
     }
 
 
+def observed_joint_limits_from_contract(contract_result: dict[str, Any]) -> dict[str, Any]:
+    summary = contract_result.get("summary")
+    summary = summary if isinstance(summary, dict) else {}
+    structure = summary.get("model_structure_inspection")
+    structure = structure if isinstance(structure, dict) else {}
+    raw_joints = structure.get("joints")
+    raw_joints = raw_joints if isinstance(raw_joints, list) else []
+
+    values: dict[str, list[float]] = {}
+    diagnostics: list[str] = []
+    for item in raw_joints:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        limits = item.get("limits_deg")
+        if name not in EXPECTED_SO101_JOINTS or name in values:
+            continue
+        if isinstance(limits, list) and len(limits) == 2:
+            try:
+                values[str(name)] = [float(limits[0]), float(limits[1])]
+            except (TypeError, ValueError):
+                diagnostics.append(f"joint_limit_non_numeric:{name}")
+
+    missing_joints = [joint for joint in EXPECTED_SO101_JOINTS if joint not in values]
+    diagnostics.extend(f"joint_limit_not_observed:{joint}" for joint in missing_joints)
+    return {
+        "status": "observed_unreviewed_limits_complete"
+        if not missing_joints
+        else "observed_unreviewed_limits_incomplete",
+        "source": "contract_checker.model_structure_inspection.joints",
+        "values_deg": values,
+        "expected_joints": list(EXPECTED_SO101_JOINTS),
+        "missing_joints": missing_joints,
+        "complete": not missing_joints,
+        "diagnostics": diagnostics,
+        "notes": (
+            "Observed model limits are review evidence only. They are not copied into "
+            "joint_limits_deg and do not create reviewed joint-limit authority."
+        ),
+    }
+
+
 def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, Any]]:
     required = {
         "reviewed_by": args.authority_reviewed_by,
@@ -402,6 +452,7 @@ def build_candidate_manifest(
     provenance: dict[str, Any],
     provenance_placeholder: dict[str, Any],
     contract_result: dict[str, Any],
+    observed_joint_limits: dict[str, Any],
 ) -> dict[str, Any]:
     return {
         "schema": CANDIDATE_SCHEMA,
@@ -431,6 +482,7 @@ def build_candidate_manifest(
             ],
             "reason": "The probe cannot infer reviewed joint-limit authority from model existence alone.",
         },
+        "observed_joint_limits_deg_from_model": observed_joint_limits,
         "tcp_offset_placeholder": {
             "status": "TODO_calibrated_target_frame_to_tcp_offset_required",
             "accepted_manifest_fields": [
@@ -457,6 +509,7 @@ def build_candidate_manifest(
             "The probe does not copy, ingest, or modify model/mesh assets.",
             "Extra probe_child_diagnostics fields are for operator review; the bundle manifest checker derives readiness from the declared manifest fields.",
             "Populate joint_limits_deg or an equivalent joint-limit authority field before expecting ready_for_model_backed_ik.",
+            "observed_joint_limits_deg_from_model is raw candidate evidence for review only; copy it into joint_limits_deg only after separate authority review.",
         ],
     }
 
@@ -495,6 +548,7 @@ def build_rows(
     provenance_placeholder: dict[str, Any],
     contract_result: dict[str, Any],
     manifest_result: dict[str, Any],
+    observed_joint_limits: dict[str, Any],
 ) -> list[dict[str, Any]]:
     manifest_excerpt = manifest_result["diagnostic_excerpt"]
     missing_inputs = manifest_excerpt.get("missing_inputs") or []
@@ -568,6 +622,22 @@ def build_rows(
             "The probe intentionally does not invent reviewed joint-limit authority.",
         ),
         row(
+            "observed_candidate_joint_limits",
+            "joint_contract",
+            "ok" if observed_joint_limits.get("complete") else "action_required",
+            "info",
+            observed_joint_limits,
+            {
+                "complete_raw_candidate_limits": True,
+                "reviewed_manifest_field_still_required": "joint_limits_deg",
+            },
+            None
+            if observed_joint_limits.get("complete")
+            else ["observed_candidate_joint_limits"],
+            observed_joint_limits.get("diagnostics", []),
+            "Raw observed limits help review; they do not satisfy reviewed joint-limit authority.",
+        ),
+        row(
             "base_to_board_transform",
             "alignment",
             "action_required",
@@ -638,6 +708,9 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         f"- `asset_preflight_status`: `{asset_preflight.get('status')}`",
         f"- `asset_preflight_missing_asset_count`: `{asset_preflight.get('missing_asset_count')}`",
         f"- `asset_preflight_unresolved_reference_count`: `{asset_preflight.get('unresolved_reference_count')}`",
+        f"- `observed_joint_limits_status`: `{summary.get('observed_joint_limits_status')}`",
+        f"- `observed_joint_limits_complete`: `{str(summary.get('observed_joint_limits_complete')).lower()}`",
+        f"- `observed_joint_limits_missing_joints`: `{', '.join(summary.get('observed_joint_limits_missing_joints') or []) if summary.get('observed_joint_limits_missing_joints') else 'none'}`",
         f"- `manifest_status`: `{manifest.get('status')}`",
         f"- `ready_for_model_backed_ik`: `{str(manifest.get('ready_for_model_backed_ik')).lower()}`",
         f"- `manifest_missing_inputs`: `{', '.join(manifest.get('missing_inputs') or []) if manifest.get('missing_inputs') else 'none'}`",
@@ -691,6 +764,7 @@ def main() -> int:
         asset_roots,
         str(args.target_frame),
     )
+    observed_joint_limits = observed_joint_limits_from_contract(contract_result)
 
     candidate_manifest_path = output_dir / "so101_model_bundle.candidate.json"
     candidate_manifest = build_candidate_manifest(
@@ -702,6 +776,7 @@ def main() -> int:
         provenance=provenance,
         provenance_placeholder=provenance_placeholder,
         contract_result=contract_result,
+        observed_joint_limits=observed_joint_limits,
     )
     write_json(candidate_manifest_path, candidate_manifest)
 
@@ -715,6 +790,7 @@ def main() -> int:
         provenance_placeholder=provenance_placeholder,
         contract_result=contract_result,
         manifest_result=manifest_result,
+        observed_joint_limits=observed_joint_limits,
     )
 
     summary_path = output_dir / "so101_model_bundle_probe_summary.json"
@@ -745,6 +821,10 @@ def main() -> int:
         "asset_preflight_present_asset_count": asset_preflight_excerpt.get("present_asset_count"),
         "asset_preflight_missing_asset_count": asset_preflight_excerpt.get("missing_asset_count"),
         "asset_preflight_unresolved_reference_count": asset_preflight_excerpt.get("unresolved_reference_count"),
+        "observed_joint_limits_status": observed_joint_limits.get("status"),
+        "observed_joint_limits_complete": observed_joint_limits.get("complete"),
+        "observed_joint_limits_deg": observed_joint_limits.get("values_deg"),
+        "observed_joint_limits_missing_joints": observed_joint_limits.get("missing_joints"),
         "manifest_status": manifest_excerpt.get("status"),
         "ready_for_model_backed_ik": manifest_excerpt.get("ready_for_model_backed_ik") is True,
         "missing_inputs": manifest_excerpt.get("missing_inputs") or [],
@@ -812,6 +892,11 @@ def main() -> int:
                 ],
                 "asset_preflight_unresolved_reference_count": summary[
                     "asset_preflight_unresolved_reference_count"
+                ],
+                "observed_joint_limits_status": summary["observed_joint_limits_status"],
+                "observed_joint_limits_complete": summary["observed_joint_limits_complete"],
+                "observed_joint_limits_missing_joints": summary[
+                    "observed_joint_limits_missing_joints"
                 ],
                 "manifest_status": summary["manifest_status"],
                 "ready_for_model_backed_ik": summary["ready_for_model_backed_ik"],

@@ -144,6 +144,8 @@ Result:
 - `asset_preflight_status`: `asset_preflight_needs_follow_up`
 - `manifest_status`: `model_bundle_manifest_needs_follow_up`
 - `ready_for_model_backed_ik`: `false`
+- `observed_joint_limits_status`: `observed_unreviewed_limits_complete`
+- `observed_joint_limits_complete`: `true`
 - `missing_inputs`: `authority`, `base_to_board_transform`,
   `joint_limits_deg`, `mesh_assets`, `non_blocking_contract_checker_result`,
   `provenance`, `tcp_offset_m`
@@ -209,6 +211,20 @@ Unique missing mesh references:
 - `assets/waveshare_mounting_plate_so101_v2.stl`
 - `assets/wrist_roll_follower_so101_v1.stl`
 - `assets/wrist_roll_pitch_so101_v2.stl`
+
+Observed unreviewed joint limits from the candidate model structure:
+
+| Joint | Observed Lower Deg | Observed Upper Deg |
+| --- | ---: | ---: |
+| `shoulder_pan` | `-109.99987525598623` | `109.99987525598623` |
+| `shoulder_lift` | `-100.00004285756798` | `100.00004285756798` |
+| `elbow_flex` | `-96.82986737710912` | `96.82986737710912` |
+| `wrist_flex` | `-94.99984017946129` | `94.99984017946129` |
+| `wrist_roll` | `-157.21102461697095` | `162.78934171036462` |
+| `gripper` | `-10.000004285756797` | `100.00004285756798` |
+
+These values are review evidence only. They are not copied into
+`joint_limits_deg`, and they do not create reviewed joint-limit authority.
 
 ## Manifest Recheck Evidence
 

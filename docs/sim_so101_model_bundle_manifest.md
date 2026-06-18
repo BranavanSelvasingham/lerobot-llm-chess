@@ -31,9 +31,13 @@ strings. It never copies or imports model assets. It writes:
 The saved probe summary repeats the review-critical fields at top level:
 `model_authority`, `model_request_status`, `contract_status`,
 `asset_preflight_status`, asset-preflight mesh/present/missing/unresolved
-counts, `manifest_status`, `ready_for_model_backed_ik`, and `missing_inputs`.
-These are shortcuts for artifact review only; readiness is still decided by the
-nested manifest checker.
+counts, `observed_joint_limits_status`,
+`observed_joint_limits_complete`, `observed_joint_limits_deg`,
+`observed_joint_limits_missing_joints`, `manifest_status`,
+`ready_for_model_backed_ik`, and `missing_inputs`. These are shortcuts for
+artifact review only; readiness is still decided by the nested manifest checker.
+Observed joint limits come from the candidate model structure and are not copied
+into `joint_limits_deg` unless a reviewer makes them authoritative.
 
 With no `--model-path`, it still exits `0`, emits a candidate manifest template
 with an empty `model_path`, and reports `candidate_model_missing`. With a
