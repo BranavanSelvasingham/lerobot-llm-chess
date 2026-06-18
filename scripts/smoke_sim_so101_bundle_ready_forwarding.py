@@ -123,6 +123,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `weak_joint_limits_manifest`: `{summary['fixtures']['weak_joint_limits_manifest_path']}`",
         f"- `weak_mesh_manifest`: `{summary['fixtures']['weak_mesh_manifest_path']}`",
         f"- `weak_target_frame_manifest`: `{summary['fixtures']['weak_target_frame_manifest_path']}`",
+        f"- `wrong_target_frame_manifest`: `{summary['fixtures']['wrong_target_frame_manifest_path']}`",
         f"- `model_missing_target_frame_manifest`: `{summary['fixtures']['model_missing_target_frame_manifest_path']}`",
         f"- `weak_tcp_manifest`: `{summary['fixtures']['weak_tcp_manifest_path']}`",
         f"- `invalid_tcp_manifest`: `{summary['fixtures']['invalid_tcp_manifest_path']}`",
@@ -371,6 +372,12 @@ def weak_target_frame_authority_manifest_payload(model_filename: str) -> dict[st
     return payload
 
 
+def wrong_target_frame_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["target_frame"] = "not_gripper_frame_link"
+    return payload
+
+
 def weak_tcp_offset_authority_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload.pop("tcp_offset_authority", None)
@@ -406,6 +413,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_joint_limits_dir = fixture_dir / "weak_joint_limits_bundle"
     weak_mesh_dir = fixture_dir / "weak_mesh_bundle"
     weak_target_frame_dir = fixture_dir / "weak_target_frame_bundle"
+    wrong_target_frame_dir = fixture_dir / "wrong_target_frame_bundle"
     model_missing_target_frame_dir = fixture_dir / "model_missing_target_frame_bundle"
     weak_tcp_dir = fixture_dir / "weak_tcp_bundle"
     invalid_tcp_dir = fixture_dir / "invalid_tcp_bundle"
@@ -421,6 +429,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_joint_limits_dir,
         weak_mesh_dir,
         weak_target_frame_dir,
+        wrong_target_frame_dir,
         model_missing_target_frame_dir,
         weak_tcp_dir,
         invalid_tcp_dir,
@@ -446,6 +455,8 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_mesh_model_path.write_text(mjcf_with_mesh_reference())
     weak_target_frame_model_path = weak_target_frame_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_target_frame_model_path.write_text(mjcf_with_mesh_reference())
+    wrong_target_frame_model_path = wrong_target_frame_dir / "model" / "synthetic_so101_mujoco.xml"
+    wrong_target_frame_model_path.write_text(mjcf_with_mesh_reference())
     model_missing_target_frame_path = model_missing_target_frame_dir / "model" / "synthetic_so101_mujoco.xml"
     model_missing_target_frame_path.write_text(mjcf_missing_target_frame_with_mesh_reference())
     weak_tcp_model_path = weak_tcp_dir / "model" / "synthetic_so101_mujoco.xml"
@@ -468,6 +479,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_joint_limits_manifest_path = weak_joint_limits_dir / "so101_model_bundle.weak_joint_limits.json"
     weak_mesh_manifest_path = weak_mesh_dir / "so101_model_bundle.weak_mesh_assets.json"
     weak_target_frame_manifest_path = weak_target_frame_dir / "so101_model_bundle.weak_target_frame.json"
+    wrong_target_frame_manifest_path = wrong_target_frame_dir / "so101_model_bundle.wrong_target_frame.json"
     model_missing_target_frame_manifest_path = (
         model_missing_target_frame_dir / "so101_model_bundle.model_missing_target_frame.json"
     )
@@ -498,6 +510,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_target_frame_authority_manifest_payload(model_filename=weak_target_frame_model_path.name),
     )
     write_json(
+        wrong_target_frame_manifest_path,
+        wrong_target_frame_manifest_payload(model_filename=wrong_target_frame_model_path.name),
+    )
+    write_json(
         model_missing_target_frame_manifest_path,
         manifest_payload(ready=True, model_filename=model_missing_target_frame_path.name),
     )
@@ -526,6 +542,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "weak_joint_limits_manifest_path": weak_joint_limits_manifest_path,
         "weak_mesh_manifest_path": weak_mesh_manifest_path,
         "weak_target_frame_manifest_path": weak_target_frame_manifest_path,
+        "wrong_target_frame_manifest_path": wrong_target_frame_manifest_path,
         "model_missing_target_frame_manifest_path": model_missing_target_frame_manifest_path,
         "weak_tcp_manifest_path": weak_tcp_manifest_path,
         "invalid_tcp_manifest_path": invalid_tcp_manifest_path,
@@ -538,6 +555,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "weak_joint_limits_model_path": weak_joint_limits_model_path,
         "weak_mesh_model_path": weak_mesh_model_path,
         "weak_target_frame_model_path": weak_target_frame_model_path,
+        "wrong_target_frame_model_path": wrong_target_frame_model_path,
         "model_missing_target_frame_path": model_missing_target_frame_path,
         "weak_tcp_model_path": weak_tcp_model_path,
         "invalid_tcp_model_path": invalid_tcp_model_path,
@@ -1045,6 +1063,38 @@ def summarize_case(
             errors.append(f"{case_id}.missing_inputs: expected target_frame_authority, got {missing_inputs!r}")
         assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
         assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
+    elif expectation == "wrong_target_frame_not_forwarded":
+        assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_not_ready",
+        )
+        assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
+        assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
+        assert_equal(
+            errors,
+            f"{case_id}.diagnostic_reason",
+            forwarding.get("diagnostic_only_reason"),
+            "bundle_not_ready_for_model_backed_ik:model_bundle_manifest_needs_follow_up",
+        )
+        assert_false(errors, f"{case_id}.used_for_downstream_contract", forwarding.get("used_for_downstream_contract"))
+        assert_equal(errors, f"{case_id}.authority_status", bundle.get("authority_status"), "present")
+        assert_equal(errors, f"{case_id}.provenance_status", bundle.get("provenance_status"), "present")
+        assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
+        assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "invalid")
+        assert_equal(errors, f"{case_id}.target_frame_value", get_nested(bundle, ("target_frame", "value")), "not_gripper_frame_link")
+        diagnostics = get_nested(bundle, ("target_frame", "diagnostics"), [])
+        if "target_frame_differs_from_default" not in diagnostics:
+            errors.append(f"{case_id}.target_frame_diagnostic_missing:{diagnostics!r}")
+        missing_inputs = bundle.get("missing_inputs")
+        if not isinstance(missing_inputs, list) or "target_frame" not in missing_inputs:
+            errors.append(f"{case_id}.missing_inputs: expected target_frame, got {missing_inputs!r}")
+        assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
+        assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
     elif expectation == "model_missing_target_frame_not_forwarded":
         assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
         assert_equal(
@@ -1292,6 +1342,12 @@ def main() -> int:
             "manifest_path": fixtures["weak_target_frame_manifest_path"],
             "explicit_model_path": None,
             "expectation": "weak_target_frame_authority_not_forwarded",
+        },
+        {
+            "case_id": "wrong_target_frame_not_forwarded",
+            "manifest_path": fixtures["wrong_target_frame_manifest_path"],
+            "explicit_model_path": None,
+            "expectation": "wrong_target_frame_not_forwarded",
         },
         {
             "case_id": "model_missing_target_frame_not_forwarded",

@@ -92,11 +92,13 @@ as `needs_review`. Mesh references also need review evidence: resolved mesh
 files without `mesh_asset_authority` or an accepted mesh/asset-root review
 marker are recorded as `needs_review`. The target frame also needs review
 evidence through `target_frame_authority` or an accepted TCP-frame review
-marker; otherwise the frame name remains diagnostic only. That reviewed target
-frame must also be visible in the actual URDF/MJCF/XML model structure; a
-manifest can name `gripper_frame_link` and provide target-frame authority while
-still remaining not ready if the model does not expose that link, joint, body,
-site, or geom. Numeric TCP offsets and base-to-board transforms also need review
+marker; otherwise the frame name remains diagnostic only. The current simulator
+contract requires `gripper_frame_link`; a reviewed-looking value such as
+`not_gripper_frame_link` is invalid for this gate. The reviewed target frame
+must also be visible in the actual URDF/MJCF/XML model structure; a manifest can
+name `gripper_frame_link` and provide target-frame authority while still
+remaining not ready if the model does not expose that link, joint, body, site,
+or geom. Numeric TCP offsets and base-to-board transforms also need review
 evidence through
 `tcp_offset_authority` and `base_to_board_alignment_authority`; otherwise they
 remain diagnostic inputs only.
@@ -338,7 +340,9 @@ without this review metadata remain diagnostic evidence, not reviewed physical
 SO-101 mesh truth.
 
 Target-frame authority must be declared in `target_frame_authority`,
-`target_frame_review`, `tcp_frame_authority`, or `target_frame_metadata`.
+`target_frame_review`, `tcp_frame_authority`, or `target_frame_metadata`, and
+the manifest `target_frame` must match the current simulator-contract value
+`gripper_frame_link`.
 Accepted target-frame review statuses are `reviewed`, `operator_reviewed`,
 `target_frame_reviewed`, `tcp_frame_reviewed`, and `model_bundle_reviewed`,
 plus `synthetic_fixture_reviewed_for_automation_only` only for explicitly

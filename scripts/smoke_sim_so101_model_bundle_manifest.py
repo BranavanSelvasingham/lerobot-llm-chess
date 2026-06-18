@@ -1065,9 +1065,16 @@ def inspect_target_frame(manifest: dict[str, Any] | None) -> dict[str, Any]:
         review = inspect_target_frame_review(manifest, raw)
         if review["status"] != "present":
             diagnostics.extend(review.get("diagnostics", []))
+        if raw != EXPECTED_TARGET_FRAME:
+            status = "invalid"
+        elif review["status"] == "present":
+            status = "present"
+        else:
+            status = "needs_review"
         return {
-            "status": "present" if review["status"] == "present" else "needs_review",
+            "status": status,
             "value": raw,
+            "expected_value": EXPECTED_TARGET_FRAME,
             "review": review,
             "review_status": review.get("status"),
             "review_diagnostics": review.get("diagnostics", []),
