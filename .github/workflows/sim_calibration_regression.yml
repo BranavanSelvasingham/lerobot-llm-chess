@@ -366,6 +366,7 @@ jobs:
               "invalid_nonfinite_tcp_offset_not_ready",
               "invalid_base_to_board_transform_not_ready",
               "invalid_nonfinite_base_to_board_transform_not_ready",
+              "ready_manifest_mismatched_mujoco_joint_limits",
               "ready_synthetic_fixture_motion_not_physical",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -431,6 +432,15 @@ jobs:
           assert nonfinite_alignment["observations"]["alignment_status"] == "invalid", nonfinite_alignment
           assert "base_to_board_transform" in nonfinite_alignment["observations"]["missing_inputs"], nonfinite_alignment
           assert nonfinite_alignment["observations"]["reviewed_model_motion_checked"] is False, nonfinite_alignment
+          mismatched_limits = by_case["ready_manifest_mismatched_mujoco_joint_limits"]
+          assert mismatched_limits["record"]["return_code"] == 1, mismatched_limits
+          assert mismatched_limits["observations"]["status"] == "reviewed_mujoco_bundle_motion_failed", mismatched_limits
+          assert mismatched_limits["observations"]["ready_for_model_backed_ik"] is True, mismatched_limits
+          assert mismatched_limits["observations"]["joint_limit_model_consistency_status"] == "joint_limits_mismatch_mujoco_model", mismatched_limits
+          assert "joint_limit_model_consistency" in mismatched_limits["observations"]["missing_inputs"], mismatched_limits
+          assert mismatched_limits["observations"]["reviewed_model_motion_checked"] is False, mismatched_limits
+          assert mismatched_limits["observations"]["motion_authority_status"] == "hardware_free_fixture_motion_failed", mismatched_limits
+          assert mismatched_limits["observations"]["hardware_free_fixture_motion_checked"] is False, mismatched_limits
           ready_fixture = by_case["ready_synthetic_fixture_motion_not_physical"]
           assert ready_fixture["observations"]["status"] == "reviewed_mujoco_bundle_motion_checked", ready_fixture
           assert ready_fixture["observations"]["reviewed_model_motion_checked"] is True, ready_fixture

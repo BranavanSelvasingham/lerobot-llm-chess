@@ -423,6 +423,10 @@ true:
 Any missing input appears in `missing_inputs`, in the CSV checklist, and in the
 README. Missing authority, provenance, target-frame authority, TCP, or alignment
 data is never treated as success.
+Readiness here only proves that reviewed joint limits are declared with the
+bundle. The downstream reviewed MuJoCo bundle gate must still load the model and
+compare body-joint `joint_limits_deg` against MuJoCo `jnt_range` before motion
+evidence is trusted.
 
 ## Relationship To Existing Checks
 

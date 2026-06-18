@@ -103,11 +103,17 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
         json.dumps(nonstandard_json_constant, indent=2, sort_keys=True, allow_nan=True) + "\n"
     )
 
+    mismatched_joint_limits = json_clone(ready_payload)
+    mismatched_joint_limits["joint_limits_deg"]["shoulder_pan"] = [-90.0, 90.0]
+    mismatched_joint_limits_path = fixture_dir / "so101_model_bundle.mismatched_joint_limits.json"
+    write_json(mismatched_joint_limits_path, mismatched_joint_limits)
+
     return {
         "nonfinite_joint_limits_manifest_path": nonfinite_joint_limits_path,
         "nonfinite_tcp_manifest_path": nonfinite_tcp_path,
         "nonfinite_alignment_manifest_path": nonfinite_alignment_path,
         "nonstandard_json_constant_manifest_path": nonstandard_json_constant_path,
+        "mismatched_joint_limits_manifest_path": mismatched_joint_limits_path,
     }
 
 
@@ -144,6 +150,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "motion_evidence_not_physical_so101_authority",
         "tcp_offset_status",
         "alignment_status",
+        "joint_limit_model_consistency_status",
         "expected_status",
         "summary_path",
         "errors",
@@ -369,6 +376,32 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "ready_manifest_mismatched_mujoco_joint_limits",
+            "manifest_path": fixtures["mismatched_joint_limits_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 1,
+                "gate_ok": False,
+                "status": "reviewed_mujoco_bundle_motion_failed",
+                "ready_for_model_backed_ik": True,
+                "model_authority": (
+                    "hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_so101_model_authority_ready": False,
+                "hardware_free_regression_fixture_ready": True,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "hardware_free_fixture_motion_failed",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "missing_inputs_contains": ["joint_limit_model_consistency"],
+                "joint_limit_model_consistency_status": "joint_limits_mismatch_mujoco_model",
+                "joint_limit_model_consistency_diagnostics_contains": [
+                    "joint_limit_mismatch:shoulder_pan"
+                ],
+            },
+        },
+        {
             "case_id": "ready_synthetic_fixture_motion_not_physical",
             "manifest_path": fixtures["ready_manifest_path"],
             "require_ready": False,
@@ -515,6 +548,7 @@ def summarize_case(
         ("joint_limits_status", "joint_limits"),
         ("mesh_assets_status", "mesh_assets"),
         ("target_frame_status", "target_frame"),
+        ("joint_limit_model_consistency_status", "joint_limit_model_consistency"),
     ):
         if expect_key in expect:
             add_error(
@@ -545,6 +579,7 @@ def summarize_case(
         ("target_frame_diagnostics_contains", "target_frame"),
         ("tcp_offset_diagnostics_contains", "tcp_offset"),
         ("alignment_diagnostics_contains", "base_to_board_alignment"),
+        ("joint_limit_model_consistency_diagnostics_contains", "joint_limit_model_consistency"),
     ):
         if diagnostics_key not in expect:
             continue
@@ -618,6 +653,12 @@ def summarize_case(
             "tcp_offset_diagnostics": (summary.get("tcp_offset") or {}).get("diagnostics"),
             "alignment_status": (summary.get("base_to_board_alignment") or {}).get("status"),
             "alignment_diagnostics": (summary.get("base_to_board_alignment") or {}).get("diagnostics"),
+            "joint_limit_model_consistency_status": (
+                summary.get("joint_limit_model_consistency") or {}
+            ).get("status"),
+            "joint_limit_model_consistency_diagnostics": (
+                summary.get("joint_limit_model_consistency") or {}
+            ).get("diagnostics"),
             "artifacts": summary.get("artifacts"),
         },
     }
@@ -660,6 +701,9 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "tcp_offset_status": observations.get("tcp_offset_status"),
         "alignment_status": observations.get("alignment_status"),
+        "joint_limit_model_consistency_status": observations.get(
+            "joint_limit_model_consistency_status"
+        ),
         "expected_status": expected.get("status"),
         "summary_path": case["summary_path"],
         "errors": case["errors"],

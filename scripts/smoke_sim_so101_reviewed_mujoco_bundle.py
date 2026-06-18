@@ -6,6 +6,7 @@ import argparse
 import csv
 import importlib.util
 import json
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -22,12 +23,15 @@ SUMMARY_NAME = "so101_reviewed_mujoco_bundle_summary.json"
 CHECKLIST_NAME = "so101_reviewed_mujoco_bundle_checklist.csv"
 README_NAME = "README.md"
 MANIFEST_CHECKER_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_bundle_manifest.py"
-SO101_JOINTS: tuple[str, ...] = (
+SO101_BODY_JOINTS: tuple[str, ...] = (
     "shoulder_pan",
     "shoulder_lift",
     "elbow_flex",
     "wrist_flex",
     "wrist_roll",
+)
+SO101_JOINTS: tuple[str, ...] = (
+    *SO101_BODY_JOINTS,
     "gripper",
 )
 BODY_JOINT_TARGETS_DEG: dict[str, float] = {
@@ -37,6 +41,7 @@ BODY_JOINT_TARGETS_DEG: dict[str, float] = {
     "wrist_flex": -20.0,
     "wrist_roll": 22.0,
 }
+JOINT_LIMIT_RANGE_TOLERANCE_RAD = 1e-6
 MOTION_AUTHORITY_STATUSES = {
     "not_checked_manifest_not_ready",
     "physical_reviewed_model_motion_checked",
@@ -308,6 +313,106 @@ def inspect_mujoco_model(model_path: Path, target_frame: str | None) -> dict[str
         "missing_joints": missing_joints,
         "target_frame_presence": target_presence,
         "joint_ranges": joint_ranges,
+    }
+
+
+def manifest_limit_pair_deg(value: Any) -> tuple[float, float] | None:
+    if isinstance(value, list) and len(value) == 2:
+        try:
+            return float(value[0]), float(value[1])
+        except (TypeError, ValueError):
+            return None
+    if isinstance(value, dict):
+        lower_key = "lower" if "lower" in value else "min" if "min" in value else None
+        upper_key = "upper" if "upper" in value else "max" if "max" in value else None
+        if lower_key is None or upper_key is None:
+            return None
+        try:
+            return float(value[lower_key]), float(value[upper_key])
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def joint_limit_model_consistency(
+    manifest_summary: dict[str, Any],
+    model_load: dict[str, Any],
+) -> dict[str, Any]:
+    manifest_joint_limits = manifest_value(manifest_summary, "joint_limits")
+    manifest_values = manifest_joint_limits.get("value")
+    model_ranges = model_load.get("joint_ranges")
+    if not isinstance(manifest_values, dict):
+        return {
+            "ok": False,
+            "status": "manifest_joint_limits_unavailable",
+            "diagnostics": ["manifest_joint_limits_not_object"],
+            "compared_joints": [],
+            "mismatched_joints": [],
+            "skipped_joints": [],
+        }
+    if not isinstance(model_ranges, dict):
+        return {
+            "ok": False,
+            "status": "mujoco_joint_ranges_unavailable",
+            "diagnostics": ["mujoco_joint_ranges_not_object"],
+            "compared_joints": [],
+            "mismatched_joints": [],
+            "skipped_joints": [],
+        }
+
+    compared: list[dict[str, Any]] = []
+    mismatches: list[dict[str, Any]] = []
+    diagnostics: list[str] = []
+    for joint_name in SO101_BODY_JOINTS:
+        manifest_pair = manifest_limit_pair_deg(manifest_values.get(joint_name))
+        model_pair = model_ranges.get(joint_name)
+        if manifest_pair is None:
+            diagnostics.append(f"manifest_joint_limit_missing_or_invalid:{joint_name}")
+            mismatches.append({"joint": joint_name, "reason": "manifest_limit_missing_or_invalid"})
+            continue
+        if not isinstance(model_pair, list) or len(model_pair) != 2:
+            diagnostics.append(f"mujoco_joint_range_missing_or_invalid:{joint_name}")
+            mismatches.append({"joint": joint_name, "reason": "mujoco_range_missing_or_invalid"})
+            continue
+        manifest_rad = [manifest_pair[0] * math.pi / 180.0, manifest_pair[1] * math.pi / 180.0]
+        try:
+            model_rad = [float(model_pair[0]), float(model_pair[1])]
+        except (TypeError, ValueError):
+            diagnostics.append(f"mujoco_joint_range_non_numeric:{joint_name}")
+            mismatches.append({"joint": joint_name, "reason": "mujoco_range_non_numeric"})
+            continue
+        deltas = [abs(manifest_rad[index] - model_rad[index]) for index in range(2)]
+        record = {
+            "joint": joint_name,
+            "manifest_limits_deg": [manifest_pair[0], manifest_pair[1]],
+            "manifest_limits_rad": manifest_rad,
+            "mujoco_limits_rad": model_rad,
+            "delta_rad": deltas,
+            "tolerance_rad": JOINT_LIMIT_RANGE_TOLERANCE_RAD,
+            "ok": all(delta <= JOINT_LIMIT_RANGE_TOLERANCE_RAD for delta in deltas),
+        }
+        compared.append(record)
+        if not record["ok"]:
+            diagnostics.append(f"joint_limit_mismatch:{joint_name}")
+            mismatches.append(record)
+
+    skipped_joints = [
+        {
+            "joint": "gripper",
+            "reason": "manifest gripper limits are percent-style command limits while MuJoCo gripper ranges may be slide meters.",
+        }
+    ]
+    return {
+        "ok": not mismatches,
+        "status": "joint_limits_match_mujoco_model" if not mismatches else "joint_limits_mismatch_mujoco_model",
+        "compared_joints": compared,
+        "mismatched_joints": mismatches,
+        "skipped_joints": skipped_joints,
+        "diagnostics": diagnostics,
+        "notes": [
+            "Body-joint manifest limits are declared in degrees and compared to MuJoCo joint ranges after radians conversion.",
+            "The gripper command range is not compared here because the manifest uses percent-style command limits while MuJoCo may use a slide-joint opening in meters.",
+        ],
     }
 
 
@@ -595,7 +700,12 @@ def build_ready_summary(
         "status": "not_attempted",
         "diagnostics": ["mujoco_model_load_not_ok"],
     }
-    motion_ok = bool(model_load.get("ok")) and bool(simrobot_motion.get("ok"))
+    joint_limit_consistency = joint_limit_model_consistency(manifest_summary, model_load)
+    motion_ok = (
+        bool(model_load.get("ok"))
+        and bool(simrobot_motion.get("ok"))
+        and bool(joint_limit_consistency.get("ok"))
+    )
     physical_authority_ready = bool(manifest_summary.get("physical_so101_model_authority_ready"))
     fixture_ready = bool(manifest_summary.get("hardware_free_regression_fixture_ready"))
     motion_authority_summary = motion_authority(
@@ -611,6 +721,8 @@ def build_ready_summary(
         missing_inputs.append("mujoco_model_load")
     if not simrobot_motion.get("ok"):
         missing_inputs.append("simrobot_mujoco_joint_motion")
+    if not joint_limit_consistency.get("ok"):
+        missing_inputs.append("joint_limit_model_consistency")
 
     summary = {
         "schema": SCHEMA,
@@ -656,6 +768,7 @@ def build_ready_summary(
         "require_ready_reviewed_model": bool(args.require_ready_reviewed_model),
         "dependencies": dependencies,
         "mujoco_model_load": model_load,
+        "joint_limit_model_consistency": joint_limit_consistency,
         "sim_robot_mujoco_sync": simrobot_motion,
         "missing_inputs": sorted(set(missing_inputs)),
         "artifacts": artifacts,
@@ -713,6 +826,17 @@ def build_ready_summary(
             simrobot_motion.get("mapped_joints"),
             list(SO101_JOINTS),
             missing_inputs=simrobot_motion.get("missing_mapped_joints") or None,
+        ),
+        checklist_row(
+            "joint_limit_model_consistency",
+            "mujoco",
+            bool(joint_limit_consistency.get("ok")),
+            "manifest.joint_limits_deg vs MuJoCo jnt_range",
+            joint_limit_consistency,
+            {"status": "joint_limits_match_mujoco_model"},
+            missing_inputs=None if joint_limit_consistency.get("ok") else ["joint_limit_model_consistency"],
+            diagnostics=joint_limit_consistency.get("diagnostics"),
+            notes="Body-joint bounds must match the loaded MuJoCo model before model-backed motion evidence is trusted.",
         ),
         checklist_row(
             "simrobot_motion",

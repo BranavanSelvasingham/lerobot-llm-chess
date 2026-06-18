@@ -59,9 +59,21 @@ When the manifest is ready, this gate must:
 - load the reviewed model with `mujoco.MjModel.from_xml_path`
 - find every expected SO-101 joint by name
 - find the manifest target frame in the MuJoCo model
+- compare the manifest body-joint limits against MuJoCo `jnt_range` values
 - instantiate `SimRobot` with the reviewed model path
 - verify the MuJoCo backend has no joint-state fallback
 - send a deterministic joint action and confirm mapped qpos motion
+
+The joint-limit comparison converts manifest body-joint limits from degrees to
+MuJoCo radians and covers `shoulder_pan`, `shoulder_lift`, `elbow_flex`,
+`wrist_flex`, and `wrist_roll`. The gripper is reported as skipped in
+`joint_limit_model_consistency` because the manifest uses percent-style command
+limits while MuJoCo gripper joints may be slide openings in meters. If any body
+joint's declared bounds differ from the loaded model, the gate reports
+`status: "reviewed_mujoco_bundle_motion_failed"` with
+`joint_limit_model_consistency` in `missing_inputs`; this prevents a
+reviewed-looking manifest from trusting motion evidence for a model with
+different configured bounds.
 
 The positive path is covered without hardware by the focused forwarding smoke:
 
