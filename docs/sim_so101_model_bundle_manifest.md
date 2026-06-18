@@ -47,7 +47,7 @@ counts, `observed_joint_limits_status`,
 artifact review only; readiness is still decided by the nested manifest checker.
 Observed source hints, joint limits, and mesh references come from the candidate
 model structure and nearby files. They are not copied into `provenance`,
-`joint_limits_deg`, or reviewed mesh authority unless a reviewer makes them
+`joint_limits_deg`, or `mesh_asset_authority` unless a reviewer makes them
 authoritative.
 
 With no `--model-path`, it still exits `0`, emits a candidate manifest template
@@ -71,7 +71,9 @@ evidence, and `provenance` must include a source reference, export tool, and
 license basis. A merely non-empty object is recorded as `needs_review` and does
 not satisfy readiness. Joint-limit values also need review evidence: numeric
 limits without `joint_limit_authority` or an accepted review marker are recorded
-as `needs_review`.
+as `needs_review`. Mesh references also need review evidence: resolved mesh
+files without `mesh_asset_authority` or an accepted mesh/asset-root review
+marker are recorded as `needs_review`.
 
 To re-check a generated draft directly:
 
@@ -164,6 +166,12 @@ resolved from the manifest directory.
     "reviewed_at": "2026-06-16",
     "source": "reviewed model bundle or calibration record"
   },
+  "mesh_asset_authority": {
+    "mesh_asset_authority_status": "reviewed",
+    "reviewed_by": "operator-or-review-id",
+    "reviewed_at": "2026-06-16",
+    "source": "reviewed mesh root or model export"
+  },
   "tcp_offset_m": {
     "x": 0.0,
     "y": 0.0,
@@ -191,7 +199,8 @@ Accepted TCP aliases are `tcp_offset_m`, `gripper_tip_offset_m`,
 `asset_roots` must be present. An explicit empty list is valid when the model
 directory alone resolves mesh paths, but readiness still requires at least one
 literal mesh reference visible to asset preflight and resolved with no missing
-or unresolved assets. Nonexistent roots are reported as follow-up diagnostics.
+or unresolved assets, plus reviewed mesh/asset-root authority. Nonexistent roots
+are reported as follow-up diagnostics.
 Explicit placeholders such as
 `base_to_board_alignment_placeholder` or `alignment_placeholders` are recorded,
 but they do not make the bundle ready for model-backed IK.
@@ -226,6 +235,16 @@ the joint-limit field itself. Accepted review statuses are `reviewed`,
 hardware-free regression fixtures. Review evidence must include at least one of
 `reviewed_by`, `reviewed_at`, `review_id`, or `review_url`.
 
+Mesh/asset-root authority must be declared in `mesh_asset_authority`,
+`mesh_assets_review`, `mesh_asset_review`, or `mesh_assets_metadata`. Accepted
+mesh review statuses are `reviewed`, `operator_reviewed`,
+`mesh_assets_reviewed`, `source_reviewed`, and `model_bundle_reviewed`, plus
+`synthetic_fixture_reviewed_for_automation_only` only for explicitly
+hardware-free regression fixtures. Review evidence must include at least one of
+`reviewed_by`, `reviewed_at`, `review_id`, or `review_url`. Resolved mesh files
+without this review metadata remain diagnostic evidence, not reviewed physical
+SO-101 mesh truth.
+
 ## Readiness Rule
 
 The checker reports `ready_for_model_backed_ik: true` only when all of these are
@@ -240,6 +259,8 @@ true:
   joint-limit review authority
 - at least one mesh reference is visible to the asset preflight and all mesh
   references resolve
+- mesh/asset-root authority includes an accepted review status plus review
+  evidence
 - the target frame is present or defaulted
 - a valid x/y/z TCP offset in meters is present
 - a real `base_to_board_transform` or `base_to_board_alignment` is populated

@@ -98,6 +98,25 @@ PROVENANCE_LICENSE_FIELDS = (
     "license_review",
     "license_basis",
 )
+MESH_ASSET_REVIEW_FIELDS = (
+    "mesh_asset_authority",
+    "mesh_assets_review",
+    "mesh_asset_review",
+    "mesh_assets_metadata",
+)
+MESH_ASSET_STATUS_FIELDS = (
+    "mesh_asset_authority_status",
+    "review_status",
+    "status",
+)
+REVIEWED_MESH_ASSET_STATUSES = {
+    "reviewed",
+    "operator_reviewed",
+    "mesh_assets_reviewed",
+    "source_reviewed",
+    "model_bundle_reviewed",
+}
+SYNTHETIC_FIXTURE_MESH_ASSET_STATUS = "synthetic_fixture_reviewed_for_automation_only"
 ALIGNMENT_FIELDS = (
     "base_to_board_transform",
     "base_to_board_alignment",
@@ -1001,12 +1020,80 @@ def contract_non_blocking(contract: dict[str, Any]) -> tuple[bool, list[str]]:
     return not diagnostics, diagnostics
 
 
-def inspect_mesh_assets(contract: dict[str, Any]) -> dict[str, Any]:
+def inspect_mesh_asset_review(manifest: dict[str, Any] | None) -> dict[str, Any]:
+    manifest = manifest if isinstance(manifest, dict) else {}
+    review_source = None
+    review_source_field = None
+    for review_field in MESH_ASSET_REVIEW_FIELDS:
+        candidate = manifest.get(review_field)
+        if not isinstance(candidate, dict):
+            continue
+        has_status = has_any_non_empty_field(candidate, MESH_ASSET_STATUS_FIELDS)
+        has_review = has_any_non_empty_field(candidate, AUTHORITY_REVIEW_FIELDS)
+        if has_status or has_review:
+            review_source = candidate
+            review_source_field = review_field
+            break
+
+    if not isinstance(review_source, dict):
+        return {
+            "status": "missing",
+            "field": None,
+            "value": None,
+            "review_status": None,
+            "review_evidence_present": False,
+            "synthetic_fixture_only": False,
+            "accepted_review_statuses": sorted(REVIEWED_MESH_ASSET_STATUSES),
+            "diagnostics": ["mesh_asset_authority_review_missing"],
+        }
+
+    status_field, raw_status = first_non_empty_field(review_source, MESH_ASSET_STATUS_FIELDS)
+    status_value = str(raw_status).strip().lower() if raw_status is not None else ""
+    review_field_present = has_any_non_empty_field(review_source, AUTHORITY_REVIEW_FIELDS)
+    diagnostics: list[str] = []
+    if not status_value:
+        diagnostics.append("mesh_asset_authority_review_status_missing")
+    elif (
+        status_value not in REVIEWED_MESH_ASSET_STATUSES
+        and status_value != SYNTHETIC_FIXTURE_MESH_ASSET_STATUS
+    ):
+        diagnostics.append(f"mesh_asset_authority_review_status_not_accepted:{status_value}")
+    if not review_field_present:
+        diagnostics.append("mesh_asset_authority_review_evidence_missing")
+
+    is_synthetic_fixture = status_value == SYNTHETIC_FIXTURE_MESH_ASSET_STATUS
+    if is_synthetic_fixture and "hardware-free" not in str(review_source.get("scope", "")).lower():
+        diagnostics.append("synthetic_mesh_asset_scope_missing_hardware_free")
+
+    review_status_ok = status_value in REVIEWED_MESH_ASSET_STATUSES or (
+        is_synthetic_fixture and "synthetic_mesh_asset_scope_missing_hardware_free" not in diagnostics
+    )
+    return {
+        "status": "present" if review_status_ok and review_field_present else "needs_review",
+        "field": review_source_field,
+        "value": review_source,
+        "review_status_field": status_field,
+        "review_status": status_value or None,
+        "review_evidence_present": review_field_present,
+        "synthetic_fixture_only": is_synthetic_fixture,
+        "accepted_review_statuses": sorted(REVIEWED_MESH_ASSET_STATUSES),
+        "diagnostics": diagnostics,
+        "notes": (
+            "Synthetic fixture mesh-asset authority is accepted only for hardware-free forwarding regression fixtures; "
+            "it is not physical SO-101 mesh truth."
+            if is_synthetic_fixture
+            else "Mesh readiness requires accepted review status plus reviewer/date/id/url evidence."
+        ),
+    }
+
+
+def inspect_mesh_assets(contract: dict[str, Any], manifest: dict[str, Any] | None) -> dict[str, Any]:
     asset_preflight = contract.get("model_asset_preflight") or {}
     mesh_reference_count = asset_preflight.get("mesh_reference_count")
     present_asset_count = asset_preflight.get("present_asset_count")
     missing_asset_count = asset_preflight.get("missing_asset_count")
     unresolved_reference_count = asset_preflight.get("unresolved_reference_count")
+    review = inspect_mesh_asset_review(manifest)
     diagnostics: list[str] = []
     if not isinstance(mesh_reference_count, int) or mesh_reference_count <= 0:
         diagnostics.append("mesh_reference_count_missing_or_zero")
@@ -1016,8 +1103,11 @@ def inspect_mesh_assets(contract: dict[str, Any]) -> dict[str, Any]:
         diagnostics.append(f"unresolved_reference_count:{unresolved_reference_count}")
     if diagnostics:
         status = "missing" if not isinstance(mesh_reference_count, int) or mesh_reference_count <= 0 else "needs_follow_up"
-    else:
+    elif review["status"] == "present":
         status = "present"
+    else:
+        status = "needs_review"
+        diagnostics.extend(review.get("diagnostics", []))
     return {
         "status": status,
         "mesh_reference_count": mesh_reference_count,
@@ -1026,8 +1116,20 @@ def inspect_mesh_assets(contract: dict[str, Any]) -> dict[str, Any]:
         "unresolved_reference_count": unresolved_reference_count,
         "asset_preflight_status": asset_preflight.get("status"),
         "artifacts": asset_preflight.get("artifacts"),
+        "review": review,
+        "review_status": review.get("status"),
+        "review_diagnostics": review.get("diagnostics", []),
         "diagnostics": diagnostics,
     }
+
+
+def mesh_asset_missing_inputs(mesh_assets: dict[str, Any]) -> list[str] | None:
+    status = mesh_assets.get("status")
+    if status == "present":
+        return None
+    if status == "needs_review":
+        return ["mesh_asset_authority"]
+    return ["mesh_assets"]
 
 
 def joint_limit_missing_inputs(joint_limits: dict[str, Any]) -> list[str] | None:
@@ -1095,7 +1197,7 @@ def build_field_checks(
         {
             "requirement_id": "mesh_assets",
             "ok": mesh_assets["status"] == "present",
-            "missing_inputs": None if mesh_assets["status"] == "present" else ["mesh_assets"],
+            "missing_inputs": mesh_asset_missing_inputs(mesh_assets),
             "diagnostics": mesh_assets.get("diagnostics", []),
         },
         {
@@ -1227,10 +1329,15 @@ def build_checklist_rows(
             "warning",
             "contract_checker.model_asset_preflight",
             mesh_assets,
-            {"mesh_reference_count": "> 0", "missing_asset_count": 0, "unresolved_reference_count": 0},
-            None if mesh_assets["status"] == "present" else ["mesh_assets"],
+            {
+                "mesh_reference_count": "> 0",
+                "missing_asset_count": 0,
+                "unresolved_reference_count": 0,
+                "review_authority": True,
+            },
+            mesh_asset_missing_inputs(mesh_assets),
             mesh_assets.get("diagnostics", []),
-            "Readiness requires actual model mesh references, not only an asset root declaration.",
+            "Readiness requires resolved model mesh references plus reviewed mesh/asset-root authority.",
         ),
         row(
             "target_frame",
@@ -1379,7 +1486,7 @@ def build_summary(
     alignment = inspect_alignment(manifest)
     contract = run_contract_checker(python_path, output_dir, model_path, asset_roots, target_frame)
     joint_limits = inspect_joint_limits(manifest)
-    mesh_assets = inspect_mesh_assets(contract)
+    mesh_assets = inspect_mesh_assets(contract, manifest)
     field_checks = build_field_checks(
         manifest_request,
         model_path,

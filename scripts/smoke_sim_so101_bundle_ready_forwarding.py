@@ -76,6 +76,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "authority_status",
         "provenance_status",
         "joint_limits_status",
+        "mesh_assets_status",
         "missing_inputs",
         "reviewed_mujoco_status",
         "reviewed_model_motion_checked",
@@ -112,25 +113,27 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `placeholder_manifest`: `{summary['fixtures']['placeholder_manifest_path']}`",
         f"- `weak_review_manifest`: `{summary['fixtures']['weak_review_manifest_path']}`",
         f"- `weak_joint_limits_manifest`: `{summary['fixtures']['weak_joint_limits_manifest_path']}`",
+        f"- `weak_mesh_manifest`: `{summary['fixtures']['weak_mesh_manifest_path']}`",
         f"- `explicit_model_path`: `{summary['fixtures']['explicit_model_path']}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `cases_csv`: `{summary['artifacts']['cases_csv']}`",
         "",
         "## Cases",
         "",
-        "| Case | Status | Authority | Provenance | Joint Limits | Reviewed MuJoCo | Forwarding | Artifact index missing | Summary |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Case | Status | Authority | Provenance | Joint Limits | Mesh Assets | Reviewed MuJoCo | Forwarding | Artifact index missing | Summary |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for case in summary["cases"]:
         forwarding = case["observations"]["bundle_forwarding"]
         reviewed_mujoco = case["observations"]["reviewed_mujoco_bundle"]
         lines.append(
-            "| `{case_id}` | `{status}` | `{authority}` | `{provenance}` | `{joint_limits}` | `{reviewed_status}`, motion `{motion}` | source `{source}`, diagnostic `{diagnostic}` | `{missing}` | `{summary_path}` |".format(
+            "| `{case_id}` | `{status}` | `{authority}` | `{provenance}` | `{joint_limits}` | `{mesh_assets}` | `{reviewed_status}`, motion `{motion}` | source `{source}`, diagnostic `{diagnostic}` | `{missing}` | `{summary_path}` |".format(
                 case_id=case["case_id"],
                 status=case["status"],
                 authority=case["observations"].get("bundle_authority_status"),
                 provenance=case["observations"].get("bundle_provenance_status"),
                 joint_limits=case["observations"].get("bundle_joint_limits_status"),
+                mesh_assets=case["observations"].get("bundle_mesh_assets_status"),
                 reviewed_status=reviewed_mujoco.get("status"),
                 motion=reviewed_mujoco.get("reviewed_model_motion_checked"),
                 source=forwarding.get("ik_model_path_source"),
@@ -258,6 +261,12 @@ def manifest_payload(*, ready: bool, model_filename: str = "synthetic_so101.urdf
             "reviewed_at": "2026-06-18",
             "scope": "hardware-free forwarding regression only",
         },
+        "mesh_asset_authority": {
+            "mesh_asset_authority_status": "synthetic_fixture_reviewed_for_automation_only",
+            "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
+            "reviewed_at": "2026-06-18",
+            "scope": "hardware-free forwarding regression only",
+        },
         "tcp_offset_m": {"x": 0.0, "y": 0.0, "z": 0.075},
     }
     if ready:
@@ -290,15 +299,22 @@ def weak_joint_limit_authority_manifest_payload(model_filename: str) -> dict[str
     return payload
 
 
+def weak_mesh_asset_authority_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload.pop("mesh_asset_authority", None)
+    return payload
+
+
 def create_fixtures(output_dir: Path) -> dict[str, Path]:
     fixture_dir = output_dir / "fixtures"
     bundle_dir = fixture_dir / "ready_bundle"
     placeholder_dir = fixture_dir / "placeholder_bundle"
     weak_review_dir = fixture_dir / "weak_review_bundle"
     weak_joint_limits_dir = fixture_dir / "weak_joint_limits_bundle"
+    weak_mesh_dir = fixture_dir / "weak_mesh_bundle"
     explicit_dir = fixture_dir / "explicit_cli"
 
-    for root in (bundle_dir, placeholder_dir, weak_review_dir, weak_joint_limits_dir):
+    for root in (bundle_dir, placeholder_dir, weak_review_dir, weak_joint_limits_dir, weak_mesh_dir):
         (root / "model").mkdir(parents=True, exist_ok=True)
         (root / "model" / "meshes").mkdir(parents=True, exist_ok=True)
         (root / "assets" / "meshes").mkdir(parents=True, exist_ok=True)
@@ -312,6 +328,8 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_review_model_path.write_text(mjcf_with_mesh_reference())
     weak_joint_limits_model_path = weak_joint_limits_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_joint_limits_model_path.write_text(mjcf_with_mesh_reference())
+    weak_mesh_model_path = weak_mesh_dir / "model" / "synthetic_so101_mujoco.xml"
+    weak_mesh_model_path.write_text(mjcf_with_mesh_reference())
 
     explicit_dir.mkdir(parents=True, exist_ok=True)
     explicit_model_path = explicit_dir / "explicit_cli_so101.urdf"
@@ -321,6 +339,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     placeholder_manifest_path = placeholder_dir / "so101_model_bundle.placeholder.json"
     weak_review_manifest_path = weak_review_dir / "so101_model_bundle.weak_review.json"
     weak_joint_limits_manifest_path = weak_joint_limits_dir / "so101_model_bundle.weak_joint_limits.json"
+    weak_mesh_manifest_path = weak_mesh_dir / "so101_model_bundle.weak_mesh_assets.json"
     write_json(ready_manifest_path, manifest_payload(ready=True, model_filename=ready_model_path.name))
     write_json(placeholder_manifest_path, manifest_payload(ready=False))
     write_json(
@@ -331,16 +350,22 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_joint_limits_manifest_path,
         weak_joint_limit_authority_manifest_payload(model_filename=weak_joint_limits_model_path.name),
     )
+    write_json(
+        weak_mesh_manifest_path,
+        weak_mesh_asset_authority_manifest_payload(model_filename=weak_mesh_model_path.name),
+    )
 
     return {
         "ready_manifest_path": ready_manifest_path,
         "placeholder_manifest_path": placeholder_manifest_path,
         "weak_review_manifest_path": weak_review_manifest_path,
         "weak_joint_limits_manifest_path": weak_joint_limits_manifest_path,
+        "weak_mesh_manifest_path": weak_mesh_manifest_path,
         "ready_model_path": ready_model_path,
         "ready_asset_root": bundle_dir / "assets",
         "weak_review_model_path": weak_review_model_path,
         "weak_joint_limits_model_path": weak_joint_limits_model_path,
+        "weak_mesh_model_path": weak_mesh_model_path,
         "explicit_model_path": explicit_model_path,
     }
 
@@ -586,6 +611,29 @@ def summarize_case(
         if not isinstance(missing_inputs, list) or "joint_limit_authority" not in missing_inputs:
             errors.append(f"{case_id}.missing_inputs: expected joint_limit_authority, got {missing_inputs!r}")
         assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+    elif expectation == "weak_mesh_asset_authority_not_forwarded":
+        assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_not_ready",
+        )
+        assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
+        assert_equal(
+            errors,
+            f"{case_id}.diagnostic_reason",
+            forwarding.get("diagnostic_only_reason"),
+            "bundle_not_ready_for_model_backed_ik:model_bundle_manifest_needs_follow_up",
+        )
+        assert_equal(errors, f"{case_id}.authority_status", bundle.get("authority_status"), "present")
+        assert_equal(errors, f"{case_id}.provenance_status", bundle.get("provenance_status"), "present")
+        assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
+        assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "needs_review")
+        missing_inputs = bundle.get("missing_inputs")
+        if not isinstance(missing_inputs, list) or "mesh_asset_authority" not in missing_inputs:
+            errors.append(f"{case_id}.missing_inputs: expected mesh_asset_authority, got {missing_inputs!r}")
     else:
         errors.append(f"{case_id}.unknown_expectation:{expectation}")
 
@@ -605,6 +653,7 @@ def summarize_case(
             "bundle_authority_status": bundle.get("authority_status"),
             "bundle_provenance_status": bundle.get("provenance_status"),
             "bundle_joint_limits_status": get_nested(bundle, ("joint_limits", "status")),
+            "bundle_mesh_assets_status": get_nested(bundle, ("mesh_assets", "status")),
             "bundle_missing_inputs": bundle.get("missing_inputs"),
             "contract_model_request": contract.get("model_request"),
             "contract_asset_preflight": contract_preflight,
@@ -630,6 +679,7 @@ def flatten_case_rows(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "authority_status": case["observations"].get("bundle_authority_status"),
                 "provenance_status": case["observations"].get("bundle_provenance_status"),
                 "joint_limits_status": case["observations"].get("bundle_joint_limits_status"),
+                "mesh_assets_status": case["observations"].get("bundle_mesh_assets_status"),
                 "missing_inputs": case["observations"].get("bundle_missing_inputs"),
                 "reviewed_mujoco_status": case["observations"]["reviewed_mujoco_bundle"].get("status"),
                 "reviewed_model_motion_checked": case["observations"]["reviewed_mujoco_bundle"].get(
@@ -686,6 +736,12 @@ def main() -> int:
             "manifest_path": fixtures["weak_joint_limits_manifest_path"],
             "explicit_model_path": None,
             "expectation": "weak_joint_limit_authority_not_forwarded",
+        },
+        {
+            "case_id": "weak_mesh_asset_authority_not_forwarded",
+            "manifest_path": fixtures["weak_mesh_manifest_path"],
+            "explicit_model_path": None,
+            "expectation": "weak_mesh_asset_authority_not_forwarded",
         },
     ]
 
