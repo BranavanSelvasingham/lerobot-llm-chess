@@ -129,7 +129,10 @@ It exits `0` for actionable diagnostics. With no `--manifest-path`, the summary
 reports `status: "model_bundle_manifest_not_supplied"` and lists the required
 fields. A nonexistent manifest path reports
 `status: "model_bundle_manifest_unavailable"`. Invalid JSON reports
-`status: "model_bundle_manifest_parse_error"`.
+`status: "model_bundle_manifest_parse_error"`. The parser rejects
+non-standard JSON constants such as raw `NaN`, `Infinity`, and `-Infinity`;
+use quoted diagnostic strings only when a negative fixture intentionally tests
+field-level numeric validation.
 
 Every summary also reports `model_authority`,
 `physical_authority_gate_status`, `physical_authority_blockers`,

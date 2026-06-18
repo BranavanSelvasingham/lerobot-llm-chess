@@ -94,10 +94,20 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
     nonfinite_alignment_path = fixture_dir / "so101_model_bundle.nonfinite_alignment.json"
     write_json(nonfinite_alignment_path, nonfinite_alignment)
 
+    nonstandard_json_constant = json_clone(ready_payload)
+    nonstandard_json_constant["tcp_offset_m"]["z"] = float("nan")
+    nonstandard_json_constant_path = (
+        fixture_dir / "so101_model_bundle.nonstandard_json_constant.json"
+    )
+    nonstandard_json_constant_path.write_text(
+        json.dumps(nonstandard_json_constant, indent=2, sort_keys=True, allow_nan=True) + "\n"
+    )
+
     return {
         "nonfinite_joint_limits_manifest_path": nonfinite_joint_limits_path,
         "nonfinite_tcp_manifest_path": nonfinite_tcp_path,
         "nonfinite_alignment_manifest_path": nonfinite_alignment_path,
+        "nonstandard_json_constant_manifest_path": nonstandard_json_constant_path,
     }
 
 
@@ -241,6 +251,24 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "alignment_diagnostics_contains": [
                     "base_to_board_alignment_authority_review_evidence_placeholder"
                 ],
+            },
+        },
+        {
+            "case_id": "nonstandard_json_constant_parse_error",
+            "manifest_path": fixtures["nonstandard_json_constant_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "manifest_status": "model_bundle_manifest_parse_error",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "missing_inputs_contains": ["--manifest-path"],
             },
         },
         {
@@ -434,6 +462,7 @@ def summarize_case(
     add_error(errors, f"{case_id}.gate_ok", summary.get("ok"), expect["gate_ok"])
     for key in (
         "status",
+        "manifest_status",
         "ready_for_model_backed_ik",
         "model_authority",
         "physical_so101_model_authority_ready",

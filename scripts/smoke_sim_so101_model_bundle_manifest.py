@@ -630,8 +630,11 @@ def load_manifest(manifest_path: Path | None) -> tuple[dict[str, Any] | None, di
             ],
         }
 
+    def reject_json_constant(value: str) -> None:
+        raise ValueError(f"non_standard_json_constant:{value}")
+
     try:
-        payload = json.loads(resolved.read_text())
+        payload = json.loads(resolved.read_text(), parse_constant=reject_json_constant)
     except Exception as exc:
         return None, {
             "status": "model_bundle_manifest_parse_error",
