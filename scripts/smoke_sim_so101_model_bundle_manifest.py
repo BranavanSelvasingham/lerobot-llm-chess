@@ -110,6 +110,10 @@ AUTHORITY_REVIEW_FIELDS = (
     "review_id",
     "review_url",
 )
+REVIEW_EVIDENCE_REQUIRED_GROUPS = (
+    ("review_actor", ("reviewed_by",)),
+    ("review_trace", ("reviewed_at", "review_id", "review_url")),
+)
 PLACEHOLDER_REVIEW_EVIDENCE_VALUES = {
     "na",
     "n/a",
@@ -290,7 +294,7 @@ NEXT_ACTIONS = {
         "action_id": "record_reviewed_model_source_authority",
         "gate": "reviewed_model_authority",
         "title": "Record reviewed model source authority",
-        "detail": "Fill authority with an accepted review status plus reviewer/date/id/url evidence.",
+        "detail": "Fill authority with an accepted review status, reviewer identity, and at least one trace field: reviewed_at, review_id, or review_url.",
     },
     "provenance": {
         "action_id": "record_model_provenance",
@@ -525,7 +529,10 @@ def placeholder_review_evidence(value: Any) -> bool:
     )
 
 
-def review_evidence_summary(value: dict[str, Any], field_names: tuple[str, ...] = AUTHORITY_REVIEW_FIELDS) -> dict[str, Any]:
+def review_evidence_summary(
+    value: dict[str, Any],
+    field_names: tuple[str, ...] = AUTHORITY_REVIEW_FIELDS,
+) -> dict[str, Any]:
     supplied_fields: list[str] = []
     valid_fields: list[str] = []
     placeholder_fields: list[str] = []
@@ -538,12 +545,34 @@ def review_evidence_summary(value: dict[str, Any], field_names: tuple[str, ...] 
             placeholder_fields.append(field_name)
         else:
             valid_fields.append(field_name)
+    valid_field_set = set(valid_fields)
+    required_groups = [
+        {
+            "group": group_name,
+            "fields": [field for field in group_fields if field in field_names],
+        }
+        for group_name, group_fields in REVIEW_EVIDENCE_REQUIRED_GROUPS
+    ]
+    required_groups = [group for group in required_groups if group["fields"]]
+    missing_required_groups = [
+        group["group"]
+        for group in required_groups
+        if not any(field in valid_field_set for field in group["fields"])
+    ]
+    satisfied_required_groups = [
+        group["group"]
+        for group in required_groups
+        if any(field in valid_field_set for field in group["fields"])
+    ]
     return {
         "supplied_fields": supplied_fields,
         "valid_fields": valid_fields,
         "placeholder_fields": placeholder_fields,
         "present": bool(valid_fields),
-        "ok": bool(valid_fields) and not placeholder_fields,
+        "required_groups": required_groups,
+        "satisfied_required_groups": satisfied_required_groups,
+        "missing_required_groups": missing_required_groups,
+        "ok": bool(valid_fields) and not placeholder_fields and not missing_required_groups,
     }
 
 
@@ -782,6 +811,8 @@ def inspect_authority(manifest: dict[str, Any] | None) -> dict[str, Any]:
         diagnostics.append(f"authority_review_status_not_accepted:{status_value}")
     if not review_evidence["present"]:
         diagnostics.append("authority_review_evidence_missing")
+    for group_name in review_evidence["missing_required_groups"]:
+        diagnostics.append(f"authority_review_evidence_missing_required_group:{group_name}")
     for field_name in review_evidence["placeholder_fields"]:
         diagnostics.append(f"authority_review_evidence_placeholder:{field_name}")
 
@@ -801,6 +832,9 @@ def inspect_authority(manifest: dict[str, Any] | None) -> dict[str, Any]:
         "review_evidence_present": review_evidence["present"],
         "review_evidence_valid_fields": review_evidence["valid_fields"],
         "review_evidence_placeholder_fields": review_evidence["placeholder_fields"],
+        "review_evidence_missing_required_groups": review_evidence[
+            "missing_required_groups"
+        ],
         "synthetic_fixture_only": is_synthetic_fixture,
         "diagnostics": diagnostics,
         "accepted_review_statuses": sorted(REVIEWED_AUTHORITY_STATUSES),
@@ -808,7 +842,7 @@ def inspect_authority(manifest: dict[str, Any] | None) -> dict[str, Any]:
             "Synthetic fixture authority is accepted only for hardware-free forwarding regression fixtures; "
             "it is not physical SO-101 source authority."
             if is_synthetic_fixture
-            else "Authority requires an accepted reviewed status plus reviewer/date/id/url evidence."
+            else "Authority requires an accepted reviewed status, reviewer identity, and at least one trace field: reviewed_at, review_id, or review_url."
         ),
     }
 
@@ -944,6 +978,10 @@ def inspect_joint_limit_review(
         diagnostics.append(f"joint_limit_authority_review_status_not_accepted:{status_value}")
     if not review_evidence["present"]:
         diagnostics.append("joint_limit_authority_review_evidence_missing")
+    for group_name in review_evidence["missing_required_groups"]:
+        diagnostics.append(
+            f"joint_limit_authority_review_evidence_missing_required_group:{group_name}"
+        )
     for field_name in review_evidence["placeholder_fields"]:
         diagnostics.append(f"joint_limit_authority_review_evidence_placeholder:{field_name}")
 
@@ -963,6 +1001,9 @@ def inspect_joint_limit_review(
         "review_evidence_present": review_evidence["present"],
         "review_evidence_valid_fields": review_evidence["valid_fields"],
         "review_evidence_placeholder_fields": review_evidence["placeholder_fields"],
+        "review_evidence_missing_required_groups": review_evidence[
+            "missing_required_groups"
+        ],
         "synthetic_fixture_only": is_synthetic_fixture,
         "accepted_review_statuses": sorted(REVIEWED_JOINT_LIMIT_STATUSES),
         "diagnostics": diagnostics,
@@ -970,7 +1011,7 @@ def inspect_joint_limit_review(
             "Synthetic fixture joint-limit authority is accepted only for hardware-free forwarding regression fixtures; "
             "it is not physical SO-101 joint-limit truth."
             if is_synthetic_fixture
-            else "Joint-limit readiness requires accepted review status plus reviewer/date/id/url evidence."
+            else "Joint-limit readiness requires accepted review status, reviewer identity, and at least one trace field: reviewed_at, review_id, or review_url."
         ),
     }
 
@@ -1132,6 +1173,10 @@ def inspect_review_metadata(
         diagnostics.append(f"{diagnostic_prefix}_review_status_not_accepted:{status_value}")
     if not review_evidence["present"]:
         diagnostics.append(f"{diagnostic_prefix}_review_evidence_missing")
+    for group_name in review_evidence["missing_required_groups"]:
+        diagnostics.append(
+            f"{diagnostic_prefix}_review_evidence_missing_required_group:{group_name}"
+        )
     for field_name in review_evidence["placeholder_fields"]:
         diagnostics.append(f"{diagnostic_prefix}_review_evidence_placeholder:{field_name}")
 
@@ -1151,6 +1196,9 @@ def inspect_review_metadata(
         "review_evidence_present": review_evidence["present"],
         "review_evidence_valid_fields": review_evidence["valid_fields"],
         "review_evidence_placeholder_fields": review_evidence["placeholder_fields"],
+        "review_evidence_missing_required_groups": review_evidence[
+            "missing_required_groups"
+        ],
         "synthetic_fixture_only": is_synthetic_fixture,
         "accepted_review_statuses": sorted(accepted_statuses),
         "diagnostics": diagnostics,
@@ -1180,7 +1228,7 @@ def inspect_tcp_offset_review(
             "Synthetic fixture TCP offset authority is accepted only for hardware-free forwarding regression fixtures; "
             "it is not physical SO-101 TCP truth."
         ),
-        review_note="TCP offset readiness requires accepted review status plus reviewer/date/id/url evidence.",
+        review_note="TCP offset readiness requires accepted review status, reviewer identity, and at least one trace field: reviewed_at, review_id, or review_url.",
     )
 
 
@@ -1203,7 +1251,7 @@ def inspect_target_frame_review(
             "Synthetic fixture target-frame authority is accepted only for hardware-free forwarding regression fixtures; "
             "it is not physical SO-101 TCP-frame truth."
         ),
-        review_note="Target-frame readiness requires accepted review status plus reviewer/date/id/url evidence.",
+        review_note="Target-frame readiness requires accepted review status, reviewer identity, and at least one trace field: reviewed_at, review_id, or review_url.",
     )
     return {
         **review,
@@ -1308,7 +1356,7 @@ def inspect_alignment_review(
             "Synthetic fixture base-to-board alignment authority is accepted only for hardware-free forwarding regression fixtures; "
             "it is not physical SO-101 board-alignment truth."
         ),
-        review_note="Base-to-board alignment readiness requires accepted review status plus reviewer/date/id/url evidence.",
+        review_note="Base-to-board alignment readiness requires accepted review status, reviewer identity, and at least one trace field: reviewed_at, review_id, or review_url.",
     )
 
 
@@ -1558,6 +1606,10 @@ def inspect_mesh_asset_review(manifest: dict[str, Any] | None) -> dict[str, Any]
         diagnostics.append(f"mesh_asset_authority_review_status_not_accepted:{status_value}")
     if not review_evidence["present"]:
         diagnostics.append("mesh_asset_authority_review_evidence_missing")
+    for group_name in review_evidence["missing_required_groups"]:
+        diagnostics.append(
+            f"mesh_asset_authority_review_evidence_missing_required_group:{group_name}"
+        )
     for field_name in review_evidence["placeholder_fields"]:
         diagnostics.append(f"mesh_asset_authority_review_evidence_placeholder:{field_name}")
 
@@ -1577,6 +1629,9 @@ def inspect_mesh_asset_review(manifest: dict[str, Any] | None) -> dict[str, Any]
         "review_evidence_present": review_evidence["present"],
         "review_evidence_valid_fields": review_evidence["valid_fields"],
         "review_evidence_placeholder_fields": review_evidence["placeholder_fields"],
+        "review_evidence_missing_required_groups": review_evidence[
+            "missing_required_groups"
+        ],
         "synthetic_fixture_only": is_synthetic_fixture,
         "accepted_review_statuses": sorted(REVIEWED_MESH_ASSET_STATUSES),
         "diagnostics": diagnostics,
@@ -1584,7 +1639,7 @@ def inspect_mesh_asset_review(manifest: dict[str, Any] | None) -> dict[str, Any]
             "Synthetic fixture mesh-asset authority is accepted only for hardware-free forwarding regression fixtures; "
             "it is not physical SO-101 mesh truth."
             if is_synthetic_fixture
-            else "Mesh readiness requires accepted review status plus reviewer/date/id/url evidence."
+            else "Mesh readiness requires accepted review status, reviewer identity, and at least one trace field: reviewed_at, review_id, or review_url."
         ),
     }
 
