@@ -83,6 +83,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "next_required_action_ids",
         "blocker_packet_action_required_item_ids",
         "blocker_packet_blocked_by_prior_requirements_item_ids",
+        "blocker_packet_next_action_ids",
         "expected_gate_ready",
         "expected_consistency_status",
         "errors",
@@ -415,6 +416,9 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                     "load_reviewed_model_in_mujoco",
                 ],
                 "action_required_contains": ["source_bundle_consistency"],
+                "blocker_packet_next_actions_contain": [
+                    "select_reviewed_so101_model_path"
+                ],
                 "blocked_prior_contains": ["physical_reviewed_mujoco_motion_checked"],
             },
         },
@@ -437,6 +441,9 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                     "load_reviewed_model_in_mujoco",
                 ],
                 "action_required_contains": ["source_bundle_consistency"],
+                "blocker_packet_next_actions_contain": [
+                    "align_source_inventory_with_bundle_manifest_model_path"
+                ],
                 "blocked_prior_contains": ["physical_reviewed_mujoco_motion_checked"],
             },
         },
@@ -456,6 +463,9 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "blockers_contain": ["align_source_inventory_with_bundle_manifest_model_path"],
                 "actions_contain": ["align_source_inventory_with_bundle_manifest_model_path"],
                 "action_required_contains": ["source_bundle_consistency"],
+                "blocker_packet_next_actions_contain": [
+                    "align_source_inventory_with_bundle_manifest_model_path"
+                ],
             },
         },
         {
@@ -480,6 +490,30 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "source_ready_physical_bundle_digest_missing",
+            "source": source_ready(
+                summary_dir / "source_ready_missing_digest.json",
+                source_model,
+                sha256=None,
+            ),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_bundle_model_digest_missing",
+                "consistency_ready": False,
+                "development_fixture": True,
+                "blockers_contain": ["record_reviewed_so101_model_file_sha256"],
+                "actions_contain": ["record_reviewed_so101_model_file_sha256"],
+                "action_required_contains": ["source_bundle_consistency"],
+                "blocker_packet_next_actions_contain": [
+                    "record_reviewed_so101_model_file_sha256"
+                ],
+                "selected_path_matches_bundle": True,
+                "selected_digest_matches_bundle": False,
+            },
+        },
+        {
             "case_id": "source_ready_physical_bundle_digest_mismatch",
             "source": source_ready(summary_dir / "source_ready.json", source_model),
             "bundle": bundle_physical_ready(
@@ -496,6 +530,9 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "blockers_contain": ["align_source_inventory_with_bundle_manifest_model_digest"],
                 "actions_contain": ["align_source_inventory_with_bundle_manifest_model_digest"],
                 "action_required_contains": ["source_bundle_consistency"],
+                "blocker_packet_next_actions_contain": [
+                    "align_source_inventory_with_bundle_manifest_model_digest"
+                ],
                 "selected_path_matches_bundle": True,
                 "selected_digest_matches_bundle": False,
             },
@@ -772,6 +809,19 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         blocker_packet.get("action_required_item_ids"),
         expect.get("action_required_contains", []),
     )
+    if "blocker_packet_next_actions_exact" in expect:
+        add_error(
+            errors,
+            "blocker_packet_next_action_ids",
+            blocker_packet.get("next_action_ids"),
+            expect["blocker_packet_next_actions_exact"],
+        )
+    expect_contains(
+        errors,
+        "blocker_packet_next_action_ids",
+        blocker_packet.get("next_action_ids"),
+        expect.get("blocker_packet_next_actions_contain", []),
+    )
     if "blocked_prior_exact" in expect:
         add_error(
             errors,
@@ -841,6 +891,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "blocker_packet_blocked_by_prior_requirements_item_ids": blocker_packet.get(
             "blocked_by_prior_requirements_item_ids"
         ),
+        "blocker_packet_next_action_ids": blocker_packet.get("next_action_ids"),
         "expected_gate_ready": case["expected"].get("ready"),
         "expected_consistency_status": case["expected"].get("consistency_status"),
         "errors": case["errors"],

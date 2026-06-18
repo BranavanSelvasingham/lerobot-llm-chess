@@ -4097,11 +4097,19 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
         source_bundle_consistency if isinstance(source_bundle_consistency, dict) else {}
     )
     source_bundle_consistency_ready = gate.get("source_bundle_consistency_ready") is True
-    source_bundle_consistency_next_action_id = (
-        "select_reviewed_so101_model_path"
-        if source_bundle_consistency.get("status") == "bundle_model_path_missing"
-        else "align_source_inventory_with_bundle_manifest_model_path"
-    )
+    consistency_status = source_bundle_consistency.get("status")
+    if consistency_status == "bundle_model_path_missing":
+        source_bundle_consistency_next_action_id = "select_reviewed_so101_model_path"
+    elif consistency_status == "source_bundle_model_digest_missing":
+        source_bundle_consistency_next_action_id = "record_reviewed_so101_model_file_sha256"
+    elif consistency_status == "source_bundle_model_digest_mismatch":
+        source_bundle_consistency_next_action_id = (
+            "align_source_inventory_with_bundle_manifest_model_digest"
+        )
+    else:
+        source_bundle_consistency_next_action_id = (
+            "align_source_inventory_with_bundle_manifest_model_path"
+        )
     physical_bundle_authority_ready = (
         gate.get("physical_so101_model_authority_ready") is True
     )
@@ -4170,8 +4178,9 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
             "next_action_id": source_bundle_consistency_next_action_id,
             "operator_action": (
                 "Use the same reviewed SO-101 model path in the source inventory and "
-                "bundle manifest; an authoritative root alone does not authorize a "
-                "different selected model file."
+                "bundle manifest, and record the same reviewed SHA-256 digest for that "
+                "file; an authoritative root alone does not authorize a different "
+                "selected model file."
             ),
         },
         {
@@ -4225,7 +4234,14 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
             )
             or (
                 spec["item_id"] == "source_bundle_consistency"
-                and ("align_source_inventory" in blocker or "model_path" in blocker)
+                and (
+                    "align_source_inventory" in blocker
+                    or "model_path" in blocker
+                    or "model_digest" in blocker
+                    or "model_sha256" in blocker
+                    or "sha256" in blocker
+                    or "record_reviewed_so101_model_file_sha256" in blocker
+                )
             )
             or (
                 spec["item_id"] == "physical_reviewed_mujoco_motion_checked"

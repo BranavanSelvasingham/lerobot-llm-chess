@@ -310,7 +310,9 @@ into ordered `next_required_for_goal`, `next_required_action_ids`, and
 `next_required_action_count` fields. The blocker packet is review intake only
 (`blocker_packet_not_authority`); its immediate `blocker_packet_next_action_ids`
 must be included in that ordered gate queue while development fixture evidence
-stays outside reviewed physical SO-101 truth.
+stays outside reviewed physical SO-101 truth. The source/bundle consistency
+item must point at the exact failed sub-step: missing model path, path mismatch,
+missing model SHA-256, or digest mismatch.
 
 The suite also records the reviewed MuJoCo handoff under
 `so101_reviewed_mujoco_bundle/`. It consumes the bundle manifest checker's
