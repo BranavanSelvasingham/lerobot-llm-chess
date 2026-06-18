@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import subprocess
 import sys
@@ -57,6 +58,11 @@ SO101_MODEL_BUNDLE_PROBE_DIR_NAME = "so101_model_bundle_probe"
 SO101_MODEL_BUNDLE_PROBE_SUMMARY_NAME = "so101_model_bundle_probe_summary.json"
 SO101_MODEL_BUNDLE_MANIFEST_SUMMARY_NAME = "so101_model_bundle_manifest_summary.json"
 SO101_MODEL_CONTRACT_SUMMARY_NAME = "so101_model_contract_summary.json"
+SO101_REVIEWED_MODEL_AUTHORITY_GATE_SCHEMA = "lerobot.sim.so101_reviewed_model_authority_gate.v1"
+SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME = "so101_reviewed_model_authority_gate"
+SO101_REVIEWED_MODEL_AUTHORITY_GATE_SUMMARY_NAME = "so101_reviewed_model_authority_gate.json"
+SO101_REVIEWED_MODEL_AUTHORITY_GATE_CHECKLIST_NAME = "so101_reviewed_model_authority_gate_checklist.csv"
+SO101_REVIEWED_MODEL_AUTHORITY_GATE_README_NAME = "README.md"
 SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME = "so101_reviewed_mujoco_bundle"
 SO101_REVIEWED_MUJOCO_BUNDLE_SUMMARY_NAME = "so101_reviewed_mujoco_bundle_summary.json"
 SO101_MUJOCO_SCENE_DIR_NAME = "so101_mujoco_scene"
@@ -1352,6 +1358,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `so101_model_bundle_manifest/so101_model_bundle_manifest_summary.json`",
         "- `so101_model_bundle_manifest/so101_model_bundle_manifest_checklist.csv`",
         "- `so101_model_bundle_manifest/README.md`",
+        f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_SUMMARY_NAME}`",
+        f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_CHECKLIST_NAME}`",
+        f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_README_NAME}`",
         f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/{SO101_REVIEWED_MUJOCO_BUNDLE_SUMMARY_NAME}`",
         f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/so101_reviewed_mujoco_bundle_checklist.csv`",
         f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/README.md`",
@@ -3431,6 +3440,147 @@ def so101_reviewed_model_authority_gate_section(
     }
 
 
+def write_so101_reviewed_model_authority_gate_artifacts(
+    output_dir: Path,
+    gate: dict[str, Any],
+) -> dict[str, Any]:
+    gate_dir = output_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME
+    summary_path = gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_SUMMARY_NAME
+    checklist_path = gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_CHECKLIST_NAME
+    readme_path = gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_README_NAME
+    artifacts = {
+        "summary_json": str(summary_path),
+        "checklist_csv": str(checklist_path),
+        "readme_md": str(readme_path),
+    }
+    payload = {
+        "schema": SO101_REVIEWED_MODEL_AUTHORITY_GATE_SCHEMA,
+        **gate,
+        "ok": bool(gate.get("ready")),
+        "summary_path": str(summary_path),
+        "artifact_dir": str(gate_dir),
+        "artifacts": artifacts,
+        "review_status": (
+            "ready_for_reviewed_model_backed_work"
+            if gate.get("ready") is True
+            else "blocked_before_reviewed_model_backed_work"
+        ),
+        "authority_sources": {
+            "source_inventory_summary_path": gate.get("source_inventory_summary_path"),
+            "bundle_manifest_summary_path": gate.get("bundle_manifest_summary_path"),
+            "reviewed_mujoco_bundle_summary_path": gate.get(
+                "reviewed_mujoco_bundle_summary_path"
+            ),
+        },
+    }
+    checklist_rows = [
+        {
+            "requirement_id": "source_authority_ready",
+            "category": "reviewed_model_authority",
+            "status": "ok" if gate.get("source_authority_ready") is True else "action_required",
+            "observed_value": markdown_bool(gate.get("source_authority_ready")),
+            "expected_value": "true",
+            "blockers": "; ".join(
+                blocker
+                for blocker in gate.get("blockers", [])
+                if "source" in blocker or "authoritative" in blocker
+            ),
+            "notes": "Model source authority must be reviewed before the bundle can close the gate.",
+        },
+        {
+            "requirement_id": "physical_bundle_authority_ready",
+            "category": "reviewed_model_authority",
+            "status": "ok"
+            if gate.get("physical_so101_model_authority_ready") is True
+            else "action_required",
+            "observed_value": markdown_bool(gate.get("physical_so101_model_authority_ready")),
+            "expected_value": "true",
+            "blockers": "; ".join(gate.get("blockers", [])),
+            "notes": "The bundle manifest must provide physical SO-101 authority, not only a development fixture.",
+        },
+        {
+            "requirement_id": "physical_reviewed_mujoco_motion_checked",
+            "category": "mujoco_scene_validity",
+            "status": "ok"
+            if gate.get("physical_reviewed_model_motion_checked") is True
+            else "action_required",
+            "observed_value": markdown_bool(gate.get("physical_reviewed_model_motion_checked")),
+            "expected_value": "true",
+            "blockers": "; ".join(
+                blocker
+                for blocker in gate.get("blockers", [])
+                if "mujoco" in blocker or "motion" in blocker or "model" in blocker
+            ),
+            "notes": "A ready reviewed manifest must load in MuJoCo and prove SO-101 joint motion.",
+        },
+        {
+            "requirement_id": "development_fixture_caveat",
+            "category": "authority_boundary",
+            "status": "ok"
+            if gate.get("development_fixture_evidence_not_physical_so101_truth") is True
+            else "review_required",
+            "observed_value": markdown_bool(
+                gate.get("development_fixture_evidence_not_physical_so101_truth")
+            ),
+            "expected_value": "true while the gate is blocked or fixture-only evidence exists",
+            "blockers": "; ".join(gate.get("blockers", [])),
+            "notes": "Development fixture evidence remains automation coverage only.",
+        },
+    ]
+    gate_dir.mkdir(parents=True, exist_ok=True)
+    write_json(summary_path, payload)
+    fieldnames = (
+        "requirement_id",
+        "category",
+        "status",
+        "observed_value",
+        "expected_value",
+        "blockers",
+        "notes",
+    )
+    with checklist_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in checklist_rows:
+            writer.writerow(row)
+    blocker_lines = (
+        [f"- `{blocker}`" for blocker in gate.get("blockers", [])]
+        if gate.get("blockers")
+        else ["- none"]
+    )
+    readme_path.write_text(
+        "\n".join(
+            [
+                "# SO-101 Reviewed Model Authority Gate",
+                "",
+                f"- Status: `{gate.get('status')}`",
+                f"- Ready: `{markdown_bool(gate.get('ready'))}`",
+                f"- Source authority ready: `{markdown_bool(gate.get('source_authority_ready'))}`",
+                "- Physical SO-101 model authority ready: "
+                f"`{markdown_bool(gate.get('physical_so101_model_authority_ready'))}`",
+                "- Physical reviewed MuJoCo motion checked: "
+                f"`{markdown_bool(gate.get('physical_reviewed_model_motion_checked'))}`",
+                "- Development fixture evidence is not physical SO-101 truth: "
+                f"`{markdown_bool(gate.get('development_fixture_evidence_not_physical_so101_truth'))}`",
+                "",
+                "## Blockers",
+                "",
+                *blocker_lines,
+                "",
+                "## Evidence Sources",
+                "",
+                f"- Source inventory: `{gate.get('source_inventory_summary_path')}`",
+                f"- Bundle manifest: `{gate.get('bundle_manifest_summary_path')}`",
+                f"- Reviewed MuJoCo bundle: `{gate.get('reviewed_mujoco_bundle_summary_path')}`",
+                "",
+                "This artifact is a hardware-free gate summary. It is ready only when source authority, physical bundle authority, and physical-reviewed MuJoCo motion are all true.",
+                "",
+            ]
+        )
+    )
+    return payload
+
+
 def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
     visual_review = visual_review if isinstance(visual_review, dict) else {}
     contact_sheets = visual_review.get("contact_sheets")
@@ -4321,6 +4471,10 @@ def main() -> int:
         so101_source_inventory_section,
         so101_bundle_manifest_section,
         so101_reviewed_mujoco_bundle_section,
+    )
+    so101_reviewed_authority_gate = write_so101_reviewed_model_authority_gate_artifacts(
+        output_dir,
+        so101_reviewed_authority_gate,
     )
 
     required_ok = all(record["ok"] for record in child_records.values())

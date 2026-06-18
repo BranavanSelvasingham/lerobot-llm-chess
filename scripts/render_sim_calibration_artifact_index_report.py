@@ -28,24 +28,25 @@ CATEGORY_ORDER = {
     "perception_fixture": 13,
     "sim_camera_pose_fixture": 14,
     "so101_model_source_inventory": 15,
-    "so101_model_bundle_probe": 16,
-    "so101_model_bundle_manifest": 17,
-    "so101_reviewed_mujoco_bundle": 18,
-    "so101_model_contract": 19,
-    "so101_model_asset_preflight": 20,
-    "ik_reachability": 21,
-    "so101_mujoco_scene": 22,
-    "so101_chess_env": 23,
-    "so101_env_resets": 24,
-    "so101_mujoco_contact_probe": 25,
-    "so101_mujoco_grasp_probe": 26,
-    "so101_mujoco_board_pick_probe": 27,
-    "so101_training_rollouts": 28,
-    "gripper_camera_pov": 29,
-    "app_entrypoint": 30,
-    "pick_place_scenario": 31,
-    "negative_check": 32,
-    "logs": 33,
+    "so101_reviewed_model_authority_gate": 16,
+    "so101_model_bundle_probe": 17,
+    "so101_model_bundle_manifest": 18,
+    "so101_reviewed_mujoco_bundle": 19,
+    "so101_model_contract": 20,
+    "so101_model_asset_preflight": 21,
+    "ik_reachability": 22,
+    "so101_mujoco_scene": 23,
+    "so101_chess_env": 24,
+    "so101_env_resets": 25,
+    "so101_mujoco_contact_probe": 26,
+    "so101_mujoco_grasp_probe": 27,
+    "so101_mujoco_board_pick_probe": 28,
+    "so101_training_rollouts": 29,
+    "gripper_camera_pov": 30,
+    "app_entrypoint": 31,
+    "pick_place_scenario": 32,
+    "negative_check": 33,
+    "logs": 34,
 }
 CATEGORY_LABELS = {
     "reference_media_inventory": "Reference Media Inventory",
@@ -64,6 +65,7 @@ CATEGORY_LABELS = {
     "perception_fixture": "Perception Fixture Evidence",
     "sim_camera_pose_fixture": "SimCamera Pose Fixture",
     "so101_model_source_inventory": "SO-101 Model Source Inventory",
+    "so101_reviewed_model_authority_gate": "SO-101 Reviewed Model Authority Gate",
     "so101_model_bundle_probe": "SO-101 Model Bundle Probe",
     "so101_model_bundle_manifest": "SO-101 Model Bundle Manifest",
     "so101_reviewed_mujoco_bundle": "SO-101 Reviewed MuJoCo Bundle",
@@ -1249,6 +1251,30 @@ def so101_model_source_inventory_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("recommended_contract_check_path", ""),
         metrics.get("next_required_action_count", ""),
         compact_list(metrics.get("next_required_action_ids")),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def so101_reviewed_model_authority_gate_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("review_status", ""),
+        metrics.get("ready", ""),
+        metrics.get("source_authority_ready", ""),
+        metrics.get("source_authority_gate_status", ""),
+        metrics.get("physical_so101_model_authority_ready", ""),
+        metrics.get("physical_authority_gate_status", ""),
+        metrics.get("physical_reviewed_model_motion_checked", ""),
+        metrics.get("reviewed_mujoco_bundle_status", ""),
+        metrics.get("development_fixture_evidence_not_physical_so101_truth", ""),
+        metrics.get("blocker_count", ""),
+        compact_list(metrics.get("blockers")),
         "ok" if artifact.get("exists") is True else "missing",
     ]
 
@@ -2728,6 +2754,46 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         )
         if so101_model_source_inventory
         else ["_No SO-101 model source inventory artifacts indexed._"]
+    )
+
+    so101_reviewed_model_authority_gate = grouped.get(
+        "so101_reviewed_model_authority_gate",
+        [],
+    )
+    lines.extend(["", "### SO-101 Reviewed Model Authority Gate"])
+    lines.append(
+        "This aggregate gate summarizes the highest-priority SO-101 blocker before "
+        "serious model-backed IK or training: source authority, physical bundle "
+        "authority, and physical-reviewed MuJoCo motion must all be true. Development "
+        "fixture evidence remains useful automation coverage only."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Review Status",
+                "Ready",
+                "Source Authority",
+                "Source Gate",
+                "Physical Authority",
+                "Physical Gate",
+                "Reviewed Motion",
+                "MuJoCo Bundle",
+                "Fixture Caveat",
+                "Blocker Count",
+                "Blockers",
+                "Artifact Status",
+            ],
+            [
+                so101_reviewed_model_authority_gate_row(row)
+                for row in so101_reviewed_model_authority_gate
+            ],
+        )
+        if so101_reviewed_model_authority_gate
+        else ["_No SO-101 reviewed model authority gate artifacts indexed._"]
     )
 
     so101_model_bundle_probe = grouped.get("so101_model_bundle_probe", [])

@@ -27,24 +27,25 @@ CATEGORY_ORDER = {
     "perception_fixture": 13,
     "sim_camera_pose_fixture": 14,
     "so101_model_source_inventory": 15,
-    "so101_model_bundle_probe": 16,
-    "so101_model_bundle_manifest": 17,
-    "so101_reviewed_mujoco_bundle": 18,
-    "so101_model_contract": 19,
-    "so101_model_asset_preflight": 20,
-    "ik_reachability": 21,
-    "so101_mujoco_scene": 22,
-    "so101_chess_env": 23,
-    "so101_env_resets": 24,
-    "so101_mujoco_contact_probe": 25,
-    "so101_mujoco_grasp_probe": 26,
-    "so101_mujoco_board_pick_probe": 27,
-    "so101_training_rollouts": 28,
-    "gripper_camera_pov": 29,
-    "app_entrypoint": 30,
-    "pick_place_scenario": 31,
-    "negative_check": 32,
-    "logs": 33,
+    "so101_reviewed_model_authority_gate": 16,
+    "so101_model_bundle_probe": 17,
+    "so101_model_bundle_manifest": 18,
+    "so101_reviewed_mujoco_bundle": 19,
+    "so101_model_contract": 20,
+    "so101_model_asset_preflight": 21,
+    "ik_reachability": 22,
+    "so101_mujoco_scene": 23,
+    "so101_chess_env": 24,
+    "so101_env_resets": 25,
+    "so101_mujoco_contact_probe": 26,
+    "so101_mujoco_grasp_probe": 27,
+    "so101_mujoco_board_pick_probe": 28,
+    "so101_training_rollouts": 29,
+    "gripper_camera_pov": 30,
+    "app_entrypoint": 31,
+    "pick_place_scenario": 32,
+    "negative_check": 33,
+    "logs": 34,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -2644,6 +2645,69 @@ def collect_so101_model_source_inventory_artifacts(
     }
 
 
+def collect_so101_reviewed_model_authority_gate_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    gate = suite.get("so101_reviewed_model_authority_gate")
+    gate = gate if isinstance(gate, dict) else {}
+    artifact_paths = gate.get("artifacts")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    metrics = {
+        "status": gate.get("status"),
+        "ok": gate.get("ok"),
+        "ready": gate.get("ready"),
+        "review_status": gate.get("review_status"),
+        "source_authority_ready": gate.get("source_authority_ready"),
+        "source_authority_gate_status": gate.get("source_authority_gate_status"),
+        "physical_so101_model_authority_ready": gate.get(
+            "physical_so101_model_authority_ready"
+        ),
+        "physical_authority_gate_status": gate.get("physical_authority_gate_status"),
+        "physical_reviewed_model_motion_checked": gate.get(
+            "physical_reviewed_model_motion_checked"
+        ),
+        "reviewed_mujoco_bundle_status": gate.get("reviewed_mujoco_bundle_status"),
+        "development_fixture_evidence_not_physical_so101_truth": gate.get(
+            "development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "blockers": gate.get("blockers") or [],
+        "blocker_count": gate.get("blocker_count"),
+        "source_inventory_summary_path": gate.get("source_inventory_summary_path"),
+        "bundle_manifest_summary_path": gate.get("bundle_manifest_summary_path"),
+        "reviewed_mujoco_bundle_summary_path": gate.get(
+            "reviewed_mujoco_bundle_summary_path"
+        ),
+    }
+    for key, label_suffix in (
+        ("summary_json", "summary"),
+        ("checklist_csv", "checklist"),
+        ("readme_md", "readme"),
+    ):
+        add_path(
+            artifacts,
+            category="so101_reviewed_model_authority_gate",
+            label=f"so101_reviewed_model_authority_gate:{label_suffix}",
+            value=artifact_paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"so101_reviewed_model_authority_gate.artifacts.{key}",
+            metrics=metrics,
+        )
+    return {
+        **metrics,
+        "summary_path": artifact_paths.get("summary_json") or gate.get("summary_path"),
+        "checklist_csv_path": artifact_paths.get("checklist_csv"),
+        "readme_md_path": artifact_paths.get("readme_md"),
+        "artifact_paths": artifact_paths,
+    }
+
+
 def collect_so101_model_bundle_probe_artifacts(
     *,
     suite: dict[str, Any],
@@ -3249,6 +3313,15 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    so101_reviewed_model_authority_gate = (
+        collect_so101_reviewed_model_authority_gate_artifacts(
+            suite=suite,
+            artifacts=artifacts,
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+        )
+    )
     so101_model_bundle_probe = collect_so101_model_bundle_probe_artifacts(
         suite=suite,
         artifacts=artifacts,
@@ -3445,6 +3518,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "visual_review": visual_review,
         "sim_camera_pose_fixture_metadata_contract": sim_camera_pose_metadata_contract,
         "so101_model_source_inventory": so101_model_source_inventory,
+        "so101_reviewed_model_authority_gate": so101_reviewed_model_authority_gate,
         "so101_model_bundle_probe": so101_model_bundle_probe,
         "so101_model_bundle_manifest": so101_model_bundle_manifest,
         "so101_reviewed_mujoco_bundle": so101_reviewed_mujoco_bundle,
