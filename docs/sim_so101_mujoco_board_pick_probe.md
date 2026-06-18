@@ -15,6 +15,19 @@ Artifacts:
 - `so101_chess_development_manifest.json`
 - `README.md`
 
+For focused seeded-fixture boundary coverage, run:
+
+```bash
+python scripts/smoke_sim_so101_mujoco_board_pick_probe_matrix.py --output-dir /private/tmp/lerobot_sim/so101_mujoco_board_pick_probe_matrix
+```
+
+The matrix writes `so101_mujoco_board_pick_probe_matrix_summary.json`,
+`so101_mujoco_board_pick_probe_matrix_cases.csv`, and `README.md`. It expects
+the current seeded `e4 -> e5` fixture to pass and alternate target/source
+placements to record place/pick gaps. Those gap cases are intentional: they
+show that direct seeded source pose is not generalized reviewed model-backed
+IK.
+
 The smoke resets the free piece onto source square `e4`, seeds the development
 robot at a source-pick pose, closes on the board piece, lifts it off the board,
 transfers toward `e5`, lowers, releases, and retreats without manually moving

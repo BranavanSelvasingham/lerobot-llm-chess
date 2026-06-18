@@ -2208,7 +2208,11 @@ def collect_so101_mujoco_smoke_artifacts(
         "model_authority": smoke.get("model_authority"),
         "physical_so101_model_authority_ready": smoke.get("physical_so101_model_authority_ready"),
         "hardware_free_regression_fixture_ready": smoke.get("hardware_free_regression_fixture_ready"),
+        "observed_evidence_is_physical_so101_authority": smoke.get(
+            "observed_evidence_is_physical_so101_authority"
+        ),
         "ready_for_model_backed_ik": smoke.get("ready_for_model_backed_ik"),
+        "ready_for_policy_training": smoke.get("ready_for_policy_training"),
         "contact_model": smoke.get("contact_model"),
         "reviewed_model_motion_checked": smoke.get("reviewed_model_motion_checked"),
         "motion_authority_status": smoke.get("motion_authority_status"),

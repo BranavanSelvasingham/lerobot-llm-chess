@@ -92,6 +92,7 @@ env:
   SO101_REVIEWED_MUJOCO_BUNDLE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_reviewed_mujoco_bundle_matrix"
   SO101_MUJOCO_SCENE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_mujoco_scene_matrix"
   SO101_CHESS_ENV_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_chess_env_matrix"
+  SO101_BOARD_PICK_PROBE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_mujoco_board_pick_probe_matrix"
   SO101_TRAINING_READINESS_GATE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_training_readiness_gate_matrix"
   CALIBRATION_REGRESSION_ARTIFACT_NAME: "sim-calibration-regression-${{ github.run_id }}"
   REFERENCE_MEDIA_ROOTS: ""
@@ -462,6 +463,78 @@ jobs:
           for relative_path in (
               "so101_chess_env_matrix_summary.json",
               "so101_chess_env_matrix_cases.csv",
+              "README.md",
+          ):
+              assert (summary_path.parent / relative_path).is_file(), relative_path
+          PY
+
+      - name: Run SO-101 board pick probe matrix
+        run: |
+          python scripts/smoke_sim_so101_mujoco_board_pick_probe_matrix.py \
+            --output-dir "${SO101_BOARD_PICK_PROBE_MATRIX_OUTPUT_DIR}" \
+            --python "$(python -c 'import sys; print(sys.executable)')"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          summary_path = Path(os.environ["SO101_BOARD_PICK_PROBE_MATRIX_OUTPUT_DIR"]) / "so101_mujoco_board_pick_probe_matrix_summary.json"
+          summary = json.loads(summary_path.read_text())
+          assert summary["ok"] is True, summary
+          assert summary["status"] == "ok", summary
+          assert summary["model_authority"] == "so101_mujoco_board_pick_probe_matrix_not_authority", summary
+          assert summary["observed_evidence_is_physical_so101_authority"] is False, summary
+          assert summary["ready_for_model_backed_ik"] is False, summary
+          assert summary["ready_for_policy_training"] is False, summary
+          assert summary["hardware_skipped"] is True, summary
+          assert summary["gui_skipped"] is True, summary
+          assert summary["openai_skipped"] is True, summary
+          assert summary["case_ids"] == [
+              "seeded_fixture_e4_e5_pick_place_verified",
+              "alternate_target_e4_d5_records_place_gap",
+              "alternate_source_d4_e5_records_pick_gap",
+              "reversed_source_e5_e4_records_pick_gap",
+          ], summary["case_ids"]
+          assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
+          assert summary["verified_pick_place_case_ids"] == [
+              "seeded_fixture_e4_e5_pick_place_verified",
+          ], summary["verified_pick_place_case_ids"]
+          assert summary["expected_gap_case_ids"] == [
+              "alternate_target_e4_d5_records_place_gap",
+              "alternate_source_d4_e5_records_pick_gap",
+              "reversed_source_e5_e4_records_pick_gap",
+          ], summary["expected_gap_case_ids"]
+          by_case = {case["case_id"]: case for case in summary["cases"]}
+          verified = by_case["seeded_fixture_e4_e5_pick_place_verified"]
+          assert verified["observations"]["status"] == "development_board_source_pick_place_verified", verified
+          assert verified["observations"]["board_source_pick_place_verified"] is True, verified
+          assert verified["observations"]["final_target_within_tolerance"] is True, verified
+          place_gap = by_case["alternate_target_e4_d5_records_place_gap"]
+          assert place_gap["observations"]["status"] == "development_board_source_lift_verified_place_gap_recorded", place_gap
+          assert place_gap["observations"]["lift_verified"] is True, place_gap
+          assert place_gap["observations"]["place_without_manual_piece_pose_verified"] is False, place_gap
+          assert place_gap["observations"]["final_target_within_tolerance"] is False, place_gap
+          for case_id in (
+              "alternate_source_d4_e5_records_pick_gap",
+              "reversed_source_e5_e4_records_pick_gap",
+          ):
+              case = by_case[case_id]
+              assert case["observations"]["status"] == "development_board_source_pick_gap_recorded", case
+              assert case["observations"]["close_two_finger_contact_observed"] is False, case
+              assert case["observations"]["lift_verified"] is False, case
+              assert case["observations"]["board_source_pick_place_verified"] is False, case
+          for case in summary["cases"]:
+              obs = case["observations"]
+              assert obs["model_authority"] == "development_scaffold_not_reviewed", case
+              assert obs["source_pick_started_at_source"] is True, case
+              assert obs["manual_piece_pose_used_after_reset"] is False, case
+              assert obs["robot_pose_seeded_for_source_fixture"] is True, case
+              assert obs["ready_for_model_backed_ik"] is False, case
+              assert obs["ready_for_policy_training"] is False, case
+              assert obs["physical_authority"] is False, case
+          for relative_path in (
+              "so101_mujoco_board_pick_probe_matrix_summary.json",
+              "so101_mujoco_board_pick_probe_matrix_cases.csv",
               "README.md",
           ):
               assert (summary_path.parent / relative_path).is_file(), relative_path
@@ -1394,7 +1467,9 @@ jobs:
           assert so101_mujoco_board_pick_probe["ok"] is True, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["status"] == "development_board_source_pick_place_verified", so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["model_authority"] == "development_scaffold_not_reviewed", so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["observed_evidence_is_physical_so101_authority"] is False, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["ready_for_model_backed_ik"] is False, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["ready_for_policy_training"] is False, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["source_pick_started_at_source"] is True, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["close_two_finger_contact_observed"] is True, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["lift_verified"] is True, so101_mujoco_board_pick_probe
@@ -2728,5 +2803,6 @@ jobs:
             ${{ env.SO101_REVIEWED_MUJOCO_BUNDLE_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_MUJOCO_SCENE_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_CHESS_ENV_MATRIX_OUTPUT_DIR }}
+            ${{ env.SO101_BOARD_PICK_PROBE_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_TRAINING_READINESS_GATE_MATRIX_OUTPUT_DIR }}
           if-no-files-found: warn
