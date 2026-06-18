@@ -486,8 +486,9 @@ exercise source-missing, bundle-missing, source/bundle path-mismatch,
 fixture-only, motion-missing, and all-ready injected gate states without treating
 the matrix itself as reviewed physical SO-101 evidence. It also runs the focused
 `so101_reviewed_mujoco_bundle_matrix` smoke to prove missing/not-ready manifests
-do not attempt motion, `--require-ready-reviewed-model` fails closed, malformed
-TCP offsets and incomplete base-to-board transforms stay not ready, and ready
+do not attempt motion, `--require-ready-reviewed-model` fails closed,
+placeholder review metadata stays `needs_review` without MuJoCo motion,
+malformed TCP offsets and incomplete base-to-board transforms stay not ready, and ready
 synthetic fixture motion remains
 `hardware_free_fixture_motion_checked_not_physical_so101_authority`. It also runs the focused
 `so101_mujoco_scene_matrix` smoke to prove generated development scenes load
@@ -560,8 +561,9 @@ The standalone reviewed-MuJoCo bundle matrix writes
 It reports `model_authority: "reviewed_mujoco_bundle_matrix_not_authority"` and
 `observed_evidence_is_physical_so101_authority: false`. It covers the default
 missing-manifest diagnostic, the fail-closed `--require-ready-reviewed-model`
-path, a not-ready placeholder manifest, malformed TCP/alignment manifest
-payloads, and a ready synthetic fixture manifest whose MuJoCo/SimRobot motion
+path, a not-ready placeholder manifest, placeholder review metadata on otherwise
+complete fields, malformed TCP/alignment manifest payloads, and a ready
+synthetic fixture manifest whose MuJoCo/SimRobot motion
 check must remain
 `hardware_free_fixture_motion_checked_not_physical_so101_authority`.
 

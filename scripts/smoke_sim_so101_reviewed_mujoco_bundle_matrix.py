@@ -84,6 +84,11 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "gate_ok",
         "status",
         "manifest_status",
+        "authority_status",
+        "provenance_status",
+        "joint_limits_status",
+        "mesh_assets_status",
+        "target_frame_status",
         "ready_for_model_backed_ik",
         "model_authority",
         "physical_so101_model_authority_ready",
@@ -155,6 +160,53 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "physical_reviewed_model_motion_checked": False,
                 "hardware_free_fixture_motion_checked": False,
                 "motion_evidence_not_physical_so101_authority": False,
+            },
+        },
+        {
+            "case_id": "placeholder_review_metadata_not_ready",
+            "manifest_path": fixtures["placeholder_review_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "authority_status": "needs_review",
+                "provenance_status": "present",
+                "joint_limits_status": "needs_review",
+                "mesh_assets_status": "needs_review",
+                "target_frame_status": "needs_review",
+                "tcp_offset_status": "needs_review",
+                "alignment_status": "needs_review",
+                "missing_inputs_contains": [
+                    "authority",
+                    "joint_limit_authority",
+                    "mesh_asset_authority",
+                    "target_frame_authority",
+                    "tcp_offset_authority",
+                    "base_to_board_alignment_authority",
+                ],
+                "authority_diagnostics_contains": ["authority_review_evidence_placeholder"],
+                "joint_limits_diagnostics_contains": [
+                    "joint_limit_authority_review_evidence_placeholder"
+                ],
+                "mesh_assets_diagnostics_contains": [
+                    "mesh_asset_authority_review_evidence_placeholder"
+                ],
+                "target_frame_diagnostics_contains": [
+                    "target_frame_authority_review_evidence_placeholder"
+                ],
+                "tcp_offset_diagnostics_contains": [
+                    "tcp_offset_authority_review_evidence_placeholder"
+                ],
+                "alignment_diagnostics_contains": [
+                    "base_to_board_alignment_authority_review_evidence_placeholder"
+                ],
             },
         },
         {
@@ -335,6 +387,20 @@ def summarize_case(
                     errors.append(
                         f"{case_id}.missing_inputs: missing {expected_input!r} in {missing_inputs!r}"
                     )
+    for expect_key, summary_key in (
+        ("authority_status", "authority"),
+        ("provenance_status", "provenance"),
+        ("joint_limits_status", "joint_limits"),
+        ("mesh_assets_status", "mesh_assets"),
+        ("target_frame_status", "target_frame"),
+    ):
+        if expect_key in expect:
+            add_error(
+                errors,
+                f"{case_id}.{expect_key}",
+                (summary.get(summary_key) or {}).get("status"),
+                expect[expect_key],
+            )
     if "tcp_offset_status" in expect:
         add_error(
             errors,
@@ -350,6 +416,11 @@ def summarize_case(
             expect["alignment_status"],
         )
     for diagnostics_key, summary_key in (
+        ("authority_diagnostics_contains", "authority"),
+        ("provenance_diagnostics_contains", "provenance"),
+        ("joint_limits_diagnostics_contains", "joint_limits"),
+        ("mesh_assets_diagnostics_contains", "mesh_assets"),
+        ("target_frame_diagnostics_contains", "target_frame"),
         ("tcp_offset_diagnostics_contains", "tcp_offset"),
         ("alignment_diagnostics_contains", "base_to_board_alignment"),
     ):
@@ -396,6 +467,11 @@ def summarize_case(
             "gate_ok": summary.get("ok"),
             "status": summary.get("status"),
             "manifest_status": summary.get("manifest_status"),
+            "authority_status": (summary.get("authority") or {}).get("status"),
+            "provenance_status": (summary.get("provenance") or {}).get("status"),
+            "joint_limits_status": (summary.get("joint_limits") or {}).get("status"),
+            "mesh_assets_status": (summary.get("mesh_assets") or {}).get("status"),
+            "target_frame_status": (summary.get("target_frame") or {}).get("status"),
             "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
             "model_authority": summary.get("model_authority"),
             "physical_so101_model_authority_ready": summary.get(
@@ -436,6 +512,11 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "gate_ok": observations.get("gate_ok"),
         "status": observations.get("status"),
         "manifest_status": observations.get("manifest_status"),
+        "authority_status": observations.get("authority_status"),
+        "provenance_status": observations.get("provenance_status"),
+        "joint_limits_status": observations.get("joint_limits_status"),
+        "mesh_assets_status": observations.get("mesh_assets_status"),
+        "target_frame_status": observations.get("target_frame_status"),
         "ready_for_model_backed_ik": observations.get("ready_for_model_backed_ik"),
         "model_authority": observations.get("model_authority"),
         "physical_so101_model_authority_ready": observations.get(

@@ -18,7 +18,14 @@ It writes:
 The summary carries the manifest checker's `model_authority`,
 `physical_so101_model_authority_ready`,
 `hardware_free_regression_fixture_ready`, and
-`synthetic_fixture_authority_fields` fields. A hardware-free synthetic fixture
+`synthetic_fixture_authority_fields` fields. It also carries the manifest
+checker diagnostics for source authority, provenance, joint-limit authority,
+mesh-asset authority, target-frame authority, TCP offset, and base-to-board
+alignment so the direct MuJoCo handoff gate shows why a bundle is not ready
+without attempting motion. Placeholder review metadata such as `TODO` or `TBD`
+must keep those authority fields in `needs_review`, leave
+`ready_for_model_backed_ik: false`, and keep
+`motion_authority_status: "not_checked_manifest_not_ready"`. A hardware-free synthetic fixture
 may exercise the positive MuJoCo motion path, but it stays labeled as
 `hardware_free_regression_fixture_not_physical_so101_authority`. Motion evidence
 also carries `motion_authority_status`,

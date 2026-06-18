@@ -341,6 +341,7 @@ jobs:
               "missing_manifest_nonfailing",
               "missing_manifest_require_ready_fails",
               "placeholder_manifest_not_ready",
+              "placeholder_review_metadata_not_ready",
               "invalid_tcp_offset_shape_not_ready",
               "invalid_base_to_board_transform_not_ready",
               "ready_synthetic_fixture_motion_not_physical",
@@ -355,6 +356,23 @@ jobs:
           assert require_ready["record"]["return_code"] == 1, require_ready
           assert require_ready["observations"]["gate_ok"] is False, require_ready
           assert require_ready["observations"]["status"] == "reviewed_mujoco_bundle_required_but_not_ready", require_ready
+          placeholder_review = by_case["placeholder_review_metadata_not_ready"]
+          assert placeholder_review["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", placeholder_review
+          assert placeholder_review["observations"]["ready_for_model_backed_ik"] is False, placeholder_review
+          assert placeholder_review["observations"]["authority_status"] == "needs_review", placeholder_review
+          assert placeholder_review["observations"]["joint_limits_status"] == "needs_review", placeholder_review
+          assert placeholder_review["observations"]["mesh_assets_status"] == "needs_review", placeholder_review
+          assert placeholder_review["observations"]["target_frame_status"] == "needs_review", placeholder_review
+          assert placeholder_review["observations"]["tcp_offset_status"] == "needs_review", placeholder_review
+          assert placeholder_review["observations"]["alignment_status"] == "needs_review", placeholder_review
+          assert "authority" in placeholder_review["observations"]["missing_inputs"], placeholder_review
+          assert "joint_limit_authority" in placeholder_review["observations"]["missing_inputs"], placeholder_review
+          assert "mesh_asset_authority" in placeholder_review["observations"]["missing_inputs"], placeholder_review
+          assert "target_frame_authority" in placeholder_review["observations"]["missing_inputs"], placeholder_review
+          assert "tcp_offset_authority" in placeholder_review["observations"]["missing_inputs"], placeholder_review
+          assert "base_to_board_alignment_authority" in placeholder_review["observations"]["missing_inputs"], placeholder_review
+          assert placeholder_review["observations"]["reviewed_model_motion_checked"] is False, placeholder_review
+          assert placeholder_review["observations"]["motion_authority_status"] == "not_checked_manifest_not_ready", placeholder_review
           invalid_tcp = by_case["invalid_tcp_offset_shape_not_ready"]
           assert invalid_tcp["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", invalid_tcp
           assert invalid_tcp["observations"]["ready_for_model_backed_ik"] is False, invalid_tcp
