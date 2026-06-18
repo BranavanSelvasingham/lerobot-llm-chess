@@ -13,9 +13,9 @@ or vendor any URDF, MJCF, or mesh assets into this repository.
 
 The readable candidate
 `/Users/branavan/GitHub/lerobot-chess/so101_new_calib.urdf` can be turned into a
-draft bundle manifest for review. The generated draft is:
+draft bundle manifest for review. The latest generated draft is:
 
-`/private/tmp/lerobot_sim/so101_real_model_probe_owner_check/so101_model_bundle.candidate.json`
+`/private/tmp/lerobot_sim/so101_real_model_probe_recheck_bundle/so101_model_bundle.candidate.json`
 
 It is not a reviewed or model-backed-IK-ready bundle. The standalone manifest
 checker reports:
@@ -24,7 +24,7 @@ checker reports:
 - `ready_for_model_backed_ik`: `false`
 - `missing_inputs`: `authority`, `base_to_board_transform`,
   `joint_limits_deg`, `mesh_assets`, `non_blocking_contract_checker_result`,
-  `provenance`, `tcp_offset_m`
+  `provenance`, `target_frame_authority`, `tcp_offset_m`
 
 No real model-backed IK readiness is claimed here. Do not trust
 Cartesian/delta/radial model-backed residuals unless
@@ -33,15 +33,15 @@ Cartesian/delta/radial model-backed residuals unless
 
 ## Orientation
 
-Initial orientation was from a clean `feat/telemetry-recording` checkout:
+The current recheck was from a clean `codex/so101-mujoco-sim-gates` checkout:
 
 ```bash
 git status --short --branch
 ```
 
-The work then moved to `codex/so101-real-model-probe-report` for this report.
-Branch creation completed, but the local post-checkout hook returned nonzero
-because `git-lfs` is not on `PATH`.
+The earlier report was originally created from `feat/telemetry-recording`; the
+current evidence below refreshes the probe artifact paths and readiness blockers
+after the target-frame authority gate was added.
 
 The candidate URDF was readable:
 
@@ -70,9 +70,9 @@ If this sibling path is not available on another machine, rerun the same checks
 with the operator's local model root:
 
 ```bash
-python3 scripts/smoke_sim_so101_model_source_inventory.py --root /absolute/path/to/lerobot-chess --output-dir /private/tmp/lerobot_sim/so101_real_model_probe_owner_source_inventory_sibling
-python3 scripts/smoke_sim_so101_model_bundle_probe.py --model-path /absolute/path/to/lerobot-chess/so101_new_calib.urdf --asset-root /absolute/path/to/lerobot-chess --output-dir /private/tmp/lerobot_sim/so101_real_model_probe_owner_check
-python3 scripts/smoke_sim_so101_model_bundle_manifest.py --manifest-path /private/tmp/lerobot_sim/so101_real_model_probe_owner_check/so101_model_bundle.candidate.json --output-dir /private/tmp/lerobot_sim/so101_real_model_probe_owner_manifest_check
+python3 scripts/smoke_sim_so101_model_source_inventory.py --root /absolute/path/to/lerobot-chess --output-dir /private/tmp/lerobot_sim/so101_real_model_probe_recheck_sibling
+python3 scripts/smoke_sim_so101_model_bundle_probe.py --model-path /absolute/path/to/lerobot-chess/so101_new_calib.urdf --asset-root /absolute/path/to/lerobot-chess --output-dir /private/tmp/lerobot_sim/so101_real_model_probe_recheck_bundle
+python3 scripts/smoke_sim_so101_model_bundle_manifest.py --manifest-path /private/tmp/lerobot_sim/so101_real_model_probe_recheck_bundle/so101_model_bundle.candidate.json --output-dir /private/tmp/lerobot_sim/so101_real_model_probe_recheck_manifest
 ```
 
 ## Source Inventory Evidence
@@ -80,7 +80,7 @@ python3 scripts/smoke_sim_so101_model_bundle_manifest.py --manifest-path /privat
 Repo-local/default inventory:
 
 ```bash
-python3 scripts/smoke_sim_so101_model_source_inventory.py --output-dir /private/tmp/lerobot_sim/so101_real_model_probe_owner_source_inventory_default
+python3 scripts/smoke_sim_so101_model_source_inventory.py --output-dir /private/tmp/lerobot_sim/so101_real_model_probe_recheck_default
 ```
 
 Result:
@@ -91,14 +91,14 @@ Result:
 - `direct_contract_candidate_count`: `0`
 - `authoritative_candidate_count`: `0`
 - `summary_json`:
-  `/private/tmp/lerobot_sim/so101_real_model_probe_owner_source_inventory_default/so101_model_source_inventory_summary.json`
+  `/private/tmp/lerobot_sim/so101_real_model_probe_recheck_default/so101_model_source_inventory_summary.json`
 - `candidates_csv`:
-  `/private/tmp/lerobot_sim/so101_real_model_probe_owner_source_inventory_default/so101_model_source_candidates.csv`
+  `/private/tmp/lerobot_sim/so101_real_model_probe_recheck_default/so101_model_source_candidates.csv`
 
 Sibling inventory:
 
 ```bash
-python3 scripts/smoke_sim_so101_model_source_inventory.py --root /Users/branavan/GitHub/lerobot-chess --output-dir /private/tmp/lerobot_sim/so101_real_model_probe_owner_source_inventory_sibling
+python3 scripts/smoke_sim_so101_model_source_inventory.py --root /Users/branavan/GitHub/lerobot-chess --output-dir /private/tmp/lerobot_sim/so101_real_model_probe_recheck_sibling
 ```
 
 Result:
@@ -109,9 +109,9 @@ Result:
 - `direct_contract_candidate_count`: `3`
 - `authoritative_candidate_count`: `0`
 - `summary_json`:
-  `/private/tmp/lerobot_sim/so101_real_model_probe_owner_source_inventory_sibling/so101_model_source_inventory_summary.json`
+  `/private/tmp/lerobot_sim/so101_real_model_probe_recheck_sibling/so101_model_source_inventory_summary.json`
 - `candidates_csv`:
-  `/private/tmp/lerobot_sim/so101_real_model_probe_owner_source_inventory_sibling/so101_model_source_candidates.csv`
+  `/private/tmp/lerobot_sim/so101_real_model_probe_recheck_sibling/so101_model_source_candidates.csv`
 
 Visible sibling candidates:
 
@@ -132,7 +132,7 @@ repo because no source authority was declared and no reviewed manifest exists.
 Command:
 
 ```bash
-python3 scripts/smoke_sim_so101_model_bundle_probe.py --model-path /Users/branavan/GitHub/lerobot-chess/so101_new_calib.urdf --asset-root /Users/branavan/GitHub/lerobot-chess --output-dir /private/tmp/lerobot_sim/so101_real_model_probe_owner_check
+python3 scripts/smoke_sim_so101_model_bundle_probe.py --model-path /Users/branavan/GitHub/lerobot-chess/so101_new_calib.urdf --asset-root /Users/branavan/GitHub/lerobot-chess --output-dir /private/tmp/lerobot_sim/so101_real_model_probe_recheck_bundle
 ```
 
 Result:
@@ -160,13 +160,13 @@ Result:
 - `mesh_asset_review_unique_unresolved_reference_count`: `0`
 - `missing_inputs`: `authority`, `base_to_board_transform`,
   `joint_limits_deg`, `mesh_assets`, `non_blocking_contract_checker_result`,
-  `provenance`, `tcp_offset_m`
+  `provenance`, `target_frame_authority`, `tcp_offset_m`
 - `summary_json`:
-  `/private/tmp/lerobot_sim/so101_real_model_probe_owner_check/so101_model_bundle_probe_summary.json`
+  `/private/tmp/lerobot_sim/so101_real_model_probe_recheck_bundle/so101_model_bundle_probe_summary.json`
 - `candidate_manifest_json`:
-  `/private/tmp/lerobot_sim/so101_real_model_probe_owner_check/so101_model_bundle.candidate.json`
+  `/private/tmp/lerobot_sim/so101_real_model_probe_recheck_bundle/so101_model_bundle.candidate.json`
 - `checklist_csv`:
-  `/private/tmp/lerobot_sim/so101_real_model_probe_owner_check/so101_model_bundle_probe_checklist.csv`
+  `/private/tmp/lerobot_sim/so101_real_model_probe_recheck_bundle/so101_model_bundle_probe_checklist.csv`
 
 The observed source hints are review evidence only. They do not populate
 `provenance`, satisfy `authority`, or make the bundle ready for model-backed IK.
@@ -174,13 +174,13 @@ The observed source hints are review evidence only. They do not populate
 Nested contract/asset artifacts:
 
 - `contract_summary_json`:
-  `/private/tmp/lerobot_sim/so101_real_model_probe_owner_check/so101_model_contract/so101_model_contract_summary.json`
+  `/private/tmp/lerobot_sim/so101_real_model_probe_recheck_bundle/so101_model_contract/so101_model_contract_summary.json`
 - `contract_checklist_csv`:
-  `/private/tmp/lerobot_sim/so101_real_model_probe_owner_check/so101_model_contract/so101_model_contract_checklist.csv`
+  `/private/tmp/lerobot_sim/so101_real_model_probe_recheck_bundle/so101_model_contract/so101_model_contract_checklist.csv`
 - `asset_preflight_summary_json`:
-  `/private/tmp/lerobot_sim/so101_real_model_probe_owner_check/so101_model_contract/so101_model_asset_preflight/so101_model_asset_preflight_summary.json`
+  `/private/tmp/lerobot_sim/so101_real_model_probe_recheck_bundle/so101_model_contract/so101_model_asset_preflight/so101_model_asset_preflight_summary.json`
 - `asset_preflight_assets_csv`:
-  `/private/tmp/lerobot_sim/so101_real_model_probe_owner_check/so101_model_contract/so101_model_asset_preflight/so101_model_asset_preflight_assets.csv`
+  `/private/tmp/lerobot_sim/so101_real_model_probe_recheck_bundle/so101_model_contract/so101_model_asset_preflight/so101_model_asset_preflight_assets.csv`
 
 Structural checks from the contract summary:
 
@@ -251,7 +251,7 @@ These values are review evidence only. They are not copied into
 Command:
 
 ```bash
-python3 scripts/smoke_sim_so101_model_bundle_manifest.py --manifest-path /private/tmp/lerobot_sim/so101_real_model_probe_owner_check/so101_model_bundle.candidate.json --output-dir /private/tmp/lerobot_sim/so101_real_model_probe_owner_manifest_check
+python3 scripts/smoke_sim_so101_model_bundle_manifest.py --manifest-path /private/tmp/lerobot_sim/so101_real_model_probe_recheck_bundle/so101_model_bundle.candidate.json --output-dir /private/tmp/lerobot_sim/so101_real_model_probe_recheck_manifest
 ```
 
 Result:
@@ -259,6 +259,9 @@ Result:
 - `ok`: `true`
 - `status`: `model_bundle_manifest_needs_follow_up`
 - `ready_for_model_backed_ik`: `false`
+- `missing_inputs`: `authority`, `base_to_board_transform`,
+  `joint_limits_deg`, `mesh_assets`, `non_blocking_contract_checker_result`,
+  `provenance`, `target_frame_authority`, `tcp_offset_m`
 - `model_path.status`: `present`
 - `asset_roots.status`: `present`
 - `authority.status`: `missing`
@@ -266,20 +269,20 @@ Result:
 - `joint_limits.status`: `missing`
 - `joint_limits.missing_joints`: `shoulder_pan`, `shoulder_lift`,
   `elbow_flex`, `wrist_flex`, `wrist_roll`, `gripper`
-- `target_frame.status`: `present`
+- `target_frame.status`: `needs_review`
 - `target_frame.value`: `gripper_frame_link`
+- `target_frame.diagnostics`: `target_frame_authority_review_missing`
 - `tcp_offset.status`: `missing`
 - `base_to_board_alignment.status`: `placeholder_only`
 - `contract_checker.status`: `model_asset_preflight_needs_follow_up`
 - `mesh_assets.status`: `needs_follow_up`
 - `mesh_assets.mesh_reference_count`: `34`
-- `model_asset_preflight.status`: `asset_preflight_needs_follow_up`
-- `model_asset_preflight.missing_asset_count`: `34`
-- `model_asset_preflight.unresolved_reference_count`: `0`
+- `mesh_assets.missing_asset_count`: `34`
+- `mesh_assets.unresolved_reference_count`: `0`
 - `summary_json`:
-  `/private/tmp/lerobot_sim/so101_real_model_probe_owner_manifest_check/so101_model_bundle_manifest_summary.json`
+  `/private/tmp/lerobot_sim/so101_real_model_probe_recheck_manifest/so101_model_bundle_manifest_summary.json`
 - `checklist_csv`:
-  `/private/tmp/lerobot_sim/so101_real_model_probe_owner_manifest_check/so101_model_bundle_manifest_checklist.csv`
+  `/private/tmp/lerobot_sim/so101_real_model_probe_recheck_manifest/so101_model_bundle_manifest_checklist.csv`
 
 ## Readiness Fields Still Needed
 
@@ -294,6 +297,9 @@ must supply or review:
   and `gripper`.
 - Mesh assets/root: a reviewed root that resolves all 34 URDF mesh references,
   or a reviewed no-mesh model with an explicit rationale.
+- `target_frame_authority` or accepted alias: reviewed evidence that the
+  manifest target frame is the intended TCP/gripper reference frame for this
+  SO-101 model and simulator.
 - `tcp_offset_m` or accepted alias: calibrated target-frame to TCP/gripper-tip
   offset as x/y/z meters.
 - `base_to_board_transform` or `base_to_board_alignment`: calibrated transform

@@ -17,8 +17,8 @@ It writes:
 
 With no manifest, or with a manifest whose bundle checker does not report
 `ready_for_model_backed_ik: true` after checking reviewed joint limits, mesh
-evidence, TCP offset, and base-to-board alignment, the smoke exits `0` with
-`status: "reviewed_mujoco_bundle_not_ready"` and
+evidence, target-frame authority, TCP offset, and base-to-board alignment, the
+smoke exits `0` with `status: "reviewed_mujoco_bundle_not_ready"` and
 `reviewed_model_motion_checked: false`.
 
 To reuse the integrated suite's manifest result:
