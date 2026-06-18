@@ -34,6 +34,30 @@ JOINT_LIMIT_FIELDS = (
     "joint_limits",
     "joint_limit_authority",
 )
+JOINT_LIMIT_NESTED_VALUE_FIELDS = (
+    "joint_limits_deg",
+    "joint_limits",
+    "limits_deg",
+    "limits",
+)
+JOINT_LIMIT_REVIEW_FIELDS = (
+    "joint_limit_authority",
+    "joint_limits_review",
+    "joint_limit_review",
+    "joint_limits_metadata",
+)
+JOINT_LIMIT_STATUS_FIELDS = (
+    "joint_limit_authority_status",
+    "review_status",
+    "status",
+)
+REVIEWED_JOINT_LIMIT_STATUSES = {
+    "reviewed",
+    "operator_reviewed",
+    "joint_limits_reviewed",
+    "source_reviewed",
+    "model_bundle_reviewed",
+}
 AUTHORITY_STATUS_FIELDS = (
     "source_authority_status",
     "review_status",
@@ -53,6 +77,7 @@ REVIEWED_AUTHORITY_STATUSES = {
     "reviewed_so101_model_bundle",
 }
 SYNTHETIC_FIXTURE_AUTHORITY_STATUS = "synthetic_fixture_reviewed_for_automation_only"
+SYNTHETIC_FIXTURE_JOINT_LIMIT_STATUS = "synthetic_fixture_reviewed_for_automation_only"
 PROVENANCE_SOURCE_FIELDS = (
     "source_url",
     "source_uri",
@@ -574,6 +599,92 @@ def parse_joint_limit_pair(value: Any) -> tuple[bool, Any, list[str]]:
     return False, value, ["joint_limit_expected_lower_upper_or_len2_list"]
 
 
+def joint_limit_values_from_field(field_name: str, value: Any) -> tuple[str, Any]:
+    if field_name == "joint_limit_authority" and isinstance(value, dict):
+        nested_field, nested_value = find_first_field(value, JOINT_LIMIT_NESTED_VALUE_FIELDS)
+        if nested_field is not None:
+            return f"{field_name}.{nested_field}", nested_value
+    return field_name, value
+
+
+def inspect_joint_limit_review(
+    manifest: dict[str, Any],
+    field_name: str,
+    raw_value: Any,
+) -> dict[str, Any]:
+    candidates: list[tuple[str, Any]] = []
+    if field_name == "joint_limit_authority":
+        candidates.append((field_name, raw_value))
+    if isinstance(raw_value, dict):
+        candidates.append((field_name, raw_value))
+    for review_field in JOINT_LIMIT_REVIEW_FIELDS:
+        if review_field in manifest:
+            candidates.append((review_field, manifest.get(review_field)))
+
+    review_source = None
+    review_source_field = None
+    for candidate_field, candidate_value in candidates:
+        if not isinstance(candidate_value, dict):
+            continue
+        has_status = has_any_non_empty_field(candidate_value, JOINT_LIMIT_STATUS_FIELDS)
+        has_review = has_any_non_empty_field(candidate_value, AUTHORITY_REVIEW_FIELDS)
+        if has_status or has_review:
+            review_source = candidate_value
+            review_source_field = candidate_field
+            break
+
+    if not isinstance(review_source, dict):
+        return {
+            "status": "missing",
+            "field": None,
+            "value": None,
+            "review_status": None,
+            "review_evidence_present": False,
+            "synthetic_fixture_only": False,
+            "accepted_review_statuses": sorted(REVIEWED_JOINT_LIMIT_STATUSES),
+            "diagnostics": ["joint_limit_authority_review_missing"],
+        }
+
+    status_field, raw_status = first_non_empty_field(review_source, JOINT_LIMIT_STATUS_FIELDS)
+    status_value = str(raw_status).strip().lower() if raw_status is not None else ""
+    review_field_present = has_any_non_empty_field(review_source, AUTHORITY_REVIEW_FIELDS)
+    diagnostics: list[str] = []
+    if not status_value:
+        diagnostics.append("joint_limit_authority_review_status_missing")
+    elif (
+        status_value not in REVIEWED_JOINT_LIMIT_STATUSES
+        and status_value != SYNTHETIC_FIXTURE_JOINT_LIMIT_STATUS
+    ):
+        diagnostics.append(f"joint_limit_authority_review_status_not_accepted:{status_value}")
+    if not review_field_present:
+        diagnostics.append("joint_limit_authority_review_evidence_missing")
+
+    is_synthetic_fixture = status_value == SYNTHETIC_FIXTURE_JOINT_LIMIT_STATUS
+    if is_synthetic_fixture and "hardware-free" not in str(review_source.get("scope", "")).lower():
+        diagnostics.append("synthetic_joint_limit_scope_missing_hardware_free")
+
+    review_status_ok = status_value in REVIEWED_JOINT_LIMIT_STATUSES or (
+        is_synthetic_fixture and "synthetic_joint_limit_scope_missing_hardware_free" not in diagnostics
+    )
+    return {
+        "status": "present" if review_status_ok and review_field_present else "needs_review",
+        "field": review_source_field,
+        "value": review_source,
+        "review_status_field": status_field,
+        "review_status": status_value or None,
+        "review_evidence_present": review_field_present,
+        "synthetic_fixture_only": is_synthetic_fixture,
+        "accepted_review_statuses": sorted(REVIEWED_JOINT_LIMIT_STATUSES),
+        "diagnostics": diagnostics,
+        "notes": (
+            "Synthetic fixture joint-limit authority is accepted only for hardware-free forwarding regression fixtures; "
+            "it is not physical SO-101 joint-limit truth."
+            if is_synthetic_fixture
+            else "Joint-limit readiness requires accepted review status plus reviewer/date/id/url evidence."
+        ),
+    }
+
+
 def inspect_joint_limits(manifest: dict[str, Any] | None) -> dict[str, Any]:
     if not manifest:
         return {
@@ -597,11 +708,13 @@ def inspect_joint_limits(manifest: dict[str, Any] | None) -> dict[str, Any]:
             "invalid_joints": [],
             "diagnostics": ["joint_limits_missing"],
         }
-    if not isinstance(value, dict):
+    value_field_name, value_payload = joint_limit_values_from_field(field_name, value)
+    if not isinstance(value_payload, dict):
         return {
             "status": "invalid",
             "field": field_name,
-            "value": value,
+            "value_field": value_field_name,
+            "value": value_payload,
             "expected_joints": list(EXPECTED_SO101_JOINTS),
             "missing_joints": list(EXPECTED_SO101_JOINTS),
             "invalid_joints": [],
@@ -611,9 +724,9 @@ def inspect_joint_limits(manifest: dict[str, Any] | None) -> dict[str, Any]:
     normalized: dict[str, Any] = {}
     invalid_joints: list[dict[str, Any]] = []
     for joint in EXPECTED_SO101_JOINTS:
-        if joint not in value:
+        if joint not in value_payload:
             continue
-        valid, normalized_value, diagnostics = parse_joint_limit_pair(value[joint])
+        valid, normalized_value, diagnostics = parse_joint_limit_pair(value_payload[joint])
         if valid:
             normalized[joint] = normalized_value
         else:
@@ -629,10 +742,17 @@ def inspect_joint_limits(manifest: dict[str, Any] | None) -> dict[str, Any]:
             f"joint_limit_invalid:{invalid['joint']}:{diagnostic}"
             for diagnostic in invalid["diagnostics"]
         )
+    review = inspect_joint_limit_review(manifest, field_name, value)
+    if not diagnostics and review["status"] != "present":
+        diagnostics.extend(review.get("diagnostics", []))
     return {
-        "status": "present" if not diagnostics else "invalid",
+        "status": "present" if not diagnostics else "needs_review" if not missing_joints and not invalid_joints else "invalid",
         "field": field_name,
+        "value_field": value_field_name,
         "value": normalized,
+        "review": review,
+        "review_status": review.get("status"),
+        "review_diagnostics": review.get("diagnostics", []),
         "expected_joints": list(EXPECTED_SO101_JOINTS),
         "missing_joints": missing_joints,
         "invalid_joints": invalid_joints,
@@ -910,6 +1030,15 @@ def inspect_mesh_assets(contract: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def joint_limit_missing_inputs(joint_limits: dict[str, Any]) -> list[str] | None:
+    status = joint_limits.get("status")
+    if status == "present":
+        return None
+    if status == "needs_review":
+        return ["joint_limit_authority"]
+    return ["joint_limits_deg"]
+
+
 def build_field_checks(
     manifest_request: dict[str, Any],
     model_path: dict[str, Any],
@@ -960,7 +1089,7 @@ def build_field_checks(
         {
             "requirement_id": "joint_limits_deg",
             "ok": joint_limits["status"] == "present",
-            "missing_inputs": None if joint_limits["status"] == "present" else ["joint_limits_deg"],
+            "missing_inputs": joint_limit_missing_inputs(joint_limits),
             "diagnostics": joint_limits.get("diagnostics", []),
         },
         {
@@ -1082,8 +1211,12 @@ def build_checklist_rows(
             "warning",
             f"manifest.{'|'.join(JOINT_LIMIT_FIELDS)}",
             joint_limits,
-            {"required_joints": list(EXPECTED_SO101_JOINTS), "unit": "degrees"},
-            None if joint_limits["status"] == "present" else ["joint_limits_deg"],
+            {
+                "required_joints": list(EXPECTED_SO101_JOINTS),
+                "unit": "degrees",
+                "review_authority": True,
+            },
+            joint_limit_missing_inputs(joint_limits),
             joint_limits.get("diagnostics", []),
             "The reviewed bundle must declare limit authority for every SO-101 joint before model-backed IK is trusted.",
         ),

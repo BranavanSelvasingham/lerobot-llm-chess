@@ -69,7 +69,9 @@ reviewed fields and this checker reports `ready_for_model_backed_ik: true`.
 `authority` must include an accepted reviewed status plus reviewer/date/id/url
 evidence, and `provenance` must include a source reference, export tool, and
 license basis. A merely non-empty object is recorded as `needs_review` and does
-not satisfy readiness.
+not satisfy readiness. Joint-limit values also need review evidence: numeric
+limits without `joint_limit_authority` or an accepted review marker are recorded
+as `needs_review`.
 
 To re-check a generated draft directly:
 
@@ -156,6 +158,12 @@ resolved from the manifest directory.
     "wrist_roll": [-180.0, 180.0],
     "gripper": [0.0, 100.0]
   },
+  "joint_limit_authority": {
+    "joint_limit_authority_status": "reviewed",
+    "reviewed_by": "operator-or-review-id",
+    "reviewed_at": "2026-06-16",
+    "source": "reviewed model bundle or calibration record"
+  },
   "tcp_offset_m": {
     "x": 0.0,
     "y": 0.0,
@@ -208,7 +216,15 @@ inputs only until copied into these reviewed manifest fields.
 as an object covering every expected SO-101 joint: `shoulder_pan`,
 `shoulder_lift`, `elbow_flex`, `wrist_flex`, `wrist_roll`, and `gripper`.
 Each entry may be a two-item `[lower, upper]` list or an object with
-`lower`/`upper` or `min`/`max` numeric values.
+`lower`/`upper` or `min`/`max` numeric values. The checker also requires
+accepted joint-limit review metadata in `joint_limit_authority`,
+`joint_limits_review`, `joint_limit_review`, `joint_limits_metadata`, or inside
+the joint-limit field itself. Accepted review statuses are `reviewed`,
+`operator_reviewed`, `joint_limits_reviewed`, `source_reviewed`, and
+`model_bundle_reviewed`, plus
+`synthetic_fixture_reviewed_for_automation_only` only for explicitly
+hardware-free regression fixtures. Review evidence must include at least one of
+`reviewed_by`, `reviewed_at`, `review_id`, or `review_url`.
 
 ## Readiness Rule
 
@@ -220,7 +236,8 @@ true:
 - `asset_roots` is present and all supplied roots are directories
 - `authority` declares an accepted reviewed status plus review evidence
 - `provenance` declares source reference, export tool, and license basis fields
-- reviewed joint-limit authority covers every SO-101 joint
+- numeric joint limits cover every SO-101 joint and include accepted
+  joint-limit review authority
 - at least one mesh reference is visible to the asset preflight and all mesh
   references resolve
 - the target frame is present or defaulted
