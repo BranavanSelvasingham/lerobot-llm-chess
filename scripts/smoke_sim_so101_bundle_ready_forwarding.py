@@ -138,6 +138,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `thin_review_manifest`: `{summary['fixtures']['thin_review_manifest_path']}`",
         f"- `weak_review_manifest`: `{summary['fixtures']['weak_review_manifest_path']}`",
         f"- `placeholder_provenance_manifest`: `{summary['fixtures']['placeholder_provenance_manifest_path']}`",
+        f"- `fixture_provenance_reviewed_authority_manifest`: `{summary['fixtures']['fixture_provenance_reviewed_authority_manifest_path']}`",
         f"- `weak_joint_limits_manifest`: `{summary['fixtures']['weak_joint_limits_manifest_path']}`",
         f"- `weak_mesh_manifest`: `{summary['fixtures']['weak_mesh_manifest_path']}`",
         f"- `weak_target_frame_manifest`: `{summary['fixtures']['weak_target_frame_manifest_path']}`",
@@ -368,6 +369,21 @@ def placeholder_provenance_manifest_payload(model_filename: str) -> dict[str, An
     return payload
 
 
+def fixture_provenance_reviewed_authority_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    for field_name, status_field in (
+        ("authority", "source_authority_status"),
+        ("target_frame_authority", "target_frame_authority_status"),
+        ("joint_limit_authority", "joint_limit_authority_status"),
+        ("mesh_asset_authority", "mesh_asset_authority_status"),
+        ("tcp_offset_authority", "tcp_offset_authority_status"),
+        ("base_to_board_alignment_authority", "base_to_board_alignment_authority_status"),
+    ):
+        payload[field_name][status_field] = "reviewed"
+        payload[field_name].pop("scope", None)
+    return payload
+
+
 def mismatched_model_sha_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload["model_sha256"] = "0" * 64
@@ -463,6 +479,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     thin_review_dir = fixture_dir / "thin_review_bundle"
     weak_review_dir = fixture_dir / "weak_review_bundle"
     placeholder_provenance_dir = fixture_dir / "placeholder_provenance_bundle"
+    fixture_provenance_reviewed_authority_dir = (
+        fixture_dir / "fixture_provenance_reviewed_authority_bundle"
+    )
     weak_joint_limits_dir = fixture_dir / "weak_joint_limits_bundle"
     weak_mesh_dir = fixture_dir / "weak_mesh_bundle"
     weak_target_frame_dir = fixture_dir / "weak_target_frame_bundle"
@@ -482,6 +501,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         thin_review_dir,
         weak_review_dir,
         placeholder_provenance_dir,
+        fixture_provenance_reviewed_authority_dir,
         weak_joint_limits_dir,
         weak_mesh_dir,
         weak_target_frame_dir,
@@ -515,6 +535,14 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         placeholder_provenance_dir / "model" / "synthetic_so101_mujoco.xml"
     )
     placeholder_provenance_model_path.write_text(mjcf_with_mesh_reference())
+    fixture_provenance_reviewed_authority_model_path = (
+        fixture_provenance_reviewed_authority_dir
+        / "model"
+        / "synthetic_so101_mujoco.xml"
+    )
+    fixture_provenance_reviewed_authority_model_path.write_text(
+        mjcf_with_mesh_reference()
+    )
     weak_joint_limits_model_path = weak_joint_limits_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_joint_limits_model_path.write_text(mjcf_with_mesh_reference())
     weak_mesh_model_path = weak_mesh_dir / "model" / "synthetic_so101_mujoco.xml"
@@ -549,6 +577,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_review_manifest_path = weak_review_dir / "so101_model_bundle.weak_review.json"
     placeholder_provenance_manifest_path = (
         placeholder_provenance_dir / "so101_model_bundle.placeholder_provenance.json"
+    )
+    fixture_provenance_reviewed_authority_manifest_path = (
+        fixture_provenance_reviewed_authority_dir
+        / "so101_model_bundle.fixture_provenance_reviewed_authority.json"
     )
     weak_joint_limits_manifest_path = weak_joint_limits_dir / "so101_model_bundle.weak_joint_limits.json"
     weak_mesh_manifest_path = weak_mesh_dir / "so101_model_bundle.weak_mesh_assets.json"
@@ -594,6 +626,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
             model_filename=placeholder_provenance_model_path.name
         ),
         placeholder_provenance_model_path,
+    )
+    write_manifest_json(
+        fixture_provenance_reviewed_authority_manifest_path,
+        fixture_provenance_reviewed_authority_manifest_payload(
+            model_filename=fixture_provenance_reviewed_authority_model_path.name
+        ),
+        fixture_provenance_reviewed_authority_model_path,
     )
     write_manifest_json(
         weak_joint_limits_manifest_path,
@@ -649,6 +688,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "thin_review_manifest_path": thin_review_manifest_path,
         "weak_review_manifest_path": weak_review_manifest_path,
         "placeholder_provenance_manifest_path": placeholder_provenance_manifest_path,
+        "fixture_provenance_reviewed_authority_manifest_path": (
+            fixture_provenance_reviewed_authority_manifest_path
+        ),
         "weak_joint_limits_manifest_path": weak_joint_limits_manifest_path,
         "weak_mesh_manifest_path": weak_mesh_manifest_path,
         "weak_target_frame_manifest_path": weak_target_frame_manifest_path,
@@ -665,6 +707,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "thin_review_model_path": thin_review_model_path,
         "weak_review_model_path": weak_review_model_path,
         "placeholder_provenance_model_path": placeholder_provenance_model_path,
+        "fixture_provenance_reviewed_authority_model_path": (
+            fixture_provenance_reviewed_authority_model_path
+        ),
         "weak_joint_limits_model_path": weak_joint_limits_model_path,
         "weak_mesh_model_path": weak_mesh_model_path,
         "weak_target_frame_model_path": weak_target_frame_model_path,
@@ -907,6 +952,11 @@ def summarize_case(
             f"{case_id}.bundle_hardware_free_regression_fixture_ready",
             bundle.get("hardware_free_regression_fixture_ready"),
         )
+        synthetic_fields = bundle.get("synthetic_fixture_authority_fields") or []
+        if "provenance" not in synthetic_fields:
+            errors.append(
+                f"{case_id}.synthetic_fixture_authority_fields: expected provenance in {synthetic_fields!r}"
+            )
         assert_equal(
             errors,
             f"{case_id}.model_identity_status",
@@ -1012,6 +1062,11 @@ def summarize_case(
         assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
         assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
         assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
+        synthetic_fields = bundle.get("synthetic_fixture_authority_fields") or []
+        if "provenance" not in synthetic_fields:
+            errors.append(
+                f"{case_id}.synthetic_fixture_authority_fields: expected provenance in {synthetic_fields!r}"
+            )
         assert_equal(
             errors,
             f"{case_id}.reviewed_mujoco_status",
@@ -1330,6 +1385,101 @@ def summarize_case(
         assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
         assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
         assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
+    elif expectation == "fixture_provenance_reviewed_authority_not_physical":
+        assert_true(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.bundle_model_authority",
+            bundle.get("model_authority"),
+            "hardware_free_regression_fixture_not_physical_so101_authority",
+        )
+        assert_false(
+            errors,
+            f"{case_id}.bundle_physical_so101_model_authority_ready",
+            bundle.get("physical_so101_model_authority_ready"),
+        )
+        assert_true(
+            errors,
+            f"{case_id}.bundle_hardware_free_regression_fixture_ready",
+            bundle.get("hardware_free_regression_fixture_ready"),
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.synthetic_fixture_authority_fields",
+            bundle.get("synthetic_fixture_authority_fields"),
+            ["provenance"],
+        )
+        assert_equal(errors, f"{case_id}.authority_status", bundle.get("authority_status"), "present")
+        assert_equal(errors, f"{case_id}.provenance_status", bundle.get("provenance_status"), "present")
+        assert_true(
+            errors,
+            f"{case_id}.provenance_synthetic_fixture_only",
+            bundle.get("provenance_synthetic_fixture_only"),
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.provenance_fixture_only_fields",
+            bundle.get("provenance_fixture_only_fields"),
+            ["source_url", "export_tool", "license"],
+        )
+        diagnostics = bundle.get("provenance_diagnostics") or []
+        expected_diagnostics = {
+            "provenance_fixture_only:source_url",
+            "provenance_fixture_only:export_tool",
+            "provenance_fixture_only:license",
+        }
+        missing_diagnostics = [
+            diagnostic
+            for diagnostic in sorted(expected_diagnostics)
+            if diagnostic not in diagnostics
+        ]
+        if missing_diagnostics:
+            errors.append(
+                f"{case_id}.provenance_diagnostics: missing {missing_diagnostics!r} from {diagnostics!r}"
+            )
+        assert_equal(errors, f"{case_id}.missing_inputs", bundle.get("missing_inputs"), [])
+        assert_equal(
+            errors,
+            f"{case_id}.physical_authority_blockers",
+            bundle.get("physical_authority_blockers"),
+            ["synthetic_fixture_authority_not_physical_so101:provenance"],
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_motion_checked",
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_model_authority",
+            reviewed_mujoco.get("model_authority"),
+            "hardware_free_regression_fixture_not_physical_so101_authority",
+        )
+        assert_false(
+            errors,
+            f"{case_id}.reviewed_mujoco_physical_so101_model_authority_ready",
+            reviewed_mujoco.get("physical_so101_model_authority_ready"),
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_synthetic_fields",
+            reviewed_mujoco.get("synthetic_fixture_authority_fields"),
+            ["provenance"],
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_motion_authority_status",
+            reviewed_mujoco.get("motion_authority_status"),
+            "hardware_free_fixture_motion_checked_not_physical_so101_authority",
+        )
+        assert_false(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
+        assert_equal(
+            errors,
+            f"{case_id}.ik_model_path_source",
+            forwarding.get("ik_model_path_source"),
+            "so101_model_bundle_manifest",
+        )
     elif expectation == "weak_joint_limit_authority_not_forwarded":
         assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
         assert_equal(
@@ -1762,6 +1912,14 @@ def main() -> int:
             "manifest_path": fixtures["placeholder_provenance_manifest_path"],
             "explicit_model_path": None,
             "expectation": "placeholder_provenance_not_forwarded",
+        },
+        {
+            "case_id": "fixture_provenance_reviewed_authority_not_physical",
+            "manifest_path": fixtures[
+                "fixture_provenance_reviewed_authority_manifest_path"
+            ],
+            "explicit_model_path": None,
+            "expectation": "fixture_provenance_reviewed_authority_not_physical",
         },
         {
             "case_id": "weak_joint_limit_authority_not_forwarded",

@@ -3187,6 +3187,7 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "model_authority": smoke.get("model_authority"),
         "physical_so101_model_authority_ready": smoke.get("physical_so101_model_authority_ready"),
         "hardware_free_regression_fixture_ready": smoke.get("hardware_free_regression_fixture_ready"),
+        "synthetic_fixture_authority_fields": smoke.get("synthetic_fixture_authority_fields"),
         "observed_evidence_is_physical_so101_authority": smoke.get(
             "observed_evidence_is_physical_so101_authority"
         ),
@@ -3705,6 +3706,9 @@ def so101_model_bundle_manifest_section(
         "authority_review_evidence_placeholder_fields": authority.get("review_evidence_placeholder_fields"),
         "provenance_status": provenance.get("status"),
         "provenance_diagnostics": provenance.get("diagnostics"),
+        "provenance_synthetic_fixture_only": provenance.get("synthetic_fixture_only"),
+        "provenance_fixture_only_fields": provenance.get("fixture_only_fields"),
+        "provenance_blocking_diagnostics": provenance.get("blocking_diagnostics"),
         "provenance_source_field": provenance.get("source_field"),
         "provenance_export_field": provenance.get("export_field"),
         "provenance_license_field": provenance.get("license_field"),

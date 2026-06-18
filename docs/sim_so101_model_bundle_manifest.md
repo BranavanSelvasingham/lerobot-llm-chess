@@ -92,8 +92,13 @@ missing, malformed, or mismatched digest records `model_identity` as not ready
 and lists `model_sha256` in `missing_inputs`; this prevents an already-reviewed
 path from silently changing contents. The reviewed-authority source/bundle
 consistency gate uses this declared digest for authority matching; the observed
-file digest is diagnostic evidence only. A merely non-empty object is recorded
-as `needs_review` and does not satisfy readiness. Joint-limit values also need
+file digest is diagnostic evidence only. Provenance values that explicitly name
+synthetic, test-only, smoke, hardware-free, or regression-fixture origins are
+classified as fixture-only automation evidence; they can keep hardware-free
+regression fixtures runnable, but they add `provenance` to
+`synthetic_fixture_authority_fields` and keep
+`physical_so101_model_authority_ready: false`. A merely non-empty object is
+recorded as `needs_review` and does not satisfy readiness. Joint-limit values also need
 review evidence: numeric
 limits without `joint_limit_authority` or an accepted review marker are recorded
 as `needs_review`. Mesh references also need review evidence: resolved mesh
@@ -322,11 +327,13 @@ that fixture-only status, `physical_so101_model_authority_ready` remains
 `false` even if `ready_for_model_backed_ik` is `true`; the summary keeps
 `physical_authority_gate_status` set to
 `hardware_free_fixture_ready_not_physical_authority` and blocker entries for
-the synthetic fixture fields. Every reviewed authority section must include
-reviewer identity plus traceable review evidence: `reviewed_by` and at least
-one of `reviewed_at`, `review_id`, or `review_url`. Thin review metadata that
-supplies only a reviewer identity is reported as missing `review_trace` and
-does not satisfy readiness.
+the synthetic fixture fields. Fixture-only provenance gets the same physical
+authority treatment even when the review-status fields themselves are
+reviewed-looking. Every reviewed authority section must include reviewer
+identity plus traceable review evidence: `reviewed_by` and at least one of
+`reviewed_at`, `review_id`, or `review_url`. Thin review metadata that supplies
+only a reviewer identity is reported as missing `review_trace` and does not
+satisfy readiness.
 
 When the integrated calibration regression suite evaluates the reviewed model
 authority gate, this manifest is checked against the SO-101 model-source
@@ -417,7 +424,8 @@ true:
 - `asset_roots` is present and all supplied roots are directories
 - `authority` declares an accepted reviewed status plus traceable review
   evidence (`reviewed_by` plus `reviewed_at`, `review_id`, or `review_url`)
-- `provenance` declares source reference, export tool, and license basis fields
+- `provenance` declares source reference, export tool, and license basis fields;
+  fixture-only provenance is still non-physical automation evidence
 - finite numeric joint limits cover every SO-101 joint and include accepted
   joint-limit review authority
 - at least one mesh reference is visible to the asset preflight and all mesh

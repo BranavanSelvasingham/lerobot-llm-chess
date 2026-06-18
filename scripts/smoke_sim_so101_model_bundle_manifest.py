@@ -171,6 +171,16 @@ PROVENANCE_LICENSE_FIELDS = (
     "license_review",
     "license_basis",
 )
+PROVENANCE_FIXTURE_ONLY_MARKERS = (
+    "synthetic",
+    "hardware free",
+    "hardware-free",
+    "smoke",
+    "test only",
+    "test-only",
+    "regression fixture",
+    "automation only",
+)
 MESH_ASSET_REVIEW_FIELDS = (
     "mesh_asset_authority",
     "mesh_assets_review",
@@ -546,6 +556,15 @@ def placeholder_review_evidence(value: Any) -> bool:
     return normalized in PLACEHOLDER_REVIEW_EVIDENCE_VALUES or any(
         normalized.startswith(prefix) for prefix in PLACEHOLDER_REVIEW_EVIDENCE_PREFIXES
     )
+
+
+def fixture_only_provenance_evidence(value: Any) -> bool:
+    if not non_empty(value):
+        return False
+    if not isinstance(value, str):
+        return False
+    normalized = normalized_review_text(value)
+    return any(marker in normalized for marker in PROVENANCE_FIXTURE_ONLY_MARKERS)
 
 
 def review_evidence_summary(
@@ -1019,22 +1038,33 @@ def inspect_provenance(manifest: dict[str, Any] | None) -> dict[str, Any]:
     license_field, license_value, license_placeholder_fields = first_valid_provenance_field(
         PROVENANCE_LICENSE_FIELDS
     )
+    blocking_diagnostics: list[str] = []
     diagnostics: list[str] = []
+    fixture_only_fields: list[str] = []
     if source_field is None:
-        diagnostics.append("provenance_source_reference_missing")
+        blocking_diagnostics.append("provenance_source_reference_missing")
     if export_field is None:
-        diagnostics.append("provenance_export_tool_missing")
+        blocking_diagnostics.append("provenance_export_tool_missing")
     if license_field is None:
-        diagnostics.append("provenance_license_basis_missing")
+        blocking_diagnostics.append("provenance_license_basis_missing")
+    for field_name, field_value in (
+        (source_field, source_value),
+        (export_field, export_value),
+        (license_field, license_value),
+    ):
+        if field_name is not None and fixture_only_provenance_evidence(field_value):
+            fixture_only_fields.append(field_name)
+            diagnostics.append(f"provenance_fixture_only:{field_name}")
     for field_name in source_placeholder_fields:
-        diagnostics.append(f"provenance_source_reference_placeholder:{field_name}")
+        blocking_diagnostics.append(f"provenance_source_reference_placeholder:{field_name}")
     for field_name in export_placeholder_fields:
-        diagnostics.append(f"provenance_export_tool_placeholder:{field_name}")
+        blocking_diagnostics.append(f"provenance_export_tool_placeholder:{field_name}")
     for field_name in license_placeholder_fields:
-        diagnostics.append(f"provenance_license_basis_placeholder:{field_name}")
+        blocking_diagnostics.append(f"provenance_license_basis_placeholder:{field_name}")
+    diagnostics = [*blocking_diagnostics, *diagnostics]
 
     return {
-        "status": "present" if not diagnostics else "needs_review",
+        "status": "present" if not blocking_diagnostics else "needs_review",
         "value": value,
         "source_field": source_field,
         "source_value": source_value,
@@ -1045,6 +1075,9 @@ def inspect_provenance(manifest: dict[str, Any] | None) -> dict[str, Any]:
         "license_field": license_field,
         "license_value": license_value,
         "license_placeholder_fields": license_placeholder_fields,
+        "synthetic_fixture_only": bool(fixture_only_fields),
+        "fixture_only_fields": fixture_only_fields,
+        "blocking_diagnostics": blocking_diagnostics,
         "diagnostics": diagnostics,
         "required_field_groups": {
             "source": list(PROVENANCE_SOURCE_FIELDS),
@@ -1053,7 +1086,8 @@ def inspect_provenance(manifest: dict[str, Any] | None) -> dict[str, Any]:
         },
         "notes": (
             "Provenance requires source reference, export tool, and license basis fields. "
-            "Placeholder values such as TODO/TBD/unknown do not satisfy provenance readiness."
+            "Placeholder values such as TODO/TBD/unknown do not satisfy provenance readiness. "
+            "Synthetic, test-only, smoke, or hardware-free provenance remains automation evidence only."
         ),
     }
 
@@ -1979,6 +2013,7 @@ def build_field_checks(
 
 def synthetic_fixture_authority_flags(
     authority: dict[str, Any],
+    provenance: dict[str, Any],
     joint_limits: dict[str, Any],
     mesh_assets: dict[str, Any],
     target_frame: dict[str, Any],
@@ -1987,6 +2022,7 @@ def synthetic_fixture_authority_flags(
 ) -> dict[str, bool]:
     return {
         "authority": bool(authority.get("synthetic_fixture_only")),
+        "provenance": bool(provenance.get("synthetic_fixture_only")),
         "joint_limits": bool((joint_limits.get("review") or {}).get("synthetic_fixture_only")),
         "mesh_assets": bool((mesh_assets.get("review") or {}).get("synthetic_fixture_only")),
         "target_frame": bool((target_frame.get("review") or {}).get("synthetic_fixture_only")),
@@ -2532,6 +2568,7 @@ def build_summary(
     next_required_for_goal = build_next_required_for_goal(sorted(set(missing_inputs)))
     synthetic_flags = synthetic_fixture_authority_flags(
         authority,
+        provenance,
         joint_limits,
         mesh_assets,
         target_frame,
