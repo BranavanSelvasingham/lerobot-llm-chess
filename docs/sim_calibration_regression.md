@@ -484,7 +484,10 @@ joint-motion checks before scripted curriculum evidence is trusted. The workflow
 also runs the focused `so101_reviewed_authority_gate_matrix` contract smoke to
 exercise source-missing, bundle-missing, source/bundle path-mismatch,
 fixture-only, motion-missing, and all-ready injected gate states without treating
-the matrix itself as reviewed physical SO-101 evidence. It also runs the focused
+the matrix itself as reviewed physical SO-101 evidence. The matrix also verifies
+that physical-reviewed MuJoCo motion needs a consistent child status and
+`motion_authority_status`; a lone true motion boolean cannot close reviewed
+model authority. It also runs the focused
 `so101_reviewed_mujoco_bundle_matrix` smoke to prove missing/not-ready manifests
 do not attempt motion, `--require-ready-reviewed-model` fails closed,
 placeholder review metadata stays `needs_review` without MuJoCo motion,
@@ -546,6 +549,11 @@ reviewed physical SO-101 authority. The blocker packet separates immediate
 `action_required` items from `blocked_by_prior_requirements` items so reviewed
 MuJoCo motion proof stays downstream of reviewed physical bundle authority and
 source/bundle model-path consistency.
+The gate reports `physical_reviewed_model_motion_reported` separately from
+`physical_reviewed_model_motion_status_ready`; it only reports
+`physical_reviewed_model_motion_checked: true` when the reviewed-MuJoCo child
+status is `reviewed_mujoco_bundle_motion_checked` and
+`motion_authority_status` is `physical_reviewed_model_motion_checked`.
 
 The standalone reviewed-authority gate matrix writes
 `so101_reviewed_authority_gate_matrix_summary.json`, `.csv`, and `README.md`.
@@ -554,7 +562,10 @@ It reports `model_authority: "contract_matrix_not_authority"`,
 `physical_so101_model_authority_ready: false` even though it includes an
 `all_ready_contract_state` case to exercise the ready branch. That case is a
 state-machine guard only; it is not evidence that a reviewed physical SO-101
-bundle exists.
+bundle exists. It also includes an inconsistent-motion negative case: even when
+the injected physical motion boolean is true, the top-level authority gate stays
+blocked unless the reviewed-MuJoCo child status and motion-authority status also
+match physical reviewed motion.
 
 The standalone reviewed-MuJoCo bundle matrix writes
 `so101_reviewed_mujoco_bundle_matrix_summary.json`, `.csv`, and `README.md`.

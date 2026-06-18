@@ -3765,8 +3765,20 @@ def so101_reviewed_model_authority_gate_section(
         source_inventory.get("source_authority_gate_status") == "source_authority_ready"
     )
     physical_authority_ready = bundle_manifest.get("physical_so101_model_authority_ready") is True
-    physical_reviewed_motion_ready = (
+    physical_reviewed_motion_reported = (
         reviewed_mujoco_bundle.get("physical_reviewed_model_motion_checked") is True
+    )
+    reviewed_mujoco_bundle_status = reviewed_mujoco_bundle.get("status")
+    reviewed_mujoco_motion_authority_status = reviewed_mujoco_bundle.get(
+        "motion_authority_status"
+    )
+    physical_reviewed_motion_status_ready = (
+        reviewed_mujoco_bundle_status == "reviewed_mujoco_bundle_motion_checked"
+        and reviewed_mujoco_motion_authority_status
+        == "physical_reviewed_model_motion_checked"
+    )
+    physical_reviewed_motion_ready = (
+        physical_reviewed_motion_reported and physical_reviewed_motion_status_ready
     )
     source_bundle_consistency = so101_source_bundle_consistency_section(
         source_inventory,
@@ -3890,7 +3902,10 @@ def so101_reviewed_model_authority_gate_section(
         "source_bundle_consistency_status": source_bundle_consistency.get("status"),
         "source_bundle_consistency": source_bundle_consistency,
         "physical_reviewed_model_motion_checked": physical_reviewed_motion_ready,
-        "reviewed_mujoco_bundle_status": reviewed_mujoco_bundle.get("status"),
+        "physical_reviewed_model_motion_reported": physical_reviewed_motion_reported,
+        "physical_reviewed_model_motion_status_ready": physical_reviewed_motion_status_ready,
+        "reviewed_mujoco_bundle_status": reviewed_mujoco_bundle_status,
+        "reviewed_mujoco_motion_authority_status": reviewed_mujoco_motion_authority_status,
         "blockers": blockers,
         "blocker_count": len(blockers),
         "next_required_for_goal": next_required_for_goal,
@@ -3912,6 +3927,7 @@ def so101_reviewed_model_authority_gate_section(
         "notes": [
             "This top-level gate is a summary over the source inventory, bundle manifest, and reviewed MuJoCo bundle artifacts.",
             "It is ready only when source authority, physical bundle authority, source-to-bundle model-path consistency, and physical-reviewed MuJoCo motion are all true.",
+            "Physical-reviewed MuJoCo motion must have a matching child status and motion-authority status, not only a lone boolean flag.",
             "The source-authority model path and bundle manifest model path must be consistent before authority can close.",
             "Development fixture evidence remains useful automation coverage but does not close reviewed physical SO-101 authority.",
         ],
@@ -3997,8 +4013,8 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
             "next_action_id": source_bundle_consistency_next_action_id,
             "operator_action": (
                 "Use the same reviewed SO-101 model path in the source inventory and "
-                "bundle manifest, or declare an authoritative source root containing the "
-                "bundle model path."
+                "bundle manifest; an authoritative root alone does not authorize a "
+                "different selected model file."
             ),
         },
         {

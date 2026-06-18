@@ -71,6 +71,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "source_bundle_consistency_status",
         "source_bundle_consistency_ready",
         "physical_reviewed_model_motion_checked",
+        "physical_reviewed_model_motion_reported",
+        "physical_reviewed_model_motion_status_ready",
+        "reviewed_mujoco_bundle_status",
+        "reviewed_mujoco_motion_authority_status",
         "development_fixture_evidence_not_physical_so101_truth",
         "blockers",
         "next_required_action_ids",
@@ -208,6 +212,7 @@ def bundle_hardware_fixture(summary_path: Path, model_path: Path) -> dict[str, A
 def motion_missing(summary_path: Path) -> dict[str, Any]:
     return {
         "status": "reviewed_mujoco_bundle_not_ready",
+        "motion_authority_status": "not_checked_manifest_not_ready",
         "physical_reviewed_model_motion_checked": False,
         "hardware_free_fixture_motion_checked": False,
         "next_required_for_goal": [
@@ -231,6 +236,9 @@ def motion_missing(summary_path: Path) -> dict[str, Any]:
 def motion_hardware_fixture(summary_path: Path) -> dict[str, Any]:
     return {
         "status": "hardware_free_fixture_motion_checked",
+        "motion_authority_status": (
+            "hardware_free_fixture_motion_checked_not_physical_so101_authority"
+        ),
         "physical_reviewed_model_motion_checked": False,
         "hardware_free_fixture_motion_checked": True,
         "next_required_for_goal": [
@@ -248,6 +256,18 @@ def motion_hardware_fixture(summary_path: Path) -> dict[str, Any]:
 def motion_physical_ready(summary_path: Path) -> dict[str, Any]:
     return {
         "status": "reviewed_mujoco_bundle_motion_checked",
+        "motion_authority_status": "physical_reviewed_model_motion_checked",
+        "physical_reviewed_model_motion_checked": True,
+        "hardware_free_fixture_motion_checked": False,
+        "next_required_for_goal": [],
+        "summary_path": str(summary_path),
+    }
+
+
+def motion_inconsistent_status(summary_path: Path) -> dict[str, Any]:
+    return {
+        "status": "reviewed_mujoco_bundle_not_ready",
+        "motion_authority_status": "not_checked_manifest_not_ready",
         "physical_reviewed_model_motion_checked": True,
         "hardware_free_fixture_motion_checked": False,
         "next_required_for_goal": [],
@@ -432,6 +452,31 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "source_ready_physical_bundle_motion_status_inconsistent",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_inconsistent_status(summary_dir / "motion_inconsistent.json"),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_bundle_model_path_consistent",
+                "consistency_ready": True,
+                "development_fixture": True,
+                "motion_reported": True,
+                "motion_status_ready": False,
+                "reviewed_mujoco_bundle_status": "reviewed_mujoco_bundle_not_ready",
+                "reviewed_mujoco_motion_authority_status": "not_checked_manifest_not_ready",
+                "blockers_contain": [
+                    "load_reviewed_model_in_mujoco",
+                    "prove_physical_reviewed_model_motion",
+                ],
+                "actions_contain": [
+                    "load_reviewed_model_in_mujoco",
+                    "prove_physical_reviewed_model_motion",
+                ],
+                "action_required_contains": ["physical_reviewed_mujoco_motion_checked"],
+            },
+        },
+        {
             "case_id": "source_ready_hardware_free_bundle_fixture",
             "source": source_ready(summary_dir / "source_ready.json", source_model),
             "bundle": bundle_hardware_fixture(summary_dir / "bundle_fixture.json", source_model),
@@ -544,6 +589,34 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         gate.get("development_fixture_evidence_not_physical_so101_truth"),
         expect["development_fixture"],
     )
+    if "motion_reported" in expect:
+        add_error(
+            errors,
+            "physical_reviewed_model_motion_reported",
+            gate.get("physical_reviewed_model_motion_reported"),
+            expect["motion_reported"],
+        )
+    if "motion_status_ready" in expect:
+        add_error(
+            errors,
+            "physical_reviewed_model_motion_status_ready",
+            gate.get("physical_reviewed_model_motion_status_ready"),
+            expect["motion_status_ready"],
+        )
+    if "reviewed_mujoco_bundle_status" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_bundle_status",
+            gate.get("reviewed_mujoco_bundle_status"),
+            expect["reviewed_mujoco_bundle_status"],
+        )
+    if "reviewed_mujoco_motion_authority_status" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_motion_authority_status",
+            gate.get("reviewed_mujoco_motion_authority_status"),
+            expect["reviewed_mujoco_motion_authority_status"],
+        )
     add_error(
         errors,
         "blocker_packet_model_authority",
@@ -664,6 +737,16 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "source_bundle_consistency_ready": gate.get("source_bundle_consistency_ready"),
         "physical_reviewed_model_motion_checked": gate.get(
             "physical_reviewed_model_motion_checked"
+        ),
+        "physical_reviewed_model_motion_reported": gate.get(
+            "physical_reviewed_model_motion_reported"
+        ),
+        "physical_reviewed_model_motion_status_ready": gate.get(
+            "physical_reviewed_model_motion_status_ready"
+        ),
+        "reviewed_mujoco_bundle_status": gate.get("reviewed_mujoco_bundle_status"),
+        "reviewed_mujoco_motion_authority_status": gate.get(
+            "reviewed_mujoco_motion_authority_status"
         ),
         "development_fixture_evidence_not_physical_so101_truth": gate.get(
             "development_fixture_evidence_not_physical_so101_truth"

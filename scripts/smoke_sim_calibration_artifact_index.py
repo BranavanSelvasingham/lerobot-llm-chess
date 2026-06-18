@@ -2839,7 +2839,16 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
         "physical_reviewed_model_motion_checked": gate.get(
             "physical_reviewed_model_motion_checked"
         ),
+        "physical_reviewed_model_motion_reported": gate.get(
+            "physical_reviewed_model_motion_reported"
+        ),
+        "physical_reviewed_model_motion_status_ready": gate.get(
+            "physical_reviewed_model_motion_status_ready"
+        ),
         "reviewed_mujoco_bundle_status": gate.get("reviewed_mujoco_bundle_status"),
+        "reviewed_mujoco_motion_authority_status": gate.get(
+            "reviewed_mujoco_motion_authority_status"
+        ),
         "development_fixture_evidence_not_physical_so101_truth": gate.get(
             "development_fixture_evidence_not_physical_so101_truth"
         ),
