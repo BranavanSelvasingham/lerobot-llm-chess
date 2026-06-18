@@ -2391,6 +2391,20 @@ def collect_so101_model_bundle_manifest_artifacts(
         "physical_authority_blockers": bundle.get("physical_authority_blockers"),
         "hardware_free_regression_fixture_ready": bundle.get("hardware_free_regression_fixture_ready"),
         "synthetic_fixture_authority_fields": bundle.get("synthetic_fixture_authority_fields"),
+        "review_packet_status": bundle.get("review_packet_status"),
+        "review_packet_model_authority": bundle.get("review_packet_model_authority"),
+        "review_packet_item_count": bundle.get("review_packet_item_count"),
+        "review_packet_item_ids": bundle.get("review_packet_item_ids"),
+        "review_packet_needs_operator_review_item_ids": bundle.get(
+            "review_packet_needs_operator_review_item_ids"
+        ),
+        "review_packet_action_ids": bundle.get("review_packet_action_ids"),
+        "review_packet_observed_evidence_is_authority": bundle.get(
+            "review_packet_observed_evidence_is_authority"
+        ),
+        "review_packet_development_fixture_evidence_not_physical_so101_truth": bundle.get(
+            "review_packet_development_fixture_evidence_not_physical_so101_truth"
+        ),
         "next_required_for_goal": next_required,
         "next_required_action_ids": next_required_action_ids,
         "next_required_action_count": len(next_required),
@@ -2430,6 +2444,8 @@ def collect_so101_model_bundle_manifest_artifacts(
     for key, label_suffix in (
         ("summary_json", "summary"),
         ("checklist_csv", "checklist"),
+        ("review_packet_json", "review_packet"),
+        ("review_packet_csv", "review_packet_rows"),
         ("readme_md", "readme"),
     ):
         add_path(
@@ -2483,6 +2499,8 @@ def collect_so101_model_bundle_manifest_artifacts(
         "ok": bundle.get("ok"),
         "summary_path": artifact_paths.get("summary_json") or bundle.get("summary_path"),
         "checklist_csv_path": artifact_paths.get("checklist_csv"),
+        "review_packet_json_path": artifact_paths.get("review_packet_json"),
+        "review_packet_csv_path": artifact_paths.get("review_packet_csv"),
         "readme_md_path": artifact_paths.get("readme_md"),
         "manifest_request": manifest_request,
         "ready_for_model_backed_ik": bundle.get("ready_for_model_backed_ik"),

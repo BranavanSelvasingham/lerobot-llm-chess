@@ -57,6 +57,12 @@ SO101_MODEL_SOURCE_INVENTORY_SUMMARY_NAME = "so101_model_source_inventory_summar
 SO101_MODEL_BUNDLE_PROBE_DIR_NAME = "so101_model_bundle_probe"
 SO101_MODEL_BUNDLE_PROBE_SUMMARY_NAME = "so101_model_bundle_probe_summary.json"
 SO101_MODEL_BUNDLE_MANIFEST_SUMMARY_NAME = "so101_model_bundle_manifest_summary.json"
+SO101_MODEL_BUNDLE_MANIFEST_REVIEW_PACKET_JSON_NAME = (
+    "so101_model_bundle_manifest_review_packet.json"
+)
+SO101_MODEL_BUNDLE_MANIFEST_REVIEW_PACKET_CSV_NAME = (
+    "so101_model_bundle_manifest_review_packet.csv"
+)
 SO101_MODEL_CONTRACT_SUMMARY_NAME = "so101_model_contract_summary.json"
 SO101_REVIEWED_MODEL_AUTHORITY_GATE_SCHEMA = "lerobot.sim.so101_reviewed_model_authority_gate.v1"
 SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME = "so101_reviewed_model_authority_gate"
@@ -1362,6 +1368,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json`",
         "- `so101_model_bundle_manifest/so101_model_bundle_manifest_summary.json`",
         "- `so101_model_bundle_manifest/so101_model_bundle_manifest_checklist.csv`",
+        f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_REVIEW_PACKET_JSON_NAME}`",
+        f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_REVIEW_PACKET_CSV_NAME}`",
         "- `so101_model_bundle_manifest/README.md`",
         f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_SUMMARY_NAME}`",
         f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_CHECKLIST_NAME}`",
@@ -3321,6 +3329,20 @@ def so101_model_bundle_manifest_section(
         "physical_authority_blockers": bundle.get("physical_authority_blockers"),
         "hardware_free_regression_fixture_ready": bundle.get("hardware_free_regression_fixture_ready"),
         "synthetic_fixture_authority_fields": bundle.get("synthetic_fixture_authority_fields"),
+        "review_packet_status": bundle.get("review_packet_status"),
+        "review_packet_model_authority": bundle.get("review_packet_model_authority"),
+        "review_packet_item_count": bundle.get("review_packet_item_count"),
+        "review_packet_item_ids": bundle.get("review_packet_item_ids"),
+        "review_packet_needs_operator_review_item_ids": bundle.get(
+            "review_packet_needs_operator_review_item_ids"
+        ),
+        "review_packet_action_ids": bundle.get("review_packet_action_ids"),
+        "review_packet_observed_evidence_is_authority": bundle.get(
+            "review_packet_observed_evidence_is_authority"
+        ),
+        "review_packet_development_fixture_evidence_not_physical_so101_truth": bundle.get(
+            "review_packet_development_fixture_evidence_not_physical_so101_truth"
+        ),
         "next_required_for_goal": bundle.get("next_required_for_goal"),
         "manifest_request": {
             "status": manifest_request.get("status"),
@@ -3414,6 +3436,8 @@ def so101_model_bundle_manifest_section(
             if isinstance(artifacts.get("summary_json"), str)
             else str(summary_path),
             "checklist_csv": artifacts.get("checklist_csv"),
+            "review_packet_json": artifacts.get("review_packet_json"),
+            "review_packet_csv": artifacts.get("review_packet_csv"),
             "readme_md": artifacts.get("readme_md"),
         },
         "hardware_skipped": bundle.get("hardware_skipped"),

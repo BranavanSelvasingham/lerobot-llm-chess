@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA = "lerobot.sim.so101_model_bundle_manifest.v1"
+REVIEW_PACKET_SCHEMA = "lerobot.sim.so101_model_bundle_manifest_review_packet.v1"
 DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "so101_model_bundle_manifest"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_CHECKER_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_contract.py"
@@ -382,6 +383,17 @@ CSV_FIELDNAMES = (
     "diagnostics",
     "notes",
 )
+REVIEW_PACKET_FIELDNAMES = (
+    "priority",
+    "review_item_id",
+    "gate",
+    "status",
+    "manifest_fields",
+    "missing_inputs",
+    "review_action_ids",
+    "observed_evidence",
+    "caveat",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -445,6 +457,17 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow({field: csv_value(row.get(field)) for field in CSV_FIELDNAMES})
+
+
+def write_review_packet_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=REVIEW_PACKET_FIELDNAMES)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(
+                {field: csv_value(row.get(field)) for field in REVIEW_PACKET_FIELDNAMES}
+            )
 
 
 def row(
@@ -1805,6 +1828,150 @@ def build_physical_authority_blockers(
     return blockers
 
 
+def review_packet_status(summary: dict[str, Any]) -> str:
+    if summary["manifest_request"]["status"] != "model_bundle_manifest_loaded":
+        return "review_packet_waiting_for_manifest"
+    if summary["physical_so101_model_authority_ready"] is True:
+        return "review_packet_physical_authority_ready"
+    if summary["hardware_free_regression_fixture_ready"] is True:
+        return "review_packet_hardware_free_fixture_ready_not_physical_authority"
+    return "review_packet_manifest_needs_operator_review"
+
+
+def review_packet_manifest_fields(row_value: dict[str, Any]) -> list[str]:
+    requirement_id = row_value["requirement_id"]
+    if requirement_id == "manifest_path":
+        return ["--manifest-path"]
+    if requirement_id == "model_path":
+        return ["model_path"]
+    if requirement_id == "asset_roots":
+        return ["asset_roots"]
+    if requirement_id == "authority":
+        return ["authority"]
+    if requirement_id == "provenance":
+        return ["provenance"]
+    if requirement_id == "joint_limits_deg":
+        return list(JOINT_LIMIT_FIELDS + JOINT_LIMIT_REVIEW_FIELDS)
+    if requirement_id == "mesh_assets":
+        return ["asset_roots", *MESH_ASSET_REVIEW_FIELDS]
+    if requirement_id == "target_frame":
+        return ["target_frame", *TARGET_FRAME_REVIEW_FIELDS]
+    if requirement_id == "tcp_offset_m":
+        return list(TCP_OFFSET_FIELDS + TCP_OFFSET_REVIEW_FIELDS)
+    if requirement_id == "base_to_board_transform":
+        return list(ALIGNMENT_FIELDS + ALIGNMENT_REVIEW_FIELDS)
+    if requirement_id == "contract_checker_result":
+        return ["model_path", "asset_roots", "target_frame"]
+    if requirement_id == "model_backed_ik_readiness":
+        return ["ready_for_model_backed_ik"]
+    return [requirement_id]
+
+
+def review_packet_action_map(next_required_for_goal: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    action_map: dict[str, list[dict[str, Any]]] = {}
+    for action in next_required_for_goal:
+        missing_input = action.get("missing_input")
+        if not isinstance(missing_input, str) or not missing_input:
+            continue
+        action_map.setdefault(missing_input, []).append(action)
+    return action_map
+
+
+def review_packet_row(
+    priority: int,
+    row_value: dict[str, Any],
+    action_map: dict[str, list[dict[str, Any]]],
+) -> dict[str, Any]:
+    missing_inputs = row_value.get("missing_inputs")
+    missing_inputs = missing_inputs if isinstance(missing_inputs, list) else []
+    actions = [
+        action
+        for missing_input in missing_inputs
+        for action in action_map.get(str(missing_input), [])
+    ]
+    first_missing_input = str(missing_inputs[0]) if missing_inputs else ""
+    return {
+        "priority": priority,
+        "review_item_id": row_value["requirement_id"],
+        "gate": NEXT_ACTIONS.get(first_missing_input, {}).get(
+            "gate",
+            "reviewed_model_authority"
+            if row_value["requirement_id"] != "contract_checker_result"
+            else "mujoco_scene_validity",
+        ),
+        "status": "reviewed_or_machine_ready"
+        if row_value["status"] == "ok"
+        else "needs_operator_review",
+        "manifest_fields": review_packet_manifest_fields(row_value),
+        "missing_inputs": missing_inputs,
+        "review_action_ids": [
+            action["action_id"]
+            for action in actions
+            if isinstance(action.get("action_id"), str) and action["action_id"]
+        ],
+        "observed_evidence": {
+            "category": row_value.get("category"),
+            "check_status": row_value.get("status"),
+            "observed_value": row_value.get("observed_value"),
+            "expected_value": row_value.get("expected_value"),
+            "diagnostics": row_value.get("diagnostics"),
+            "source": row_value.get("source"),
+        },
+        "caveat": (
+            "This item is machine-checked review evidence only. It does not create physical "
+            "SO-101 authority unless the manifest checker reports physical_so101_model_authority_ready true."
+        ),
+    }
+
+
+def build_review_packet(
+    summary: dict[str, Any],
+    rows: list[dict[str, Any]],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    action_map = review_packet_action_map(summary["next_required_for_goal"])
+    packet_rows = [
+        review_packet_row(index, row_value, action_map)
+        for index, row_value in enumerate(rows, start=1)
+    ]
+    review_action_ids = sorted(
+        {
+            action_id
+            for row_value in packet_rows
+            for action_id in row_value["review_action_ids"]
+        }
+    )
+    packet = {
+        "schema": REVIEW_PACKET_SCHEMA,
+        "ok": True,
+        "status": review_packet_status(summary),
+        "model_authority": "review_packet_not_authority",
+        "manifest_path": summary["manifest_request"]["path"],
+        "manifest_status": summary["status"],
+        "ready_for_model_backed_ik": summary["ready_for_model_backed_ik"],
+        "physical_so101_model_authority_ready": summary["physical_so101_model_authority_ready"],
+        "hardware_free_regression_fixture_ready": summary["hardware_free_regression_fixture_ready"],
+        "physical_authority_blockers": summary["physical_authority_blockers"],
+        "synthetic_fixture_authority_fields": summary["synthetic_fixture_authority_fields"],
+        "review_item_count": len(packet_rows),
+        "review_item_ids": [row_value["review_item_id"] for row_value in packet_rows],
+        "needs_operator_review_item_ids": [
+            row_value["review_item_id"]
+            for row_value in packet_rows
+            if row_value["status"] == "needs_operator_review"
+        ],
+        "review_action_ids": review_action_ids,
+        "review_items": packet_rows,
+        "observed_evidence_is_authority": False,
+        "development_fixture_evidence_not_physical_so101_truth": True,
+        "notes": [
+            "The packet is derived from the manifest checker's current field checks.",
+            "It is an operator review aid and not a reviewed model bundle.",
+            "Synthetic fixture readiness remains explicitly non-physical SO-101 authority.",
+        ],
+    }
+    return packet, packet_rows
+
+
 def build_checklist_rows(
     manifest_request: dict[str, Any],
     model_path: dict[str, Any],
@@ -2025,6 +2192,10 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         f"- `asset_preflight_unresolved_reference_count`: `{asset_preflight.get('unresolved_reference_count')}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `checklist_csv`: `{summary['artifacts']['checklist_csv']}`",
+        f"- `review_packet_status`: `{summary.get('review_packet_status')}`",
+        f"- `review_packet_item_count`: `{summary.get('review_packet_item_count')}`",
+        f"- `review_packet_json`: `{summary['artifacts'].get('review_packet_json')}`",
+        f"- `review_packet_csv`: `{summary['artifacts'].get('review_packet_csv')}`",
         f"- `contract_summary_json`: `{contract.get('artifacts', {}).get('summary_json')}`",
         "",
         "## Missing Inputs",
@@ -2194,17 +2365,43 @@ def main() -> int:
     summary_path = output_dir / "so101_model_bundle_manifest_summary.json"
     csv_path = output_dir / "so101_model_bundle_manifest_checklist.csv"
     readme_path = output_dir / "README.md"
+    review_packet_path = output_dir / "so101_model_bundle_manifest_review_packet.json"
+    review_packet_csv_path = output_dir / "so101_model_bundle_manifest_review_packet.csv"
     artifacts = {
         "summary_json": str(summary_path),
         "checklist_csv": str(csv_path),
         "readme_md": str(readme_path),
+        "review_packet_json": str(review_packet_path),
+        "review_packet_csv": str(review_packet_csv_path),
     }
 
     manifest, manifest_request = load_manifest(args.manifest_path)
     summary, rows = build_summary(manifest, manifest_request, args.python, output_dir, artifacts)
+    review_packet, review_packet_rows = build_review_packet(summary, rows)
+    summary.update(
+        {
+            "review_packet_status": review_packet["status"],
+            "review_packet_model_authority": review_packet["model_authority"],
+            "review_packet_item_count": review_packet["review_item_count"],
+            "review_packet_item_ids": review_packet["review_item_ids"],
+            "review_packet_needs_operator_review_item_ids": review_packet[
+                "needs_operator_review_item_ids"
+            ],
+            "review_packet_action_ids": review_packet["review_action_ids"],
+            "review_packet_observed_evidence_is_authority": review_packet[
+                "observed_evidence_is_authority"
+            ],
+            "review_packet_development_fixture_evidence_not_physical_so101_truth": review_packet[
+                "development_fixture_evidence_not_physical_so101_truth"
+            ],
+            "review_packet": review_packet,
+        }
+    )
 
     write_json(summary_path, summary)
     write_csv(csv_path, rows)
+    write_json(review_packet_path, review_packet)
+    write_review_packet_csv(review_packet_csv_path, review_packet_rows)
     write_markdown(readme_path, summary, rows)
 
     print(
@@ -2220,6 +2417,9 @@ def main() -> int:
                 "hardware_free_regression_fixture_ready": summary["hardware_free_regression_fixture_ready"],
                 "missing_inputs": summary["missing_inputs"],
                 "next_required_for_goal": summary["next_required_for_goal"],
+                "review_packet_status": summary["review_packet_status"],
+                "review_packet_item_count": summary["review_packet_item_count"],
+                "review_packet_action_ids": summary["review_packet_action_ids"],
                 "manifest_path": summary["manifest_request"]["path"],
                 "model_path": summary["model_path"]["path"],
                 "asset_roots": summary["asset_roots"]["asset_roots"],
@@ -2230,6 +2430,8 @@ def main() -> int:
                 "asset_preflight_status": summary["contract_checker"].get("model_asset_preflight", {}).get("status"),
                 "summary_json": str(summary_path),
                 "checklist_csv": str(csv_path),
+                "review_packet_json": str(review_packet_path),
+                "review_packet_csv": str(review_packet_csv_path),
                 "readme_md": str(readme_path),
             },
             sort_keys=True,

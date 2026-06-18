@@ -1298,6 +1298,10 @@ def so101_model_bundle_manifest_row(artifact: dict[str, Any]) -> list[Any]:
         compact_list(metrics.get("physical_authority_blockers")),
         metrics.get("hardware_free_regression_fixture_ready", ""),
         compact_list(metrics.get("synthetic_fixture_authority_fields")),
+        metrics.get("review_packet_status", ""),
+        metrics.get("review_packet_model_authority", ""),
+        metrics.get("review_packet_item_count", ""),
+        compact_list(metrics.get("review_packet_action_ids")),
         metrics.get("next_required_action_count", ""),
         compact_list(metrics.get("next_required_action_ids")),
         metrics.get("model_path", ""),
@@ -2883,6 +2887,8 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         "diagnostics. Manifest fields remain diagnostic-only unless "
         "`ready_for_model_backed_ik` is true; fixture-only readiness stays labeled separately "
         "from physical SO-101 model authority and explicit suite CLI model inputs take precedence."
+        " The manifest review packet is indexed as operator intake only and remains "
+        "`review_packet_not_authority`."
     )
     lines.extend(
         linked_table(
@@ -2899,6 +2905,10 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Authority Blockers",
                 "Fixture Ready",
                 "Synthetic Fields",
+                "Review Packet",
+                "Review Packet Authority",
+                "Review Items",
+                "Review Actions",
                 "Action Count",
                 "Next Actions",
                 "Model Path",

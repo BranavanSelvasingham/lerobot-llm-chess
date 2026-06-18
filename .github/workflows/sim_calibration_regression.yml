@@ -462,6 +462,27 @@ jobs:
               assert isinstance(action.get("gate"), str) and action["gate"], action
               assert isinstance(action.get("title"), str) and action["title"], action
               assert isinstance(action.get("detail"), str) and action["detail"], action
+          assert bundle_manifest["review_packet_status"] in {
+              "review_packet_waiting_for_manifest",
+              "review_packet_manifest_needs_operator_review",
+              "review_packet_hardware_free_fixture_ready_not_physical_authority",
+              "review_packet_physical_authority_ready",
+          }, bundle_manifest
+          assert bundle_manifest["review_packet_model_authority"] == "review_packet_not_authority", bundle_manifest
+          assert isinstance(bundle_manifest["review_packet_item_count"], int) and bundle_manifest["review_packet_item_count"] > 0, bundle_manifest
+          assert isinstance(bundle_manifest["review_packet_item_ids"], list) and bundle_manifest["review_packet_item_ids"], bundle_manifest
+          assert isinstance(bundle_manifest["review_packet_needs_operator_review_item_ids"], list), bundle_manifest
+          assert isinstance(bundle_manifest["review_packet_action_ids"], list), bundle_manifest
+          assert bundle_manifest["review_packet_observed_evidence_is_authority"] is False, bundle_manifest
+          assert bundle_manifest["review_packet_development_fixture_evidence_not_physical_so101_truth"] is True, bundle_manifest
+          if bundle_manifest["physical_so101_model_authority_ready"] is True:
+              assert bundle_manifest["review_packet_status"] == "review_packet_physical_authority_ready", bundle_manifest
+          elif bundle_manifest["hardware_free_regression_fixture_ready"] is True:
+              assert bundle_manifest["review_packet_status"] == "review_packet_hardware_free_fixture_ready_not_physical_authority", bundle_manifest
+          elif bundle_manifest["manifest_request"]["status"] == "model_bundle_manifest_loaded":
+              assert bundle_manifest["review_packet_status"] == "review_packet_manifest_needs_operator_review", bundle_manifest
+          else:
+              assert bundle_manifest["review_packet_status"] == "review_packet_waiting_for_manifest", bundle_manifest
           assert not (
               bundle_manifest["physical_so101_model_authority_ready"]
               and bundle_manifest["hardware_free_regression_fixture_ready"]
@@ -486,7 +507,7 @@ jobs:
               assert bundle_manifest["next_required_for_goal"][0]["action_id"] == "supply_reviewed_so101_model_bundle_manifest", bundle_manifest
               assert bundle_manifest["forwarding"]["diagnostic_only"] is True, bundle_manifest["forwarding"]
           bundle_artifacts = bundle_manifest["artifacts"]
-          for key in ("summary_json", "checklist_csv", "readme_md"):
+          for key in ("summary_json", "checklist_csv", "review_packet_json", "review_packet_csv", "readme_md"):
               assert isinstance(bundle_artifacts.get(key), str) and Path(bundle_artifacts[key]).is_file(), (
                   key,
                   bundle_artifacts,
@@ -1283,6 +1304,17 @@ jobs:
               assert isinstance(metrics.get("next_required_for_goal"), list), metrics
               assert isinstance(metrics.get("next_required_action_ids"), list), metrics
               assert metrics.get("next_required_action_count") == len(metrics.get("next_required_for_goal")), metrics
+              assert metrics.get("review_packet_status") in {
+                  "review_packet_waiting_for_manifest",
+                  "review_packet_manifest_needs_operator_review",
+                  "review_packet_hardware_free_fixture_ready_not_physical_authority",
+                  "review_packet_physical_authority_ready",
+              }, metrics
+              assert metrics.get("review_packet_model_authority") == "review_packet_not_authority", metrics
+              assert isinstance(metrics.get("review_packet_item_count"), int) and metrics.get("review_packet_item_count") > 0, metrics
+              assert isinstance(metrics.get("review_packet_item_ids"), list) and metrics.get("review_packet_item_ids"), metrics
+              assert metrics.get("review_packet_observed_evidence_is_authority") is False, metrics
+              assert metrics.get("review_packet_development_fixture_evidence_not_physical_so101_truth") is True, metrics
               if metrics.get("manifest_request_status") == "model_bundle_manifest_not_supplied":
                   assert metrics.get("next_required_action_ids", [None])[0] == "supply_reviewed_so101_model_bundle_manifest", metrics
               if metrics.get("ready_for_model_backed_ik") is True:
@@ -1297,6 +1329,20 @@ jobs:
           ), artifacts_by_category["so101_model_bundle_manifest"]
           assert any(
               row.get("label") == "so101_model_bundle_manifest:readme" and row.get("exists") is True
+              for row in artifacts_by_category["so101_model_bundle_manifest"]
+          ), artifacts_by_category["so101_model_bundle_manifest"]
+          assert any(
+              row.get("label") == "so101_model_bundle_manifest:review_packet"
+              and row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("review_packet_model_authority") == "review_packet_not_authority"
+              and row.get("metrics", {}).get("review_packet_observed_evidence_is_authority") is False
+              for row in artifacts_by_category["so101_model_bundle_manifest"]
+          ), artifacts_by_category["so101_model_bundle_manifest"]
+          assert any(
+              row.get("label") == "so101_model_bundle_manifest:review_packet_rows"
+              and row.get("kind") == "csv"
+              and row.get("exists") is True
               for row in artifacts_by_category["so101_model_bundle_manifest"]
           ), artifacts_by_category["so101_model_bundle_manifest"]
           assert any(

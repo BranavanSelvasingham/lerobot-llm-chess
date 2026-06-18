@@ -111,6 +111,8 @@ The script writes:
 
 - `so101_model_bundle_manifest_summary.json`
 - `so101_model_bundle_manifest_checklist.csv`
+- `so101_model_bundle_manifest_review_packet.json`
+- `so101_model_bundle_manifest_review_packet.csv`
 - `README.md`
 - `so101_model_contract/so101_model_contract_summary.json`
 - `so101_model_contract/so101_model_contract_checklist.csv`
@@ -138,6 +140,15 @@ authority is not ready, `physical_authority_blockers` contains the current
 reviewed-authority action IDs plus any
 `synthetic_fixture_authority_not_physical_so101:<field>` blockers that keep
 fixture-ready manifests from being treated as reviewed physical SO-101 truth.
+
+The manifest checker also writes
+`so101_model_bundle_manifest_review_packet.json` and `.csv`. This packet is
+derived from the current checklist rows and ordered `next_required_for_goal`
+actions, so a missing or incomplete manifest has a deterministic operator review
+queue. It always reports `model_authority: "review_packet_not_authority"`,
+`observed_evidence_is_authority: false`, and
+`development_fixture_evidence_not_physical_so101_truth: true`; it does not
+upgrade diagnostic manifest fields to reviewed SO-101 truth.
 
 Review evidence fields must be actual identifiers, dates, tickets, or URLs.
 Placeholder strings such as `TODO`, `TBD`, `unknown`, `placeholder`, or
