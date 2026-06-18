@@ -132,6 +132,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         "",
         f"- `status`: `{summary['status']}`",
         f"- `ready_manifest`: `{summary['fixtures']['ready_manifest_path']}`",
+        f"- `mismatched_model_sha_manifest`: `{summary['fixtures']['mismatched_model_sha_manifest_path']}`",
         f"- `placeholder_manifest`: `{summary['fixtures']['placeholder_manifest_path']}`",
         f"- `placeholder_review_manifest`: `{summary['fixtures']['placeholder_review_manifest_path']}`",
         f"- `thin_review_manifest`: `{summary['fixtures']['thin_review_manifest_path']}`",
@@ -356,6 +357,12 @@ def weak_review_manifest_payload(model_filename: str) -> dict[str, Any]:
     return payload
 
 
+def mismatched_model_sha_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["model_sha256"] = "0" * 64
+    return payload
+
+
 def placeholder_review_metadata_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     for review_field in (
@@ -439,6 +446,7 @@ def invalid_alignment_transform_manifest_payload(model_filename: str) -> dict[st
 def create_fixtures(output_dir: Path) -> dict[str, Path]:
     fixture_dir = output_dir / "fixtures"
     bundle_dir = fixture_dir / "ready_bundle"
+    mismatched_model_sha_dir = fixture_dir / "mismatched_model_sha_bundle"
     placeholder_dir = fixture_dir / "placeholder_bundle"
     placeholder_review_dir = fixture_dir / "placeholder_review_bundle"
     thin_review_dir = fixture_dir / "thin_review_bundle"
@@ -456,6 +464,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
 
     for root in (
         bundle_dir,
+        mismatched_model_sha_dir,
         placeholder_dir,
         placeholder_review_dir,
         thin_review_dir,
@@ -479,6 +488,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
 
     ready_model_path = bundle_dir / "model" / "synthetic_so101_mujoco.xml"
     ready_model_path.write_text(mjcf_with_mesh_reference())
+    mismatched_model_sha_model_path = (
+        mismatched_model_sha_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    mismatched_model_sha_model_path.write_text(mjcf_with_mesh_reference())
     placeholder_review_model_path = placeholder_review_dir / "model" / "synthetic_so101_mujoco.xml"
     placeholder_review_model_path.write_text(mjcf_with_mesh_reference())
     thin_review_model_path = thin_review_dir / "model" / "synthetic_so101_mujoco.xml"
@@ -510,6 +523,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     placeholder_model_path = placeholder_dir / "model" / "synthetic_so101.urdf"
 
     ready_manifest_path = bundle_dir / "so101_model_bundle.ready.json"
+    mismatched_model_sha_manifest_path = (
+        mismatched_model_sha_dir / "so101_model_bundle.mismatched_model_sha.json"
+    )
     placeholder_manifest_path = placeholder_dir / "so101_model_bundle.placeholder.json"
     placeholder_review_manifest_path = placeholder_review_dir / "so101_model_bundle.placeholder_review.json"
     thin_review_manifest_path = thin_review_dir / "so101_model_bundle.thin_review.json"
@@ -529,6 +545,12 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         ready_manifest_path,
         manifest_payload(ready=True, model_filename=ready_model_path.name),
         ready_model_path,
+    )
+    write_json(
+        mismatched_model_sha_manifest_path,
+        mismatched_model_sha_manifest_payload(
+            model_filename=mismatched_model_sha_model_path.name
+        ),
     )
     write_manifest_json(placeholder_manifest_path, manifest_payload(ready=False), placeholder_model_path)
     write_manifest_json(
@@ -594,6 +616,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
 
     return {
         "ready_manifest_path": ready_manifest_path,
+        "mismatched_model_sha_manifest_path": mismatched_model_sha_manifest_path,
         "placeholder_manifest_path": placeholder_manifest_path,
         "placeholder_review_manifest_path": placeholder_review_manifest_path,
         "thin_review_manifest_path": thin_review_manifest_path,
@@ -608,6 +631,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "weak_alignment_manifest_path": weak_alignment_manifest_path,
         "invalid_alignment_manifest_path": invalid_alignment_manifest_path,
         "ready_model_path": ready_model_path,
+        "mismatched_model_sha_model_path": mismatched_model_sha_model_path,
         "ready_asset_root": bundle_dir / "assets",
         "placeholder_review_model_path": placeholder_review_model_path,
         "thin_review_model_path": thin_review_model_path,
@@ -1047,6 +1071,40 @@ def summarize_case(
         assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
         assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
         assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
+    elif expectation == "mismatched_model_sha_not_forwarded":
+        assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_not_ready",
+        )
+        assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
+        assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
+        assert_equal(
+            errors,
+            f"{case_id}.diagnostic_reason",
+            forwarding.get("diagnostic_only_reason"),
+            "bundle_not_ready_for_model_backed_ik:model_bundle_manifest_needs_follow_up",
+        )
+        assert_false(errors, f"{case_id}.used_for_downstream_contract", forwarding.get("used_for_downstream_contract"))
+        assert_equal(errors, f"{case_id}.ik_model_path_source", forwarding.get("ik_model_path_source"), "not_supplied")
+        assert_equal(errors, f"{case_id}.model_identity_status", get_nested(bundle, ("model_identity", "status")), "invalid")
+        assert_false(errors, f"{case_id}.model_identity_matches", get_nested(bundle, ("model_identity", "matches")))
+        missing_inputs = bundle.get("missing_inputs")
+        if not isinstance(missing_inputs, list) or "model_sha256" not in missing_inputs:
+            errors.append(f"{case_id}.missing_inputs: expected model_sha256, got {missing_inputs!r}")
+        diagnostics = get_nested(bundle, ("model_identity", "diagnostics"), [])
+        if "model_sha256_mismatch" not in diagnostics:
+            errors.append(f"{case_id}.model_identity_diagnostic_missing:{diagnostics!r}")
+        assert_equal(errors, f"{case_id}.authority_status", bundle.get("authority_status"), "present")
+        assert_equal(errors, f"{case_id}.provenance_status", bundle.get("provenance_status"), "present")
+        assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
+        assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
+        assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
+        assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
     elif expectation == "placeholder_review_metadata_not_forwarded":
         assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
         assert_equal(
@@ -1595,6 +1653,12 @@ def main() -> int:
             "manifest_path": fixtures["ready_manifest_path"],
             "explicit_model_path": fixtures["explicit_model_path"],
             "expectation": "explicit_cli_precedence",
+        },
+        {
+            "case_id": "mismatched_model_sha_not_forwarded",
+            "manifest_path": fixtures["mismatched_model_sha_manifest_path"],
+            "explicit_model_path": None,
+            "expectation": "mismatched_model_sha_not_forwarded",
         },
         {
             "case_id": "placeholder_manifest_not_forwarded",

@@ -395,11 +395,13 @@ gate to report `reviewed_mujoco_bundle_motion_checked` for the ready MJCF
 fixture while preserving `hardware_free_fixture_motion_checked` as non-physical
 SO-101 authority, requires explicit `--ik-model-path` to take precedence and
 leave the ready manifest diagnostic-only for downstream IK/contract forwarding,
-requires incomplete placeholder-alignment, placeholder-review, and thin-review
-manifests to remain not ready and not forward, requires accepted review metadata
-to include reviewer identity plus at least one trace field (`reviewed_at`,
-`review_id`, or `review_url`), requires the current simulator-contract target frame
-`gripper_frame_link` to be declared and visible in the actual model before
+requires a ready-shaped manifest with mismatched `model_sha256` to remain not
+ready and not forward, requires incomplete placeholder-alignment,
+placeholder-review, and thin-review manifests to remain not ready and not
+forward, requires accepted review metadata to include reviewer identity plus at
+least one trace field (`reviewed_at`, `review_id`, or `review_url`), requires
+the current simulator-contract target frame `gripper_frame_link` to be declared
+and visible in the actual model before
 forwarding, requires malformed TCP-offset and base-to-board transform payloads
 to remain diagnostic-only instead of forwarding to downstream contract/IK
 checks, and requires
