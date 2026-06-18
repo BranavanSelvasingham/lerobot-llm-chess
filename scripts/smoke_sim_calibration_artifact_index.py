@@ -27,23 +27,24 @@ CATEGORY_ORDER = {
     "perception_fixture": 13,
     "sim_camera_pose_fixture": 14,
     "so101_model_source_inventory": 15,
-    "so101_model_bundle_manifest": 16,
-    "so101_reviewed_mujoco_bundle": 17,
-    "so101_model_contract": 18,
-    "so101_model_asset_preflight": 19,
-    "ik_reachability": 20,
-    "so101_mujoco_scene": 21,
-    "so101_chess_env": 22,
-    "so101_env_resets": 23,
-    "so101_mujoco_contact_probe": 24,
-    "so101_mujoco_grasp_probe": 25,
-    "so101_mujoco_board_pick_probe": 26,
-    "so101_training_rollouts": 27,
-    "gripper_camera_pov": 28,
-    "app_entrypoint": 29,
-    "pick_place_scenario": 30,
-    "negative_check": 31,
-    "logs": 32,
+    "so101_model_bundle_probe": 16,
+    "so101_model_bundle_manifest": 17,
+    "so101_reviewed_mujoco_bundle": 18,
+    "so101_model_contract": 19,
+    "so101_model_asset_preflight": 20,
+    "ik_reachability": 21,
+    "so101_mujoco_scene": 22,
+    "so101_chess_env": 23,
+    "so101_env_resets": 24,
+    "so101_mujoco_contact_probe": 25,
+    "so101_mujoco_grasp_probe": 26,
+    "so101_mujoco_board_pick_probe": 27,
+    "so101_training_rollouts": 28,
+    "gripper_camera_pov": 29,
+    "app_entrypoint": 30,
+    "pick_place_scenario": 31,
+    "negative_check": 32,
+    "logs": 33,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -2643,6 +2644,87 @@ def collect_so101_model_source_inventory_artifacts(
     }
 
 
+def collect_so101_model_bundle_probe_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    probe = suite.get("so101_model_bundle_probe")
+    probe = probe if isinstance(probe, dict) else {}
+    artifact_paths = probe.get("artifacts")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    metrics = {
+        "status": probe.get("status"),
+        "ok": probe.get("ok"),
+        "model_authority": probe.get("model_authority"),
+        "selected_model_path": probe.get("selected_model_path"),
+        "model_request_status": probe.get("model_request_status"),
+        "contract_status": probe.get("contract_status"),
+        "asset_preflight_status": probe.get("asset_preflight_status"),
+        "asset_preflight_mesh_reference_count": probe.get("asset_preflight_mesh_reference_count"),
+        "asset_preflight_present_asset_count": probe.get("asset_preflight_present_asset_count"),
+        "asset_preflight_missing_asset_count": probe.get("asset_preflight_missing_asset_count"),
+        "asset_preflight_unresolved_reference_count": probe.get(
+            "asset_preflight_unresolved_reference_count"
+        ),
+        "observed_source_hints_status": probe.get("observed_source_hints_status"),
+        "observed_source_hints_export_tool_hints": probe.get(
+            "observed_source_hints_export_tool_hints"
+        ),
+        "observed_source_hints_license_status": probe.get("observed_source_hints_license_status"),
+        "observed_joint_limits_status": probe.get("observed_joint_limits_status"),
+        "observed_joint_limits_complete": probe.get("observed_joint_limits_complete"),
+        "observed_joint_limits_missing_joints": probe.get("observed_joint_limits_missing_joints"),
+        "mesh_asset_review_status": probe.get("mesh_asset_review_status"),
+        "mesh_asset_review_unique_missing_reference_count": probe.get(
+            "mesh_asset_review_unique_missing_reference_count"
+        ),
+        "mesh_asset_review_unique_unresolved_reference_count": probe.get(
+            "mesh_asset_review_unique_unresolved_reference_count"
+        ),
+        "manifest_status": probe.get("manifest_status"),
+        "ready_for_model_backed_ik": probe.get("ready_for_model_backed_ik"),
+        "missing_inputs": probe.get("missing_inputs"),
+        "next_required_for_goal": probe.get("next_required_for_goal"),
+        "next_required_action_ids": probe.get("next_required_action_ids"),
+        "next_required_action_count": len(probe.get("next_required_for_goal") or []),
+    }
+    for key, label_suffix in (
+        ("summary_json", "summary"),
+        ("candidate_manifest_json", "candidate_manifest"),
+        ("checklist_csv", "checklist"),
+        ("readme_md", "readme"),
+        ("contract_summary_json", "child_contract_summary"),
+        ("contract_checklist_csv", "child_contract_checklist"),
+        ("manifest_check_summary_json", "child_manifest_summary"),
+        ("manifest_checklist_csv", "child_manifest_checklist"),
+    ):
+        add_path(
+            artifacts,
+            category="so101_model_bundle_probe",
+            label=f"so101_model_bundle_probe:{label_suffix}",
+            value=artifact_paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"so101_model_bundle_probe.artifacts.{key}",
+            metrics=metrics,
+        )
+    return {
+        **metrics,
+        "summary_path": artifact_paths.get("summary_json") or probe.get("summary_path"),
+        "candidate_manifest_path": artifact_paths.get("candidate_manifest_json"),
+        "checklist_csv_path": artifact_paths.get("checklist_csv"),
+        "readme_md_path": artifact_paths.get("readme_md"),
+        "contract_summary_path": artifact_paths.get("contract_summary_json"),
+        "manifest_check_summary_path": artifact_paths.get("manifest_check_summary_json"),
+        "artifact_paths": artifact_paths,
+    }
+
+
 def collect_app_entrypoint_artifacts(
     *,
     suite: dict[str, Any],
@@ -3167,6 +3249,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    so101_model_bundle_probe = collect_so101_model_bundle_probe_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
     so101_model_bundle_manifest = collect_so101_model_bundle_manifest_artifacts(
         suite=suite,
         artifacts=artifacts,
@@ -3356,6 +3445,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "visual_review": visual_review,
         "sim_camera_pose_fixture_metadata_contract": sim_camera_pose_metadata_contract,
         "so101_model_source_inventory": so101_model_source_inventory,
+        "so101_model_bundle_probe": so101_model_bundle_probe,
         "so101_model_bundle_manifest": so101_model_bundle_manifest,
         "so101_reviewed_mujoco_bundle": so101_reviewed_mujoco_bundle,
         "so101_model_contract": so101_model_contract,

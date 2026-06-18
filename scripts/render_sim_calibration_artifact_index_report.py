@@ -28,23 +28,24 @@ CATEGORY_ORDER = {
     "perception_fixture": 13,
     "sim_camera_pose_fixture": 14,
     "so101_model_source_inventory": 15,
-    "so101_model_bundle_manifest": 16,
-    "so101_reviewed_mujoco_bundle": 17,
-    "so101_model_contract": 18,
-    "so101_model_asset_preflight": 19,
-    "ik_reachability": 20,
-    "so101_mujoco_scene": 21,
-    "so101_chess_env": 22,
-    "so101_env_resets": 23,
-    "so101_mujoco_contact_probe": 24,
-    "so101_mujoco_grasp_probe": 25,
-    "so101_mujoco_board_pick_probe": 26,
-    "so101_training_rollouts": 27,
-    "gripper_camera_pov": 28,
-    "app_entrypoint": 29,
-    "pick_place_scenario": 30,
-    "negative_check": 31,
-    "logs": 32,
+    "so101_model_bundle_probe": 16,
+    "so101_model_bundle_manifest": 17,
+    "so101_reviewed_mujoco_bundle": 18,
+    "so101_model_contract": 19,
+    "so101_model_asset_preflight": 20,
+    "ik_reachability": 21,
+    "so101_mujoco_scene": 22,
+    "so101_chess_env": 23,
+    "so101_env_resets": 24,
+    "so101_mujoco_contact_probe": 25,
+    "so101_mujoco_grasp_probe": 26,
+    "so101_mujoco_board_pick_probe": 27,
+    "so101_training_rollouts": 28,
+    "gripper_camera_pov": 29,
+    "app_entrypoint": 30,
+    "pick_place_scenario": 31,
+    "negative_check": 32,
+    "logs": 33,
 }
 CATEGORY_LABELS = {
     "reference_media_inventory": "Reference Media Inventory",
@@ -63,6 +64,7 @@ CATEGORY_LABELS = {
     "perception_fixture": "Perception Fixture Evidence",
     "sim_camera_pose_fixture": "SimCamera Pose Fixture",
     "so101_model_source_inventory": "SO-101 Model Source Inventory",
+    "so101_model_bundle_probe": "SO-101 Model Bundle Probe",
     "so101_model_bundle_manifest": "SO-101 Model Bundle Manifest",
     "so101_reviewed_mujoco_bundle": "SO-101 Reviewed MuJoCo Bundle",
     "so101_model_contract": "SO-101 Model Contract",
@@ -1282,6 +1284,35 @@ def so101_model_bundle_manifest_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("asset_preflight_status", ""),
         metrics.get("diagnostic_only", ""),
         metrics.get("diagnostic_only_reason", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def so101_model_bundle_probe_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("model_authority", ""),
+        metrics.get("selected_model_path", ""),
+        metrics.get("model_request_status", ""),
+        metrics.get("contract_status", ""),
+        metrics.get("asset_preflight_status", ""),
+        metrics.get("asset_preflight_mesh_reference_count", ""),
+        metrics.get("asset_preflight_missing_asset_count", ""),
+        metrics.get("asset_preflight_unresolved_reference_count", ""),
+        metrics.get("observed_source_hints_status", ""),
+        metrics.get("observed_joint_limits_status", ""),
+        metrics.get("observed_joint_limits_complete", ""),
+        metrics.get("mesh_asset_review_status", ""),
+        metrics.get("manifest_status", ""),
+        metrics.get("ready_for_model_backed_ik", ""),
+        metrics.get("next_required_action_count", ""),
+        compact_list(metrics.get("next_required_action_ids")),
         "ok" if artifact.get("exists") is True else "missing",
     ]
 
@@ -2697,6 +2728,46 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         )
         if so101_model_source_inventory
         else ["_No SO-101 model source inventory artifacts indexed._"]
+    )
+
+    so101_model_bundle_probe = grouped.get("so101_model_bundle_probe", [])
+    lines.extend(["", "### SO-101 Model Bundle Probe"])
+    lines.append(
+        "This hardware-free child turns a selected candidate model path, when one exists, "
+        "into a candidate bundle manifest draft and nested contract/manifest diagnostics. "
+        "With no selected model it still emits a template artifact. Probe output is "
+        "review scaffolding only and does not create source authority, physical model "
+        "authority, or physical reviewed MuJoCo motion evidence."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Authority",
+                "Selected Model",
+                "Model Request",
+                "Contract",
+                "Asset Preflight",
+                "Mesh Refs",
+                "Missing Mesh",
+                "Unresolved Mesh",
+                "Source Hints",
+                "Joint Limits",
+                "Limits Complete",
+                "Mesh Review",
+                "Manifest Status",
+                "Ready",
+                "Action Count",
+                "Next Actions",
+                "Artifact Status",
+            ],
+            [so101_model_bundle_probe_row(row) for row in so101_model_bundle_probe],
+        )
+        if so101_model_bundle_probe
+        else ["_No SO-101 model bundle probe artifacts indexed._"]
     )
 
     so101_model_bundle_manifest = grouped.get("so101_model_bundle_manifest", [])

@@ -29,6 +29,13 @@ strings. It never copies or imports model assets. It writes:
 - `so101_model_contract/so101_model_asset_preflight/so101_model_asset_preflight_summary.json`
 - `so101_model_bundle_manifest_check/so101_model_bundle_manifest_summary.json`
 
+The integrated calibration regression suite also runs this probe under
+`so101_model_bundle_probe/` after the model-source inventory. Default CI leaves
+the selected model path empty and preserves a no-model candidate manifest
+template as review scaffolding; when the inventory recommends a candidate, the
+suite forwards that candidate to the probe without upgrading it to reviewed
+authority.
+
 The saved probe summary repeats the review-critical fields at top level:
 `model_authority`, `model_request_status`, `contract_status`,
 `asset_preflight_status`, asset-preflight mesh/present/missing/unresolved

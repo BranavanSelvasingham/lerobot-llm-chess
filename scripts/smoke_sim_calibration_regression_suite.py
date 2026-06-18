@@ -53,6 +53,8 @@ EVIDENCE_BUNDLE_MD_NAME = "sim_evidence_bundle.md"
 EVIDENCE_BUNDLE_JSON_NAME = "sim_evidence_bundle.json"
 IK_REACHABILITY_SUMMARY_NAME = "ik_reachability_drill_summary.json"
 SO101_MODEL_SOURCE_INVENTORY_SUMMARY_NAME = "so101_model_source_inventory_summary.json"
+SO101_MODEL_BUNDLE_PROBE_DIR_NAME = "so101_model_bundle_probe"
+SO101_MODEL_BUNDLE_PROBE_SUMMARY_NAME = "so101_model_bundle_probe_summary.json"
 SO101_MODEL_BUNDLE_MANIFEST_SUMMARY_NAME = "so101_model_bundle_manifest_summary.json"
 SO101_MODEL_CONTRACT_SUMMARY_NAME = "so101_model_contract_summary.json"
 SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME = "so101_reviewed_mujoco_bundle"
@@ -698,6 +700,39 @@ def so101_model_source_inventory_command(
     return command
 
 
+def recommended_contract_model_path(inventory: dict[str, Any] | None) -> Path | None:
+    inventory = inventory if isinstance(inventory, dict) else {}
+    recommended = inventory.get("recommended_contract_check")
+    recommended = recommended if isinstance(recommended, dict) else {}
+    candidate_path = recommended.get("candidate_path")
+    return path_from_string(candidate_path)
+
+
+def so101_model_bundle_probe_command(
+    *,
+    python: str,
+    probe_dir: Path,
+    model_path: Path | None,
+    asset_roots: list[Path],
+    target_frame: str,
+) -> list[str]:
+    command = [
+        python,
+        str(REPO_ROOT / "scripts" / "smoke_sim_so101_model_bundle_probe.py"),
+        "--output-dir",
+        str(probe_dir),
+        "--python",
+        python,
+        "--target-frame",
+        target_frame,
+    ]
+    if model_path is not None:
+        command.extend(["--model-path", str(model_path.expanduser())])
+    for asset_root in asset_roots:
+        command.extend(["--asset-root", str(asset_root.expanduser())])
+    return command
+
+
 def reference_media_inventory_command(
     *,
     python: str,
@@ -1193,6 +1228,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
     so101_inventory = so101_inventory if isinstance(so101_inventory, dict) else {}
     so101_source_config = so101_inventory.get("source_configuration")
     so101_source_config = so101_source_config if isinstance(so101_source_config, dict) else {}
+    so101_bundle_probe = summary.get("so101_model_bundle_probe")
+    so101_bundle_probe = so101_bundle_probe if isinstance(so101_bundle_probe, dict) else {}
     so101_bundle = summary.get("so101_model_bundle_manifest")
     so101_bundle = so101_bundle if isinstance(so101_bundle, dict) else {}
     so101_bundle_forwarding = so101_bundle.get("forwarding")
@@ -1321,6 +1358,10 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `so101_model_source_inventory/so101_model_source_inventory_summary.json`",
         "- `so101_model_source_inventory/so101_model_source_candidates.csv`",
         "- `so101_model_source_inventory/README.md`",
+        f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/{SO101_MODEL_BUNDLE_PROBE_SUMMARY_NAME}`",
+        f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/so101_model_bundle.candidate.json`",
+        f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/so101_model_bundle_probe_checklist.csv`",
+        f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/README.md`",
         "- `so101_model_contract/so101_model_contract_summary.json`",
         "- `so101_model_contract/so101_model_contract_checklist.csv`",
         "- `so101_model_contract/README.md`",
@@ -1596,6 +1637,21 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             f"authoritative roots "
             f"`{markdown_list_value(so101_source_config.get('authoritative_model_roots'))}`; "
             "`--ik-model-path` authority `false`."
+        ),
+        (
+            "- SO-101 model bundle probe: "
+            f"status `{so101_bundle_probe.get('status')}`; model_authority "
+            f"`{so101_bundle_probe.get('model_authority')}`; selected model "
+            f"`{so101_bundle_probe.get('selected_model_path') or 'none'}`; "
+            f"manifest status `{so101_bundle_probe.get('manifest_status')}`; "
+            f"ready_for_model_backed_ik "
+            f"`{markdown_bool(so101_bundle_probe.get('ready_for_model_backed_ik'))}`; "
+            f"next actions `{markdown_list_value(so101_bundle_probe.get('next_required_action_ids'))}`."
+        ),
+        (
+            "- SO-101 model bundle probe caveat: the generated candidate manifest is a "
+            "review draft only; it does not close source authority, physical model "
+            "authority, or physical reviewed MuJoCo motion."
         ),
         (
             "- SO-101 model bundle manifest evidence records the reviewed bundle request, "
@@ -3074,6 +3130,95 @@ def so101_model_source_inventory_section(
     }
 
 
+def so101_model_bundle_probe_section(
+    probe: dict[str, Any] | None,
+    summary_path: Path,
+    selected_model_path: Path | None,
+    asset_roots: list[Path],
+) -> dict[str, Any]:
+    probe = probe if isinstance(probe, dict) else {}
+    artifacts = probe.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    model_request = probe.get("model_request")
+    model_request = model_request if isinstance(model_request, dict) else {}
+    asset_root_config = probe.get("asset_roots")
+    asset_root_config = asset_root_config if isinstance(asset_root_config, dict) else {}
+    authority = probe.get("authority")
+    authority = authority if isinstance(authority, dict) else {}
+    provenance = probe.get("provenance")
+    provenance = provenance if isinstance(provenance, dict) else {}
+    contract_checker = probe.get("contract_checker")
+    contract_checker = contract_checker if isinstance(contract_checker, dict) else {}
+    manifest_checker = probe.get("manifest_checker")
+    manifest_checker = manifest_checker if isinstance(manifest_checker, dict) else {}
+    return {
+        "summary_path": str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(probe.get("ok", False)),
+        "status": probe.get("status"),
+        "model_authority": probe.get("model_authority"),
+        "selected_model_path": str(selected_model_path.expanduser()) if selected_model_path is not None else None,
+        "configured_asset_roots": [str(path.expanduser()) for path in asset_roots],
+        "model_request_status": probe.get("model_request_status"),
+        "model_request": model_request,
+        "contract_status": probe.get("contract_status"),
+        "asset_preflight_status": probe.get("asset_preflight_status"),
+        "asset_preflight_mesh_reference_count": probe.get("asset_preflight_mesh_reference_count"),
+        "asset_preflight_present_asset_count": probe.get("asset_preflight_present_asset_count"),
+        "asset_preflight_missing_asset_count": probe.get("asset_preflight_missing_asset_count"),
+        "asset_preflight_unresolved_reference_count": probe.get("asset_preflight_unresolved_reference_count"),
+        "observed_source_hints_status": probe.get("observed_source_hints_status"),
+        "observed_source_hints_onshape_urls": probe.get("observed_source_hints_onshape_urls"),
+        "observed_source_hints_export_tool_hints": probe.get("observed_source_hints_export_tool_hints"),
+        "observed_source_hints_license_status": probe.get("observed_source_hints_license_status"),
+        "observed_source_hints_license_path": probe.get("observed_source_hints_license_path"),
+        "observed_source_hints_sha256": probe.get("observed_source_hints_sha256"),
+        "observed_joint_limits_status": probe.get("observed_joint_limits_status"),
+        "observed_joint_limits_complete": probe.get("observed_joint_limits_complete"),
+        "observed_joint_limits_missing_joints": probe.get("observed_joint_limits_missing_joints"),
+        "mesh_asset_review_status": probe.get("mesh_asset_review_status"),
+        "mesh_asset_review_unique_missing_reference_count": probe.get(
+            "mesh_asset_review_unique_missing_reference_count"
+        ),
+        "mesh_asset_review_missing_references": probe.get("mesh_asset_review_missing_references"),
+        "mesh_asset_review_unique_unresolved_reference_count": probe.get(
+            "mesh_asset_review_unique_unresolved_reference_count"
+        ),
+        "mesh_asset_review_unresolved_references": probe.get("mesh_asset_review_unresolved_references"),
+        "manifest_status": probe.get("manifest_status"),
+        "ready_for_model_backed_ik": probe.get("ready_for_model_backed_ik"),
+        "missing_inputs": probe.get("missing_inputs") or [],
+        "next_required_for_goal": probe.get("next_required_for_goal") or [],
+        "next_required_action_ids": probe.get("next_required_action_ids") or [],
+        "authority": authority,
+        "provenance": provenance,
+        "asset_roots": asset_root_config,
+        "contract_checker": contract_checker,
+        "manifest_checker": manifest_checker,
+        "artifacts": {
+            "summary_json": artifacts.get("summary_json")
+            if isinstance(artifacts.get("summary_json"), str)
+            else str(summary_path),
+            "checklist_csv": artifacts.get("checklist_csv"),
+            "readme_md": artifacts.get("readme_md"),
+            "candidate_manifest_json": artifacts.get("candidate_manifest_json"),
+            "contract_summary_json": artifacts.get("contract_summary_json"),
+            "contract_checklist_csv": artifacts.get("contract_checklist_csv"),
+            "manifest_check_summary_json": artifacts.get("manifest_check_summary_json"),
+            "manifest_checklist_csv": artifacts.get("manifest_checklist_csv"),
+        },
+        "hardware_skipped": probe.get("hardware_skipped"),
+        "gui_skipped": probe.get("gui_skipped"),
+        "openai_skipped": probe.get("openai_skipped"),
+        "limitations": probe.get("limitations"),
+        "notes": [
+            "The suite-indexed bundle probe is a manifest drafting aid.",
+            "It never upgrades source authority or physical SO-101 authority on its own.",
+            "Use the generated candidate manifest only after replacing placeholders with reviewed authority, provenance, TCP, joint-limit, mesh, and board-alignment evidence.",
+        ],
+    }
+
+
 def so101_model_bundle_manifest_section(
     bundle: dict[str, Any] | None,
     summary_path: Path,
@@ -3861,6 +4006,28 @@ def main() -> int:
         expected_json_path=so101_model_source_inventory_summary_path,
     )
 
+    so101_model_bundle_probe_dir = output_dir / SO101_MODEL_BUNDLE_PROBE_DIR_NAME
+    so101_model_bundle_probe_summary_path = (
+        so101_model_bundle_probe_dir / SO101_MODEL_BUNDLE_PROBE_SUMMARY_NAME
+    )
+    so101_model_bundle_probe_model_path = recommended_contract_model_path(
+        so101_model_source_inventory
+    )
+    if so101_model_bundle_probe_model_path is None:
+        so101_model_bundle_probe_model_path = effective_ik_model_path
+    so101_model_bundle_probe_record, so101_model_bundle_probe = run_child(
+        name="so101_model_bundle_probe",
+        command=so101_model_bundle_probe_command(
+            python=python,
+            probe_dir=so101_model_bundle_probe_dir,
+            model_path=so101_model_bundle_probe_model_path,
+            asset_roots=effective_ik_model_asset_roots,
+            target_frame="gripper_frame_link",
+        ),
+        output_dir=so101_model_bundle_probe_dir,
+        expected_json_path=so101_model_bundle_probe_summary_path,
+    )
+
     so101_model_contract_dir = output_dir / "so101_model_contract"
     so101_model_contract_summary_path = so101_model_contract_dir / SO101_MODEL_CONTRACT_SUMMARY_NAME
     so101_model_contract_command = [
@@ -4112,6 +4279,7 @@ def main() -> int:
         "so101_model_bundle_manifest": so101_model_bundle_manifest_record,
         "so101_reviewed_mujoco_bundle": so101_reviewed_mujoco_bundle_record,
         "so101_model_source_inventory": so101_model_source_inventory_record,
+        "so101_model_bundle_probe": so101_model_bundle_probe_record,
         "so101_model_contract": so101_model_contract_record,
         "ik_reachability_drill": ik_reachability_record,
         "so101_mujoco_scene": so101_mujoco_scene_record,
@@ -4132,6 +4300,12 @@ def main() -> int:
         so101_model_source_inventory,
         so101_model_source_inventory_summary_path,
         so101_source_config,
+    )
+    so101_bundle_probe_section = so101_model_bundle_probe_section(
+        so101_model_bundle_probe,
+        so101_model_bundle_probe_summary_path,
+        so101_model_bundle_probe_model_path,
+        effective_ik_model_asset_roots,
     )
     so101_bundle_manifest_section = so101_model_bundle_manifest_section(
         so101_model_bundle_manifest,
@@ -4246,6 +4420,7 @@ def main() -> int:
             pose_fixture_summary_path,
         ),
         "so101_model_source_inventory": so101_source_inventory_section,
+        "so101_model_bundle_probe": so101_bundle_probe_section,
         "so101_model_bundle_manifest": so101_bundle_manifest_section,
         "so101_reviewed_mujoco_bundle": so101_reviewed_mujoco_bundle_section,
         "so101_reviewed_model_authority_gate": so101_reviewed_authority_gate,

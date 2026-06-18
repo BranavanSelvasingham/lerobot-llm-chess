@@ -606,6 +606,43 @@ jobs:
                   key,
                   source_inventory_artifacts,
               )
+          bundle_probe = summary["so101_model_bundle_probe"]
+          assert bundle_probe["ok"] is True, bundle_probe
+          assert bundle_probe["status"] in {
+              "candidate_model_missing",
+              "candidate_model_unavailable",
+              "candidate_manifest_needs_review",
+              "candidate_manifest_ready_for_model_backed_ik",
+          }, bundle_probe
+          assert bundle_probe["model_authority"] == "draft_candidate_not_reviewed", bundle_probe
+          assert bundle_probe["ready_for_model_backed_ik"] is False, bundle_probe
+          assert bundle_probe["manifest_status"] in {
+              "model_bundle_manifest_needs_follow_up",
+              "model_bundle_manifest_unavailable",
+              "model_bundle_manifest_parse_error",
+              "model_bundle_manifest_schema_error",
+          }, bundle_probe
+          assert isinstance(bundle_probe["missing_inputs"], list), bundle_probe
+          assert bundle_probe["missing_inputs"], bundle_probe
+          assert isinstance(bundle_probe["next_required_for_goal"], list), bundle_probe
+          assert isinstance(bundle_probe["next_required_action_ids"], list), bundle_probe
+          assert bundle_probe["next_required_action_ids"], bundle_probe
+          assert "supply_reviewed_so101_model_bundle_manifest" in source_inventory["next_required_action_ids"], source_inventory
+          probe_artifacts = bundle_probe["artifacts"]
+          for key in (
+              "summary_json",
+              "candidate_manifest_json",
+              "checklist_csv",
+              "readme_md",
+              "contract_summary_json",
+              "contract_checklist_csv",
+              "manifest_check_summary_json",
+              "manifest_checklist_csv",
+          ):
+              assert isinstance(probe_artifacts.get(key), str) and Path(probe_artifacts[key]).is_file(), (
+                  key,
+                  probe_artifacts,
+              )
           reviewed_model_authority_gate = summary["so101_reviewed_model_authority_gate"]
           assert reviewed_model_authority_gate["status"] in {
               "reviewed_model_authority_blocked",
@@ -879,6 +916,7 @@ jobs:
               "perception_fixture",
               "sim_camera_pose_fixture",
               "so101_model_source_inventory",
+              "so101_model_bundle_probe",
               "so101_model_bundle_manifest",
               "so101_reviewed_mujoco_bundle",
               "so101_model_contract",
@@ -1700,6 +1738,16 @@ jobs:
               f"- `authoritative_paths`: `{summary['so101_model_source_inventory']['source_configuration']['authoritative_model_paths']}`",
               f"- `authoritative_roots`: `{summary['so101_model_source_inventory']['source_configuration']['authoritative_model_roots']}`",
               "- `--ik-model-path` is forwarded only to the contract checker and IK drill, not to source authority.",
+              "",
+              "SO-101 model bundle probe:",
+              f"- `status`: `{summary['so101_model_bundle_probe']['status']}`",
+              f"- `model_authority`: `{summary['so101_model_bundle_probe']['model_authority']}`",
+              f"- `selected_model_path`: `{summary['so101_model_bundle_probe']['selected_model_path']}`",
+              f"- `model_request_status`: `{summary['so101_model_bundle_probe']['model_request_status']}`",
+              f"- `manifest_status`: `{summary['so101_model_bundle_probe']['manifest_status']}`",
+              f"- `ready_for_model_backed_ik`: `{summary['so101_model_bundle_probe']['ready_for_model_backed_ik']}`",
+              f"- `next_required_action_ids`: `{summary['so101_model_bundle_probe']['next_required_action_ids']}`",
+              "- The generated candidate manifest is a review draft and is not reviewed physical SO-101 authority.",
               "",
               "SO-101 model bundle manifest:",
               f"- `status`: `{summary['so101_model_bundle_manifest']['status']}`",
