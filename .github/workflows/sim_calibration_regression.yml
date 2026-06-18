@@ -89,6 +89,7 @@ env:
   CALIBRATION_REGRESSION_OUTPUT_DIR: "/tmp/lerobot_sim/calibration_regression_suite"
   SO101_SOURCE_AUTHORITY_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_source_authority_matrix"
   SO101_REVIEWED_AUTHORITY_GATE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_reviewed_authority_gate_matrix"
+  SO101_REVIEWED_MUJOCO_BUNDLE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_reviewed_mujoco_bundle_matrix"
   SO101_TRAINING_READINESS_GATE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_training_readiness_gate_matrix"
   CALIBRATION_REGRESSION_ARTIFACT_NAME: "sim-calibration-regression-${{ github.run_id }}"
   REFERENCE_MEDIA_ROOTS: ""
@@ -297,6 +298,58 @@ jobs:
           for relative_path in (
               "so101_reviewed_authority_gate_matrix_summary.json",
               "so101_reviewed_authority_gate_matrix_cases.csv",
+              "README.md",
+          ):
+              assert (summary_path.parent / relative_path).is_file(), relative_path
+          PY
+
+      - name: Run SO-101 reviewed MuJoCo bundle matrix
+        run: |
+          python scripts/smoke_sim_so101_reviewed_mujoco_bundle_matrix.py \
+            --output-dir "${SO101_REVIEWED_MUJOCO_BUNDLE_MATRIX_OUTPUT_DIR}" \
+            --python "$(python -c 'import sys; print(sys.executable)')"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          summary_path = Path(os.environ["SO101_REVIEWED_MUJOCO_BUNDLE_MATRIX_OUTPUT_DIR"]) / "so101_reviewed_mujoco_bundle_matrix_summary.json"
+          summary = json.loads(summary_path.read_text())
+          assert summary["ok"] is True, summary
+          assert summary["status"] == "ok", summary
+          assert summary["model_authority"] == "reviewed_mujoco_bundle_matrix_not_authority", summary
+          assert summary["observed_evidence_is_physical_so101_authority"] is False, summary
+          assert summary["hardware_skipped"] is True, summary
+          assert summary["gui_skipped"] is True, summary
+          assert summary["openai_skipped"] is True, summary
+          assert summary["case_ids"] == [
+              "missing_manifest_nonfailing",
+              "missing_manifest_require_ready_fails",
+              "placeholder_manifest_not_ready",
+              "ready_synthetic_fixture_motion_not_physical",
+          ], summary["case_ids"]
+          assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
+          by_case = {case["case_id"]: case for case in summary["cases"]}
+          missing = by_case["missing_manifest_nonfailing"]
+          assert missing["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", missing
+          assert missing["observations"]["motion_authority_status"] == "not_checked_manifest_not_ready", missing
+          assert missing["observations"]["reviewed_model_motion_checked"] is False, missing
+          require_ready = by_case["missing_manifest_require_ready_fails"]
+          assert require_ready["record"]["return_code"] == 1, require_ready
+          assert require_ready["observations"]["gate_ok"] is False, require_ready
+          assert require_ready["observations"]["status"] == "reviewed_mujoco_bundle_required_but_not_ready", require_ready
+          ready_fixture = by_case["ready_synthetic_fixture_motion_not_physical"]
+          assert ready_fixture["observations"]["status"] == "reviewed_mujoco_bundle_motion_checked", ready_fixture
+          assert ready_fixture["observations"]["reviewed_model_motion_checked"] is True, ready_fixture
+          assert ready_fixture["observations"]["physical_so101_model_authority_ready"] is False, ready_fixture
+          assert ready_fixture["observations"]["hardware_free_regression_fixture_ready"] is True, ready_fixture
+          assert ready_fixture["observations"]["motion_authority_status"] == "hardware_free_fixture_motion_checked_not_physical_so101_authority", ready_fixture
+          assert ready_fixture["observations"]["physical_reviewed_model_motion_checked"] is False, ready_fixture
+          assert ready_fixture["observations"]["hardware_free_fixture_motion_checked"] is True, ready_fixture
+          assert ready_fixture["observations"]["motion_evidence_not_physical_so101_authority"] is True, ready_fixture
+          for relative_path in (
+              "so101_reviewed_mujoco_bundle_matrix_summary.json",
+              "so101_reviewed_mujoco_bundle_matrix_cases.csv",
               "README.md",
           ):
               assert (summary_path.parent / relative_path).is_file(), relative_path
@@ -2543,5 +2596,6 @@ jobs:
             ${{ env.CALIBRATION_REGRESSION_OUTPUT_DIR }}
             ${{ env.SO101_SOURCE_AUTHORITY_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_REVIEWED_AUTHORITY_GATE_MATRIX_OUTPUT_DIR }}
+            ${{ env.SO101_REVIEWED_MUJOCO_BUNDLE_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_TRAINING_READINESS_GATE_MATRIX_OUTPUT_DIR }}
           if-no-files-found: warn
