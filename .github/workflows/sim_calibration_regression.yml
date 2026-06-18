@@ -815,6 +815,28 @@ jobs:
           ), reviewed_model_authority_gate
           assert isinstance(reviewed_model_authority_gate["blockers"], list), reviewed_model_authority_gate
           assert reviewed_model_authority_gate["blocker_count"] == len(reviewed_model_authority_gate["blockers"]), reviewed_model_authority_gate
+          assert isinstance(reviewed_model_authority_gate["next_required_for_goal"], list), reviewed_model_authority_gate
+          for index, action in enumerate(reviewed_model_authority_gate["next_required_for_goal"], start=1):
+              assert action["priority"] == index, action
+              assert isinstance(action.get("action_id"), str) and action["action_id"], action
+              assert isinstance(action.get("gate"), str) and action["gate"], action
+              assert isinstance(action.get("title"), str) and action["title"], action
+              assert isinstance(action.get("detail"), str) and action["detail"], action
+          assert isinstance(reviewed_model_authority_gate["next_required_action_ids"], list), reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["next_required_action_ids"] == [
+              action["action_id"] for action in reviewed_model_authority_gate["next_required_for_goal"]
+          ], reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["next_required_action_count"] == len(reviewed_model_authority_gate["next_required_for_goal"]), reviewed_model_authority_gate
+          for key in (
+              "source_authority_next_required_action_ids",
+              "physical_bundle_next_required_action_ids",
+              "reviewed_mujoco_next_required_action_ids",
+          ):
+              assert isinstance(reviewed_model_authority_gate[key], list), reviewed_model_authority_gate
+              assert all(
+                  action_id in reviewed_model_authority_gate["next_required_action_ids"]
+                  for action_id in reviewed_model_authority_gate[key]
+              ), reviewed_model_authority_gate
           assert isinstance(
               reviewed_model_authority_gate["development_fixture_evidence_not_physical_so101_truth"],
               bool,
@@ -834,6 +856,20 @@ jobs:
               & set(reviewed_model_authority_gate["blocker_packet_blocked_by_prior_requirements_item_ids"])
           ), reviewed_model_authority_gate
           assert isinstance(reviewed_model_authority_gate["blocker_packet_next_action_ids"], list), reviewed_model_authority_gate
+          assert all(
+              action_id in reviewed_model_authority_gate["next_required_action_ids"]
+              for action_id in reviewed_model_authority_gate["blocker_packet_next_action_ids"]
+          ), reviewed_model_authority_gate
+          if (
+              reviewed_model_authority_gate["source_authority_ready"] is False
+              and reviewed_model_authority_gate["source_authority_next_required_action_ids"]
+          ):
+              assert reviewed_model_authority_gate["blocker_packet_next_action_ids"][0] == reviewed_model_authority_gate["source_authority_next_required_action_ids"][0], reviewed_model_authority_gate
+          if (
+              reviewed_model_authority_gate["physical_so101_model_authority_ready"] is False
+              and reviewed_model_authority_gate["physical_bundle_next_required_action_ids"]
+          ):
+              assert reviewed_model_authority_gate["physical_bundle_next_required_action_ids"][0] in reviewed_model_authority_gate["blocker_packet_next_action_ids"], reviewed_model_authority_gate
           if reviewed_model_authority_gate["source_bundle_consistency_status"] == "not_checked_prerequisites_not_ready":
               assert "source_bundle_consistency" in reviewed_model_authority_gate["blocker_packet_blocked_by_prior_requirements_item_ids"], reviewed_model_authority_gate
           if reviewed_model_authority_gate["physical_so101_model_authority_ready"] is False:
@@ -845,12 +881,16 @@ jobs:
               assert reviewed_model_authority_gate["source_bundle_consistency_status"] == "source_bundle_model_path_consistent", reviewed_model_authority_gate
               assert reviewed_model_authority_gate["blocker_packet_action_required_count"] == 0, reviewed_model_authority_gate
               assert reviewed_model_authority_gate["blocker_packet_blocked_by_prior_requirements_count"] == 0, reviewed_model_authority_gate
+              assert reviewed_model_authority_gate["next_required_action_count"] == 0, reviewed_model_authority_gate
           else:
               assert reviewed_model_authority_gate["status"] == "reviewed_model_authority_blocked", reviewed_model_authority_gate
               assert reviewed_model_authority_gate["blockers"], reviewed_model_authority_gate
               assert reviewed_model_authority_gate["ready"] is False, reviewed_model_authority_gate
               assert reviewed_model_authority_gate["blocker_packet_action_required_count"] > 0, reviewed_model_authority_gate
               assert reviewed_model_authority_gate["blocker_packet_next_action_ids"], reviewed_model_authority_gate
+              assert reviewed_model_authority_gate["next_required_action_ids"], reviewed_model_authority_gate
+              if source_inventory["next_required_action_ids"]:
+                  assert reviewed_model_authority_gate["next_required_action_ids"][0] == source_inventory["next_required_action_ids"][0], reviewed_model_authority_gate
               assert (
                   reviewed_model_authority_gate["development_fixture_evidence_not_physical_so101_truth"]
                   is True
@@ -1511,6 +1551,36 @@ jobs:
                   & set(metrics.get("blocker_packet_blocked_by_prior_requirements_item_ids") or [])
               ), metrics
               assert isinstance(metrics.get("blocker_packet_next_action_ids"), list), metrics
+              assert isinstance(metrics.get("next_required_for_goal"), list), metrics
+              assert isinstance(metrics.get("next_required_action_ids"), list), metrics
+              assert metrics.get("next_required_action_ids") == [
+                  action.get("action_id") for action in metrics.get("next_required_for_goal")
+              ], metrics
+              assert metrics.get("next_required_action_count") == len(metrics.get("next_required_for_goal")), metrics
+              for key in (
+                  "source_authority_next_required_action_ids",
+                  "physical_bundle_next_required_action_ids",
+                  "reviewed_mujoco_next_required_action_ids",
+              ):
+                  assert isinstance(metrics.get(key), list), metrics
+                  assert all(
+                      action_id in metrics.get("next_required_action_ids")
+                      for action_id in metrics.get(key)
+                  ), metrics
+              assert all(
+                  action_id in metrics.get("next_required_action_ids")
+                  for action_id in metrics.get("blocker_packet_next_action_ids")
+              ), metrics
+              if (
+                  metrics.get("source_authority_ready") is False
+                  and metrics.get("source_authority_next_required_action_ids")
+              ):
+                  assert metrics.get("blocker_packet_next_action_ids")[0] == metrics.get("source_authority_next_required_action_ids")[0], metrics
+              if (
+                  metrics.get("physical_so101_model_authority_ready") is False
+                  and metrics.get("physical_bundle_next_required_action_ids")
+              ):
+                  assert metrics.get("physical_bundle_next_required_action_ids")[0] in metrics.get("blocker_packet_next_action_ids"), metrics
               if metrics.get("source_bundle_consistency_status") == "not_checked_prerequisites_not_ready":
                   assert "source_bundle_consistency" in metrics.get("blocker_packet_blocked_by_prior_requirements_item_ids"), metrics
               if metrics.get("physical_so101_model_authority_ready") is False:
@@ -1522,11 +1592,13 @@ jobs:
                   assert metrics.get("source_bundle_consistency_status") == "source_bundle_model_path_consistent", metrics
                   assert metrics.get("blocker_packet_action_required_count") == 0, metrics
                   assert metrics.get("blocker_packet_blocked_by_prior_requirements_count") == 0, metrics
+                  assert metrics.get("next_required_action_count") == 0, metrics
               else:
                   assert metrics.get("status") == "reviewed_model_authority_blocked", metrics
                   assert metrics.get("blockers"), metrics
                   assert metrics.get("blocker_packet_action_required_count") > 0, metrics
                   assert metrics.get("blocker_packet_next_action_ids"), metrics
+                  assert metrics.get("next_required_action_ids"), metrics
                   assert metrics.get("development_fixture_evidence_not_physical_so101_truth") is True, metrics
           assert any(
               row.get("kind") == "json"

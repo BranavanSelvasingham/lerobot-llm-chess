@@ -331,6 +331,36 @@ def unique_string_values(values: list[Any]) -> list[str]:
     return unique
 
 
+def prioritized_gate_actions(*action_groups: Any) -> list[dict[str, Any]]:
+    actions: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for group in action_groups:
+        if not isinstance(group, list):
+            continue
+        for action in group:
+            if not isinstance(action, dict):
+                continue
+            action_id = action.get("action_id")
+            if not isinstance(action_id, str) or not action_id or action_id in seen:
+                continue
+            seen.add(action_id)
+            actions.append(
+                {
+                    "priority": len(actions) + 1,
+                    "action_id": action_id,
+                    "gate": action.get("gate"),
+                    "title": action.get("title"),
+                    "detail": action.get("detail"),
+                    **(
+                        {"missing_input": action.get("missing_input")}
+                        if action.get("missing_input") not in (None, "")
+                        else {}
+                    ),
+                }
+            )
+    return actions
+
+
 def first_non_empty_mapping_value(value: dict[str, Any], field_names: tuple[str, ...]) -> Any:
     for field_name in field_names:
         field_value = value.get(field_name)
@@ -3730,6 +3760,70 @@ def so101_reviewed_model_authority_gate_section(
             ),
         ]
     )
+    consistency_actions = (
+        [
+            {
+                "action_id": "align_source_inventory_with_bundle_manifest_model_path",
+                "gate": "reviewed_model_authority",
+                "title": "Align source inventory and bundle model paths",
+                "detail": (
+                    "Use the same reviewed SO-101 model path in the source inventory "
+                    "and the reviewed bundle manifest before closing model authority."
+                ),
+            }
+        ]
+        if source_bundle_consistency.get("status") == "source_bundle_model_path_mismatch"
+        else []
+    )
+    motion_actions = (
+        [
+            {
+                "action_id": "load_reviewed_model_in_mujoco",
+                "gate": "mujoco_scene_validity",
+                "title": "Load the reviewed SO-101 model in MuJoCo",
+                "detail": (
+                    "Load the reviewed bundle in MuJoCo with the declared mesh roots, "
+                    "joint map, target frame, TCP offset, and base-to-board alignment."
+                ),
+            },
+            {
+                "action_id": "prove_physical_reviewed_model_motion",
+                "gate": "mujoco_scene_validity",
+                "title": "Prove reviewed SO-101 joint motion",
+                "detail": (
+                    "Move every reviewed SO-101 joint in MuJoCo without fallback behavior "
+                    "and record physical-reviewed motion evidence."
+                ),
+            },
+        ]
+        if not physical_reviewed_motion_ready
+        else []
+    )
+    next_required_for_goal = prioritized_gate_actions(
+        source_inventory.get("next_required_for_goal"),
+        bundle_manifest.get("next_required_for_goal"),
+        reviewed_mujoco_bundle.get("next_required_for_goal"),
+        consistency_actions,
+        motion_actions,
+    )
+    source_next_required = source_inventory.get("next_required_action_ids")
+    bundle_next_required = bundle_manifest.get("next_required_action_ids")
+    reviewed_mujoco_next_required = reviewed_mujoco_bundle.get("next_required_for_goal")
+    source_next_required_action_ids = unique_string_values(
+        source_next_required if isinstance(source_next_required, list) else []
+    )
+    physical_bundle_next_required_action_ids = unique_string_values(
+        bundle_next_required if isinstance(bundle_next_required, list) else []
+    )
+    reviewed_mujoco_next_required_action_ids = unique_string_values(
+        [
+            action.get("action_id")
+            for action in reviewed_mujoco_next_required
+            if isinstance(action, dict)
+        ]
+        if isinstance(reviewed_mujoco_next_required, list)
+        else []
+    )
     return {
         "status": "reviewed_model_authority_ready"
         if ready
@@ -3746,6 +3840,14 @@ def so101_reviewed_model_authority_gate_section(
         "reviewed_mujoco_bundle_status": reviewed_mujoco_bundle.get("status"),
         "blockers": blockers,
         "blocker_count": len(blockers),
+        "next_required_for_goal": next_required_for_goal,
+        "next_required_action_ids": [
+            action["action_id"] for action in next_required_for_goal
+        ],
+        "next_required_action_count": len(next_required_for_goal),
+        "source_authority_next_required_action_ids": source_next_required_action_ids,
+        "physical_bundle_next_required_action_ids": physical_bundle_next_required_action_ids,
+        "reviewed_mujoco_next_required_action_ids": reviewed_mujoco_next_required_action_ids,
         "source_inventory_summary_path": source_inventory.get("summary_path"),
         "bundle_manifest_summary_path": bundle_manifest.get("summary_path"),
         "reviewed_mujoco_bundle_summary_path": reviewed_mujoco_bundle.get("summary_path"),
@@ -3772,6 +3874,28 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
     physical_bundle_authority_ready = (
         gate.get("physical_so101_model_authority_ready") is True
     )
+    source_next_required_action_ids = gate.get("source_authority_next_required_action_ids")
+    source_next_required_action_ids = (
+        source_next_required_action_ids
+        if isinstance(source_next_required_action_ids, list)
+        else []
+    )
+    bundle_next_required_action_ids = gate.get("physical_bundle_next_required_action_ids")
+    bundle_next_required_action_ids = (
+        bundle_next_required_action_ids
+        if isinstance(bundle_next_required_action_ids, list)
+        else []
+    )
+    source_next_action_id = (
+        source_next_required_action_ids[0]
+        if source_next_required_action_ids
+        else "review_and_declare_authoritative_so101_model_source"
+    )
+    bundle_next_action_id = (
+        bundle_next_required_action_ids[0]
+        if bundle_next_required_action_ids
+        else "supply_reviewed_so101_model_bundle_manifest"
+    )
     item_specs = [
         {
             "item_id": "source_authority_ready",
@@ -3779,9 +3903,10 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
             "required_state": "source_authority_ready",
             "observed_ready": gate.get("source_authority_ready") is True,
             "evidence_artifact_path": gate.get("source_inventory_summary_path"),
-            "next_action_id": "review_and_declare_authoritative_so101_model_source",
+            "next_action_id": source_next_action_id,
             "operator_action": (
-                "Review provenance/license/source authority and rerun the source inventory "
+                "Scan or supply candidate SO-101 model-source roots, then review "
+                "provenance/license/source authority and rerun the source inventory "
                 "with authoritative path/root plus review metadata."
             ),
         },
@@ -3791,7 +3916,7 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
             "required_state": "physical_so101_model_authority_ready",
             "observed_ready": gate.get("physical_so101_model_authority_ready") is True,
             "evidence_artifact_path": gate.get("bundle_manifest_summary_path"),
-            "next_action_id": "supply_reviewed_so101_model_bundle_manifest",
+            "next_action_id": bundle_next_action_id,
             "operator_action": (
                 "Supply a reviewed SO-101 model bundle manifest with mesh roots, reviewed "
                 "joint limits, target frame, TCP offset, and base-to-board alignment."
@@ -4181,6 +4306,8 @@ def write_so101_reviewed_model_authority_gate_artifacts(
                 f"`{markdown_bool(gate.get('development_fixture_evidence_not_physical_so101_truth'))}`",
                 "- Immediate action required items: "
                 f"`{markdown_list_value(payload.get('blocker_packet_action_required_item_ids'))}`",
+                "- Prioritized next required actions: "
+                f"`{markdown_list_value(gate.get('next_required_action_ids'))}`",
                 "- Blocked by prior requirement items: "
                 f"`{markdown_list_value(payload.get('blocker_packet_blocked_by_prior_requirements_item_ids'))}`",
                 f"- Blocker packet: `{blocker_packet_path}`",

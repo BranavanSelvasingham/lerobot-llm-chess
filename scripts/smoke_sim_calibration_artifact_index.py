@@ -2772,6 +2772,21 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
     gate = gate if isinstance(gate, dict) else {}
     artifact_paths = gate.get("artifacts")
     artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    next_required_for_goal = gate.get("next_required_for_goal")
+    next_required_for_goal = (
+        [action for action in next_required_for_goal if isinstance(action, dict)]
+        if isinstance(next_required_for_goal, list)
+        else []
+    )
+    next_required_action_ids = gate.get("next_required_action_ids")
+    next_required_action_ids = (
+        unique_string_values(next_required_action_ids)
+        if isinstance(next_required_action_ids, list)
+        else unique_string_values([action.get("action_id") for action in next_required_for_goal])
+    )
+    next_required_action_count = gate.get("next_required_action_count")
+    if not isinstance(next_required_action_count, int):
+        next_required_action_count = len(next_required_for_goal)
     metrics = {
         "status": gate.get("status"),
         "ok": gate.get("ok"),
@@ -2813,6 +2828,21 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
         )
         or [],
         "blocker_packet_next_action_ids": gate.get("blocker_packet_next_action_ids")
+        or [],
+        "next_required_for_goal": next_required_for_goal,
+        "next_required_action_ids": next_required_action_ids,
+        "next_required_action_count": next_required_action_count,
+        "source_authority_next_required_action_ids": gate.get(
+            "source_authority_next_required_action_ids"
+        )
+        or [],
+        "physical_bundle_next_required_action_ids": gate.get(
+            "physical_bundle_next_required_action_ids"
+        )
+        or [],
+        "reviewed_mujoco_next_required_action_ids": gate.get(
+            "reviewed_mujoco_next_required_action_ids"
+        )
         or [],
         "source_inventory_summary_path": gate.get("source_inventory_summary_path"),
         "bundle_manifest_summary_path": gate.get("bundle_manifest_summary_path"),
