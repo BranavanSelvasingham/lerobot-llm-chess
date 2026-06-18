@@ -293,6 +293,13 @@ that fixture-only status, `physical_so101_model_authority_ready` remains
 the synthetic fixture fields. Authority must also include at least one review
 evidence field: `reviewed_by`, `reviewed_at`, `review_id`, or `review_url`.
 
+When the integrated calibration regression suite evaluates the reviewed model
+authority gate, this manifest is checked against the SO-101 model-source
+inventory. The manifest `model_path` must match an authoritative source path, or
+be contained by an authoritative source root, before the aggregate reviewed
+model authority gate can close. This prevents a reviewed source inventory and a
+reviewed bundle manifest from silently referring to different SO-101 models.
+
 Provenance must include at least one source field (`source_url`, `source_uri`,
 `cad_url`, `repository_url`, `source_path`, or `source_reference`), one export
 field (`export_tool`, `exporter`, or `generated_by`), and one license field

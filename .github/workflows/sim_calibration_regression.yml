@@ -749,6 +749,19 @@ jobs:
           assert reviewed_model_authority_gate["physical_so101_model_authority_ready"] == (
               bundle_manifest["physical_so101_model_authority_ready"] is True
           ), reviewed_model_authority_gate
+          assert isinstance(reviewed_model_authority_gate["source_bundle_consistency_ready"], bool), reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["source_bundle_consistency_status"] in {
+              "not_checked_prerequisites_not_ready",
+              "bundle_model_path_missing",
+              "source_bundle_model_path_consistent",
+              "source_bundle_model_path_mismatch",
+          }, reviewed_model_authority_gate
+          source_bundle_consistency = reviewed_model_authority_gate["source_bundle_consistency"]
+          assert isinstance(source_bundle_consistency, dict), reviewed_model_authority_gate
+          assert source_bundle_consistency.get("status") == reviewed_model_authority_gate["source_bundle_consistency_status"], reviewed_model_authority_gate
+          assert source_bundle_consistency.get("ready") == reviewed_model_authority_gate["source_bundle_consistency_ready"], reviewed_model_authority_gate
+          assert isinstance(source_bundle_consistency.get("source_authoritative_model_paths"), list), source_bundle_consistency
+          assert isinstance(source_bundle_consistency.get("source_authoritative_model_roots"), list), source_bundle_consistency
           assert reviewed_model_authority_gate["physical_reviewed_model_motion_checked"] == (
               reviewed_mujoco_bundle["physical_reviewed_model_motion_checked"] is True
           ), reviewed_model_authority_gate
@@ -769,6 +782,8 @@ jobs:
           if reviewed_model_authority_gate["ready"] is True:
               assert reviewed_model_authority_gate["status"] == "reviewed_model_authority_ready", reviewed_model_authority_gate
               assert reviewed_model_authority_gate["blockers"] == [], reviewed_model_authority_gate
+              assert reviewed_model_authority_gate["source_bundle_consistency_ready"] is True, reviewed_model_authority_gate
+              assert reviewed_model_authority_gate["source_bundle_consistency_status"] == "source_bundle_model_path_consistent", reviewed_model_authority_gate
               assert reviewed_model_authority_gate["blocker_packet_action_required_count"] == 0, reviewed_model_authority_gate
           else:
               assert reviewed_model_authority_gate["status"] == "reviewed_model_authority_blocked", reviewed_model_authority_gate
@@ -1388,6 +1403,18 @@ jobs:
               assert metrics.get("ready") in {True, False}, metrics
               assert metrics.get("source_authority_ready") in {True, False, None}, metrics
               assert metrics.get("physical_so101_model_authority_ready") in {True, False, None}, metrics
+              assert metrics.get("source_bundle_consistency_ready") in {True, False, None}, metrics
+              assert metrics.get("source_bundle_consistency_status") in {
+                  "not_checked_prerequisites_not_ready",
+                  "bundle_model_path_missing",
+                  "source_bundle_model_path_consistent",
+                  "source_bundle_model_path_mismatch",
+                  None,
+              }, metrics
+              source_bundle_consistency = metrics.get("source_bundle_consistency")
+              assert isinstance(source_bundle_consistency, dict), metrics
+              assert source_bundle_consistency.get("status") == metrics.get("source_bundle_consistency_status"), metrics
+              assert source_bundle_consistency.get("ready") == metrics.get("source_bundle_consistency_ready"), metrics
               assert metrics.get("physical_reviewed_model_motion_checked") in {True, False, None}, metrics
               assert isinstance(metrics.get("blockers"), list), metrics
               assert metrics.get("blocker_count") == len(metrics.get("blockers")), metrics
@@ -1400,6 +1427,8 @@ jobs:
               if metrics.get("ready") is True:
                   assert metrics.get("status") == "reviewed_model_authority_ready", metrics
                   assert metrics.get("blockers") == [], metrics
+                  assert metrics.get("source_bundle_consistency_ready") is True, metrics
+                  assert metrics.get("source_bundle_consistency_status") == "source_bundle_model_path_consistent", metrics
                   assert metrics.get("blocker_packet_action_required_count") == 0, metrics
               else:
                   assert metrics.get("status") == "reviewed_model_authority_blocked", metrics

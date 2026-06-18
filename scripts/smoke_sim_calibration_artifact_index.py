@@ -2753,6 +2753,9 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
             "physical_so101_model_authority_ready"
         ),
         "physical_authority_gate_status": gate.get("physical_authority_gate_status"),
+        "source_bundle_consistency_ready": gate.get("source_bundle_consistency_ready"),
+        "source_bundle_consistency_status": gate.get("source_bundle_consistency_status"),
+        "source_bundle_consistency": gate.get("source_bundle_consistency"),
         "physical_reviewed_model_motion_checked": gate.get(
             "physical_reviewed_model_motion_checked"
         ),
