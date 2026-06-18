@@ -357,7 +357,9 @@ jobs:
           same_root = by_case["source_ready_physical_bundle_same_root_unselected_model"]["gate"]
           assert same_root["ready"] is False, same_root
           assert same_root["source_bundle_consistency_status"] == "source_bundle_model_path_mismatch", same_root
-          assert same_root["physical_reviewed_model_motion_checked"] is True, same_root
+          assert same_root["physical_reviewed_model_motion_child_ready"] is True, same_root
+          assert same_root["physical_reviewed_model_motion_checked"] is False, same_root
+          assert same_root["reviewed_mujoco_motion_bundle_consistency_status"] == "not_checked_prerequisites_not_ready", same_root
           assert same_root["development_fixture_evidence_not_physical_so101_truth"] is True, same_root
           assert "align_source_inventory_with_bundle_manifest_model_path" in same_root["next_required_action_ids"], same_root
           digest_missing_case = by_case["source_ready_physical_bundle_digest_missing"]
