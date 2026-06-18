@@ -74,6 +74,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "physical_bundle_ready",
         "source_bundle_consistency_status",
         "source_bundle_consistency_ready",
+        "selected_authoritative_candidate_declared_by_authoritative_path",
+        "selected_authoritative_candidate_within_authoritative_root",
+        "selected_authoritative_candidate_covered_by_source_configuration",
         "bundle_model_observed_sha256_missing",
         "bundle_model_observed_sha256_matches_declared",
         "physical_reviewed_model_motion_checked",
@@ -179,6 +182,45 @@ def source_ready_missing_selected_path(summary_path: Path, model_path: Path) -> 
         "source_configuration": {
             "authoritative_model_paths": [model],
             "authoritative_model_roots": [normalize_path(model_path.parent)],
+        },
+        "summary_path": str(summary_path),
+    }
+
+
+def source_ready_unconfigured_selection(summary_path: Path, model_path: Path) -> dict[str, Any]:
+    model = normalize_path(model_path)
+    return {
+        "source_authority_gate_status": "source_authority_ready",
+        "source_authority_blockers": [],
+        "next_required_for_goal": [],
+        "next_required_action_ids": [],
+        "selected_authoritative_candidate_path": model,
+        "selected_authoritative_candidate_sha256": SOURCE_MODEL_SHA256,
+        "source_configuration": {
+            "authoritative_model_paths": [],
+            "authoritative_model_roots": [],
+        },
+        "summary_path": str(summary_path),
+    }
+
+
+def source_ready_mismatched_selection(
+    summary_path: Path,
+    selected_model_path: Path,
+    declared_model_path: Path,
+) -> dict[str, Any]:
+    selected_model = normalize_path(selected_model_path)
+    declared_model = normalize_path(declared_model_path)
+    return {
+        "source_authority_gate_status": "source_authority_ready",
+        "source_authority_blockers": [],
+        "next_required_for_goal": [],
+        "next_required_action_ids": [],
+        "selected_authoritative_candidate_path": selected_model,
+        "selected_authoritative_candidate_sha256": SOURCE_MODEL_SHA256,
+        "source_configuration": {
+            "authoritative_model_paths": [declared_model],
+            "authoritative_model_roots": [],
         },
         "summary_path": str(summary_path),
     }
@@ -458,6 +500,67 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 ],
                 "selected_path_matches_bundle": False,
                 "selected_digest_matches_bundle": True,
+            },
+        },
+        {
+            "case_id": "source_ready_unconfigured_selection_physical_bundle_ready",
+            "source": source_ready_unconfigured_selection(
+                summary_dir / "source_ready_unconfigured_selection.json",
+                source_model,
+            ),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_authoritative_model_selection_unconfigured",
+                "consistency_ready": False,
+                "development_fixture": True,
+                "blockers_contain": [
+                    "declare_reviewed_authoritative_so101_source_path_or_root"
+                ],
+                "actions_contain": [
+                    "declare_reviewed_authoritative_so101_source_path_or_root"
+                ],
+                "action_required_contains": ["source_bundle_consistency"],
+                "blocker_packet_next_actions_contain": [
+                    "declare_reviewed_authoritative_so101_source_path_or_root"
+                ],
+                "selected_path_matches_bundle": True,
+                "selected_digest_matches_bundle": True,
+                "selected_declared_by_path": False,
+                "selected_within_root": False,
+                "selected_covered_by_source_configuration": False,
+            },
+        },
+        {
+            "case_id": "source_ready_selection_outside_authority_physical_bundle_ready",
+            "source": source_ready_mismatched_selection(
+                summary_dir / "source_ready_selection_outside_authority.json",
+                source_model,
+                source_sibling_model,
+            ),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_authoritative_model_selection_mismatch",
+                "consistency_ready": False,
+                "development_fixture": True,
+                "blockers_contain": [
+                    "align_selected_so101_source_model_with_authoritative_declaration"
+                ],
+                "actions_contain": [
+                    "align_selected_so101_source_model_with_authoritative_declaration"
+                ],
+                "action_required_contains": ["source_bundle_consistency"],
+                "blocker_packet_next_actions_contain": [
+                    "align_selected_so101_source_model_with_authoritative_declaration"
+                ],
+                "selected_path_matches_bundle": True,
+                "selected_digest_matches_bundle": True,
+                "selected_declared_by_path": False,
+                "selected_within_root": False,
+                "selected_covered_by_source_configuration": False,
             },
         },
         {
@@ -975,6 +1078,14 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
                 ),
                 True,
             )
+            add_error(
+                errors,
+                "selected_covered_by_source_configuration",
+                source_bundle_consistency.get(
+                    "selected_authoritative_candidate_covered_by_source_configuration"
+                ),
+                True,
+            )
         if "selected_path_matches_bundle" in expect:
             add_error(
                 errors,
@@ -992,6 +1103,33 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
                     "selected_authoritative_candidate_sha256_matches_bundle"
                 ),
                 expect["selected_digest_matches_bundle"],
+            )
+        if "selected_declared_by_path" in expect:
+            add_error(
+                errors,
+                "selected_declared_by_path",
+                source_bundle_consistency.get(
+                    "selected_authoritative_candidate_declared_by_authoritative_path"
+                ),
+                expect["selected_declared_by_path"],
+            )
+        if "selected_within_root" in expect:
+            add_error(
+                errors,
+                "selected_within_root",
+                source_bundle_consistency.get(
+                    "selected_authoritative_candidate_within_authoritative_root"
+                ),
+                expect["selected_within_root"],
+            )
+        if "selected_covered_by_source_configuration" in expect:
+            add_error(
+                errors,
+                "selected_covered_by_source_configuration",
+                source_bundle_consistency.get(
+                    "selected_authoritative_candidate_covered_by_source_configuration"
+                ),
+                expect["selected_covered_by_source_configuration"],
             )
         if "bundle_declared_sha256" in expect:
             add_error(
@@ -1125,6 +1263,19 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "physical_bundle_ready": gate.get("physical_so101_model_authority_ready"),
         "source_bundle_consistency_status": gate.get("source_bundle_consistency_status"),
         "source_bundle_consistency_ready": gate.get("source_bundle_consistency_ready"),
+        "selected_authoritative_candidate_declared_by_authoritative_path": (
+            consistency.get(
+                "selected_authoritative_candidate_declared_by_authoritative_path"
+            )
+        ),
+        "selected_authoritative_candidate_within_authoritative_root": consistency.get(
+            "selected_authoritative_candidate_within_authoritative_root"
+        ),
+        "selected_authoritative_candidate_covered_by_source_configuration": (
+            consistency.get(
+                "selected_authoritative_candidate_covered_by_source_configuration"
+            )
+        ),
         "bundle_model_observed_sha256_missing": consistency.get(
             "bundle_model_observed_sha256_missing"
         ),

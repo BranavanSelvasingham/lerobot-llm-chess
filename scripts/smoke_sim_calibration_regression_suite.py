@@ -3818,6 +3818,16 @@ def normalized_sha256(value: Any) -> str | None:
     return text
 
 
+def normalized_path_is_same_or_within(path: str | None, root: str | None) -> bool:
+    if not path or not root:
+        return False
+    try:
+        Path(path).relative_to(Path(root))
+    except ValueError:
+        return False
+    return True
+
+
 def so101_source_bundle_consistency_section(
     source_inventory: dict[str, Any],
     bundle_manifest: dict[str, Any],
@@ -3855,6 +3865,26 @@ def so101_source_bundle_consistency_section(
     )
     selected_authoritative_candidate_sha256 = normalized_sha256(
         source_inventory.get("selected_authoritative_candidate_sha256")
+    )
+    selected_declared_by_authoritative_path = bool(
+        selected_authoritative_candidate_path
+        and selected_authoritative_candidate_path in source_authoritative_paths
+    )
+    selected_within_authoritative_root = bool(
+        selected_authoritative_candidate_path
+        and any(
+            normalized_path_is_same_or_within(
+                selected_authoritative_candidate_path,
+                root,
+            )
+            for root in source_authoritative_roots
+        )
+    )
+    source_configuration_declares_authority = bool(
+        source_authoritative_paths or source_authoritative_roots
+    )
+    selected_covered_by_source_configuration = (
+        selected_declared_by_authoritative_path or selected_within_authoritative_root
     )
     bundle_model_identity = bundle_manifest.get("model_identity")
     bundle_model_identity = (
@@ -3900,6 +3930,14 @@ def so101_source_bundle_consistency_section(
         status = "source_authoritative_model_path_missing"
         ready = False
         blocker = "select_reviewed_authoritative_so101_source_model_path"
+    elif not source_configuration_declares_authority:
+        status = "source_authoritative_model_selection_unconfigured"
+        ready = False
+        blocker = "declare_reviewed_authoritative_so101_source_path_or_root"
+    elif not selected_covered_by_source_configuration:
+        status = "source_authoritative_model_selection_mismatch"
+        ready = False
+        blocker = "align_selected_so101_source_model_with_authoritative_declaration"
     elif not selected_path_matches_bundle:
         status = "source_bundle_model_path_mismatch"
         ready = False
@@ -3939,6 +3977,15 @@ def so101_source_bundle_consistency_section(
         "source_authoritative_model_paths": source_authoritative_paths,
         "source_authoritative_model_roots": source_authoritative_roots,
         "selected_authoritative_candidate_path": selected_authoritative_candidate_path,
+        "selected_authoritative_candidate_declared_by_authoritative_path": (
+            selected_declared_by_authoritative_path
+        ),
+        "selected_authoritative_candidate_within_authoritative_root": (
+            selected_within_authoritative_root
+        ),
+        "selected_authoritative_candidate_covered_by_source_configuration": (
+            selected_covered_by_source_configuration
+        ),
         "selected_authoritative_candidate_path_matches_bundle": selected_path_matches_bundle,
         "selected_authoritative_candidate_sha256": selected_authoritative_candidate_sha256,
         "bundle_model_declared_sha256": bundle_model_declared_sha256,
@@ -3956,6 +4003,7 @@ def so101_source_bundle_consistency_section(
         "notes": [
             "This check prevents source authority and bundle authority from closing on different model paths or digests.",
             "It is evaluated only after source authority and physical bundle authority are otherwise ready.",
+            "A source-authority-ready inventory must still identify a selected model path covered by the authoritative path/root declarations in that same child summary.",
             "The bundle manifest declared digest must match the selected authoritative model candidate digest.",
             "The observed bundle model digest is diagnostic evidence and does not substitute for a reviewed manifest declaration, but it must not be missing or conflict with the declared digest when the bundle claims physical authority.",
         ],
@@ -4050,6 +4098,32 @@ def so101_reviewed_model_authority_gate_section(
                 "detail": (
                     "Record selected_authoritative_candidate_path in the source inventory "
                     "before comparing source authority with the reviewed bundle manifest."
+                ),
+            }
+        ]
+    elif consistency_status == "source_authoritative_model_selection_unconfigured":
+        consistency_actions = [
+            {
+                "action_id": "declare_reviewed_authoritative_so101_source_path_or_root",
+                "gate": "reviewed_model_authority",
+                "title": "Declare reviewed authoritative SO-101 source path or root",
+                "detail": (
+                    "Rerun the source inventory with the reviewed authoritative model "
+                    "path or root so the selected source model is covered by explicit "
+                    "authority declarations."
+                ),
+            }
+        ]
+    elif consistency_status == "source_authoritative_model_selection_mismatch":
+        consistency_actions = [
+            {
+                "action_id": "align_selected_so101_source_model_with_authoritative_declaration",
+                "gate": "reviewed_model_authority",
+                "title": "Align selected SO-101 source model with authority declaration",
+                "detail": (
+                    "Resolve the source inventory so selected_authoritative_candidate_path "
+                    "matches an authoritative model path or is inside an authoritative "
+                    "model root before comparing it with the bundle manifest."
                 ),
             }
         ]
@@ -4247,6 +4321,14 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
         source_bundle_consistency_next_action_id = (
             "select_reviewed_authoritative_so101_source_model_path"
         )
+    elif consistency_status == "source_authoritative_model_selection_unconfigured":
+        source_bundle_consistency_next_action_id = (
+            "declare_reviewed_authoritative_so101_source_path_or_root"
+        )
+    elif consistency_status == "source_authoritative_model_selection_mismatch":
+        source_bundle_consistency_next_action_id = (
+            "align_selected_so101_source_model_with_authoritative_declaration"
+        )
     elif consistency_status == "source_bundle_model_digest_missing":
         source_bundle_consistency_next_action_id = "record_reviewed_so101_model_file_sha256"
     elif consistency_status == "bundle_model_observed_digest_missing":
@@ -4395,6 +4477,8 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
                     or "model_digest" in blocker
                     or "model_sha256" in blocker
                     or "sha256" in blocker
+                    or "declare_reviewed_authoritative_so101_source_path_or_root" in blocker
+                    or "align_selected_so101_source_model" in blocker
                     or "record_reviewed_so101_model_file_sha256" in blocker
                     or "verify_reviewed_so101_bundle_model_file_sha256" in blocker
                     or "inspect_reviewed_so101_bundle_model_file_sha256" in blocker
