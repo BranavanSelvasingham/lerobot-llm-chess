@@ -2854,6 +2854,15 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
         "source_bundle_consistency_ready": gate.get("source_bundle_consistency_ready"),
         "source_bundle_consistency_status": gate.get("source_bundle_consistency_status"),
         "source_bundle_consistency": gate.get("source_bundle_consistency"),
+        "reviewed_mujoco_motion_bundle_consistency_ready": gate.get(
+            "reviewed_mujoco_motion_bundle_consistency_ready"
+        ),
+        "reviewed_mujoco_motion_bundle_consistency_status": gate.get(
+            "reviewed_mujoco_motion_bundle_consistency_status"
+        ),
+        "reviewed_mujoco_motion_bundle_consistency": gate.get(
+            "reviewed_mujoco_motion_bundle_consistency"
+        ),
         "physical_reviewed_model_motion_checked": gate.get(
             "physical_reviewed_model_motion_checked"
         ),
@@ -2862,6 +2871,9 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
         ),
         "physical_reviewed_model_motion_status_ready": gate.get(
             "physical_reviewed_model_motion_status_ready"
+        ),
+        "physical_reviewed_model_motion_child_ready": gate.get(
+            "physical_reviewed_model_motion_child_ready"
         ),
         "reviewed_mujoco_bundle_status": gate.get("reviewed_mujoco_bundle_status"),
         "reviewed_mujoco_motion_authority_status": gate.get(

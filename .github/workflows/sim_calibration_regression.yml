@@ -1598,10 +1598,14 @@ jobs:
               "not_checked_prerequisites_not_ready",
               "bundle_model_path_missing",
               "source_authoritative_model_path_missing",
+              "source_authoritative_model_selection_unconfigured",
+              "source_authoritative_model_selection_mismatch",
               "source_bundle_model_path_and_digest_consistent",
               "source_bundle_model_path_mismatch",
               "source_bundle_model_digest_missing",
               "source_bundle_model_digest_mismatch",
+              "bundle_model_observed_digest_missing",
+              "bundle_model_observed_digest_mismatch",
           }, reviewed_model_authority_gate
           source_bundle_consistency = reviewed_model_authority_gate["source_bundle_consistency"]
           assert isinstance(source_bundle_consistency, dict), reviewed_model_authority_gate
@@ -1625,15 +1629,41 @@ jobs:
               reviewed_mujoco_bundle["status"] == "reviewed_mujoco_bundle_motion_checked"
               and reviewed_mujoco_bundle["motion_authority_status"] == "physical_reviewed_model_motion_checked"
           )
+          expected_physical_motion_child_ready = (
+              reviewed_model_authority_gate["physical_reviewed_model_motion_reported"] is True
+              and reviewed_model_authority_gate["physical_reviewed_model_motion_status_ready"] is True
+          )
           assert reviewed_model_authority_gate["physical_reviewed_model_motion_reported"] == (
               reviewed_mujoco_bundle["physical_reviewed_model_motion_checked"] is True
           ), reviewed_model_authority_gate
           assert reviewed_model_authority_gate["physical_reviewed_model_motion_status_ready"] == expected_physical_motion_status_ready, reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["physical_reviewed_model_motion_child_ready"] == expected_physical_motion_child_ready, reviewed_model_authority_gate
           assert reviewed_model_authority_gate["reviewed_mujoco_bundle_status"] == reviewed_mujoco_bundle["status"], reviewed_model_authority_gate
           assert reviewed_model_authority_gate["reviewed_mujoco_motion_authority_status"] == reviewed_mujoco_bundle["motion_authority_status"], reviewed_model_authority_gate
+          assert isinstance(reviewed_model_authority_gate["reviewed_mujoco_motion_bundle_consistency"], dict), reviewed_model_authority_gate
+          motion_bundle_consistency = reviewed_model_authority_gate["reviewed_mujoco_motion_bundle_consistency"]
+          assert reviewed_model_authority_gate["reviewed_mujoco_motion_bundle_consistency_status"] in {
+              "not_checked_prerequisites_not_ready",
+              "bundle_model_path_missing",
+              "reviewed_mujoco_motion_model_path_missing",
+              "reviewed_mujoco_motion_model_path_mismatch",
+              "reviewed_mujoco_motion_model_digest_missing",
+              "reviewed_mujoco_motion_model_digest_mismatch",
+              "reviewed_mujoco_motion_matches_bundle_model_identity",
+          }, reviewed_model_authority_gate
+          assert motion_bundle_consistency.get("status") == reviewed_model_authority_gate["reviewed_mujoco_motion_bundle_consistency_status"], reviewed_model_authority_gate
+          assert motion_bundle_consistency.get("ready") == reviewed_model_authority_gate["reviewed_mujoco_motion_bundle_consistency_ready"], reviewed_model_authority_gate
+          assert isinstance(motion_bundle_consistency.get("reviewed_mujoco_motion_model_path_matches_bundle"), bool), reviewed_model_authority_gate
+          assert isinstance(motion_bundle_consistency.get("reviewed_mujoco_motion_model_sha256_matches_bundle"), bool), reviewed_model_authority_gate
+          if reviewed_model_authority_gate["reviewed_mujoco_motion_bundle_consistency_ready"] is True:
+              assert reviewed_model_authority_gate["reviewed_mujoco_motion_bundle_consistency_status"] == "reviewed_mujoco_motion_matches_bundle_model_identity", reviewed_model_authority_gate
+              assert motion_bundle_consistency.get("reviewed_mujoco_motion_model_path_matches_bundle") is True, reviewed_model_authority_gate
+              assert motion_bundle_consistency.get("reviewed_mujoco_motion_model_sha256_matches_bundle") is True, reviewed_model_authority_gate
+          if reviewed_model_authority_gate["reviewed_mujoco_motion_bundle_consistency_status"] == "not_checked_prerequisites_not_ready":
+              assert reviewed_model_authority_gate["reviewed_mujoco_motion_bundle_consistency_ready"] is False, reviewed_model_authority_gate
           assert reviewed_model_authority_gate["physical_reviewed_model_motion_checked"] == (
-              reviewed_model_authority_gate["physical_reviewed_model_motion_reported"] is True
-              and reviewed_model_authority_gate["physical_reviewed_model_motion_status_ready"] is True
+              reviewed_model_authority_gate["physical_reviewed_model_motion_child_ready"] is True
+              and reviewed_model_authority_gate["reviewed_mujoco_motion_bundle_consistency_ready"] is True
           ), reviewed_model_authority_gate
           assert isinstance(reviewed_model_authority_gate["blockers"], list), reviewed_model_authority_gate
           assert reviewed_model_authority_gate["blocker_count"] == len(reviewed_model_authority_gate["blockers"]), reviewed_model_authority_gate
@@ -2405,10 +2435,14 @@ jobs:
                   "not_checked_prerequisites_not_ready",
                   "bundle_model_path_missing",
                   "source_authoritative_model_path_missing",
+                  "source_authoritative_model_selection_unconfigured",
+                  "source_authoritative_model_selection_mismatch",
                   "source_bundle_model_path_and_digest_consistent",
                   "source_bundle_model_path_mismatch",
                   "source_bundle_model_digest_missing",
                   "source_bundle_model_digest_mismatch",
+                  "bundle_model_observed_digest_missing",
+                  "bundle_model_observed_digest_mismatch",
                   None,
               }, metrics
               source_bundle_consistency = metrics.get("source_bundle_consistency")
@@ -2428,6 +2462,24 @@ jobs:
               assert metrics.get("physical_reviewed_model_motion_checked") in {True, False, None}, metrics
               assert metrics.get("physical_reviewed_model_motion_reported") in {True, False, None}, metrics
               assert metrics.get("physical_reviewed_model_motion_status_ready") in {True, False, None}, metrics
+              assert metrics.get("physical_reviewed_model_motion_child_ready") in {True, False, None}, metrics
+              assert metrics.get("reviewed_mujoco_motion_bundle_consistency_ready") in {True, False, None}, metrics
+              assert metrics.get("reviewed_mujoco_motion_bundle_consistency_status") in {
+                  "not_checked_prerequisites_not_ready",
+                  "bundle_model_path_missing",
+                  "reviewed_mujoco_motion_model_path_missing",
+                  "reviewed_mujoco_motion_model_path_mismatch",
+                  "reviewed_mujoco_motion_model_digest_missing",
+                  "reviewed_mujoco_motion_model_digest_mismatch",
+                  "reviewed_mujoco_motion_matches_bundle_model_identity",
+                  None,
+              }, metrics
+              motion_bundle_consistency = metrics.get("reviewed_mujoco_motion_bundle_consistency")
+              assert isinstance(motion_bundle_consistency, dict), metrics
+              assert motion_bundle_consistency.get("status") == metrics.get("reviewed_mujoco_motion_bundle_consistency_status"), metrics
+              assert motion_bundle_consistency.get("ready") == metrics.get("reviewed_mujoco_motion_bundle_consistency_ready"), metrics
+              assert isinstance(motion_bundle_consistency.get("reviewed_mujoco_motion_model_path_matches_bundle"), bool), metrics
+              assert isinstance(motion_bundle_consistency.get("reviewed_mujoco_motion_model_sha256_matches_bundle"), bool), metrics
               assert metrics.get("reviewed_mujoco_motion_authority_status") in {
                   "not_checked_manifest_not_ready",
                   "physical_reviewed_model_motion_checked",
@@ -2439,8 +2491,12 @@ jobs:
                   None,
               }, metrics
               if metrics.get("physical_reviewed_model_motion_reported") is True:
-                  assert metrics.get("physical_reviewed_model_motion_checked") == (
+                  assert metrics.get("physical_reviewed_model_motion_child_ready") == (
                       metrics.get("physical_reviewed_model_motion_status_ready") is True
+                  ), metrics
+              if metrics.get("physical_reviewed_model_motion_child_ready") is True:
+                  assert metrics.get("physical_reviewed_model_motion_checked") == (
+                      metrics.get("reviewed_mujoco_motion_bundle_consistency_ready") is True
                   ), metrics
               assert isinstance(metrics.get("blockers"), list), metrics
               assert metrics.get("blocker_count") == len(metrics.get("blockers")), metrics
