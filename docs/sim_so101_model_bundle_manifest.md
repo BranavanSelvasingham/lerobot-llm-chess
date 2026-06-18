@@ -84,6 +84,11 @@ inventing reviewed target-frame authority, limits, calibrated TCP, or
 board-alignment values. That means the generated manifest remains
 diagnostic-only until an operator replaces those placeholders with reviewed
 fields and this checker reports `ready_for_model_backed_ik: true`.
+When `--authority-reviewed-by` and `--authority-reviewed-at` are supplied, the
+probe writes `authority.source_authority_status: "operator_reviewed"`, which is
+one of the manifest checker's accepted reviewed statuses; that still only
+covers source-authority metadata and does not make observed model hints,
+joint limits, mesh references, TCP offset, or board alignment reviewed truth.
 `authority` must include an accepted reviewed status plus reviewer/date/id/url
 evidence, and `provenance` must include a source reference, export tool, and
 license basis. The manifest must also declare `model_sha256` (or an accepted

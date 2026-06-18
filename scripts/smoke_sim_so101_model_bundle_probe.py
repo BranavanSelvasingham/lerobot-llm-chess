@@ -618,7 +618,7 @@ def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str,
             "reason": "The probe never infers reviewed model authority from a path or asset root.",
         }
     return {
-        "source_authority_status": "operator_supplied_reviewed",
+        "source_authority_status": "operator_reviewed",
         "reviewed_by": args.authority_reviewed_by,
         "reviewed_at": args.authority_reviewed_at,
     }, {
