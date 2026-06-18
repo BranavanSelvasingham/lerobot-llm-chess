@@ -1374,6 +1374,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `so101_model_source_inventory/README.md`",
         f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/{SO101_MODEL_BUNDLE_PROBE_SUMMARY_NAME}`",
         f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/so101_model_bundle.candidate.json`",
+        f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/so101_model_bundle_review_packet.json`",
+        f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/so101_model_bundle_review_packet.csv`",
         f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/so101_model_bundle_probe_checklist.csv`",
         f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/README.md`",
         "- `so101_model_contract/so101_model_contract_summary.json`",
@@ -1678,12 +1680,15 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             f"manifest status `{so101_bundle_probe.get('manifest_status')}`; "
             f"ready_for_model_backed_ik "
             f"`{markdown_bool(so101_bundle_probe.get('ready_for_model_backed_ik'))}`; "
+            f"review packet `{so101_bundle_probe.get('review_packet_status')}` with "
+            f"`{so101_bundle_probe.get('review_packet_item_count')}` items; "
             f"next actions `{markdown_list_value(so101_bundle_probe.get('next_required_action_ids'))}`."
         ),
         (
             "- SO-101 model bundle probe caveat: the generated candidate manifest is a "
-            "review draft only; it does not close source authority, physical model "
-            "authority, or physical reviewed MuJoCo motion."
+            "review draft only, and the review packet is operator intake only; neither "
+            "closes source authority, physical model authority, or physical reviewed "
+            "MuJoCo motion."
         ),
         (
             "- SO-101 model bundle manifest evidence records the reviewed bundle request, "
@@ -3220,6 +3225,16 @@ def so101_model_bundle_probe_section(
         "manifest_status": probe.get("manifest_status"),
         "ready_for_model_backed_ik": probe.get("ready_for_model_backed_ik"),
         "missing_inputs": probe.get("missing_inputs") or [],
+        "review_packet_status": probe.get("review_packet_status"),
+        "review_packet_model_authority": probe.get("review_packet_model_authority"),
+        "review_packet_item_count": probe.get("review_packet_item_count"),
+        "review_packet_item_ids": probe.get("review_packet_item_ids") or [],
+        "review_packet_observed_evidence_is_authority": probe.get(
+            "review_packet_observed_evidence_is_authority"
+        ),
+        "review_packet_development_fixture_evidence_not_physical_so101_truth": probe.get(
+            "review_packet_development_fixture_evidence_not_physical_so101_truth"
+        ),
         "next_required_for_goal": probe.get("next_required_for_goal") or [],
         "next_required_action_ids": probe.get("next_required_action_ids") or [],
         "authority": authority,
@@ -3234,6 +3249,8 @@ def so101_model_bundle_probe_section(
             "checklist_csv": artifacts.get("checklist_csv"),
             "readme_md": artifacts.get("readme_md"),
             "candidate_manifest_json": artifacts.get("candidate_manifest_json"),
+            "review_packet_json": artifacts.get("review_packet_json"),
+            "review_packet_csv": artifacts.get("review_packet_csv"),
             "contract_summary_json": artifacts.get("contract_summary_json"),
             "contract_checklist_csv": artifacts.get("contract_checklist_csv"),
             "manifest_check_summary_json": artifacts.get("manifest_check_summary_json"),

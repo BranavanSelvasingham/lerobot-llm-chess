@@ -24,6 +24,8 @@ strings. It never copies or imports model assets. It writes:
 - `so101_model_bundle.candidate.json`
 - `so101_model_bundle_probe_summary.json`
 - `so101_model_bundle_probe_checklist.csv`
+- `so101_model_bundle_review_packet.json`
+- `so101_model_bundle_review_packet.csv`
 - `README.md`
 - `so101_model_contract/so101_model_contract_summary.json`
 - `so101_model_contract/so101_model_asset_preflight/so101_model_asset_preflight_summary.json`
@@ -54,6 +56,11 @@ counts, `observed_joint_limits_status`,
 `ready_for_model_backed_ik`, `missing_inputs`, `next_required_for_goal`, and
 `next_required_action_ids`. These are shortcuts for artifact review only;
 readiness is still decided by the nested manifest checker.
+The probe also writes a review packet JSON/CSV that groups the same raw
+source, joint-limit, mesh, TCP, and board-alignment evidence into ordered
+operator review items. The packet always reports
+`model_authority: "review_packet_not_authority"` and never copies observed
+values into reviewed manifest fields.
 Observed source hints, joint limits, and mesh references come from the candidate
 model structure and nearby files. They are not copied into `provenance`,
 `joint_limits_deg`, or `mesh_asset_authority` unless a reviewer makes them

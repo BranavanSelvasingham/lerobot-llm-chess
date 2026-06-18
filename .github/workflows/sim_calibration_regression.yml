@@ -627,11 +627,22 @@ jobs:
           assert isinstance(bundle_probe["next_required_for_goal"], list), bundle_probe
           assert isinstance(bundle_probe["next_required_action_ids"], list), bundle_probe
           assert bundle_probe["next_required_action_ids"], bundle_probe
+          assert bundle_probe["review_packet_status"] in {
+              "review_packet_ready_for_operator_review",
+              "review_packet_waiting_for_candidate_model",
+          }, bundle_probe
+          assert bundle_probe["review_packet_model_authority"] == "review_packet_not_authority", bundle_probe
+          assert isinstance(bundle_probe["review_packet_item_count"], int) and bundle_probe["review_packet_item_count"] > 0, bundle_probe
+          assert isinstance(bundle_probe["review_packet_item_ids"], list) and bundle_probe["review_packet_item_ids"], bundle_probe
+          assert bundle_probe["review_packet_observed_evidence_is_authority"] is False, bundle_probe
+          assert bundle_probe["review_packet_development_fixture_evidence_not_physical_so101_truth"] is True, bundle_probe
           assert "supply_reviewed_so101_model_bundle_manifest" in source_inventory["next_required_action_ids"], source_inventory
           probe_artifacts = bundle_probe["artifacts"]
           for key in (
               "summary_json",
               "candidate_manifest_json",
+              "review_packet_json",
+              "review_packet_csv",
               "checklist_csv",
               "readme_md",
               "contract_summary_json",
@@ -1289,6 +1300,24 @@ jobs:
               for row in artifacts_by_category["so101_model_bundle_manifest"]
           ), artifacts_by_category["so101_model_bundle_manifest"]
           assert any(
+              row.get("label") == "so101_model_bundle_probe:review_packet"
+              and row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("review_packet_status") in {
+                  "review_packet_ready_for_operator_review",
+                  "review_packet_waiting_for_candidate_model",
+              }
+              and row.get("metrics", {}).get("review_packet_model_authority") == "review_packet_not_authority"
+              and row.get("metrics", {}).get("review_packet_observed_evidence_is_authority") is False
+              for row in artifacts_by_category["so101_model_bundle_probe"]
+          ), artifacts_by_category["so101_model_bundle_probe"]
+          assert any(
+              row.get("label") == "so101_model_bundle_probe:review_packet_rows"
+              and row.get("kind") == "csv"
+              and row.get("exists") is True
+              for row in artifacts_by_category["so101_model_bundle_probe"]
+          ), artifacts_by_category["so101_model_bundle_probe"]
+          assert any(
               row.get("kind") == "json"
               and row.get("exists") is True
               and row.get("metrics", {}).get("status") in {
@@ -1850,8 +1879,11 @@ jobs:
               f"- `model_request_status`: `{summary['so101_model_bundle_probe']['model_request_status']}`",
               f"- `manifest_status`: `{summary['so101_model_bundle_probe']['manifest_status']}`",
               f"- `ready_for_model_backed_ik`: `{summary['so101_model_bundle_probe']['ready_for_model_backed_ik']}`",
+              f"- `review_packet_status`: `{summary['so101_model_bundle_probe']['review_packet_status']}`",
+              f"- `review_packet_item_count`: `{summary['so101_model_bundle_probe']['review_packet_item_count']}`",
               f"- `next_required_action_ids`: `{summary['so101_model_bundle_probe']['next_required_action_ids']}`",
               "- The generated candidate manifest is a review draft and is not reviewed physical SO-101 authority.",
+              "- The generated review packet is operator review intake only and is not model authority.",
               "",
               "SO-101 model bundle manifest:",
               f"- `status`: `{summary['so101_model_bundle_manifest']['status']}`",

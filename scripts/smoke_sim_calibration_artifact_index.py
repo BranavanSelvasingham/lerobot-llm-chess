@@ -2825,6 +2825,16 @@ def collect_so101_model_bundle_probe_artifacts(
         "manifest_status": probe.get("manifest_status"),
         "ready_for_model_backed_ik": probe.get("ready_for_model_backed_ik"),
         "missing_inputs": probe.get("missing_inputs"),
+        "review_packet_status": probe.get("review_packet_status"),
+        "review_packet_model_authority": probe.get("review_packet_model_authority"),
+        "review_packet_item_count": probe.get("review_packet_item_count"),
+        "review_packet_item_ids": probe.get("review_packet_item_ids"),
+        "review_packet_observed_evidence_is_authority": probe.get(
+            "review_packet_observed_evidence_is_authority"
+        ),
+        "review_packet_development_fixture_evidence_not_physical_so101_truth": probe.get(
+            "review_packet_development_fixture_evidence_not_physical_so101_truth"
+        ),
         "next_required_for_goal": probe.get("next_required_for_goal"),
         "next_required_action_ids": probe.get("next_required_action_ids"),
         "next_required_action_count": len(probe.get("next_required_for_goal") or []),
@@ -2832,6 +2842,8 @@ def collect_so101_model_bundle_probe_artifacts(
     for key, label_suffix in (
         ("summary_json", "summary"),
         ("candidate_manifest_json", "candidate_manifest"),
+        ("review_packet_json", "review_packet"),
+        ("review_packet_csv", "review_packet_rows"),
         ("checklist_csv", "checklist"),
         ("readme_md", "readme"),
         ("contract_summary_json", "child_contract_summary"),
@@ -2854,6 +2866,8 @@ def collect_so101_model_bundle_probe_artifacts(
         **metrics,
         "summary_path": artifact_paths.get("summary_json") or probe.get("summary_path"),
         "candidate_manifest_path": artifact_paths.get("candidate_manifest_json"),
+        "review_packet_json_path": artifact_paths.get("review_packet_json"),
+        "review_packet_csv_path": artifact_paths.get("review_packet_csv"),
         "checklist_csv_path": artifact_paths.get("checklist_csv"),
         "readme_md_path": artifact_paths.get("readme_md"),
         "contract_summary_path": artifact_paths.get("contract_summary_json"),

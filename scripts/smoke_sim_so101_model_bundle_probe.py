@@ -14,6 +14,7 @@ from typing import Any
 
 SCHEMA = "lerobot.sim.so101_model_bundle_probe.v1"
 CANDIDATE_SCHEMA = "lerobot.sim.so101_model_bundle_candidate.v1"
+REVIEW_PACKET_SCHEMA = "lerobot.sim.so101_model_bundle_review_packet.v1"
 DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "so101_model_bundle_probe"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_CHECKER_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_contract.py"
@@ -50,6 +51,16 @@ CSV_FIELDNAMES = (
     "missing_inputs",
     "diagnostics",
     "notes",
+)
+REVIEW_PACKET_FIELDNAMES = (
+    "priority",
+    "review_item_id",
+    "gate",
+    "status",
+    "manifest_fields",
+    "observed_evidence",
+    "review_action",
+    "caveat",
 )
 
 
@@ -154,6 +165,17 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow({field: csv_value(row.get(field)) for field in CSV_FIELDNAMES})
+
+
+def write_review_packet_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=REVIEW_PACKET_FIELDNAMES)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(
+                {field: csv_value(row.get(field)) for field in REVIEW_PACKET_FIELDNAMES}
+            )
 
 
 def sha256_file(path: Path) -> str | None:
@@ -941,6 +963,199 @@ def build_rows(
     ]
 
 
+def review_packet_row(
+    priority: int,
+    review_item_id: str,
+    gate: str,
+    status: str,
+    manifest_fields: list[str],
+    observed_evidence: dict[str, Any],
+    review_action: str,
+) -> dict[str, Any]:
+    return {
+        "priority": priority,
+        "review_item_id": review_item_id,
+        "gate": gate,
+        "status": status,
+        "manifest_fields": manifest_fields,
+        "observed_evidence": observed_evidence,
+        "review_action": review_action,
+        "caveat": (
+            "Review-packet evidence is operator intake only; copying values into the "
+            "manifest requires separate reviewed authority and does not happen here."
+        ),
+    }
+
+
+def build_review_packet(
+    *,
+    model_request: dict[str, Any],
+    asset_root_config: dict[str, Any],
+    candidate_manifest_path: Path,
+    observed_source_hints: dict[str, Any],
+    observed_joint_limits: dict[str, Any],
+    mesh_asset_review: dict[str, Any],
+    manifest_result: dict[str, Any],
+    contract_result: dict[str, Any],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    manifest_excerpt = manifest_result["diagnostic_excerpt"]
+    contract_excerpt = contract_result["diagnostic_excerpt"]
+    asset_preflight = contract_excerpt.get("model_asset_preflight") or {}
+    missing_inputs = manifest_excerpt.get("missing_inputs")
+    missing_inputs = missing_inputs if isinstance(missing_inputs, list) else []
+    source_hints_available = observed_source_hints.get("status") in {
+        "source_reference_detected",
+        "license_context_detected",
+        "model_fingerprint_only",
+    }
+    rows = [
+        review_packet_row(
+            1,
+            "review_model_source_authority",
+            "reviewed_model_authority",
+            "evidence_available" if model_request.get("status") == "model_supplied" else "needs_candidate_model",
+            ["authority"],
+            {
+                "model_request_status": model_request.get("status"),
+                "model_path": model_request.get("path"),
+                "sha256": observed_source_hints.get("sha256"),
+            },
+            "Choose the authoritative SO-101 model source and record accepted authority review metadata.",
+        ),
+        review_packet_row(
+            2,
+            "review_model_provenance",
+            "reviewed_model_authority",
+            "evidence_available" if source_hints_available else "needs_source_provenance_review",
+            ["provenance"],
+            {
+                "source_hints_status": observed_source_hints.get("status"),
+                "onshape_urls": observed_source_hints.get("onshape_urls"),
+                "export_tool_hints": observed_source_hints.get("export_tool_hints"),
+                "license": observed_source_hints.get("license"),
+            },
+            "Review source/export/license evidence before copying provenance into the manifest.",
+        ),
+        review_packet_row(
+            3,
+            "resolve_reviewed_mesh_assets",
+            "reviewed_model_authority",
+            "needs_mesh_assets"
+            if not isinstance(mesh_asset_review.get("mesh_reference_count"), int)
+            or mesh_asset_review.get("mesh_reference_count") <= 0
+            or mesh_asset_review.get("missing_references")
+            or mesh_asset_review.get("unresolved_references")
+            else "evidence_available",
+            ["asset_roots", "mesh_asset_authority"],
+            {
+                "asset_roots": asset_root_config.get("asset_roots"),
+                "mesh_reference_count": mesh_asset_review.get("mesh_reference_count"),
+                "missing_references": mesh_asset_review.get("missing_references"),
+                "unresolved_references": mesh_asset_review.get("unresolved_references"),
+                "asset_preflight_status": asset_preflight.get("status"),
+            },
+            "Supply reviewed asset roots until mesh preflight has no missing or unresolved references, then record mesh authority.",
+        ),
+        review_packet_row(
+            4,
+            "review_joint_limits",
+            "reviewed_model_authority",
+            "evidence_available"
+            if observed_joint_limits.get("complete") is True
+            else "needs_complete_joint_limit_evidence",
+            ["joint_limits_deg", "joint_limit_authority"],
+            {
+                "observed_joint_limits_status": observed_joint_limits.get("status"),
+                "values_deg": observed_joint_limits.get("values_deg"),
+                "missing_joints": observed_joint_limits.get("missing_joints"),
+            },
+            "Review raw candidate limits before declaring reviewed joint_limits_deg and joint-limit authority.",
+        ),
+        review_packet_row(
+            5,
+            "review_target_frame",
+            "reviewed_model_authority",
+            "needs_reviewed_target_frame_authority",
+            ["target_frame", "target_frame_authority"],
+            {
+                "target_frame": manifest_excerpt.get("target_frame"),
+                "contract_status": contract_excerpt.get("status"),
+            },
+            "Confirm the target frame is the intended SO-101 gripper/TCP frame and record review metadata.",
+        ),
+        review_packet_row(
+            6,
+            "calibrate_tcp_offset",
+            "reviewed_model_authority",
+            "needs_tcp_calibration",
+            ["tcp_offset_m", "tcp_offset_authority"],
+            {
+                "manifest_tcp_offset": manifest_excerpt.get("tcp_offset"),
+                "candidate_manifest": str(candidate_manifest_path),
+            },
+            "Measure or review target-frame-to-TCP/gripper-tip offset and record authority.",
+        ),
+        review_packet_row(
+            7,
+            "calibrate_base_to_board_alignment",
+            "reviewed_model_authority",
+            "needs_base_to_board_calibration",
+            ["base_to_board_transform", "base_to_board_alignment_authority"],
+            {
+                "manifest_base_to_board_alignment": manifest_excerpt.get("base_to_board_alignment"),
+                "candidate_manifest": str(candidate_manifest_path),
+            },
+            "Record reviewed base-to-board translation and roll/pitch/yaw alignment for the chess scene.",
+        ),
+        review_packet_row(
+            8,
+            "clear_model_contract_and_asset_preflight",
+            "mujoco_scene_validity",
+            "evidence_available"
+            if contract_excerpt.get("status")
+            in {"model_contract_checked", "model_contract_needs_follow_up"}
+            and asset_preflight.get("missing_asset_count") in {0, None}
+            and asset_preflight.get("unresolved_reference_count") in {0, None}
+            else "needs_contract_or_asset_follow_up",
+            ["non_blocking_contract_checker_result"],
+            {
+                "contract_status": contract_excerpt.get("status"),
+                "asset_preflight_status": asset_preflight.get("status"),
+                "missing_asset_count": asset_preflight.get("missing_asset_count"),
+                "unresolved_reference_count": asset_preflight.get("unresolved_reference_count"),
+                "artifacts": contract_result.get("artifacts"),
+            },
+            "Rerun the contract checker and asset preflight until the reviewed model has non-blocking diagnostics.",
+        ),
+    ]
+    packet_ready = model_request.get("status") == "model_supplied"
+    packet = {
+        "schema": REVIEW_PACKET_SCHEMA,
+        "ok": True,
+        "status": "review_packet_ready_for_operator_review"
+        if packet_ready
+        else "review_packet_waiting_for_candidate_model",
+        "model_authority": "review_packet_not_authority",
+        "candidate_manifest_path": str(candidate_manifest_path),
+        "model_request_status": model_request.get("status"),
+        "selected_model_path": model_request.get("path"),
+        "ready_for_model_backed_ik": False,
+        "manifest_status": manifest_excerpt.get("status"),
+        "manifest_missing_inputs": missing_inputs,
+        "review_item_count": len(rows),
+        "review_item_ids": [row["review_item_id"] for row in rows],
+        "review_items": rows,
+        "observed_evidence_is_authority": False,
+        "development_fixture_evidence_not_physical_so101_truth": True,
+        "notes": [
+            "The review packet organizes evidence already produced by the bundle probe.",
+            "It does not copy observed source hints, joint limits, or mesh references into reviewed manifest fields.",
+            "A human/operator review still has to fill the candidate manifest and rerun the manifest checker.",
+        ],
+    }
+    return packet, rows
+
+
 def status_for(model_request: dict[str, Any], manifest_result: dict[str, Any]) -> str:
     if model_request["status"] == "model_not_supplied":
         return "candidate_model_missing"
@@ -982,6 +1197,10 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         f"- `manifest_status`: `{manifest.get('status')}`",
         f"- `ready_for_model_backed_ik`: `{str(manifest.get('ready_for_model_backed_ik')).lower()}`",
         f"- `manifest_missing_inputs`: `{', '.join(manifest.get('missing_inputs') or []) if manifest.get('missing_inputs') else 'none'}`",
+        f"- `review_packet_status`: `{summary.get('review_packet_status')}`",
+        f"- `review_packet_item_count`: `{summary.get('review_packet_item_count')}`",
+        f"- `review_packet_json`: `{summary['artifacts']['review_packet_json']}`",
+        f"- `review_packet_csv`: `{summary['artifacts']['review_packet_csv']}`",
         f"- `next_required_action_ids`: `{', '.join(summary.get('next_required_action_ids') or []) if summary.get('next_required_action_ids') else 'none'}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `checklist_csv`: `{summary['artifacts']['checklist_csv']}`",
@@ -1032,6 +1251,7 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
             "- Replace `tcp_offset_placeholder` with one accepted calibrated TCP/gripper-tip offset field.",
             "- Replace `base_to_board_alignment_placeholder` with a real base-to-board transform/alignment.",
             "- Re-run `scripts/smoke_sim_so101_model_bundle_manifest.py` on the candidate manifest before enabling model-backed IK.",
+            "- Use `so101_model_bundle_review_packet.json` and `.csv` as review intake only; they are not model authority.",
         ]
     )
     path.write_text("\n".join(lines) + "\n")
@@ -1077,6 +1297,16 @@ def main() -> int:
     write_json(candidate_manifest_path, candidate_manifest)
 
     manifest_result = run_manifest_checker(args.python, output_dir, candidate_manifest_path)
+    review_packet, review_packet_rows = build_review_packet(
+        model_request=model_request,
+        asset_root_config=asset_root_config,
+        candidate_manifest_path=candidate_manifest_path,
+        observed_source_hints=observed_source_hints,
+        observed_joint_limits=observed_joint_limits,
+        mesh_asset_review=mesh_asset_review,
+        manifest_result=manifest_result,
+        contract_result=contract_result,
+    )
     rows = build_rows(
         model_request=model_request,
         asset_root_config=asset_root_config,
@@ -1093,12 +1323,16 @@ def main() -> int:
 
     summary_path = output_dir / "so101_model_bundle_probe_summary.json"
     csv_path = output_dir / "so101_model_bundle_probe_checklist.csv"
+    review_packet_path = output_dir / "so101_model_bundle_review_packet.json"
+    review_packet_csv_path = output_dir / "so101_model_bundle_review_packet.csv"
     readme_path = output_dir / "README.md"
     artifacts = {
         "summary_json": str(summary_path),
         "checklist_csv": str(csv_path),
         "readme_md": str(readme_path),
         "candidate_manifest_json": str(candidate_manifest_path),
+        "review_packet_json": str(review_packet_path),
+        "review_packet_csv": str(review_packet_csv_path),
         "contract_summary_json": contract_result["artifacts"]["summary_json"],
         "contract_checklist_csv": contract_result["artifacts"]["checklist_csv"],
         "manifest_check_summary_json": manifest_result["artifacts"]["summary_json"],
@@ -1147,6 +1381,16 @@ def main() -> int:
         "manifest_status": manifest_excerpt.get("status"),
         "ready_for_model_backed_ik": manifest_excerpt.get("ready_for_model_backed_ik") is True,
         "missing_inputs": manifest_excerpt.get("missing_inputs") or [],
+        "review_packet_status": review_packet["status"],
+        "review_packet_model_authority": review_packet["model_authority"],
+        "review_packet_item_count": review_packet["review_item_count"],
+        "review_packet_item_ids": review_packet["review_item_ids"],
+        "review_packet_observed_evidence_is_authority": review_packet[
+            "observed_evidence_is_authority"
+        ],
+        "review_packet_development_fixture_evidence_not_physical_so101_truth": review_packet[
+            "development_fixture_evidence_not_physical_so101_truth"
+        ],
         "next_required_for_goal": next_required,
         "next_required_action_ids": next_action_ids,
         "hardware_skipped": True,
@@ -1165,6 +1409,7 @@ def main() -> int:
             "placeholder": provenance_placeholder,
         },
         "candidate_manifest": candidate_manifest,
+        "review_packet": review_packet,
         "contract_checker": {
             "status": contract_result.get("status"),
             "ok": contract_result.get("ok"),
@@ -1191,6 +1436,8 @@ def main() -> int:
         ],
     }
 
+    write_json(review_packet_path, review_packet)
+    write_review_packet_csv(review_packet_csv_path, review_packet_rows)
     write_json(summary_path, summary)
     write_csv(csv_path, rows)
     write_markdown(readme_path, summary, rows)
@@ -1239,6 +1486,10 @@ def main() -> int:
                 "manifest_status": summary["manifest_status"],
                 "ready_for_model_backed_ik": summary["ready_for_model_backed_ik"],
                 "missing_inputs": summary["missing_inputs"],
+                "review_packet_status": summary["review_packet_status"],
+                "review_packet_item_count": summary["review_packet_item_count"],
+                "review_packet_json": str(review_packet_path),
+                "review_packet_csv": str(review_packet_csv_path),
                 "next_required_action_ids": summary["next_required_action_ids"],
             },
             sort_keys=True,
