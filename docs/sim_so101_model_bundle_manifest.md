@@ -326,7 +326,8 @@ field (`export_tool`, `exporter`, or `generated_by`), and one license field
 inputs only until copied into these reviewed manifest fields.
 
 `joint_limits_deg`, `joint_limits`, or `joint_limit_authority` must be present
-as an object covering every expected SO-101 joint: `shoulder_pan`,
+as an object covering every expected SO-101 joint with finite numeric bounds:
+`shoulder_pan`,
 `shoulder_lift`, `elbow_flex`, `wrist_flex`, `wrist_roll`, and `gripper`.
 Each entry may be a two-item `[lower, upper]` list or an object with
 `lower`/`upper` or `min`/`max` numeric values. The checker also requires
@@ -370,9 +371,9 @@ Accepted TCP review statuses are `reviewed`, `operator_reviewed`,
 `synthetic_fixture_reviewed_for_automation_only` only for explicitly
 hardware-free regression fixtures. Review evidence must include `reviewed_by`
 plus at least one trace field: `reviewed_at`, `review_id`, or `review_url`.
-Numeric TCP offsets
-without this metadata remain diagnostic evidence, not reviewed physical SO-101
-TCP truth.
+Numeric TCP offsets must be finite; values such as `NaN` or `Infinity`, or
+offsets without this metadata, remain diagnostic evidence and are not reviewed
+physical SO-101 TCP truth.
 
 Base-to-board alignment authority must be declared in
 `base_to_board_alignment_authority`, `base_to_board_authority`,
@@ -383,10 +384,9 @@ Base-to-board alignment authority must be declared in
 `synthetic_fixture_reviewed_for_automation_only` only for explicitly
 hardware-free regression fixtures. Review evidence must include `reviewed_by`
 plus at least one trace field: `reviewed_at`, `review_id`, or `review_url`.
-The transform value
-must include x/y/z translation and roll/pitch/yaw rotation fields; a non-empty
-object without that shape or without review metadata does not make the bundle
-ready.
+The transform value must include finite x/y/z translation and roll/pitch/yaw
+rotation fields; a non-empty object without that shape or without review
+metadata does not make the bundle ready.
 
 ## Readiness Rule
 
@@ -399,7 +399,7 @@ true:
 - `authority` declares an accepted reviewed status plus traceable review
   evidence (`reviewed_by` plus `reviewed_at`, `review_id`, or `review_url`)
 - `provenance` declares source reference, export tool, and license basis fields
-- numeric joint limits cover every SO-101 joint and include accepted
+- finite numeric joint limits cover every SO-101 joint and include accepted
   joint-limit review authority
 - at least one mesh reference is visible to the asset preflight and all mesh
   references resolve
@@ -407,11 +407,11 @@ true:
   review evidence
 - the target frame is explicitly declared and includes accepted target-frame
   review authority
-- a valid x/y/z TCP offset in meters is present and includes accepted TCP
+- a valid finite x/y/z TCP offset in meters is present and includes accepted TCP
   review authority
 - a real `base_to_board_transform` or `base_to_board_alignment` is populated
-  with translation/rotation fields and includes accepted alignment review
-  authority
+  with finite translation/rotation fields and includes accepted alignment
+  review authority
 - the child SO-101 model contract checker reports `model_contract_checked`, or
   the URDF has the expected static joint/frame contract and the only runtime
   follow-up is missing optional `placo`

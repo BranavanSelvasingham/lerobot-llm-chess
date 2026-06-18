@@ -67,6 +67,40 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
+def json_clone(payload: dict[str, Any]) -> dict[str, Any]:
+    return json.loads(json.dumps(payload))
+
+
+def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path]) -> dict[str, Path]:
+    fixture_dir = output_dir / "fixtures" / "invalid_numeric_bundle"
+    fixture_dir.mkdir(parents=True, exist_ok=True)
+
+    ready_payload = json.loads(fixtures["ready_manifest_path"].read_text())
+    ready_payload["model_path"] = str(normalize_path(fixtures["ready_model_path"]))
+    ready_payload["asset_roots"] = [str(normalize_path(fixtures["ready_asset_root"]))]
+
+    nonfinite_joint_limits = json_clone(ready_payload)
+    nonfinite_joint_limits["joint_limits_deg"]["shoulder_pan"] = ["NaN", 110.0]
+    nonfinite_joint_limits_path = fixture_dir / "so101_model_bundle.nonfinite_joint_limits.json"
+    write_json(nonfinite_joint_limits_path, nonfinite_joint_limits)
+
+    nonfinite_tcp = json_clone(ready_payload)
+    nonfinite_tcp["tcp_offset_m"]["z"] = "Infinity"
+    nonfinite_tcp_path = fixture_dir / "so101_model_bundle.nonfinite_tcp_offset.json"
+    write_json(nonfinite_tcp_path, nonfinite_tcp)
+
+    nonfinite_alignment = json_clone(ready_payload)
+    nonfinite_alignment["base_to_board_transform"]["rotation_rpy_rad"]["yaw"] = "NaN"
+    nonfinite_alignment_path = fixture_dir / "so101_model_bundle.nonfinite_alignment.json"
+    write_json(nonfinite_alignment_path, nonfinite_alignment)
+
+    return {
+        "nonfinite_joint_limits_manifest_path": nonfinite_joint_limits_path,
+        "nonfinite_tcp_manifest_path": nonfinite_tcp_path,
+        "nonfinite_alignment_manifest_path": nonfinite_alignment_path,
+    }
+
+
 def csv_cell(value: Any) -> str:
     if isinstance(value, (dict, list, tuple)):
         return json.dumps(value, sort_keys=True)
@@ -229,6 +263,46 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "invalid_nonfinite_joint_limits_not_ready",
+            "manifest_path": fixtures["nonfinite_joint_limits_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "joint_limits_status": "invalid",
+                "missing_inputs_contains": ["joint_limits_deg"],
+                "joint_limits_diagnostics_contains": [
+                    "joint_limit_invalid:shoulder_pan:joint_limit_non_finite"
+                ],
+            },
+        },
+        {
+            "case_id": "invalid_nonfinite_tcp_offset_not_ready",
+            "manifest_path": fixtures["nonfinite_tcp_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "tcp_offset_status": "invalid",
+                "missing_inputs_contains": ["tcp_offset_m"],
+                "tcp_offset_diagnostics_contains": ["non_finite_axis:z"],
+            },
+        },
+        {
             "case_id": "invalid_base_to_board_transform_not_ready",
             "manifest_path": fixtures["invalid_alignment_manifest_path"],
             "require_ready": False,
@@ -245,6 +319,25 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "alignment_status": "invalid",
                 "missing_inputs_contains": ["base_to_board_transform"],
                 "alignment_diagnostics_contains": ["base_to_board_rotation_rpy_missing"],
+            },
+        },
+        {
+            "case_id": "invalid_nonfinite_base_to_board_transform_not_ready",
+            "manifest_path": fixtures["nonfinite_alignment_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "alignment_status": "invalid",
+                "missing_inputs_contains": ["base_to_board_transform"],
+                "alignment_diagnostics_contains": ["rotation_rpy:non_finite_axis:yaw"],
             },
         },
         {
@@ -598,6 +691,7 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     fixtures = create_fixtures(output_dir)
+    fixtures.update(create_invalid_numeric_fixtures(output_dir, fixtures))
     cases: list[dict[str, Any]] = []
     for spec in case_specs(fixtures):
         record, summary = run_case(

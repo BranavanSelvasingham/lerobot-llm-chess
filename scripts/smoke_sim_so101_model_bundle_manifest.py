@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -686,6 +687,14 @@ def vector_status(value: Any, axes: tuple[str, str, str]) -> dict[str, Any]:
                 "value": value,
                 "diagnostics": [f"non_numeric_axis:{type(exc).__name__}"],
             }
+        non_finite_axes = [axis for axis, item in vector.items() if not math.isfinite(item)]
+        if non_finite_axes:
+            return {
+                "present": True,
+                "valid": False,
+                "value": value,
+                "diagnostics": [f"non_finite_axis:{axis}" for axis in non_finite_axes],
+            }
         return {"present": True, "valid": True, "value": vector, "diagnostics": []}
 
     if isinstance(value, list) and len(value) == 3:
@@ -697,6 +706,18 @@ def vector_status(value: Any, axes: tuple[str, str, str]) -> dict[str, Any]:
                 "valid": False,
                 "value": value,
                 "diagnostics": [f"non_numeric_vector:{type(exc).__name__}"],
+            }
+        non_finite_indexes = [
+            index for index, item in enumerate(vector) if not math.isfinite(item)
+        ]
+        if non_finite_indexes:
+            return {
+                "present": True,
+                "valid": False,
+                "value": value,
+                "diagnostics": [
+                    f"non_finite_vector_index:{index}" for index in non_finite_indexes
+                ],
             }
         return {"present": True, "valid": True, "value": vector, "diagnostics": []}
 
@@ -912,6 +933,8 @@ def parse_joint_limit_pair(value: Any) -> tuple[bool, Any, list[str]]:
             upper = float(value[upper_key])
         except (TypeError, ValueError) as exc:
             return False, value, [f"joint_limit_non_numeric:{type(exc).__name__}"]
+        if not math.isfinite(lower) or not math.isfinite(upper):
+            return False, value, ["joint_limit_non_finite"]
         if lower >= upper:
             return False, {"lower": lower, "upper": upper}, ["joint_limit_lower_not_below_upper"]
         return True, {"lower": lower, "upper": upper}, []
@@ -922,6 +945,8 @@ def parse_joint_limit_pair(value: Any) -> tuple[bool, Any, list[str]]:
             upper = float(value[1])
         except (TypeError, ValueError) as exc:
             return False, value, [f"joint_limit_non_numeric:{type(exc).__name__}"]
+        if not math.isfinite(lower) or not math.isfinite(upper):
+            return False, value, ["joint_limit_non_finite"]
         if lower >= upper:
             return False, [lower, upper], ["joint_limit_lower_not_below_upper"]
         return True, [lower, upper], []

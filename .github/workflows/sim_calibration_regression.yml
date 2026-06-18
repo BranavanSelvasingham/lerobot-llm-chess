@@ -361,7 +361,10 @@ jobs:
               "placeholder_manifest_not_ready",
               "placeholder_review_metadata_not_ready",
               "invalid_tcp_offset_shape_not_ready",
+              "invalid_nonfinite_joint_limits_not_ready",
+              "invalid_nonfinite_tcp_offset_not_ready",
               "invalid_base_to_board_transform_not_ready",
+              "invalid_nonfinite_base_to_board_transform_not_ready",
               "ready_synthetic_fixture_motion_not_physical",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -397,12 +400,30 @@ jobs:
           assert invalid_tcp["observations"]["tcp_offset_status"] == "invalid", invalid_tcp
           assert "tcp_offset_m" in invalid_tcp["observations"]["missing_inputs"], invalid_tcp
           assert invalid_tcp["observations"]["reviewed_model_motion_checked"] is False, invalid_tcp
+          nonfinite_joints = by_case["invalid_nonfinite_joint_limits_not_ready"]
+          assert nonfinite_joints["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", nonfinite_joints
+          assert nonfinite_joints["observations"]["ready_for_model_backed_ik"] is False, nonfinite_joints
+          assert nonfinite_joints["observations"]["joint_limits_status"] == "invalid", nonfinite_joints
+          assert "joint_limits_deg" in nonfinite_joints["observations"]["missing_inputs"], nonfinite_joints
+          assert nonfinite_joints["observations"]["reviewed_model_motion_checked"] is False, nonfinite_joints
+          nonfinite_tcp = by_case["invalid_nonfinite_tcp_offset_not_ready"]
+          assert nonfinite_tcp["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", nonfinite_tcp
+          assert nonfinite_tcp["observations"]["ready_for_model_backed_ik"] is False, nonfinite_tcp
+          assert nonfinite_tcp["observations"]["tcp_offset_status"] == "invalid", nonfinite_tcp
+          assert "tcp_offset_m" in nonfinite_tcp["observations"]["missing_inputs"], nonfinite_tcp
+          assert nonfinite_tcp["observations"]["reviewed_model_motion_checked"] is False, nonfinite_tcp
           invalid_alignment = by_case["invalid_base_to_board_transform_not_ready"]
           assert invalid_alignment["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", invalid_alignment
           assert invalid_alignment["observations"]["ready_for_model_backed_ik"] is False, invalid_alignment
           assert invalid_alignment["observations"]["alignment_status"] == "invalid", invalid_alignment
           assert "base_to_board_transform" in invalid_alignment["observations"]["missing_inputs"], invalid_alignment
           assert invalid_alignment["observations"]["reviewed_model_motion_checked"] is False, invalid_alignment
+          nonfinite_alignment = by_case["invalid_nonfinite_base_to_board_transform_not_ready"]
+          assert nonfinite_alignment["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", nonfinite_alignment
+          assert nonfinite_alignment["observations"]["ready_for_model_backed_ik"] is False, nonfinite_alignment
+          assert nonfinite_alignment["observations"]["alignment_status"] == "invalid", nonfinite_alignment
+          assert "base_to_board_transform" in nonfinite_alignment["observations"]["missing_inputs"], nonfinite_alignment
+          assert nonfinite_alignment["observations"]["reviewed_model_motion_checked"] is False, nonfinite_alignment
           ready_fixture = by_case["ready_synthetic_fixture_motion_not_physical"]
           assert ready_fixture["observations"]["status"] == "reviewed_mujoco_bundle_motion_checked", ready_fixture
           assert ready_fixture["observations"]["reviewed_model_motion_checked"] is True, ready_fixture
