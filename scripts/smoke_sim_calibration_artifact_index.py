@@ -2264,6 +2264,7 @@ def collect_so101_mujoco_smoke_artifacts(
         "all_mujoco_piece_release_synced": smoke.get("all_mujoco_piece_release_synced"),
         "next_required_for_goal": next_required,
         "next_required_action_ids": next_required_action_ids,
+        "next_required_action_count": len(next_required),
     }
     for key, value in sorted(artifact_paths.items()):
         add_path(

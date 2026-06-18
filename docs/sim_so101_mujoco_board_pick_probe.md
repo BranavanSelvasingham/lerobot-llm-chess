@@ -46,3 +46,9 @@ contact-tuned piece, and a seeded source robot pose. Serious policy training
 still needs reviewed SO-101 model authority, calibrated TCP/gripper offset,
 base-to-board alignment, and the same board-source pick/place proof using
 reviewed model-backed IK instead of direct pose seeding.
+The summary keeps that handoff machine-readable through
+`next_required_for_goal`, `next_required_action_ids`, and
+`next_required_action_count`; current action IDs include
+`supply_reviewed_so101_model_bundle_manifest`,
+`calibrate_reviewed_tcp_and_base_to_board_alignment`, and
+`repeat_board_pick_with_reviewed_model_backed_ik`.

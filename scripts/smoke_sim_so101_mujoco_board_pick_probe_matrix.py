@@ -92,6 +92,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "ready_for_model_backed_ik",
         "ready_for_policy_training",
         "physical_authority",
+        "next_required_action_ids",
         "summary_path",
         "errors",
     )
@@ -201,6 +202,20 @@ def add_error(errors: list[str], label: str, actual: Any, expected: Any) -> None
         errors.append(f"{label}: expected {expected!r}, got {actual!r}")
 
 
+def add_contains_errors(
+    errors: list[str],
+    label: str,
+    actual: Any,
+    expected_values: list[str],
+) -> None:
+    if not isinstance(actual, list):
+        errors.append(f"{label}: expected list containing {expected_values!r}, got {actual!r}")
+        return
+    missing = [value for value in expected_values if value not in actual]
+    if missing:
+        errors.append(f"{label}: missing {missing!r} from {actual!r}")
+
+
 def summarize_case(
     *,
     spec: dict[str, Any],
@@ -243,6 +258,8 @@ def summarize_case(
         "ready_for_policy_training": summary.get("ready_for_policy_training"),
         "physical_authority": summary.get("observed_evidence_is_physical_so101_authority"),
         "next_required_for_goal": summary.get("next_required_for_goal"),
+        "next_required_action_ids": summary.get("next_required_action_ids"),
+        "next_required_action_count": summary.get("next_required_action_count"),
         "artifacts": summary.get("artifacts"),
     }
 
@@ -316,6 +333,22 @@ def summarize_case(
     add_error(errors, f"{case_id}.physical_authority", observations["physical_authority"], False)
     if not observations["next_required_for_goal"]:
         errors.append(f"{case_id}.next_required_for_goal: expected non-empty list")
+    add_contains_errors(
+        errors,
+        f"{case_id}.next_required_action_ids",
+        observations["next_required_action_ids"],
+        [
+            "supply_reviewed_so101_model_bundle_manifest",
+            "calibrate_reviewed_tcp_and_base_to_board_alignment",
+            "repeat_board_pick_with_reviewed_model_backed_ik",
+        ],
+    )
+    add_error(
+        errors,
+        f"{case_id}.next_required_action_count",
+        observations["next_required_action_count"],
+        3,
+    )
     artifacts = observations["artifacts"]
     if not isinstance(artifacts, dict):
         errors.append(f"{case_id}.artifacts: expected dict")
@@ -394,6 +427,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "ready_for_model_backed_ik": observations.get("ready_for_model_backed_ik"),
         "ready_for_policy_training": observations.get("ready_for_policy_training"),
         "physical_authority": observations.get("physical_authority"),
+        "next_required_action_ids": observations.get("next_required_action_ids"),
         "summary_path": case["summary_path"],
         "errors": case["errors"],
     }

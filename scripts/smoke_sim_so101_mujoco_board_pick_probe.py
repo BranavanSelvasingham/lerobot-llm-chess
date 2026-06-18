@@ -48,6 +48,32 @@ LIFT_JOINT_TARGETS = {
     "elbow_flex": math.radians(10.0),
     "wrist_flex": math.radians(5.0),
 }
+NEXT_REQUIRED_FOR_GOAL = (
+    {
+        "priority": 1,
+        "missing_input": "reviewed_so101_model_bundle",
+        "action_id": "supply_reviewed_so101_model_bundle_manifest",
+        "gate": "reviewed_model_authority",
+        "title": "Replace generated scaffold with a reviewed SO-101 model bundle",
+        "detail": "Supply a reviewed SO-101 URDF/MJCF bundle and mesh roots before treating board-source pickup as physical model truth.",
+    },
+    {
+        "priority": 2,
+        "missing_input": "reviewed_tcp_and_base_to_board_alignment",
+        "action_id": "calibrate_reviewed_tcp_and_base_to_board_alignment",
+        "gate": "reviewed_model_authority",
+        "title": "Use reviewed TCP/gripper offset and base-to-board alignment",
+        "detail": "Use reviewed TCP/gripper offset and base-to-board alignment for model-backed IK instead of seeded source-pose joint targets.",
+    },
+    {
+        "priority": 3,
+        "missing_input": "reviewed_model_backed_board_source_pick_place",
+        "action_id": "repeat_board_pick_with_reviewed_model_backed_ik",
+        "gate": "scripted_contact_grasp_pick_place",
+        "title": "Repeat board-source pick/place with reviewed model-backed IK",
+        "detail": "Repeat the board-source pick/place proof with calibrated gripper geometry before treating training rollouts as physical truth.",
+    },
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -695,11 +721,11 @@ def main() -> int:
             "The robot source pose is seeded directly in qpos/ctrl; reviewed model-backed IK remains required.",
             "The piece freejoint is reset onto the source square once before the run and is not manually moved after that reset.",
         ],
-        "next_required_for_goal": [
-            "Replace the generated scaffold with a reviewed SO-101 URDF/MJCF bundle and mesh roots.",
-            "Use reviewed TCP/gripper offset and base-to-board alignment for model-backed IK instead of seeded source pose.",
-            "Repeat board-source pick/place with calibrated gripper geometry before treating training rollouts as physical truth.",
+        "next_required_for_goal": [dict(action) for action in NEXT_REQUIRED_FOR_GOAL],
+        "next_required_action_ids": [
+            action["action_id"] for action in NEXT_REQUIRED_FOR_GOAL
         ],
+        "next_required_action_count": len(NEXT_REQUIRED_FOR_GOAL),
     }
     write_json(summary_path, summary)
     write_rows(rows_path, rows)

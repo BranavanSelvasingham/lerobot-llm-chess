@@ -3134,6 +3134,17 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
     artifacts = artifacts if isinstance(artifacts, dict) else {}
     dependencies = smoke.get("dependencies")
     dependencies = dependencies if isinstance(dependencies, dict) else {}
+    next_required = smoke.get("next_required_for_goal")
+    next_required = next_required if isinstance(next_required, list) else []
+    next_required_action_ids = smoke.get("next_required_action_ids")
+    next_required_action_ids = (
+        unique_string_values(next_required_action_ids)
+        if isinstance(next_required_action_ids, list)
+        else unique_string_values([action.get("action_id") for action in next_required if isinstance(action, dict)])
+    )
+    next_required_action_count = smoke.get("next_required_action_count")
+    if not isinstance(next_required_action_count, int):
+        next_required_action_count = len(next_required)
     section: dict[str, Any] = {
         "summary_path": artifacts.get("summary_json") or str(summary_path),
         "output_dir": str(summary_path.parent),
@@ -3155,7 +3166,9 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         ),
         "ready_for_model_backed_ik": smoke.get("ready_for_model_backed_ik"),
         "limitations": smoke.get("limitations"),
-        "next_required_for_goal": smoke.get("next_required_for_goal"),
+        "next_required_for_goal": next_required,
+        "next_required_action_ids": next_required_action_ids,
+        "next_required_action_count": next_required_action_count,
     }
     for key in (
         "mujoco_model_load",
