@@ -2986,6 +2986,15 @@ def collect_so101_training_readiness_gate_artifacts(
         "development_fixture_evidence_not_policy_training_truth": gate.get(
             "development_fixture_evidence_not_policy_training_truth"
         ),
+        "priority_gate_order": gate.get("priority_gate_order") or [],
+        "priority_gate_queue": gate.get("priority_gate_queue") or [],
+        "next_priority_gate_id": gate.get("next_priority_gate_id"),
+        "next_priority_action_ids": gate.get("next_priority_action_ids") or [],
+        "blocked_by_prior_gate_ids": gate.get("blocked_by_prior_gate_ids") or [],
+        "development_evidence_only_gate_ids": gate.get(
+            "development_evidence_only_gate_ids"
+        )
+        or [],
         "blockers": gate.get("blockers") or [],
         "blocker_count": gate.get("blocker_count"),
         "reviewed_model_authority_gate_summary_path": gate.get(

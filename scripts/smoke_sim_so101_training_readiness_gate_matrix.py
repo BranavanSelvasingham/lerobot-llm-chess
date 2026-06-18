@@ -17,6 +17,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 from smoke_sim_calibration_regression_suite import (  # noqa: E402
     REVIEWED_SO101_MODEL_AUTHORITY,
+    SO101_TRAINING_PRIORITY_STAGE_IDS,
     so101_training_readiness_gate_section,
 )
 
@@ -69,6 +70,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "rollout_ready_for_policy_training",
         "rollout_policy_training_authority_ready",
         "development_fixture_evidence_not_policy_training_truth",
+        "next_priority_gate_id",
+        "next_priority_action_ids",
+        "priority_gate_order",
         "blockers",
         "expected_gate_ready",
         "errors",
@@ -164,9 +168,58 @@ def rollout_state(
     }
 
 
+def mujoco_scene_state(
+    summary_path: Path,
+    *,
+    model_authority: str | None,
+    status: str = "ok",
+) -> dict[str, Any]:
+    return {
+        "status": status,
+        "model_authority": model_authority,
+        "ready_for_model_backed_ik": model_authority == REVIEWED_SO101_MODEL_AUTHORITY,
+        "summary_path": str(summary_path),
+    }
+
+
+def chess_env_state(
+    summary_path: Path,
+    *,
+    model_authority: str | None,
+    status: str = "ok",
+) -> dict[str, Any]:
+    return {
+        "status": status,
+        "model_authority": model_authority,
+        "ready_for_policy_training": model_authority == REVIEWED_SO101_MODEL_AUTHORITY,
+        "summary_path": str(summary_path),
+    }
+
+
+def contact_probe_state(summary_path: Path, *, observed: bool = True) -> dict[str, Any]:
+    return {
+        "status": "ok" if observed else "contact_not_observed",
+        "all_board_contacts_observed": observed,
+        "summary_path": str(summary_path),
+    }
+
+
+def grasp_probe_state(summary_path: Path, *, verified: bool = True) -> dict[str, Any]:
+    return {
+        "status": (
+            "contact_grasp_lift_place_physics_verified"
+            if verified
+            else "contact_grasp_lift_place_not_verified"
+        ),
+        "contact_grasp_lift_place_physics_verified": verified,
+        "summary_path": str(summary_path),
+    }
+
+
 def case_specs(output_dir: Path) -> list[dict[str, Any]]:
     summaries = output_dir / "input_summaries"
     authority_ready = reviewed_authority_ready(summaries / "authority_ready.json")
+    authority_ready["physical_reviewed_model_motion_checked"] = True
     authority_blocked = reviewed_authority_blocked(summaries / "authority_blocked.json")
     board_dev = board_pick_state(
         summaries / "board_dev.json",
@@ -195,10 +248,32 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         ready_for_policy_training=True,
         model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
     )
+    scene_dev = mujoco_scene_state(
+        summaries / "scene_dev.json",
+        model_authority=DEV_AUTHORITY,
+    )
+    scene_reviewed = mujoco_scene_state(
+        summaries / "scene_reviewed.json",
+        model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+    )
+    env_dev = chess_env_state(
+        summaries / "env_dev.json",
+        model_authority=DEV_AUTHORITY,
+    )
+    env_reviewed = chess_env_state(
+        summaries / "env_reviewed.json",
+        model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+    )
+    contact_ready = contact_probe_state(summaries / "contact_ready.json")
+    grasp_ready = grasp_probe_state(summaries / "grasp_ready.json")
     return [
         {
             "case_id": "all_development_evidence_blocked",
             "authority": authority_blocked,
+            "mujoco_scene": scene_dev,
+            "chess_env": env_dev,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
             "board": board_dev,
             "rollouts": rollout_dev_blocked,
             "expect": {
@@ -212,11 +287,16 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                     "supply_reviewed_so101_model_bundle_manifest",
                     "reviewed_model_backed_board_source_pick_place",
                 ],
+                "next_priority_gate": "reviewed_model_authority",
             },
         },
         {
             "case_id": "reviewed_authority_but_board_still_development",
             "authority": authority_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
             "board": board_dev,
             "rollouts": rollout_reviewed_ready,
             "expect": {
@@ -228,11 +308,58 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "rollout_authority": True,
                 "development_caveat": True,
                 "blockers_contain": ["reviewed_model_backed_board_source_pick_place"],
+                "next_priority_gate": "scripted_contact_grasp_pick_place",
+            },
+        },
+        {
+            "case_id": "reviewed_authority_but_scene_still_development",
+            "authority": authority_ready,
+            "mujoco_scene": scene_dev,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": True,
+                "board_authority": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "blockers_contain": ["load_reviewed_model_in_mujoco"],
+                "next_priority_gate": "mujoco_scene_validity",
+            },
+        },
+        {
+            "case_id": "reviewed_scene_but_gym_still_development",
+            "authority": authority_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_dev,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": True,
+                "board_authority": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "blockers_contain": ["wire_reviewed_so101_chess_gymnasium_task"],
+                "next_priority_gate": "gymnasium_task_wiring",
             },
         },
         {
             "case_id": "board_draft_authority_rejected",
             "authority": authority_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
             "board": board_pick_state(
                 summaries / "board_draft.json",
                 model_authority="draft_candidate_not_reviewed",
@@ -249,11 +376,16 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "rollout_authority": True,
                 "development_caveat": True,
                 "blockers_contain": ["reviewed_model_backed_board_source_pick_place"],
+                "next_priority_gate": "scripted_contact_grasp_pick_place",
             },
         },
         {
             "case_id": "board_seeded_reviewed_authority_rejected",
             "authority": authority_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
             "board": board_pick_state(
                 summaries / "board_seeded_reviewed.json",
                 model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
@@ -270,11 +402,16 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "rollout_authority": True,
                 "development_caveat": True,
                 "blockers_contain": ["reviewed_model_backed_board_source_pick_place"],
+                "next_priority_gate": "scripted_contact_grasp_pick_place",
             },
         },
         {
             "case_id": "board_manual_reset_pose_reviewed_authority_rejected",
             "authority": authority_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
             "board": board_pick_state(
                 summaries / "board_manual_reset_pose_reviewed.json",
                 model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
@@ -292,11 +429,16 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "rollout_authority": True,
                 "development_caveat": True,
                 "blockers_contain": ["reviewed_model_backed_board_source_pick_place"],
+                "next_priority_gate": "scripted_contact_grasp_pick_place",
             },
         },
         {
             "case_id": "rollout_raw_ready_development_authority_rejected",
             "authority": authority_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
             "board": board_reviewed,
             "rollouts": rollout_state(
                 summaries / "rollout_raw_dev.json",
@@ -313,11 +455,16 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "rollout_authority": False,
                 "development_caveat": True,
                 "blockers_contain": ["reviewed_model_backed_training_rollouts"],
+                "next_priority_gate": "focused_training_rollouts",
             },
         },
         {
             "case_id": "rollout_reviewed_authority_not_ready",
             "authority": authority_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
             "board": board_reviewed,
             "rollouts": rollout_state(
                 summaries / "rollout_reviewed_not_ready.json",
@@ -334,11 +481,16 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "rollout_authority": False,
                 "development_caveat": True,
                 "blockers_contain": ["reviewed_model_backed_training_rollouts"],
+                "next_priority_gate": "focused_training_rollouts",
             },
         },
         {
             "case_id": "all_ready_reviewed_contract_state",
             "authority": authority_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
             "board": board_reviewed,
             "rollouts": rollout_reviewed_ready,
             "expect": {
@@ -350,6 +502,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "rollout_authority": True,
                 "development_caveat": False,
                 "blockers_exact": [],
+                "next_priority_gate": None,
             },
         },
     ]
@@ -372,6 +525,10 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         spec["authority"],
         spec["board"],
         spec["rollouts"],
+        mujoco_scene=spec["mujoco_scene"],
+        chess_env=spec["chess_env"],
+        contact_probe=spec["contact"],
+        grasp_probe=spec["grasp"],
     )
     expect = spec["expect"]
     errors: list[str] = []
@@ -420,6 +577,33 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         expect["development_caveat"],
     )
     add_error(errors, "blocker_count", gate.get("blocker_count"), len(gate.get("blockers") or []))
+    add_error(
+        errors,
+        "priority_gate_order",
+        gate.get("priority_gate_order"),
+        list(SO101_TRAINING_PRIORITY_STAGE_IDS),
+    )
+    queue = gate.get("priority_gate_queue")
+    if not isinstance(queue, list):
+        errors.append("priority_gate_queue: expected list")
+    else:
+        add_error(errors, "priority_gate_queue_count", len(queue), len(SO101_TRAINING_PRIORITY_STAGE_IDS))
+        add_error(
+            errors,
+            "priority_gate_queue_ids",
+            [stage.get("gate_id") for stage in queue],
+            list(SO101_TRAINING_PRIORITY_STAGE_IDS),
+        )
+    add_error(
+        errors,
+        "next_priority_gate_id",
+        gate.get("next_priority_gate_id"),
+        expect.get("next_priority_gate"),
+    )
+    if expect.get("next_priority_gate") is None:
+        add_error(errors, "next_priority_action_ids", gate.get("next_priority_action_ids"), [])
+    elif not gate.get("next_priority_action_ids"):
+        errors.append("next_priority_action_ids: expected non-empty list")
     if "blockers_exact" in expect:
         add_error(errors, "blockers", gate.get("blockers"), expect["blockers_exact"])
     expect_contains(
@@ -464,6 +648,9 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "development_fixture_evidence_not_policy_training_truth": gate.get(
             "development_fixture_evidence_not_policy_training_truth"
         ),
+        "next_priority_gate_id": gate.get("next_priority_gate_id"),
+        "next_priority_action_ids": gate.get("next_priority_action_ids"),
+        "priority_gate_order": gate.get("priority_gate_order"),
         "blockers": gate.get("blockers"),
         "expected_gate_ready": case["expected"].get("ready"),
         "errors": case["errors"],
@@ -484,16 +671,17 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         "",
         "## Cases",
         "",
-        "| Case | Status | Ready | Board Pick | Rollout Authority | Fixture Caveat | Blockers |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| Case | Status | Ready | Next Gate | Board Pick | Rollout Authority | Fixture Caveat | Blockers |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for case in summary["cases"]:
         gate = case["gate"]
         lines.append(
-            "| `{case_id}` | `{status}` | `{ready}` | `{board}` | `{rollout}` | `{fixture}` | `{blockers}` |".format(
+            "| `{case_id}` | `{status}` | `{ready}` | `{next_gate}` | `{board}` | `{rollout}` | `{fixture}` | `{blockers}` |".format(
                 case_id=case["case_id"],
                 status=case["status"],
                 ready=gate.get("ready"),
+                next_gate=gate.get("next_priority_gate_id") or "none",
                 board=gate.get("reviewed_model_backed_board_source_pick_place"),
                 rollout=gate.get("rollout_policy_training_authority_ready"),
                 fixture=gate.get("development_fixture_evidence_not_policy_training_truth"),
@@ -506,6 +694,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "## Authority Boundary",
             "",
             "- `all_ready_reviewed_contract_state` exercises the ready branch only; its injected dictionaries are not reviewed robot evidence.",
+            "- `priority_gate_queue` preserves reviewed authority, MuJoCo scene, Gymnasium task wiring, scripted pick/place, then training rollout order.",
             "- Draft, development, and fixture-only model-authority labels are rejected even when raw readiness booleans are true.",
             "- Use this smoke to protect training-readiness gate logic. Use reviewed SO-101 model-backed pick/place and rollout evidence before serious training.",
         ]

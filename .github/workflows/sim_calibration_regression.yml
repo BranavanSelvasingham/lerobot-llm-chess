@@ -808,6 +808,8 @@ jobs:
           assert summary["case_ids"] == [
               "all_development_evidence_blocked",
               "reviewed_authority_but_board_still_development",
+              "reviewed_authority_but_scene_still_development",
+              "reviewed_scene_but_gym_still_development",
               "board_draft_authority_rejected",
               "board_seeded_reviewed_authority_rejected",
               "board_manual_reset_pose_reviewed_authority_rejected",
@@ -825,6 +827,14 @@ jobs:
           assert raw_dev["rollout_ready_for_policy_training"] is True, raw_dev
           assert raw_dev["rollout_policy_training_authority_ready"] is False, raw_dev
           assert raw_dev["ready"] is False, raw_dev
+          scene_dev = by_case["reviewed_authority_but_scene_still_development"]["gate"]
+          assert scene_dev["ready"] is False, scene_dev
+          assert scene_dev["next_priority_gate_id"] == "mujoco_scene_validity", scene_dev
+          assert "load_reviewed_model_in_mujoco" in scene_dev["next_priority_action_ids"], scene_dev
+          gym_dev = by_case["reviewed_scene_but_gym_still_development"]["gate"]
+          assert gym_dev["ready"] is False, gym_dev
+          assert gym_dev["next_priority_gate_id"] == "gymnasium_task_wiring", gym_dev
+          assert "wire_reviewed_so101_chess_gymnasium_task" in gym_dev["next_priority_action_ids"], gym_dev
           seeded = by_case["board_seeded_reviewed_authority_rejected"]["gate"]
           assert seeded["board_pick_reviewed_model_authority_ready"] is True, seeded
           assert seeded["reviewed_model_backed_board_source_pick_place"] is False, seeded
@@ -2629,12 +2639,29 @@ jobs:
               assert metrics.get("rollout_policy_training_authority_ready") in {True, False, None}, metrics
               assert isinstance(metrics.get("blockers"), list), metrics
               assert metrics.get("blocker_count") == len(metrics.get("blockers")), metrics
+              assert metrics.get("priority_gate_order") == [
+                  "reviewed_model_authority",
+                  "mujoco_scene_validity",
+                  "gymnasium_task_wiring",
+                  "scripted_contact_grasp_pick_place",
+                  "focused_training_rollouts",
+              ], metrics
+              assert isinstance(metrics.get("priority_gate_queue"), list), metrics
+              assert len(metrics.get("priority_gate_queue")) == len(metrics.get("priority_gate_order")), metrics
+              assert [
+                  stage.get("gate_id") for stage in metrics.get("priority_gate_queue")
+              ] == metrics.get("priority_gate_order"), metrics
+              assert isinstance(metrics.get("next_priority_action_ids"), list), metrics
               if metrics.get("ready") is True:
                   assert metrics.get("status") == "serious_training_ready", metrics
                   assert metrics.get("blockers") == [], metrics
+                  assert metrics.get("next_priority_gate_id") in {None, ""}, metrics
+                  assert metrics.get("next_priority_action_ids") == [], metrics
               else:
                   assert metrics.get("status") == "serious_training_blocked", metrics
                   assert metrics.get("blockers"), metrics
+                  assert metrics.get("next_priority_gate_id") in metrics.get("priority_gate_order"), metrics
+                  assert metrics.get("next_priority_action_ids"), metrics
                   assert metrics.get("development_fixture_evidence_not_policy_training_truth") is True, metrics
           assert any(
               row.get("label") == "so101_mujoco_scene:model_xml"

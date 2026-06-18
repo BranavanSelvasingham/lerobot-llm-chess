@@ -109,6 +109,13 @@ SO101_TRAINING_READINESS_GATE_README_NAME = "README.md"
 SO101_TRAINING_ROLLOUTS_DIR_NAME = "so101_training_rollouts"
 SO101_TRAINING_ROLLOUTS_SUMMARY_NAME = "so101_training_rollouts_summary.json"
 REVIEWED_SO101_MODEL_AUTHORITY = "reviewed_so101_model_bundle_manifest"
+SO101_TRAINING_PRIORITY_STAGE_IDS = (
+    "reviewed_model_authority",
+    "mujoco_scene_validity",
+    "gymnasium_task_wiring",
+    "scripted_contact_grasp_pick_place",
+    "focused_training_rollouts",
+)
 BASELINE_CORNERS = [[32, 338], [594, 340], [540, 20], [86, 12]]
 PERTURBED_CORNERS = [[34, 337], [592, 342], [538, 22], [88, 14]]
 
@@ -4624,10 +4631,229 @@ def write_so101_reviewed_model_authority_gate_artifacts(
     return payload
 
 
+def _summary_path(value: dict[str, Any]) -> str | None:
+    path = value.get("summary_path")
+    return path if isinstance(path, str) and path else None
+
+
+def so101_training_priority_gate_queue(
+    reviewed_authority_gate: dict[str, Any],
+    board_pick: dict[str, Any],
+    training_rollouts: dict[str, Any],
+    *,
+    mujoco_scene: dict[str, Any] | None = None,
+    chess_env: dict[str, Any] | None = None,
+    contact_probe: dict[str, Any] | None = None,
+    grasp_probe: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    mujoco_scene = mujoco_scene if isinstance(mujoco_scene, dict) else {}
+    chess_env = chess_env if isinstance(chess_env, dict) else {}
+    contact_probe = contact_probe if isinstance(contact_probe, dict) else {}
+    grasp_probe = grasp_probe if isinstance(grasp_probe, dict) else {}
+
+    reviewed_authority_ready = reviewed_authority_gate.get("ready") is True
+    reviewed_motion_ready = (
+        reviewed_authority_gate.get("physical_reviewed_model_motion_checked") is True
+    )
+    mujoco_scene_automation_ready = mujoco_scene.get("status") == "ok"
+    mujoco_scene_training_ready = (
+        reviewed_authority_ready
+        and reviewed_motion_ready
+        and mujoco_scene_automation_ready
+        and mujoco_scene.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
+    )
+    gym_automation_ready = chess_env.get("status") == "ok"
+    gym_training_ready = (
+        mujoco_scene_training_ready
+        and gym_automation_ready
+        and chess_env.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
+    )
+    contact_automation_ready = (
+        contact_probe.get("all_board_contacts_observed") is True
+        or contact_probe.get("status") == "ok"
+    )
+    grasp_automation_ready = (
+        grasp_probe.get("status") == "contact_grasp_lift_place_physics_verified"
+        or grasp_probe.get("contact_grasp_lift_place_physics_verified") is True
+    )
+    board_pick_reviewed_model_authority_ready = (
+        board_pick.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
+    )
+    reviewed_model_backed_board_pick_place = (
+        board_pick.get("board_source_pick_place_verified") is True
+        and board_pick.get("ready_for_model_backed_ik") is True
+        and board_pick_reviewed_model_authority_ready
+        and board_pick.get("robot_pose_seeded_for_source_fixture") is not True
+        and board_pick.get("manual_piece_pose_used_after_reset") is False
+    )
+    scripted_pick_place_automation_ready = (
+        contact_automation_ready
+        and grasp_automation_ready
+        and board_pick.get("board_source_pick_place_verified") is True
+    )
+    scripted_pick_place_training_ready = (
+        gym_training_ready and reviewed_model_backed_board_pick_place
+    )
+    rollout_policy_training_authority_ready = (
+        training_rollouts.get("ready_for_policy_training") is True
+        and training_rollouts.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
+    )
+    rollout_automation_ready = training_rollouts.get("status") == "ok"
+    rollout_training_ready = (
+        scripted_pick_place_training_ready and rollout_policy_training_authority_ready
+    )
+
+    stage_specs = [
+        {
+            "gate_id": "reviewed_model_authority",
+            "title": "Reviewed SO-101 model authority",
+            "required_state": "reviewed_model_authority_ready",
+            "training_ready": reviewed_authority_ready,
+            "automation_evidence_ready": reviewed_authority_ready,
+            "next_action_ids": (
+                reviewed_authority_gate.get("next_required_action_ids")
+                or reviewed_authority_gate.get("blocker_packet_next_action_ids")
+                or reviewed_authority_gate.get("blockers")
+                or ["supply_reviewed_so101_model_bundle_manifest"]
+            ),
+            "evidence_artifact_paths": [
+                _summary_path(reviewed_authority_gate),
+            ],
+        },
+        {
+            "gate_id": "mujoco_scene_validity",
+            "title": "MuJoCo scene validity with reviewed motion",
+            "required_state": "physical_reviewed_model_motion_checked",
+            "training_ready": mujoco_scene_training_ready,
+            "automation_evidence_ready": mujoco_scene_automation_ready,
+            "next_action_ids": [
+                "load_reviewed_model_in_mujoco",
+                "prove_physical_reviewed_model_motion",
+            ],
+            "evidence_artifact_paths": [
+                _summary_path(reviewed_authority_gate),
+                _summary_path(mujoco_scene),
+            ],
+        },
+        {
+            "gate_id": "gymnasium_task_wiring",
+            "title": "Gymnasium SO-101 chess task wiring",
+            "required_state": "reviewed_model_backed_gymnasium_task_wiring",
+            "training_ready": gym_training_ready,
+            "automation_evidence_ready": gym_automation_ready,
+            "next_action_ids": ["wire_reviewed_so101_chess_gymnasium_task"],
+            "evidence_artifact_paths": [
+                _summary_path(chess_env),
+            ],
+        },
+        {
+            "gate_id": "scripted_contact_grasp_pick_place",
+            "title": "Scripted contact, grasp, pick, place, and release evidence",
+            "required_state": "reviewed_model_backed_board_source_pick_place",
+            "training_ready": scripted_pick_place_training_ready,
+            "automation_evidence_ready": scripted_pick_place_automation_ready,
+            "next_action_ids": [
+                "repeat_board_source_pick_place_with_reviewed_model_backed_ik"
+            ],
+            "evidence_artifact_paths": [
+                _summary_path(contact_probe),
+                _summary_path(grasp_probe),
+                _summary_path(board_pick),
+            ],
+        },
+        {
+            "gate_id": "focused_training_rollouts",
+            "title": "Focused training rollouts",
+            "required_state": "policy_training_rollouts_ready",
+            "training_ready": rollout_training_ready,
+            "automation_evidence_ready": rollout_automation_ready,
+            "next_action_ids": (
+                training_rollouts.get("serious_policy_training_blockers")
+                or ["run_focused_training_rollouts_after_reviewed_pick_place"]
+            ),
+            "evidence_artifact_paths": [
+                _summary_path(training_rollouts),
+            ],
+        },
+    ]
+
+    stages: list[dict[str, Any]] = []
+    prior_ready = True
+    for priority, spec in enumerate(stage_specs, start=1):
+        training_ready = bool(spec["training_ready"])
+        automation_ready = bool(spec["automation_evidence_ready"])
+        if training_ready:
+            status = "ready"
+        elif not prior_ready:
+            status = "blocked_by_prior_requirements"
+        elif automation_ready:
+            status = "development_evidence_only"
+        else:
+            status = "action_required"
+        next_action_ids = unique_string_values(spec.get("next_action_ids") or [])
+        stages.append(
+            {
+                "priority": priority,
+                "gate_id": spec["gate_id"],
+                "title": spec["title"],
+                "required_state": spec["required_state"],
+                "status": status,
+                "training_ready": training_ready,
+                "automation_evidence_ready": automation_ready,
+                "blocked_by_prior_gate_ids": [
+                    stage["gate_id"] for stage in stages if stage["training_ready"] is False
+                ]
+                if status == "blocked_by_prior_requirements"
+                else [],
+                "next_action_ids": [] if training_ready else next_action_ids,
+                "evidence_artifact_paths": [
+                    path
+                    for path in spec.get("evidence_artifact_paths", [])
+                    if isinstance(path, str) and path
+                ],
+            }
+        )
+        prior_ready = prior_ready and training_ready
+
+    next_stage = next(
+        (
+            stage
+            for stage in stages
+            if stage.get("status") in {"action_required", "development_evidence_only"}
+        ),
+        None,
+    )
+    blocked_stage_ids = [
+        stage["gate_id"]
+        for stage in stages
+        if stage.get("status") == "blocked_by_prior_requirements"
+    ]
+    development_only_stage_ids = [
+        stage["gate_id"]
+        for stage in stages
+        if stage.get("status") == "development_evidence_only"
+    ]
+    return {
+        "priority_gate_queue": stages,
+        "priority_gate_order": list(SO101_TRAINING_PRIORITY_STAGE_IDS),
+        "next_priority_gate_id": next_stage.get("gate_id") if next_stage else None,
+        "next_priority_action_ids": (
+            next_stage.get("next_action_ids") if next_stage else []
+        ),
+        "blocked_by_prior_gate_ids": blocked_stage_ids,
+        "development_evidence_only_gate_ids": development_only_stage_ids,
+    }
+
+
 def so101_training_readiness_gate_section(
     reviewed_authority_gate: dict[str, Any],
     board_pick: dict[str, Any],
     training_rollouts: dict[str, Any],
+    *,
+    mujoco_scene: dict[str, Any] | None = None,
+    chess_env: dict[str, Any] | None = None,
+    contact_probe: dict[str, Any] | None = None,
+    grasp_probe: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     reviewed_authority_ready = reviewed_authority_gate.get("ready") is True
     board_pick_reviewed_model_authority_ready = (
@@ -4643,6 +4869,19 @@ def so101_training_readiness_gate_section(
     rollout_policy_training_authority_ready = (
         training_rollouts.get("ready_for_policy_training") is True
         and training_rollouts.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
+    )
+    priority_queue = so101_training_priority_gate_queue(
+        reviewed_authority_gate,
+        board_pick,
+        training_rollouts,
+        mujoco_scene=mujoco_scene,
+        chess_env=chess_env,
+        contact_probe=contact_probe,
+        grasp_probe=grasp_probe,
+    )
+    priority_gate_queue_ready = all(
+        stage.get("training_ready") is True
+        for stage in priority_queue.get("priority_gate_queue", [])
     )
     blockers = unique_string_values(
         [
@@ -4664,12 +4903,18 @@ def so101_training_readiness_gate_section(
                     or ["reviewed_model_backed_training_rollouts"]
                 )
             ),
+            *(
+                []
+                if priority_gate_queue_ready
+                else priority_queue.get("next_priority_action_ids", [])
+            ),
         ]
     )
     ready = (
         reviewed_authority_ready
         and reviewed_model_backed_board_pick_place
         and rollout_policy_training_authority_ready
+        and priority_gate_queue_ready
     )
     return {
         "status": "serious_training_ready" if ready else "serious_training_blocked",
@@ -4703,6 +4948,7 @@ def so101_training_readiness_gate_section(
         ),
         "blockers": blockers,
         "blocker_count": len(blockers),
+        **priority_queue,
         "reviewed_model_authority_gate_summary_path": reviewed_authority_gate.get(
             "summary_path"
         ),
@@ -4710,6 +4956,7 @@ def so101_training_readiness_gate_section(
         "training_rollouts_summary_path": training_rollouts.get("summary_path"),
         "notes": [
             "This gate is false until the reviewed model-authority gate is ready, board-source pick/place is repeated with reviewed model-backed IK, and policy rollout evidence is no longer development-scaffold-only.",
+            "priority_gate_queue preserves the MuJoCo-first gate order: reviewed model authority, MuJoCo scene validity, Gymnasium wiring, scripted contact/grasp/pick/place, then focused training rollouts.",
             "Development rollout JSONL remains useful for debugging and narrow imitation-curriculum tests, not serious policy training truth.",
         ],
     }
@@ -4787,6 +5034,19 @@ def write_so101_training_readiness_gate_artifacts(
             "blockers": "; ".join(gate.get("blockers", [])),
             "notes": "This caveat prevents treating scaffold rollouts as serious training truth.",
         },
+        {
+            "requirement_id": "priority_gate_queue",
+            "category": "automation_priority",
+            "status": "ok"
+            if gate.get("priority_gate_order") == list(SO101_TRAINING_PRIORITY_STAGE_IDS)
+            and isinstance(gate.get("priority_gate_queue"), list)
+            and len(gate.get("priority_gate_queue")) == len(SO101_TRAINING_PRIORITY_STAGE_IDS)
+            else "review_required",
+            "observed_value": markdown_list_value(gate.get("priority_gate_order")),
+            "expected_value": markdown_list_value(SO101_TRAINING_PRIORITY_STAGE_IDS),
+            "blockers": "; ".join(gate.get("next_priority_action_ids") or []),
+            "notes": "The gate queue keeps missing work ordered before serious training rollouts.",
+        },
     ]
     gate_dir.mkdir(parents=True, exist_ok=True)
     write_json(summary_path, payload)
@@ -4828,6 +5088,12 @@ def write_so101_training_readiness_gate_artifacts(
                 f"`{markdown_bool(gate.get('rollout_policy_training_authority_ready'))}`",
                 "- Development fixture evidence is not policy training truth: "
                 f"`{markdown_bool(gate.get('development_fixture_evidence_not_policy_training_truth'))}`",
+                "- Next priority gate: "
+                f"`{gate.get('next_priority_gate_id') or 'none'}`",
+                "- Next priority actions: "
+                f"`{markdown_list_value(gate.get('next_priority_action_ids'))}`",
+                "- Priority gate order: "
+                f"`{markdown_list_value(gate.get('priority_gate_order'))}`",
                 "",
                 "## Blockers",
                 "",
@@ -5742,6 +6008,22 @@ def main() -> int:
         output_dir,
         so101_reviewed_authority_gate,
     )
+    so101_mujoco_scene_section = so101_mujoco_smoke_section(
+        so101_mujoco_scene,
+        so101_mujoco_scene_summary_path,
+    )
+    so101_chess_env_section = so101_mujoco_smoke_section(
+        so101_chess_env,
+        so101_chess_env_summary_path,
+    )
+    so101_mujoco_contact_probe_section = so101_mujoco_smoke_section(
+        so101_mujoco_contact_probe,
+        so101_mujoco_contact_probe_summary_path,
+    )
+    so101_mujoco_grasp_probe_section = so101_mujoco_smoke_section(
+        so101_mujoco_grasp_probe,
+        so101_mujoco_grasp_probe_summary_path,
+    )
     so101_mujoco_board_pick_probe_section = so101_mujoco_smoke_section(
         so101_mujoco_board_pick_probe,
         so101_mujoco_board_pick_probe_summary_path,
@@ -5754,6 +6036,10 @@ def main() -> int:
         so101_reviewed_authority_gate,
         so101_mujoco_board_pick_probe_section,
         so101_training_rollouts_section,
+        mujoco_scene=so101_mujoco_scene_section,
+        chess_env=so101_chess_env_section,
+        contact_probe=so101_mujoco_contact_probe_section,
+        grasp_probe=so101_mujoco_grasp_probe_section,
     )
     so101_training_readiness_gate = write_so101_training_readiness_gate_artifacts(
         output_dir,
@@ -5869,26 +6155,14 @@ def main() -> int:
             ik_reachability,
             ik_reachability_summary_path,
         ),
-        "so101_mujoco_scene": so101_mujoco_smoke_section(
-            so101_mujoco_scene,
-            so101_mujoco_scene_summary_path,
-        ),
-        "so101_chess_env": so101_mujoco_smoke_section(
-            so101_chess_env,
-            so101_chess_env_summary_path,
-        ),
+        "so101_mujoco_scene": so101_mujoco_scene_section,
+        "so101_chess_env": so101_chess_env_section,
         "so101_env_resets": so101_mujoco_smoke_section(
             so101_env_resets,
             so101_env_resets_summary_path,
         ),
-        "so101_mujoco_contact_probe": so101_mujoco_smoke_section(
-            so101_mujoco_contact_probe,
-            so101_mujoco_contact_probe_summary_path,
-        ),
-        "so101_mujoco_grasp_probe": so101_mujoco_smoke_section(
-            so101_mujoco_grasp_probe,
-            so101_mujoco_grasp_probe_summary_path,
-        ),
+        "so101_mujoco_contact_probe": so101_mujoco_contact_probe_section,
+        "so101_mujoco_grasp_probe": so101_mujoco_grasp_probe_section,
         "so101_mujoco_board_pick_probe": so101_mujoco_board_pick_probe_section,
         "so101_training_readiness_gate": so101_training_readiness_gate,
         "so101_training_rollouts": so101_training_rollouts_section,
