@@ -534,9 +534,11 @@ selected authoritative source candidate path. The nested object records that as
 `selected_authoritative_candidate_path_matches_bundle`; `matched_by` is populated
 only when the prerequisites are ready and the checked path match closes. An
 authoritative root alone is not enough to authorize a different model file in the
-same tree. If source or bundle authority is not ready yet, the consistency check
-remains `not_checked_prerequisites_not_ready` rather than overclaiming reviewed
-physical SO-101 authority. The blocker packet separates immediate
+same tree; the reviewed-authority matrix includes a same-root unselected-model
+negative case so even physical-motion-ready injected state remains blocked on
+that mismatch. If source or bundle authority is not ready yet, the consistency
+check remains `not_checked_prerequisites_not_ready` rather than overclaiming
+reviewed physical SO-101 authority. The blocker packet separates immediate
 `action_required` items from `blocked_by_prior_requirements` items so reviewed
 MuJoCo motion proof stays downstream of reviewed physical bundle authority and
 source/bundle model-path consistency.

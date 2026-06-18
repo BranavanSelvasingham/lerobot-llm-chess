@@ -258,11 +258,15 @@ def motion_physical_ready(summary_path: Path) -> dict[str, Any]:
 def case_specs(output_dir: Path) -> list[dict[str, Any]]:
     fixture_dir = output_dir / "contract_state_paths"
     source_model = fixture_dir / "reviewed_source" / "so101_reviewed.urdf"
+    source_sibling_model = fixture_dir / "reviewed_source" / "so101_unselected_sibling.xml"
     bundle_model = fixture_dir / "reviewed_bundle" / "so101_reviewed.urdf"
     source_model.parent.mkdir(parents=True, exist_ok=True)
     bundle_model.parent.mkdir(parents=True, exist_ok=True)
     source_model.write_text(
         "contract-state path placeholder only; not physical SO-101 evidence\n"
+    )
+    source_sibling_model.write_text(
+        "same-root unselected placeholder only; not physical SO-101 evidence\n"
     )
     bundle_model.write_text(
         "contract-state path placeholder only; not physical SO-101 evidence\n"
@@ -386,6 +390,24 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 ],
                 "action_required_contains": ["source_bundle_consistency"],
                 "blocked_prior_contains": ["physical_reviewed_mujoco_motion_checked"],
+            },
+        },
+        {
+            "case_id": "source_ready_physical_bundle_same_root_unselected_model",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready(
+                summary_dir / "bundle_same_root_unselected.json",
+                source_sibling_model,
+            ),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_bundle_model_path_mismatch",
+                "consistency_ready": False,
+                "development_fixture": True,
+                "blockers_contain": ["align_source_inventory_with_bundle_manifest_model_path"],
+                "actions_contain": ["align_source_inventory_with_bundle_manifest_model_path"],
+                "action_required_contains": ["source_bundle_consistency"],
             },
         },
         {

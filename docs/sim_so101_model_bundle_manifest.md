@@ -303,9 +303,11 @@ evidence field: `reviewed_by`, `reviewed_at`, `review_id`, or `review_url`.
 
 When the integrated calibration regression suite evaluates the reviewed model
 authority gate, this manifest is checked against the SO-101 model-source
-inventory. The manifest `model_path` must match an authoritative source path, or
-be contained by an authoritative source root, before the aggregate reviewed
-model authority gate can close. This prevents a reviewed source inventory and a
+inventory. The manifest `model_path` must match the selected authoritative
+source candidate path before the aggregate reviewed model authority gate can
+close. An authoritative source root can help the inventory discover and narrow
+that selected candidate, but root containment alone does not authorize a
+different bundle model file. This prevents a reviewed source inventory and a
 reviewed bundle manifest from silently referring to different SO-101 models.
 
 Provenance must include at least one source field (`source_url`, `source_uri`,

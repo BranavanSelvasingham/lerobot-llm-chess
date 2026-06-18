@@ -281,6 +281,7 @@ jobs:
               "source_missing_physical_bundle_ready",
               "source_ready_physical_bundle_missing_model_path",
               "source_ready_physical_bundle_path_mismatch",
+              "source_ready_physical_bundle_same_root_unselected_model",
               "source_ready_physical_bundle_path_match_motion_missing",
               "source_ready_hardware_free_bundle_fixture",
               "source_ready_physical_bundle_fixture_motion_not_physical",
@@ -292,6 +293,12 @@ jobs:
           assert mismatch["ready"] is False, mismatch
           assert mismatch["source_bundle_consistency_status"] == "source_bundle_model_path_mismatch", mismatch
           assert "align_source_inventory_with_bundle_manifest_model_path" in mismatch["next_required_action_ids"], mismatch
+          same_root = by_case["source_ready_physical_bundle_same_root_unselected_model"]["gate"]
+          assert same_root["ready"] is False, same_root
+          assert same_root["source_bundle_consistency_status"] == "source_bundle_model_path_mismatch", same_root
+          assert same_root["physical_reviewed_model_motion_checked"] is True, same_root
+          assert same_root["development_fixture_evidence_not_physical_so101_truth"] is True, same_root
+          assert "align_source_inventory_with_bundle_manifest_model_path" in same_root["next_required_action_ids"], same_root
           fixture_motion = by_case["source_ready_physical_bundle_fixture_motion_not_physical"]["gate"]
           assert fixture_motion["ready"] is False, fixture_motion
           assert fixture_motion["source_bundle_consistency_status"] == "source_bundle_model_path_consistent", fixture_motion
