@@ -1292,6 +1292,7 @@ def so101_reviewed_model_authority_gate_row(artifact: dict[str, Any]) -> list[An
         metrics.get("blocker_packet_model_authority", ""),
         metrics.get("blocker_packet_item_count", ""),
         metrics.get("blocker_packet_action_required_count", ""),
+        compact_list(metrics.get("blocker_packet_blocked_by_prior_requirements_item_ids")),
         compact_list(metrics.get("blocker_packet_next_action_ids")),
         "ok" if artifact.get("exists") is True else "missing",
     ]
@@ -2854,6 +2855,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Packet Authority",
                 "Packet Items",
                 "Action Required",
+                "Blocked Prior",
                 "Packet Next Actions",
                 "Artifact Status",
             ],

@@ -3756,6 +3756,10 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
     source_bundle_consistency = (
         source_bundle_consistency if isinstance(source_bundle_consistency, dict) else {}
     )
+    source_bundle_consistency_ready = gate.get("source_bundle_consistency_ready") is True
+    physical_bundle_authority_ready = (
+        gate.get("physical_so101_model_authority_ready") is True
+    )
     item_specs = [
         {
             "item_id": "source_authority_ready",
@@ -3790,6 +3794,10 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
                 source_bundle_consistency.get("status")
                 == "not_checked_prerequisites_not_ready"
             ),
+            "blocked_by_prior_requirement_ids": [
+                "source_authority_ready",
+                "physical_bundle_authority_ready",
+            ],
             "evidence_artifact_path": gate.get("summary_path"),
             "next_action_id": "align_source_inventory_with_bundle_manifest_model_path",
             "operator_action": (
@@ -3803,6 +3811,13 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
             "gate": "mujoco_scene_validity",
             "required_state": "physical_reviewed_model_motion_checked",
             "observed_ready": gate.get("physical_reviewed_model_motion_checked") is True,
+            "blocked_by_prior_requirements": (
+                not physical_bundle_authority_ready or not source_bundle_consistency_ready
+            ),
+            "blocked_by_prior_requirement_ids": [
+                "physical_bundle_authority_ready",
+                "source_bundle_consistency",
+            ],
             "evidence_artifact_path": gate.get("reviewed_mujoco_bundle_summary_path"),
             "next_action_id": "prove_physical_reviewed_model_motion",
             "operator_action": (
@@ -3846,7 +3861,26 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
             )
             or (
                 spec["item_id"] == "physical_reviewed_mujoco_motion_checked"
-                and ("mujoco" in blocker or "motion" in blocker)
+                and (
+                    (
+                        not spec.get("blocked_by_prior_requirements")
+                        and ("mujoco" in blocker or "motion" in blocker)
+                    )
+                    or (
+                        spec.get("blocked_by_prior_requirements")
+                        and (
+                            "manifest" in blocker
+                            or "mesh" in blocker
+                            or "joint" in blocker
+                            or "target" in blocker
+                            or "tcp" in blocker
+                            or "base" in blocker
+                            or "contract" in blocker
+                            or "align_source_inventory" in blocker
+                            or "model_path" in blocker
+                        )
+                    )
+                )
             )
         ]
         if (
@@ -3861,6 +3895,11 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
                 **spec,
                 "status": status,
                 "blockers": related_blockers,
+                "blocked_by_prior_requirement_ids": (
+                    spec.get("blocked_by_prior_requirement_ids", [])
+                    if status == "blocked_by_prior_requirements"
+                    else []
+                ),
                 "development_fixture_evidence_not_physical_so101_truth": gate.get(
                     "development_fixture_evidence_not_physical_so101_truth"
                 )
@@ -3891,6 +3930,11 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
     action_required_item_ids = [
         item["item_id"] for item in items if item.get("status") == "action_required"
     ]
+    blocked_by_prior_item_ids = [
+        item["item_id"]
+        for item in items
+        if item.get("status") == "blocked_by_prior_requirements"
+    ]
     return {
         "schema": "lerobot.sim.so101_reviewed_model_authority_blocker_packet.v1",
         "ok": True,
@@ -3903,6 +3947,8 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
         "ready": gate.get("ready") is True,
         "action_required_item_ids": action_required_item_ids,
         "action_required_count": len(action_required_item_ids),
+        "blocked_by_prior_requirements_item_ids": blocked_by_prior_item_ids,
+        "blocked_by_prior_requirements_count": len(blocked_by_prior_item_ids),
         "item_count": len(items),
         "item_ids": [item["item_id"] for item in items],
         "next_action_ids": [
@@ -3980,6 +4026,12 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "blocker_packet_action_required_count": blocker_packet["action_required_count"],
         "blocker_packet_action_required_item_ids": blocker_packet[
             "action_required_item_ids"
+        ],
+        "blocker_packet_blocked_by_prior_requirements_count": blocker_packet[
+            "blocked_by_prior_requirements_count"
+        ],
+        "blocker_packet_blocked_by_prior_requirements_item_ids": blocker_packet[
+            "blocked_by_prior_requirements_item_ids"
         ],
         "blocker_packet_next_action_ids": blocker_packet["next_action_ids"],
         "blocker_packet": blocker_packet,
@@ -4082,6 +4134,7 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "required_state",
         "status",
         "observed_ready",
+        "blocked_by_prior_requirement_ids",
         "next_action_id",
         "evidence_artifact_path",
         "blockers",
@@ -4114,6 +4167,10 @@ def write_so101_reviewed_model_authority_gate_artifacts(
                 f"`{markdown_bool(gate.get('physical_reviewed_model_motion_checked'))}`",
                 "- Development fixture evidence is not physical SO-101 truth: "
                 f"`{markdown_bool(gate.get('development_fixture_evidence_not_physical_so101_truth'))}`",
+                "- Immediate action required items: "
+                f"`{markdown_list_value(payload.get('blocker_packet_action_required_item_ids'))}`",
+                "- Blocked by prior requirement items: "
+                f"`{markdown_list_value(payload.get('blocker_packet_blocked_by_prior_requirements_item_ids'))}`",
                 f"- Blocker packet: `{blocker_packet_path}`",
                 f"- Blocker packet rows: `{blocker_packet_csv_path}`",
                 "",

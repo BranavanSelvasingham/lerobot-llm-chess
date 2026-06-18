@@ -2775,6 +2775,13 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
             "blocker_packet_action_required_item_ids"
         )
         or [],
+        "blocker_packet_blocked_by_prior_requirements_count": gate.get(
+            "blocker_packet_blocked_by_prior_requirements_count"
+        ),
+        "blocker_packet_blocked_by_prior_requirements_item_ids": gate.get(
+            "blocker_packet_blocked_by_prior_requirements_item_ids"
+        )
+        or [],
         "blocker_packet_next_action_ids": gate.get("blocker_packet_next_action_ids")
         or [],
         "source_inventory_summary_path": gate.get("source_inventory_summary_path"),
