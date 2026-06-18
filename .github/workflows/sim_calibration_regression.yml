@@ -647,6 +647,16 @@ jobs:
           assert so101_training_rollouts["all_mujoco_piece_release_synced"] is True, so101_training_rollouts
           assert isinstance(so101_training_rollouts["episode_count"], int) and so101_training_rollouts["episode_count"] > 0, so101_training_rollouts
           assert isinstance(so101_training_rollouts["transition_count"], int) and so101_training_rollouts["transition_count"] > 0, so101_training_rollouts
+          assert so101_training_rollouts["development_prerequisites_satisfied"] is True, so101_training_rollouts
+          assert so101_training_rollouts["training_authority_status"] == "development_rollouts_prerequisites_verified_not_policy_ready", so101_training_rollouts
+          assert so101_training_rollouts["ready_for_policy_training"] is False, so101_training_rollouts
+          assert "reviewed_model_backed_board_source_pick_place" in so101_training_rollouts["serious_policy_training_blockers"], so101_training_rollouts
+          board_pick_prerequisite = so101_training_rollouts["board_pick_prerequisite"]
+          assert board_pick_prerequisite["ok"] is True, board_pick_prerequisite
+          assert board_pick_prerequisite["status"] == "development_board_pick_prerequisite_verified", board_pick_prerequisite
+          assert board_pick_prerequisite["board_source_pick_place_verified"] is True, board_pick_prerequisite
+          assert board_pick_prerequisite["manual_piece_pose_used_after_reset"] is False, board_pick_prerequisite
+          assert board_pick_prerequisite["robot_pose_seeded_for_source_fixture"] is True, board_pick_prerequisite
           matrix = summary["pick_place_scenario_matrix"]
           assert matrix["ok"] is True, matrix
           assert matrix["aggregate_status"]["ok"] is True, matrix["aggregate_status"]

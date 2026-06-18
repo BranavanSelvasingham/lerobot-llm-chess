@@ -24,6 +24,7 @@ MODEL_NAME = "so101_chess_development.xml"
 MANIFEST_NAME = "so101_chess_development_manifest.json"
 README_NAME = "README.md"
 SCHEMA = "lerobot.sim.so101_training_rollouts.v1"
+BOARD_PICK_PREREQUISITE_SCHEMA = SCHEMA + ".board_pick_prerequisite.v1"
 DEFAULT_TASKS: tuple[tuple[str, str], ...] = (
     ("e4", "e5"),
     ("a4", "a5"),
@@ -55,6 +56,15 @@ def parse_args() -> argparse.Namespace:
         action="append",
         default=[],
         help="Task pair as SOURCE:TARGET, for example e4:e5. Repeatable. Defaults to a small board-zone curriculum.",
+    )
+    parser.add_argument(
+        "--development-board-pick-summary-json",
+        type=Path,
+        required=True,
+        help=(
+            "Summary JSON from smoke_sim_so101_mujoco_board_pick_probe.py. "
+            "Training rollouts are collected only after this development board-source pick/place gate is explicit."
+        ),
     )
     return parser.parse_args()
 
@@ -110,6 +120,73 @@ def parse_tasks(values: list[str]) -> tuple[tuple[str, str], ...]:
         source, target = value.split(":", 1)
         tasks.append((source.strip().lower(), target.strip().lower()))
     return tuple(tasks)
+
+
+def load_json_object(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text())
+    if not isinstance(payload, dict):
+        raise ValueError(f"Expected JSON object in {path}.")
+    return payload
+
+
+def inspect_board_pick_prerequisite(path: Path) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "schema": BOARD_PICK_PREREQUISITE_SCHEMA,
+        "path": str(path),
+        "ok": False,
+        "status": "unavailable",
+        "required_status": "development_board_source_pick_place_verified",
+        "required_authority": "development_scaffold_not_reviewed",
+        "ready_for_model_backed_ik_required": False,
+        "diagnostics": [],
+    }
+    if not path.is_file():
+        result["status"] = "missing"
+        result["diagnostics"] = ["development_board_pick_summary_missing"]
+        return result
+    try:
+        summary = load_json_object(path)
+    except Exception as exc:
+        result["status"] = "parse_error"
+        result["diagnostics"] = [f"{type(exc).__name__}: {exc}"]
+        return result
+
+    required_checks = {
+        "summary_ok": summary.get("ok") is True,
+        "status": summary.get("status") == "development_board_source_pick_place_verified",
+        "model_authority": summary.get("model_authority") == "development_scaffold_not_reviewed",
+        "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik") is False,
+        "board_source_pick_place_verified": summary.get("board_source_pick_place_verified") is True,
+        "source_pick_started_at_source": summary.get("source_pick_started_at_source") is True,
+        "close_two_finger_contact_observed": summary.get("close_two_finger_contact_observed") is True,
+        "lift_verified": summary.get("lift_verified") is True,
+        "board_contact_cleared_during_lift": summary.get("board_contact_cleared_during_lift") is True,
+        "transfer_verified": summary.get("transfer_verified") is True,
+        "place_without_manual_piece_pose_verified": summary.get("place_without_manual_piece_pose_verified") is True,
+        "release_contact_cleared_after_retreat": summary.get("release_contact_cleared_after_retreat") is True,
+        "manual_piece_pose_used_after_reset": summary.get("manual_piece_pose_used_after_reset") is False,
+        "robot_pose_seeded_for_source_fixture": summary.get("robot_pose_seeded_for_source_fixture") is True,
+    }
+    missing = [key for key, ok in required_checks.items() if not ok]
+    result.update(
+        {
+            "ok": not missing,
+            "status": "development_board_pick_prerequisite_verified" if not missing else "development_board_pick_prerequisite_failed",
+            "source_square": summary.get("source_square"),
+            "target_square": summary.get("target_square"),
+            "model_authority": summary.get("model_authority"),
+            "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
+            "board_source_pick_place_verified": summary.get("board_source_pick_place_verified"),
+            "manual_piece_pose_used_after_reset": summary.get("manual_piece_pose_used_after_reset"),
+            "robot_pose_seeded_for_source_fixture": summary.get("robot_pose_seeded_for_source_fixture"),
+            "final_target_xy_error_m": summary.get("final_target_xy_error_m"),
+            "target_xy_tolerance_m": summary.get("target_xy_tolerance_m"),
+            "required_checks": required_checks,
+            "failed_checks": missing,
+            "diagnostics": missing,
+        }
+    )
+    return result
 
 
 def observation_payload(obs: dict[str, Any]) -> dict[str, Any]:
@@ -255,9 +332,12 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- All episodes complete: `{summary['all_scripted_pick_place_complete']}`",
         f"- MuJoCo fallback-free: `{summary['all_mujoco_fallback_free']}`",
         f"- MuJoCo piece release synced: `{summary['all_mujoco_piece_release_synced']}`",
+        f"- Development board-pick prerequisite: `{summary['development_prerequisites_satisfied']}`",
+        f"- Ready for serious policy training: `{summary['ready_for_policy_training']}`",
         f"- Rollouts JSONL: `{summary['artifacts']['transitions_jsonl']}`",
         "",
         "The rollouts use the development MJCF scaffold and are not physical SO-101 training truth.",
+        "The board-pick prerequisite proves only development-fixture board-source pick/place before rollout collection.",
     ]
     path.write_text("\n".join(lines) + "\n")
 
@@ -290,6 +370,20 @@ def main() -> int:
             "all_scripted_pick_place_complete": False,
             "all_mujoco_fallback_free": False,
             "all_mujoco_piece_release_synced": False,
+            "development_prerequisites_satisfied": False,
+            "ready_for_policy_training": False,
+            "training_authority_status": "missing_runtime_dependencies",
+            "board_pick_prerequisite": {
+                "schema": BOARD_PICK_PREREQUISITE_SCHEMA,
+                "path": str(args.development_board_pick_summary_json),
+                "ok": False,
+                "status": "not_checked_due_to_missing_runtime_dependencies",
+            },
+            "serious_policy_training_blockers": [
+                "reviewed_so101_model_bundle",
+                "reviewed_tcp_and_base_to_board_alignment",
+                "reviewed_model_backed_board_source_pick_place",
+            ],
             "artifacts": {
                 "summary_json": str(summary_path),
                 "transitions_jsonl": str(transitions_path),
@@ -314,6 +408,7 @@ def main() -> int:
     )
 
     tasks = parse_tasks(args.task)
+    board_pick_prerequisite = inspect_board_pick_prerequisite(args.development_board_pick_summary_json)
     first_source, first_target = tasks[0]
     manifest = write_so101_development_mjcf(
         model_path,
@@ -339,14 +434,36 @@ def main() -> int:
     all_complete = all(row["scripted_pick_place_complete"] for row in episode_rows)
     all_fallback_free = all(row["mujoco_active"] and row["fallback"] is None for row in episode_rows)
     all_release_synced = all(row["mujoco_piece_release_synced"] for row in episode_rows)
-    ok = bool(episode_rows) and bool(transitions) and all_complete and all_fallback_free and all_release_synced
+    development_prerequisites_satisfied = bool(board_pick_prerequisite.get("ok"))
+    ok = (
+        bool(episode_rows)
+        and bool(transitions)
+        and all_complete
+        and all_fallback_free
+        and all_release_synced
+        and development_prerequisites_satisfied
+    )
     summary = {
         "schema": SCHEMA,
         "ok": ok,
-        "status": "ok" if ok else "failed",
+        "status": "ok" if ok else "failed_prerequisite_or_rollout_check",
         "dependencies": deps,
         "model_authority": SO101_DEV_MJCF_AUTHORITY,
         "ready_for_model_backed_ik": False,
+        "development_prerequisites_satisfied": development_prerequisites_satisfied,
+        "board_pick_prerequisite": board_pick_prerequisite,
+        "training_authority_status": (
+            "development_rollouts_prerequisites_verified_not_policy_ready"
+            if development_prerequisites_satisfied
+            else "missing_or_failed_development_board_pick_prerequisite"
+        ),
+        "ready_for_policy_training": False,
+        "rollout_use": "debug_imitation_curriculum_only",
+        "serious_policy_training_blockers": [
+            "reviewed_so101_model_bundle",
+            "reviewed_tcp_and_base_to_board_alignment",
+            "reviewed_model_backed_board_source_pick_place",
+        ],
         "development_manifest": manifest,
         "tasks": [{"source_square": source, "target_square": target} for source, target in tasks],
         "episode_count": len(episode_rows),
@@ -367,10 +484,12 @@ def main() -> int:
             "Rollouts use a generated development MJCF scaffold, not a reviewed SO-101 model bundle.",
             "The expert policy tracks deterministic joint-space waypoints, not calibrated IK or learned contact behavior.",
             "The piece transfer in the environment remains symbolic until reviewed MuJoCo contact manipulation is implemented.",
+            "The development board-pick prerequisite uses seeded source pose and is not reviewed model-backed IK.",
         ],
         "next_required_for_goal": [
             "Replace the development MJCF scaffold with reviewed model bundle evidence.",
             "Add contact-validated grasp/lift/place physics after TCP and base-to-board alignment are reviewed.",
+            "Repeat board-source pick/place with reviewed model-backed IK instead of seeded development pose.",
             "Use these JSONL transitions as a narrow imitation-learning/debug curriculum, not final policy training truth.",
         ],
     }

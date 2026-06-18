@@ -1466,7 +1466,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             f"board-source pick/place `{markdown_bool(so101_mujoco_board_pick_probe.get('board_source_pick_place_verified'))}`, "
             f"board-source final target XY error `{so101_mujoco_board_pick_probe.get('final_target_xy_error_m')}`, "
             f"scripted rollout episodes `{so101_training_rollouts.get('episode_count')}` and transitions "
-            f"`{so101_training_rollouts.get('transition_count')}`."
+            f"`{so101_training_rollouts.get('transition_count')}`, rollout prerequisites "
+            f"`{markdown_bool(so101_training_rollouts.get('development_prerequisites_satisfied'))}`, "
+            f"ready_for_policy_training `{markdown_bool(so101_training_rollouts.get('ready_for_policy_training'))}`."
         ),
         (
             "- SO-101 MuJoCo next required items stay open: reviewed model bundle, mesh roots, "
@@ -2691,6 +2693,12 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "transition_count",
         "all_scripted_pick_place_complete",
         "all_mujoco_piece_release_synced",
+        "development_prerequisites_satisfied",
+        "board_pick_prerequisite",
+        "training_authority_status",
+        "ready_for_policy_training",
+        "rollout_use",
+        "serious_policy_training_blockers",
         "manifest_status",
         "manifest_request",
         "model_path",
@@ -3713,6 +3721,8 @@ def main() -> int:
             str(REPO_ROOT / "scripts" / "smoke_sim_so101_training_rollouts.py"),
             "--output-dir",
             str(so101_training_rollouts_dir),
+            "--development-board-pick-summary-json",
+            str(so101_mujoco_board_pick_probe_summary_path),
         ],
         output_dir=so101_training_rollouts_dir,
         expected_json_path=so101_training_rollouts_summary_path,
