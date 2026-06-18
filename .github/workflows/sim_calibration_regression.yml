@@ -230,12 +230,16 @@ jobs:
               "authoritative_missing_review_metadata",
               "authoritative_placeholder_review_metadata",
               "authoritative_complete_source_review",
+              "authoritative_single_root_complete_source_review",
               "authoritative_root_ambiguous",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
           by_case = {case["case_id"]: case for case in summary["cases"]}
           assert by_case["authoritative_complete_source_review"]["observations"]["source_authority_gate_status"] == "source_authority_ready", by_case["authoritative_complete_source_review"]
           assert by_case["authoritative_complete_source_review"]["observations"]["source_intake_status"] == "source_authority_ready_waiting_for_bundle_manifest", by_case["authoritative_complete_source_review"]
+          assert by_case["authoritative_single_root_complete_source_review"]["observations"]["source_authority_gate_status"] == "source_authority_ready", by_case["authoritative_single_root_complete_source_review"]
+          assert by_case["authoritative_single_root_complete_source_review"]["observations"]["source_intake_status"] == "source_authority_ready_waiting_for_bundle_manifest", by_case["authoritative_single_root_complete_source_review"]
+          assert by_case["authoritative_single_root_complete_source_review"]["observations"]["selected_authoritative_candidate_path"] == by_case["authoritative_complete_source_review"]["observations"]["selected_authoritative_candidate_path"], by_case
           assert by_case["authoritative_root_ambiguous"]["observations"]["source_authority_gate_status"] == "source_authority_blocked_ambiguous_authoritative_model", by_case["authoritative_root_ambiguous"]
           assert by_case["authoritative_root_ambiguous"]["observations"]["source_intake_status"] == "single_source_selection_required", by_case["authoritative_root_ambiguous"]
           for case in summary["cases"]:

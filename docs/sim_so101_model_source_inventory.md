@@ -140,10 +140,11 @@ python scripts/smoke_sim_so101_source_authority_matrix.py --output-dir /private/
 ```
 
 The smoke generates synthetic URDF fixtures under the output directory and runs
-the inventory through six non-hardware cases: missing source root, unverified
+the inventory through seven non-hardware cases: missing source root, unverified
 candidate, authoritative path without review metadata, authoritative path with
 placeholder review metadata, authoritative path with complete source-review
-metadata, and ambiguous authoritative root. It writes:
+metadata, single authoritative root with complete source-review metadata, and
+ambiguous authoritative root. It writes:
 
 - `so101_source_authority_matrix_summary.json`
 - `so101_source_authority_matrix_cases.csv`
@@ -152,6 +153,9 @@ metadata, and ambiguous authoritative root. It writes:
 The complete-source-review fixture must reach
 `source_authority_gate_status: "source_authority_ready"` and
 `source_intake_status: "source_authority_ready_waiting_for_bundle_manifest"`.
+The single-root ready fixture must resolve to the same
+`selected_authoritative_candidate_path` as the explicit authoritative-path
+fixture; this is the path later compared against the reviewed bundle manifest.
 The ambiguous-root fixture must remain
 `source_authority_blocked_ambiguous_authoritative_model` and queue
 `select_single_authoritative_so101_model_source`. Every matrix case keeps

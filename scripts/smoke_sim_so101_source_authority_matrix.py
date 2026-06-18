@@ -75,6 +75,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "inventory_status",
         "candidate_count",
         "authoritative_candidate_count",
+        "selected_authoritative_candidate_path",
         "source_authority_gate_status",
         "source_authority_review_status",
         "source_authority_review_ready",
@@ -328,6 +329,34 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "source_authority_review_ready": True,
                 "source_intake_status": "source_authority_ready_waiting_for_bundle_manifest",
                 "review_packet_status": "review_packet_source_authority_ready",
+                "selected_authoritative_candidate_path": str(normalize_path(fixtures["single_model"])),
+                "blockers_exact": [],
+                "actions_contain": [
+                    "run_so101_model_bundle_probe",
+                    "supply_reviewed_so101_model_bundle_manifest",
+                ],
+                "missing_review_scope_ids": [],
+            },
+        },
+        {
+            "case_id": "authoritative_single_root_complete_source_review",
+            "args": [
+                "--root",
+                str(fixtures["single_root"]),
+                "--authoritative-root",
+                str(fixtures["single_root"]),
+                *complete_review_args(),
+            ],
+            "expect": {
+                "status": "authoritative_model_found",
+                "candidate_count": 1,
+                "authoritative_candidate_count": 1,
+                "source_authority_gate_status": "source_authority_ready",
+                "source_authority_review_status": "review_metadata_supplied",
+                "source_authority_review_ready": True,
+                "source_intake_status": "source_authority_ready_waiting_for_bundle_manifest",
+                "review_packet_status": "review_packet_source_authority_ready",
+                "selected_authoritative_candidate_path": str(normalize_path(fixtures["single_model"])),
                 "blockers_exact": [],
                 "actions_contain": [
                     "run_so101_model_bundle_probe",
@@ -565,6 +594,13 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
             inventory.get("source_authority_missing_review_scope_ids"),
             expect["missing_review_scope_ids"],
         )
+    if "selected_authoritative_candidate_path" in expect:
+        add_error(
+            errors,
+            f"{case_id}.selected_authoritative_candidate_path",
+            inventory.get("selected_authoritative_candidate_path"),
+            expect["selected_authoritative_candidate_path"],
+        )
 
     return {
         "case_id": case_id,
@@ -619,6 +655,9 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "inventory_status": observations.get("inventory_status"),
         "candidate_count": observations.get("candidate_count"),
         "authoritative_candidate_count": observations.get("authoritative_candidate_count"),
+        "selected_authoritative_candidate_path": observations.get(
+            "selected_authoritative_candidate_path"
+        ),
         "source_authority_gate_status": observations.get("source_authority_gate_status"),
         "source_authority_review_status": observations.get("source_authority_review_status"),
         "source_authority_review_ready": observations.get("source_authority_review_ready"),
