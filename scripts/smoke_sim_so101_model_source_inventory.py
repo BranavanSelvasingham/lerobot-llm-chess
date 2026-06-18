@@ -1325,6 +1325,8 @@ def source_intake_command_template(action_id: str) -> list[str]:
             "<absolute-reviewed-so101-model-file>",
             "--authority-license-basis",
             "<reviewed-license-or-redistribution-basis>",
+            "--authority-source-reference",
+            "<reviewed-cad-export-source-url-or-commit>",
             "--authority-review-scope",
             "model_identity",
             "--authority-review-scope",

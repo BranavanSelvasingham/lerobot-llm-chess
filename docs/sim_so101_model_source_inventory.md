@@ -27,7 +27,10 @@ hints, or local fixture evidence reviewed physical SO-101 truth.
 The source-intake checklist is narrower: it records the scanned roots, missing
 source-authority review fields/scopes, `source_intake_status`,
 `source_intake_action_ids`, and command templates for the current
-`next_required_action_ids`. It reports
+`next_required_action_ids`. Source-review command templates include the required
+license basis, source reference, review scopes, reviewer identity, and at least
+one review trace field so following the checklist can close the source-authority
+metadata gate when the supplied values are real and non-placeholder. It reports
 `source_intake_model_authority: "source_intake_not_authority"` plus false
 observed-evidence and physical-authority flags, so it remains operator guidance
 rather than reviewed SO-101 model authority.

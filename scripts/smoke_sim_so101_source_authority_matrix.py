@@ -678,6 +678,38 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
     )
     if not all(isinstance(action.get("command"), list) for action in source_intake.get("actions") or []):
         errors.append(f"{case_id}.source_intake_commands: expected all commands to be lists")
+    review_command_action_ids = {
+        "review_and_declare_authoritative_so101_model_source",
+        "record_source_authority_review_metadata",
+        "select_single_authoritative_so101_model_source",
+    }
+    for action in source_intake.get("actions") or []:
+        action_id = action.get("action_id")
+        if action_id not in review_command_action_ids:
+            continue
+        command = action.get("command")
+        command = command if isinstance(command, list) else []
+        for flag in (
+            "--authority-license-basis",
+            "--authority-source-reference",
+            "--authority-review-scope",
+            "--authority-reviewed-by",
+        ):
+            if flag not in command:
+                errors.append(
+                    f"{case_id}.{action_id}.source_intake_command: missing {flag}"
+                )
+        if not any(
+            flag in command
+            for flag in (
+                "--authority-reviewed-at",
+                "--authority-review-id",
+                "--authority-review-url",
+            )
+        ):
+            errors.append(
+                f"{case_id}.{action_id}.source_intake_command: missing review trace flag"
+            )
 
     expect_contains(
         errors,

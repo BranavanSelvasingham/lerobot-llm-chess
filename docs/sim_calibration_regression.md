@@ -674,7 +674,9 @@ from the reset scene state.
 The SO-101 model-source inventory artifact contract also includes
 `so101_model_source_intake_checklist.json` and `.csv`. The checklist must mirror
 `next_required_action_ids`, preserve scanned roots and command templates, and
-report `source_intake_model_authority: "source_intake_not_authority"` with false
+include source-review command flags for license basis, source reference, review
+scopes, reviewer identity, and at least one review trace field. It must report
+`source_intake_model_authority: "source_intake_not_authority"` with false
 observed-evidence and physical-authority flags.
 
 For the SO-101 model-source inventory contract, CI also requires
