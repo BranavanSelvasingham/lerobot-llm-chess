@@ -91,6 +91,16 @@ REVIEW_PACKET_FIELDNAMES = (
     "evidence",
     "operator_action",
 )
+SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS = (
+    "model_identity",
+    "provenance",
+    "license",
+)
+SOURCE_AUTHORITY_REVIEW_SCOPE_DESCRIPTIONS = {
+    "model_identity": "Selected model path, digest, and SO-101 joint/frame identity were reviewed.",
+    "provenance": "CAD/export source, toolchain, commit or source reference, and local edits were reviewed.",
+    "license": "License or redistribution basis for using the model source in this repository was reviewed.",
+}
 
 SOURCE_INVENTORY_ACTIONS = {
     "scan_or_supply_so101_model_source_root": {
@@ -107,8 +117,9 @@ SOURCE_INVENTORY_ACTIONS = {
         "gate": "reviewed_model_authority",
         "title": "Record source-authority review metadata",
         "detail": (
-            "Rerun with --authority-license-basis plus at least one of --authority-reviewed-by, "
-            "--authority-reviewed-at, --authority-review-id, or --authority-review-url."
+            "Rerun with --authority-license-basis, all required --authority-review-scope values, "
+            "and at least one of --authority-reviewed-by, --authority-reviewed-at, "
+            "--authority-review-id, or --authority-review-url."
         ),
     },
     "run_so101_model_bundle_probe": {
@@ -263,6 +274,19 @@ def placeholder_review_evidence(value: Any) -> bool:
     )
 
 
+def normalized_review_scope_ids(values: list[str] | tuple[str, ...] | None) -> list[str]:
+    seen: set[str] = set()
+    normalized: list[str] = []
+    for value in values or []:
+        for raw_scope in str(value).split(","):
+            scope = raw_scope.strip().lower().replace("-", "_")
+            if not scope or scope in seen:
+                continue
+            seen.add(scope)
+            normalized.append(scope)
+    return normalized
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -342,6 +366,16 @@ def parse_args() -> argparse.Namespace:
         "--authority-source-reference",
         default=None,
         help="Optional CAD/export/source reference used during source-authority review.",
+    )
+    parser.add_argument(
+        "--authority-review-scope",
+        action="append",
+        choices=SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS,
+        default=[],
+        help=(
+            "Required source-authority review scope. Repeat for every required scope: "
+            f"{', '.join(SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS)}."
+        ),
     )
     parser.add_argument(
         "--authority-license-basis",
@@ -633,14 +667,35 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
     supplied_optional = {key: value for key, value in other_optional.items() if value}
     if args.authority_license_basis:
         supplied_optional["authority_license_basis"] = args.authority_license_basis
+    supplied_review_scope_ids = normalized_review_scope_ids(args.authority_review_scope)
+    missing_review_scope_ids = [
+        scope
+        for scope in SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS
+        if scope not in supplied_review_scope_ids
+    ]
     missing_required = []
     diagnostics = [f"authority_review_evidence_placeholder:{field}" for field in placeholder_review_fields]
     if not valid_review_evidence:
         missing_required.append("authority_review_evidence")
+    missing_required.extend(
+        f"authority_review_scope:{scope}" for scope in missing_review_scope_ids
+    )
     if not args.authority_license_basis:
         missing_required.append("authority_license_basis")
     return {
-        "required_fields": ["authority_review_evidence", "authority_license_basis"],
+        "required_fields": [
+            "authority_review_evidence",
+            *[
+                f"authority_review_scope:{scope}"
+                for scope in SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS
+            ],
+            "authority_license_basis",
+        ],
+        "required_review_scope_ids": list(SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS),
+        "supplied_review_scope_ids": supplied_review_scope_ids,
+        "missing_review_scope_ids": missing_review_scope_ids,
+        "review_scope_descriptions": SOURCE_AUTHORITY_REVIEW_SCOPE_DESCRIPTIONS,
+        "review_scope_ready": not missing_review_scope_ids,
         "review_evidence_fields": sorted(review_evidence),
         "review_evidence_valid_fields": sorted(valid_review_evidence),
         "review_evidence_placeholder_fields": placeholder_review_fields,
@@ -654,6 +709,7 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
         "notes": [
             "This metadata describes the inventory-level source-authority review declaration only.",
             "Placeholder review evidence such as TODO/TBD/unknown does not satisfy source-authority readiness.",
+            "Source-authority readiness also requires explicit review scopes for model identity, provenance, and license.",
             "The bundle manifest still must declare reviewed provenance, mesh authority, joint limits, target frame, TCP offset, and base-to-board alignment before model-backed IK is trusted.",
         ],
     }
@@ -691,6 +747,11 @@ def source_authority_review_summary(
         "required_fields": review_input.get("required_fields", []),
         "optional_fields": review_input.get("optional_fields", []),
         "missing_required_fields": review_input.get("missing_required_fields", []),
+        "required_review_scope_ids": review_input.get("required_review_scope_ids", []),
+        "supplied_review_scope_ids": review_input.get("supplied_review_scope_ids", []),
+        "missing_review_scope_ids": review_input.get("missing_review_scope_ids", []),
+        "review_scope_descriptions": review_input.get("review_scope_descriptions", {}),
+        "review_scope_ready": review_input.get("review_scope_ready", False),
         "diagnostics": review_input.get("diagnostics", []),
         "review_evidence_valid_fields": review_input.get("review_evidence_valid_fields", []),
         "review_evidence_placeholder_fields": review_input.get("review_evidence_placeholder_fields", []),
@@ -916,6 +977,46 @@ def build_source_inventory_review_packet(summary: dict[str, Any]) -> dict[str, A
             operator_action=requirement["requirement"],
         )
 
+    source_authority_review = summary.get("source_authority_review")
+    source_authority_review = (
+        source_authority_review if isinstance(source_authority_review, dict) else {}
+    )
+    supplied_review_scope_ids = set(
+        source_authority_review.get("supplied_review_scope_ids") or []
+    )
+    missing_review_scope_ids = set(
+        source_authority_review.get("missing_review_scope_ids") or []
+    )
+    review_scope_descriptions = source_authority_review.get("review_scope_descriptions")
+    review_scope_descriptions = (
+        review_scope_descriptions if isinstance(review_scope_descriptions, dict) else {}
+    )
+    for scope_id in source_authority_review.get("required_review_scope_ids") or []:
+        missing = scope_id in missing_review_scope_ids
+        append_item(
+            item_id=f"source_review_scope:{scope_id}",
+            item_type="source_authority_review_scope",
+            status="needs_operator_review" if missing else "scope_supplied",
+            gate="reviewed_model_authority",
+            required_input=f"authority_review_scope:{scope_id}",
+            candidate_id=None,
+            candidate_path=None,
+            candidate_relevance=None,
+            source_authority_status=summary.get("source_authority_gate_status"),
+            source_authority_review_status=summary.get("source_authority_review_status"),
+            next_action_id="record_source_authority_review_metadata" if missing else None,
+            evidence={
+                "scope_id": scope_id,
+                "description": review_scope_descriptions.get(scope_id),
+                "supplied": scope_id in supplied_review_scope_ids,
+            },
+            operator_action=(
+                "Rerun with "
+                f"--authority-review-scope {scope_id} after this source-authority review "
+                "scope has been explicitly checked."
+            ),
+        )
+
     review_candidates = [
         candidate
         for candidate in sorted(candidates, key=candidate_sort_key)
@@ -1123,6 +1224,16 @@ def build_summary(
         "source_authority_review_status": authority_review["status"],
         "source_authority_review_ready": authority_review["ready"],
         "source_authority_review": authority_review,
+        "source_authority_review_scope_ready": authority_review["review_scope_ready"],
+        "source_authority_required_review_scope_ids": authority_review[
+            "required_review_scope_ids"
+        ],
+        "source_authority_supplied_review_scope_ids": authority_review[
+            "supplied_review_scope_ids"
+        ],
+        "source_authority_missing_review_scope_ids": authority_review[
+            "missing_review_scope_ids"
+        ],
         "source_authority_gate_status": source_authority_gate_status(
             authoritative_candidate_count=len(authoritative_candidates),
             source_authority_review_ready=authority_review["ready"],
@@ -1211,6 +1322,10 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `authoritative_candidate_count`: `{summary['authoritative_candidate_count']}`",
         f"- `source_authority_review_status`: `{summary['source_authority_review_status']}`",
         f"- `source_authority_review_ready`: `{str(summary['source_authority_review_ready']).lower()}`",
+        f"- `source_authority_review_scope_ready`: `{str(summary['source_authority_review_scope_ready']).lower()}`",
+        f"- `source_authority_required_review_scope_ids`: `{', '.join(summary.get('source_authority_required_review_scope_ids') or [])}`",
+        f"- `source_authority_supplied_review_scope_ids`: `{', '.join(summary.get('source_authority_supplied_review_scope_ids') or []) if summary.get('source_authority_supplied_review_scope_ids') else 'none'}`",
+        f"- `source_authority_missing_review_scope_ids`: `{', '.join(summary.get('source_authority_missing_review_scope_ids') or []) if summary.get('source_authority_missing_review_scope_ids') else 'none'}`",
         f"- `source_authority_gate_status`: `{summary['source_authority_gate_status']}`",
         f"- `source_authority_blockers`: `{', '.join(summary.get('source_authority_blockers') or []) if summary.get('source_authority_blockers') else 'none'}`",
         f"- `next_required_action_ids`: `{', '.join(summary.get('next_required_action_ids') or []) if summary.get('next_required_action_ids') else 'none'}`",
@@ -1374,6 +1489,12 @@ def main() -> int:
                 "authoritative_candidate_count": summary["authoritative_candidate_count"],
                 "source_authority_review_status": summary["source_authority_review_status"],
                 "source_authority_review_ready": summary["source_authority_review_ready"],
+                "source_authority_review_scope_ready": summary[
+                    "source_authority_review_scope_ready"
+                ],
+                "source_authority_missing_review_scope_ids": summary[
+                    "source_authority_missing_review_scope_ids"
+                ],
                 "source_authority_gate_status": summary["source_authority_gate_status"],
                 "source_authority_blockers": summary["source_authority_blockers"],
                 "next_required_action_ids": summary["next_required_action_ids"],

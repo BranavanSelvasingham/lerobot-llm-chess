@@ -42,8 +42,10 @@ suite-level names:
 
 Use the authoritative flags only after source provenance, license, mesh
 dependencies, and authority have been reviewed. When an authoritative path/root
-is declared, also pass `--so101-source-authority-license-basis` plus at least one
-review-evidence field: `--so101-source-authority-reviewed-by`,
+is declared, also pass `--so101-source-authority-license-basis`, every required
+`--so101-source-authority-review-scope` value (`model_identity`, `provenance`,
+and `license`), plus at least one review-evidence field:
+`--so101-source-authority-reviewed-by`,
 `--so101-source-authority-reviewed-at`, `--so101-source-authority-review-id`, or
 `--so101-source-authority-review-url`. Without those metadata fields the
 inventory can report an authoritative candidate, but it also reports
@@ -59,7 +61,11 @@ Review evidence must be non-placeholder metadata. Values such as `TODO`, `TBD`,
 `unknown`, `placeholder`, or `review required` are preserved in the summary as
 `review_evidence_placeholder_fields`, but they keep
 `source_authority_review_ready: false` and do not satisfy source-authority
-readiness.
+readiness. The inventory also reports `source_authority_review_scope_ready`,
+`source_authority_required_review_scope_ids`,
+`source_authority_supplied_review_scope_ids`, and
+`source_authority_missing_review_scope_ids` so a generic reviewer token cannot
+close source authority without explicit review scope coverage.
 
 Supplying an empty reviewed root or authority root is still a non-failing
 diagnostic: the suite should report `missing_authoritative_model`,
@@ -98,7 +104,17 @@ To inspect an external or installed model location without importing assets:
 python scripts/smoke_sim_so101_model_source_inventory.py --root /absolute/path/to/model/root --output-dir /private/tmp/lerobot_sim/so101_model_source_inventory_external
 ```
 
-Use `--authoritative-path` or `--authoritative-root` only after the model source, license, and authority have been reviewed. Pair them with `--authority-license-basis` plus at least one of `--authority-reviewed-by`, `--authority-reviewed-at`, `--authority-review-id`, or `--authority-review-url` so the artifact distinguishes a bare authoritative-path declaration from a reviewed source-authority declaration. Without authoritative flags, a SO-101-looking file remains `source_authority_status: "unverified"` and does not count as authoritative. Without review metadata, an authoritative candidate remains explicit but reports `source_authority_review_ready: false`.
+Use `--authoritative-path` or `--authoritative-root` only after the model source,
+license, and authority have been reviewed. Pair them with
+`--authority-license-basis`, all three required `--authority-review-scope`
+values (`model_identity`, `provenance`, and `license`), plus at least one of
+`--authority-reviewed-by`, `--authority-reviewed-at`, `--authority-review-id`,
+or `--authority-review-url` so the artifact distinguishes a bare
+authoritative-path declaration from a reviewed source-authority declaration.
+Without authoritative flags, a SO-101-looking file remains
+`source_authority_status: "unverified"` and does not count as authoritative.
+Without complete review metadata and scope coverage, an authoritative candidate
+remains explicit but reports `source_authority_review_ready: false`.
 
 ## Owner Check Evidence
 
@@ -116,6 +132,8 @@ Key fields:
 - `authoritative_candidate_count: 0`
 - `source_authority_gate_status: "source_authority_blocked_missing_authoritative_model"`
 - `source_authority_blockers: ["scan_or_supply_so101_model_source_root", "review_and_declare_authoritative_so101_model_source"]`
+- `source_authority_review_scope_ready: false`
+- `source_authority_missing_review_scope_ids: ["model_identity", "provenance", "license"]`
 - `artifacts.summary_json: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_inventory_summary.json`
 - `artifacts.candidates_csv: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_candidates.csv`
 - `artifacts.review_packet_json: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_inventory_review_packet.json`

@@ -2606,6 +2606,21 @@ def collect_so101_model_source_inventory_artifacts(
         "source_authority_review_status": inventory.get("source_authority_review_status"),
         "source_authority_review_ready": inventory.get("source_authority_review_ready"),
         "source_authority_review": inventory.get("source_authority_review"),
+        "source_authority_review_scope_ready": inventory.get(
+            "source_authority_review_scope_ready"
+        ),
+        "source_authority_required_review_scope_ids": inventory.get(
+            "source_authority_required_review_scope_ids"
+        )
+        or [],
+        "source_authority_supplied_review_scope_ids": inventory.get(
+            "source_authority_supplied_review_scope_ids"
+        )
+        or [],
+        "source_authority_missing_review_scope_ids": inventory.get(
+            "source_authority_missing_review_scope_ids"
+        )
+        or [],
         "source_authority_gate_status": inventory.get("source_authority_gate_status"),
         "source_authority_blockers": inventory.get("source_authority_blockers") or [],
         "root_count": inventory.get("root_count"),
@@ -2674,6 +2689,18 @@ def collect_so101_model_source_inventory_artifacts(
         "source_authority_review_status": inventory.get("source_authority_review_status"),
         "source_authority_review_ready": inventory.get("source_authority_review_ready"),
         "source_authority_review": inventory.get("source_authority_review"),
+        "source_authority_review_scope_ready": metrics[
+            "source_authority_review_scope_ready"
+        ],
+        "source_authority_required_review_scope_ids": metrics[
+            "source_authority_required_review_scope_ids"
+        ],
+        "source_authority_supplied_review_scope_ids": metrics[
+            "source_authority_supplied_review_scope_ids"
+        ],
+        "source_authority_missing_review_scope_ids": metrics[
+            "source_authority_missing_review_scope_ids"
+        ],
         "source_authority_gate_status": metrics["source_authority_gate_status"],
         "source_authority_blockers": metrics["source_authority_blockers"],
         "source_configuration": source_configuration,

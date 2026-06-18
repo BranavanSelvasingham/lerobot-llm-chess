@@ -250,6 +250,17 @@ def parse_args() -> argparse.Namespace:
         help="CAD/export/source reference forwarded to the SO-101 model-source inventory.",
     )
     parser.add_argument(
+        "--so101-source-authority-review-scope",
+        action="append",
+        choices=SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS,
+        default=[],
+        help=(
+            "Source-authority review scope forwarded to the SO-101 model-source inventory. "
+            "Repeat for every required scope: "
+            f"{', '.join(SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS)}."
+        ),
+    )
+    parser.add_argument(
         "--so101-source-authority-license-basis",
         default=None,
         help="Reviewed license or redistribution basis forwarded to the SO-101 model-source inventory.",
@@ -356,6 +367,17 @@ SOURCE_AUTHORITY_REVIEW_EVIDENCE_KEYS = (
     "authority_review_id",
     "authority_review_url",
 )
+SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS = (
+    "model_identity",
+    "provenance",
+    "license",
+)
+SOURCE_AUTHORITY_REVIEW_SCOPE_FIELDS = (
+    "review_scope",
+    "review_scopes",
+    "source_review_scope",
+    "source_review_scopes",
+)
 
 
 def normalized_review_text(value: Any) -> str:
@@ -371,6 +393,36 @@ def placeholder_review_evidence(value: Any) -> bool:
     )
 
 
+def normalized_review_scope_ids(value: Any) -> list[str]:
+    raw_values: list[Any]
+    if value is None:
+        raw_values = []
+    elif isinstance(value, (list, tuple, set)):
+        raw_values = list(value)
+    else:
+        raw_values = [value]
+
+    seen: set[str] = set()
+    normalized: list[str] = []
+    for raw_value in raw_values:
+        for raw_scope in str(raw_value).split(","):
+            scope = raw_scope.strip().lower().replace("-", "_")
+            if not scope or scope in seen:
+                continue
+            seen.add(scope)
+            normalized.append(scope)
+    return normalized
+
+
+def mapping_review_scope_ids(mapping: dict[str, Any]) -> list[str]:
+    for field_name in SOURCE_AUTHORITY_REVIEW_SCOPE_FIELDS:
+        value = mapping.get(field_name)
+        scopes = normalized_review_scope_ids(value)
+        if scopes:
+            return scopes
+    return []
+
+
 def so101_source_authority_review_forwarding(
     *,
     args: argparse.Namespace,
@@ -383,6 +435,9 @@ def so101_source_authority_review_forwarding(
         "authority_review_id": args.so101_source_authority_review_id,
         "authority_review_url": args.so101_source_authority_review_url,
         "authority_source_reference": args.so101_source_authority_source_reference,
+        "authority_review_scope_ids": normalized_review_scope_ids(
+            args.so101_source_authority_review_scope
+        ),
         "authority_license_basis": args.so101_source_authority_license_basis,
     }
     explicit_values = {key: value for key, value in values.items() if value}
@@ -407,6 +462,8 @@ def so101_source_authority_review_forwarding(
                 provenance_value,
                 ("source_url", "source_uri", "cad_url", "repository_url", "source_path", "source_reference"),
             ),
+            "authority_review_scope_ids": mapping_review_scope_ids(authority_value)
+            or mapping_review_scope_ids(provenance_value),
             "authority_license_basis": first_non_empty_mapping_value(
                 provenance_value,
                 ("license", "license_url", "license_file", "license_review", "license_basis"),
@@ -423,16 +480,31 @@ def so101_source_authority_review_forwarding(
     valid_review_fields = [
         key for key in supplied_review_fields if key not in placeholder_review_fields
     ]
+    supplied_review_scope_ids = normalized_review_scope_ids(
+        values.get("authority_review_scope_ids")
+    )
+    missing_review_scope_ids = [
+        scope
+        for scope in SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS
+        if scope not in supplied_review_scope_ids
+    ]
     missing_required_fields = []
     diagnostics = [f"authority_review_evidence_placeholder:{field}" for field in placeholder_review_fields]
     if not valid_review_fields:
         missing_required_fields.append("authority_review_evidence")
+    missing_required_fields.extend(
+        f"authority_review_scope:{scope}" for scope in missing_review_scope_ids
+    )
     if not values.get("authority_license_basis"):
         missing_required_fields.append("authority_license_basis")
     return {
         "source": source,
         "ready_if_authoritative_source_declared": not missing_required_fields and not placeholder_review_fields,
         "missing_required_fields": missing_required_fields,
+        "required_review_scope_ids": list(SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS),
+        "supplied_review_scope_ids": supplied_review_scope_ids,
+        "missing_review_scope_ids": missing_review_scope_ids,
+        "review_scope_ready": not missing_review_scope_ids,
         "review_evidence_valid_fields": valid_review_fields,
         "review_evidence_placeholder_fields": placeholder_review_fields,
         "diagnostics": diagnostics,
@@ -440,6 +512,7 @@ def so101_source_authority_review_forwarding(
         "notes": [
             "These values are forwarded only to the SO-101 model-source inventory.",
             "Placeholder review evidence such as TODO/TBD/unknown does not satisfy source-authority readiness.",
+            "Source-authority readiness also requires explicit review scopes for model identity, provenance, and license.",
             "They do not replace the bundle manifest's reviewed authority/provenance/readiness gate.",
         ],
     }
@@ -734,6 +807,8 @@ def so101_model_source_inventory_command(
         value = source_authority_review.get(source_key)
         if value:
             command.extend([cli_name, str(value)])
+    for scope_id in source_authority_review.get("supplied_review_scope_ids") or []:
+        command.extend(["--authority-review-scope", str(scope_id)])
     return command
 
 
@@ -3168,6 +3243,21 @@ def so101_model_source_inventory_section(
         "source_authority_review_status": inventory.get("source_authority_review_status"),
         "source_authority_review_ready": inventory.get("source_authority_review_ready"),
         "source_authority_review": inventory.get("source_authority_review"),
+        "source_authority_review_scope_ready": inventory.get(
+            "source_authority_review_scope_ready"
+        ),
+        "source_authority_required_review_scope_ids": inventory.get(
+            "source_authority_required_review_scope_ids"
+        )
+        or [],
+        "source_authority_supplied_review_scope_ids": inventory.get(
+            "source_authority_supplied_review_scope_ids"
+        )
+        or [],
+        "source_authority_missing_review_scope_ids": inventory.get(
+            "source_authority_missing_review_scope_ids"
+        )
+        or [],
         "source_authority_gate_status": inventory.get("source_authority_gate_status"),
         "source_authority_blockers": inventory.get("source_authority_blockers") or [],
         "root_count": inventory.get("root_count"),

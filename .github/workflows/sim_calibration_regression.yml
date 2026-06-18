@@ -97,6 +97,13 @@ env:
   SO101_MODEL_SOURCE_EXTRA_ROOTS: ""
   SO101_AUTHORITATIVE_MODEL_PATHS: ""
   SO101_AUTHORITATIVE_MODEL_ROOTS: ""
+  SO101_SOURCE_AUTHORITY_REVIEWED_BY: ""
+  SO101_SOURCE_AUTHORITY_REVIEWED_AT: ""
+  SO101_SOURCE_AUTHORITY_REVIEW_ID: ""
+  SO101_SOURCE_AUTHORITY_REVIEW_URL: ""
+  SO101_SOURCE_AUTHORITY_SOURCE_REFERENCE: ""
+  SO101_SOURCE_AUTHORITY_REVIEW_SCOPES: ""
+  SO101_SOURCE_AUTHORITY_LICENSE_BASIS: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -171,6 +178,25 @@ jobs:
           append_repeatable_args --so101-model-source-extra-root "${SO101_MODEL_SOURCE_EXTRA_ROOTS}"
           append_repeatable_args --so101-authoritative-model-path "${SO101_AUTHORITATIVE_MODEL_PATHS}"
           append_repeatable_args --so101-authoritative-model-root "${SO101_AUTHORITATIVE_MODEL_ROOTS}"
+          if [ -n "${SO101_SOURCE_AUTHORITY_REVIEWED_BY}" ]; then
+            cmd+=(--so101-source-authority-reviewed-by "${SO101_SOURCE_AUTHORITY_REVIEWED_BY}")
+          fi
+          if [ -n "${SO101_SOURCE_AUTHORITY_REVIEWED_AT}" ]; then
+            cmd+=(--so101-source-authority-reviewed-at "${SO101_SOURCE_AUTHORITY_REVIEWED_AT}")
+          fi
+          if [ -n "${SO101_SOURCE_AUTHORITY_REVIEW_ID}" ]; then
+            cmd+=(--so101-source-authority-review-id "${SO101_SOURCE_AUTHORITY_REVIEW_ID}")
+          fi
+          if [ -n "${SO101_SOURCE_AUTHORITY_REVIEW_URL}" ]; then
+            cmd+=(--so101-source-authority-review-url "${SO101_SOURCE_AUTHORITY_REVIEW_URL}")
+          fi
+          if [ -n "${SO101_SOURCE_AUTHORITY_SOURCE_REFERENCE}" ]; then
+            cmd+=(--so101-source-authority-source-reference "${SO101_SOURCE_AUTHORITY_SOURCE_REFERENCE}")
+          fi
+          append_repeatable_args --so101-source-authority-review-scope "${SO101_SOURCE_AUTHORITY_REVIEW_SCOPES}"
+          if [ -n "${SO101_SOURCE_AUTHORITY_LICENSE_BASIS}" ]; then
+            cmd+=(--so101-source-authority-license-basis "${SO101_SOURCE_AUTHORITY_LICENSE_BASIS}")
+          fi
           "${cmd[@]}"
 
       - name: Check regression summary
@@ -588,6 +614,15 @@ jobs:
           assert isinstance(source_authority_review.get("diagnostics"), list), source_authority_review
           assert isinstance(source_authority_review.get("review_evidence_valid_fields"), list), source_authority_review
           assert isinstance(source_authority_review.get("review_evidence_placeholder_fields"), list), source_authority_review
+          assert isinstance(source_authority_review.get("required_review_scope_ids"), list), source_authority_review
+          assert isinstance(source_authority_review.get("supplied_review_scope_ids"), list), source_authority_review
+          assert isinstance(source_authority_review.get("missing_review_scope_ids"), list), source_authority_review
+          assert isinstance(source_authority_review.get("review_scope_ready"), bool), source_authority_review
+          assert isinstance(source_inventory["source_authority_review_scope_ready"], bool), source_inventory
+          assert source_inventory["source_authority_required_review_scope_ids"] == source_authority_review["required_review_scope_ids"], source_inventory
+          assert source_inventory["source_authority_supplied_review_scope_ids"] == source_authority_review["supplied_review_scope_ids"], source_inventory
+          assert source_inventory["source_authority_missing_review_scope_ids"] == source_authority_review["missing_review_scope_ids"], source_inventory
+          assert source_inventory["source_authority_review_scope_ready"] == source_authority_review["review_scope_ready"], source_inventory
           assert isinstance(source_inventory["next_required_for_goal"], list), source_inventory
           assert isinstance(source_inventory["next_required_action_ids"], list), source_inventory
           assert source_inventory["next_required_action_ids"], source_inventory
@@ -646,6 +681,8 @@ jobs:
               assert source_inventory["source_authority_gate_status"] == "source_authority_ready", source_inventory
               assert source_inventory["review_packet_status"] == "review_packet_source_authority_ready", source_inventory
               assert source_inventory["source_authority_blockers"] == [], source_inventory
+              assert source_inventory["source_authority_review_scope_ready"] is True, source_inventory
+              assert source_inventory["source_authority_missing_review_scope_ids"] == [], source_inventory
           source_inventory_artifacts = source_inventory["artifacts"]
           for key in ("summary_json", "candidates_csv", "review_packet_json", "review_packet_csv", "readme_md"):
               assert isinstance(source_inventory_artifacts.get(key), str) and Path(source_inventory_artifacts[key]).is_file(), (
@@ -1290,6 +1327,15 @@ jobs:
               assert isinstance(source_authority_review.get("diagnostics"), list), source_authority_review
               assert isinstance(source_authority_review.get("review_evidence_valid_fields"), list), source_authority_review
               assert isinstance(source_authority_review.get("review_evidence_placeholder_fields"), list), source_authority_review
+              assert isinstance(source_authority_review.get("required_review_scope_ids"), list), source_authority_review
+              assert isinstance(source_authority_review.get("supplied_review_scope_ids"), list), source_authority_review
+              assert isinstance(source_authority_review.get("missing_review_scope_ids"), list), source_authority_review
+              assert isinstance(source_authority_review.get("review_scope_ready"), bool), source_authority_review
+              assert isinstance(metrics.get("source_authority_review_scope_ready"), bool), metrics
+              assert metrics.get("source_authority_required_review_scope_ids") == source_authority_review["required_review_scope_ids"], metrics
+              assert metrics.get("source_authority_supplied_review_scope_ids") == source_authority_review["supplied_review_scope_ids"], metrics
+              assert metrics.get("source_authority_missing_review_scope_ids") == source_authority_review["missing_review_scope_ids"], metrics
+              assert metrics.get("source_authority_review_scope_ready") == source_authority_review["review_scope_ready"], metrics
               assert isinstance(metrics.get("next_required_for_goal"), list), metrics
               assert isinstance(metrics.get("next_required_action_ids"), list), metrics
               assert metrics.get("next_required_action_count") == len(metrics.get("next_required_for_goal")), metrics
