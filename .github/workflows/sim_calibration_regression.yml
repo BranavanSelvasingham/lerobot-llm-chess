@@ -434,6 +434,25 @@ jobs:
           }, bundle_manifest
           assert bundle_manifest["physical_so101_model_authority_ready"] in {True, False}, bundle_manifest
           assert bundle_manifest["hardware_free_regression_fixture_ready"] in {True, False}, bundle_manifest
+          assert bundle_manifest["physical_authority_gate_status"] in {
+              "physical_reviewed_authority_ready",
+              "hardware_free_fixture_ready_not_physical_authority",
+              "physical_reviewed_authority_blocked",
+          }, bundle_manifest
+          assert isinstance(bundle_manifest["physical_authority_blockers"], list), bundle_manifest
+          assert all(isinstance(blocker, str) and blocker for blocker in bundle_manifest["physical_authority_blockers"]), bundle_manifest
+          if bundle_manifest["physical_so101_model_authority_ready"] is True:
+              assert bundle_manifest["physical_authority_gate_status"] == "physical_reviewed_authority_ready", bundle_manifest
+              assert bundle_manifest["physical_authority_blockers"] == [], bundle_manifest
+          else:
+              assert bundle_manifest["physical_authority_gate_status"] != "physical_reviewed_authority_ready", bundle_manifest
+              assert bundle_manifest["physical_authority_blockers"], bundle_manifest
+          if bundle_manifest["hardware_free_regression_fixture_ready"] is True:
+              assert bundle_manifest["physical_authority_gate_status"] == "hardware_free_fixture_ready_not_physical_authority", bundle_manifest
+              assert any(
+                  blocker.startswith("synthetic_fixture_authority_not_physical_so101:")
+                  for blocker in bundle_manifest["physical_authority_blockers"]
+              ), bundle_manifest
           assert isinstance(bundle_manifest["synthetic_fixture_authority_fields"], list), bundle_manifest
           assert isinstance(bundle_manifest["next_required_for_goal"], list), bundle_manifest
           for index, action in enumerate(bundle_manifest["next_required_for_goal"], start=1):
@@ -462,6 +481,8 @@ jobs:
               assert bundle_manifest["model_authority"] == "reviewed_bundle_required", bundle_manifest
               assert bundle_manifest["physical_so101_model_authority_ready"] is False, bundle_manifest
               assert bundle_manifest["hardware_free_regression_fixture_ready"] is False, bundle_manifest
+              assert bundle_manifest["physical_authority_gate_status"] == "physical_reviewed_authority_blocked", bundle_manifest
+              assert "supply_reviewed_so101_model_bundle_manifest" in bundle_manifest["physical_authority_blockers"], bundle_manifest
               assert bundle_manifest["next_required_for_goal"][0]["action_id"] == "supply_reviewed_so101_model_bundle_manifest", bundle_manifest
               assert bundle_manifest["forwarding"]["diagnostic_only"] is True, bundle_manifest["forwarding"]
           bundle_artifacts = bundle_manifest["artifacts"]

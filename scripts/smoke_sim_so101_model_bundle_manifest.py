@@ -1754,6 +1754,14 @@ def model_authority_class(ready: bool, synthetic_flags: dict[str, bool]) -> str:
     return "reviewed_bundle_required"
 
 
+def physical_authority_gate_status(ready: bool, physical_authority_ready: bool, synthetic_fields: list[str]) -> str:
+    if physical_authority_ready:
+        return "physical_reviewed_authority_ready"
+    if ready and synthetic_fields:
+        return "hardware_free_fixture_ready_not_physical_authority"
+    return "physical_reviewed_authority_blocked"
+
+
 def build_next_required_for_goal(missing_inputs: list[str]) -> list[dict[str, Any]]:
     missing_set = set(missing_inputs)
     ordered_inputs = [item for item in NEXT_ACTION_ORDER if item in missing_set]
@@ -1779,6 +1787,22 @@ def build_next_required_for_goal(missing_inputs: list[str]) -> list[dict[str, An
             }
         )
     return actions
+
+
+def build_physical_authority_blockers(
+    next_required_for_goal: list[dict[str, Any]],
+    synthetic_fields: list[str],
+) -> list[str]:
+    blockers: list[str] = []
+    for action in next_required_for_goal:
+        action_id = action.get("action_id")
+        if isinstance(action_id, str) and action_id:
+            blockers.append(action_id)
+    blockers.extend(
+        f"synthetic_fixture_authority_not_physical_so101:{field}"
+        for field in synthetic_fields
+    )
+    return blockers
 
 
 def build_checklist_rows(
@@ -1980,7 +2004,9 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         f"- `status`: `{summary['status']}`",
         f"- `ready_for_model_backed_ik`: `{str(summary['ready_for_model_backed_ik']).lower()}`",
         f"- `model_authority`: `{summary['model_authority']}`",
+        f"- `physical_authority_gate_status`: `{summary['physical_authority_gate_status']}`",
         f"- `physical_so101_model_authority_ready`: `{str(summary['physical_so101_model_authority_ready']).lower()}`",
+        f"- `physical_authority_blockers`: `{'; '.join(summary['physical_authority_blockers']) if summary['physical_authority_blockers'] else 'none'}`",
         f"- `hardware_free_regression_fixture_ready`: `{str(summary['hardware_free_regression_fixture_ready']).lower()}`",
         f"- `synthetic_fixture_authority_fields`: `{'; '.join(summary['synthetic_fixture_authority_fields']) if summary['synthetic_fixture_authority_fields'] else 'none'}`",
         f"- `manifest_path`: `{summary['manifest_request']['path']}`",
@@ -2095,13 +2121,23 @@ def build_summary(
     )
     synthetic_fields = [field for field, enabled in synthetic_flags.items() if enabled]
     physical_authority_ready = ready and not synthetic_fields
+    physical_authority_blockers = build_physical_authority_blockers(
+        next_required_for_goal,
+        synthetic_fields,
+    )
     summary = {
         "schema": SCHEMA,
         "ok": True,
         "status": status_for(manifest_request, ready),
         "ready_for_model_backed_ik": ready,
         "model_authority": model_authority_class(ready, synthetic_flags),
+        "physical_authority_gate_status": physical_authority_gate_status(
+            ready,
+            physical_authority_ready,
+            synthetic_fields,
+        ),
         "physical_so101_model_authority_ready": physical_authority_ready,
+        "physical_authority_blockers": physical_authority_blockers,
         "hardware_free_regression_fixture_ready": ready and bool(synthetic_fields),
         "synthetic_fixture_authority_fields": synthetic_fields,
         "hardware_skipped": True,
@@ -2178,7 +2214,9 @@ def main() -> int:
                 "status": summary["status"],
                 "ready_for_model_backed_ik": summary["ready_for_model_backed_ik"],
                 "model_authority": summary["model_authority"],
+                "physical_authority_gate_status": summary["physical_authority_gate_status"],
                 "physical_so101_model_authority_ready": summary["physical_so101_model_authority_ready"],
+                "physical_authority_blockers": summary["physical_authority_blockers"],
                 "hardware_free_regression_fixture_ready": summary["hardware_free_regression_fixture_ready"],
                 "missing_inputs": summary["missing_inputs"],
                 "next_required_for_goal": summary["next_required_for_goal"],
