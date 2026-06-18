@@ -193,6 +193,36 @@ def parse_args() -> argparse.Namespace:
             "--authoritative-root. Repeatable. This is separate from --ik-model-path."
         ),
     )
+    parser.add_argument(
+        "--so101-source-authority-reviewed-by",
+        default=None,
+        help="Reviewer/operator identifier forwarded to the SO-101 model-source inventory.",
+    )
+    parser.add_argument(
+        "--so101-source-authority-reviewed-at",
+        default=None,
+        help="Deterministic review date/string forwarded to the SO-101 model-source inventory.",
+    )
+    parser.add_argument(
+        "--so101-source-authority-review-id",
+        default=None,
+        help="Review ticket, issue, commit, or checklist identifier forwarded to the source inventory.",
+    )
+    parser.add_argument(
+        "--so101-source-authority-review-url",
+        default=None,
+        help="URL to the reviewed source-authority record forwarded to the source inventory.",
+    )
+    parser.add_argument(
+        "--so101-source-authority-source-reference",
+        default=None,
+        help="CAD/export/source reference forwarded to the SO-101 model-source inventory.",
+    )
+    parser.add_argument(
+        "--so101-source-authority-license-basis",
+        default=None,
+        help="Reviewed license or redistribution basis forwarded to the SO-101 model-source inventory.",
+    )
     parser.add_argument("--base-profile", default=DEFAULT_BASE_PROFILE)
     parser.add_argument("--source-square", default="e4")
     parser.add_argument("--target-square", default="e5")
@@ -238,6 +268,85 @@ def markdown_list_value(values: Any) -> str:
     return "; ".join(str(value) for value in values)
 
 
+def first_non_empty_mapping_value(value: dict[str, Any], field_names: tuple[str, ...]) -> Any:
+    for field_name in field_names:
+        field_value = value.get(field_name)
+        if isinstance(field_value, str) and field_value.strip():
+            return field_value
+        if field_value not in (None, "", [], {}):
+            return field_value
+    return None
+
+
+def so101_source_authority_review_forwarding(
+    *,
+    args: argparse.Namespace,
+    bundle: dict[str, Any] | None,
+    bundle_inventory_forwarding: dict[str, Any],
+) -> dict[str, Any]:
+    values = {
+        "authority_reviewed_by": args.so101_source_authority_reviewed_by,
+        "authority_reviewed_at": args.so101_source_authority_reviewed_at,
+        "authority_review_id": args.so101_source_authority_review_id,
+        "authority_review_url": args.so101_source_authority_review_url,
+        "authority_source_reference": args.so101_source_authority_source_reference,
+        "authority_license_basis": args.so101_source_authority_license_basis,
+    }
+    explicit_values = {key: value for key, value in values.items() if value}
+    source = "explicit_cli" if explicit_values else "not_supplied"
+
+    if not explicit_values and bundle_inventory_forwarding.get("used_for_source_inventory") is True:
+        bundle = bundle if isinstance(bundle, dict) else {}
+        authority = bundle.get("authority")
+        authority = authority if isinstance(authority, dict) else {}
+        authority_value = authority.get("value")
+        authority_value = authority_value if isinstance(authority_value, dict) else {}
+        provenance = bundle.get("provenance")
+        provenance = provenance if isinstance(provenance, dict) else {}
+        provenance_value = provenance.get("value")
+        provenance_value = provenance_value if isinstance(provenance_value, dict) else {}
+        values = {
+            "authority_reviewed_by": first_non_empty_mapping_value(authority_value, ("reviewed_by",)),
+            "authority_reviewed_at": first_non_empty_mapping_value(authority_value, ("reviewed_at",)),
+            "authority_review_id": first_non_empty_mapping_value(authority_value, ("review_id",)),
+            "authority_review_url": first_non_empty_mapping_value(authority_value, ("review_url",)),
+            "authority_source_reference": first_non_empty_mapping_value(
+                provenance_value,
+                ("source_url", "source_uri", "cad_url", "repository_url", "source_path", "source_reference"),
+            ),
+            "authority_license_basis": first_non_empty_mapping_value(
+                provenance_value,
+                ("license", "license_url", "license_file", "license_review", "license_basis"),
+            ),
+        }
+        source = "so101_model_bundle_manifest"
+
+    review_evidence_present = any(
+        values.get(key)
+        for key in (
+            "authority_reviewed_by",
+            "authority_reviewed_at",
+            "authority_review_id",
+            "authority_review_url",
+        )
+    )
+    missing_required_fields = []
+    if not review_evidence_present:
+        missing_required_fields.append("authority_review_evidence")
+    if not values.get("authority_license_basis"):
+        missing_required_fields.append("authority_license_basis")
+    return {
+        "source": source,
+        "ready_if_authoritative_source_declared": not missing_required_fields,
+        "missing_required_fields": missing_required_fields,
+        **values,
+        "notes": [
+            "These values are forwarded only to the SO-101 model-source inventory.",
+            "They do not replace the bundle manifest's reviewed authority/provenance/readiness gate.",
+        ],
+    }
+
+
 def so101_model_source_inventory_config(
     args: argparse.Namespace,
     *,
@@ -246,6 +355,7 @@ def so101_model_source_inventory_config(
     authoritative_model_paths: list[Path],
     authoritative_model_roots: list[Path],
     bundle_inventory_forwarding: dict[str, Any],
+    source_authority_review: dict[str, Any],
     effective_ik_model_path: Path | None,
 ) -> dict[str, Any]:
     roots = cli_path_values(model_source_roots)
@@ -258,6 +368,7 @@ def so101_model_source_inventory_config(
         "model_source_extra_roots": extra_roots,
         "authoritative_model_paths": authoritative_paths,
         "authoritative_model_roots": authoritative_roots,
+        "source_authority_review": source_authority_review,
         "model_source_root_source": bundle_inventory_forwarding.get("model_source_root_source"),
         "authoritative_model_path_source": bundle_inventory_forwarding.get(
             "authoritative_model_path_source"
@@ -274,6 +385,7 @@ def so101_model_source_inventory_config(
         "notes": [
             "--ik-model-path is forwarded only to the model contract checker and IK reachability drill.",
             "Inventory authority must be declared with --so101-authoritative-model-path or --so101-authoritative-model-root.",
+            "Inventory source-authority review metadata is forwarded separately and does not replace the reviewed bundle manifest gate.",
             "A ready bundle manifest may supply a reviewed model path as inventory root and authoritative path when no explicit inventory source options were supplied.",
         ],
     }
@@ -497,6 +609,7 @@ def so101_model_source_inventory_command(
     model_source_extra_roots: list[Path],
     authoritative_model_paths: list[Path],
     authoritative_model_roots: list[Path],
+    source_authority_review: dict[str, Any],
 ) -> list[str]:
     command = [
         python,
@@ -512,6 +625,17 @@ def so101_model_source_inventory_command(
         command.extend(["--authoritative-path", str(path.expanduser())])
     for root in authoritative_model_roots:
         command.extend(["--authoritative-root", str(root.expanduser())])
+    for source_key, cli_name in (
+        ("authority_reviewed_by", "--authority-reviewed-by"),
+        ("authority_reviewed_at", "--authority-reviewed-at"),
+        ("authority_review_id", "--authority-review-id"),
+        ("authority_review_url", "--authority-review-url"),
+        ("authority_source_reference", "--authority-source-reference"),
+        ("authority_license_basis", "--authority-license-basis"),
+    ):
+        value = source_authority_review.get(source_key)
+        if value:
+            command.extend([cli_name, str(value)])
     return command
 
 
@@ -2834,6 +2958,9 @@ def so101_model_source_inventory_section(
         "likely_candidate_count": inventory.get("likely_candidate_count"),
         "direct_contract_candidate_count": inventory.get("direct_contract_candidate_count"),
         "authoritative_candidate_count": inventory.get("authoritative_candidate_count"),
+        "source_authority_review_status": inventory.get("source_authority_review_status"),
+        "source_authority_review_ready": inventory.get("source_authority_review_ready"),
+        "source_authority_review": inventory.get("source_authority_review"),
         "root_count": inventory.get("root_count"),
         "source_configuration": source_configuration,
         "configured_model_source_roots": source_configuration.get("model_source_roots"),
@@ -3552,6 +3679,11 @@ def main() -> int:
     so101_model_source_inventory_summary_path = (
         so101_model_source_inventory_dir / SO101_MODEL_SOURCE_INVENTORY_SUMMARY_NAME
     )
+    so101_source_authority_review = so101_source_authority_review_forwarding(
+        args=args,
+        bundle=so101_model_bundle_manifest,
+        bundle_inventory_forwarding=so101_bundle_inventory_forwarding,
+    )
     so101_source_config = so101_model_source_inventory_config(
         args,
         model_source_roots=effective_model_source_roots,
@@ -3559,6 +3691,7 @@ def main() -> int:
         authoritative_model_paths=effective_authoritative_model_paths,
         authoritative_model_roots=effective_authoritative_model_roots,
         bundle_inventory_forwarding=so101_bundle_inventory_forwarding,
+        source_authority_review=so101_source_authority_review,
         effective_ik_model_path=effective_ik_model_path,
     )
     so101_contract_config = so101_model_contract_config(
@@ -3576,6 +3709,7 @@ def main() -> int:
             model_source_extra_roots=effective_model_source_extra_roots,
             authoritative_model_paths=effective_authoritative_model_paths,
             authoritative_model_roots=effective_authoritative_model_roots,
+            source_authority_review=so101_source_authority_review,
         ),
         output_dir=so101_model_source_inventory_dir,
         expected_json_path=so101_model_source_inventory_summary_path,

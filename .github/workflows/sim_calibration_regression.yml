@@ -502,6 +502,13 @@ jobs:
           assert isinstance(source_inventory["likely_candidate_count"], int), source_inventory
           assert isinstance(source_inventory["direct_contract_candidate_count"], int), source_inventory
           assert isinstance(source_inventory["authoritative_candidate_count"], int), source_inventory
+          assert source_inventory["source_authority_review_status"] in {
+              "not_applicable_no_authoritative_candidate",
+              "review_metadata_missing",
+              "review_metadata_supplied",
+          }, source_inventory
+          assert isinstance(source_inventory["source_authority_review_ready"], bool), source_inventory
+          assert isinstance(source_inventory["source_authority_review"], dict), source_inventory
           assert isinstance(source_inventory["next_required_for_goal"], list), source_inventory
           assert isinstance(source_inventory["next_required_action_ids"], list), source_inventory
           assert source_inventory["next_required_action_ids"], source_inventory
@@ -522,8 +529,12 @@ jobs:
           assert source_configuration["scan_mode"] == expected_scan_mode, source_configuration
           if source_inventory["status"] == "missing_authoritative_model":
               assert source_inventory["authoritative_candidate_count"] == 0, source_inventory
+              assert source_inventory["source_authority_review_status"] == "not_applicable_no_authoritative_candidate", source_inventory
+              assert source_inventory["source_authority_review_ready"] is False, source_inventory
               assert source_inventory["diagnostics"], source_inventory
               assert "review_and_declare_authoritative_so101_model_source" in source_inventory["next_required_action_ids"], source_inventory
+          if source_inventory["authoritative_candidate_count"] > 0 and source_inventory["source_authority_review_ready"] is False:
+              assert "record_source_authority_review_metadata" in source_inventory["next_required_action_ids"], source_inventory
           source_inventory_artifacts = source_inventory["artifacts"]
           for key in ("summary_json", "candidates_csv", "readme_md"):
               assert isinstance(source_inventory_artifacts.get(key), str) and Path(source_inventory_artifacts[key]).is_file(), (
@@ -1006,6 +1017,13 @@ jobs:
           ), artifacts_by_category["so101_model_source_inventory"]
           for row in artifacts_by_category["so101_model_source_inventory"]:
               metrics = row.get("metrics", {})
+              assert metrics.get("source_authority_review_status") in {
+                  "not_applicable_no_authoritative_candidate",
+                  "review_metadata_missing",
+                  "review_metadata_supplied",
+              }, metrics
+              assert isinstance(metrics.get("source_authority_review_ready"), bool), metrics
+              assert isinstance(metrics.get("source_authority_review"), dict), metrics
               assert isinstance(metrics.get("next_required_for_goal"), list), metrics
               assert isinstance(metrics.get("next_required_action_ids"), list), metrics
               assert metrics.get("next_required_action_count") == len(metrics.get("next_required_for_goal")), metrics

@@ -32,11 +32,19 @@ suite-level names:
 - `--so101-authoritative-model-root` maps to inventory `--authoritative-root`.
 
 Use the authoritative flags only after source provenance, license, mesh
-dependencies, and authority have been reviewed. Supplying an empty reviewed root
-or authority root is still a non-failing diagnostic: the suite should report
-`missing_authoritative_model`, `candidate_count: 0`, and
-`authoritative_candidate_count: 0` rather than inventing a model. The suite
-preserves the configured values under
+dependencies, and authority have been reviewed. When an authoritative path/root
+is declared, also pass `--so101-source-authority-license-basis` plus at least one
+review-evidence field: `--so101-source-authority-reviewed-by`,
+`--so101-source-authority-reviewed-at`, `--so101-source-authority-review-id`, or
+`--so101-source-authority-review-url`. Without those metadata fields the
+inventory can report an authoritative candidate, but it also reports
+`source_authority_review_status: "review_metadata_missing"` and queues
+`record_source_authority_review_metadata`.
+
+Supplying an empty reviewed root or authority root is still a non-failing
+diagnostic: the suite should report `missing_authoritative_model`,
+`candidate_count: 0`, and `authoritative_candidate_count: 0` rather than
+inventing a model. The suite preserves the configured values under
 `calibration_regression_summary.json.so101_model_source_inventory.source_configuration`,
 mirrors them in `so101_model_source_inventory_config`, writes the exact forwarded
 child command under `child_commands.so101_model_source_inventory.command`, and
@@ -69,7 +77,7 @@ To inspect an external or installed model location without importing assets:
 python scripts/smoke_sim_so101_model_source_inventory.py --root /absolute/path/to/model/root --output-dir /private/tmp/lerobot_sim/so101_model_source_inventory_external
 ```
 
-Use `--authoritative-path` or `--authoritative-root` only after the model source, license, and authority have been reviewed. Without those flags, a SO-101-looking file remains `source_authority_status: "unverified"` and does not count as authoritative.
+Use `--authoritative-path` or `--authoritative-root` only after the model source, license, and authority have been reviewed. Pair them with `--authority-license-basis` plus at least one of `--authority-reviewed-by`, `--authority-reviewed-at`, `--authority-review-id`, or `--authority-review-url` so the artifact distinguishes a bare authoritative-path declaration from a reviewed source-authority declaration. Without authoritative flags, a SO-101-looking file remains `source_authority_status: "unverified"` and does not count as authoritative. Without review metadata, an authoritative candidate remains explicit but reports `source_authority_review_ready: false`.
 
 ## Owner Check Evidence
 

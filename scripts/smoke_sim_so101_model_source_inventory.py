@@ -70,6 +70,7 @@ CSV_FIELDNAMES = (
     "provenance_status",
     "license_status",
     "source_authority_status",
+    "source_authority_review_status",
     "authoritative",
     "diagnostics",
 )
@@ -84,6 +85,14 @@ SOURCE_INVENTORY_ACTIONS = {
         "gate": "reviewed_model_authority",
         "title": "Review and declare the authoritative SO-101 model source",
         "detail": "After provenance, license, and source authority review, rerun with --authoritative-path or --authoritative-root.",
+    },
+    "record_source_authority_review_metadata": {
+        "gate": "reviewed_model_authority",
+        "title": "Record source-authority review metadata",
+        "detail": (
+            "Rerun with --authority-license-basis plus at least one of --authority-reviewed-by, "
+            "--authority-reviewed-at, --authority-review-id, or --authority-review-url."
+        ),
     },
     "run_so101_model_bundle_probe": {
         "gate": "reviewed_model_authority",
@@ -104,6 +113,7 @@ def source_inventory_next_required(
     likely_candidate_count: int,
     direct_contract_candidate_count: int,
     authoritative_candidate_count: int,
+    source_authority_review_ready: bool,
     recommended_contract_check: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
     action_ids: list[str] = []
@@ -111,6 +121,8 @@ def source_inventory_next_required(
         action_ids.append("scan_or_supply_so101_model_source_root")
     if authoritative_candidate_count <= 0:
         action_ids.append("review_and_declare_authoritative_so101_model_source")
+    elif not source_authority_review_ready:
+        action_ids.append("record_source_authority_review_metadata")
     if recommended_contract_check:
         action_ids.append("run_so101_model_bundle_probe")
     elif direct_contract_candidate_count > 0 or likely_candidate_count > 0:
@@ -189,6 +201,39 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=256_000,
         help="Maximum leading bytes to read from each candidate for lightweight inspection.",
+    )
+    parser.add_argument(
+        "--authority-reviewed-by",
+        default=None,
+        help=(
+            "Reviewer/operator identifier for an explicit authoritative source declaration. "
+            "Recorded as evidence only; it does not copy or modify model assets."
+        ),
+    )
+    parser.add_argument(
+        "--authority-reviewed-at",
+        default=None,
+        help="Deterministic review date/string for an explicit authoritative source declaration.",
+    )
+    parser.add_argument(
+        "--authority-review-id",
+        default=None,
+        help="Optional review ticket, issue, commit, or checklist identifier for source authority.",
+    )
+    parser.add_argument(
+        "--authority-review-url",
+        default=None,
+        help="Optional URL to the reviewed source-authority record.",
+    )
+    parser.add_argument(
+        "--authority-source-reference",
+        default=None,
+        help="Optional CAD/export/source reference used during source-authority review.",
+    )
+    parser.add_argument(
+        "--authority-license-basis",
+        default=None,
+        help="Reviewed license or redistribution basis for the authoritative model source.",
     )
     return parser.parse_args()
 
@@ -453,6 +498,78 @@ def is_authoritative(
     return False, "unverified", []
 
 
+def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
+    review_evidence = {
+        "authority_reviewed_by": args.authority_reviewed_by,
+        "authority_reviewed_at": args.authority_reviewed_at,
+        "authority_review_id": args.authority_review_id,
+        "authority_review_url": args.authority_review_url,
+    }
+    other_optional = {
+        "authority_source_reference": args.authority_source_reference,
+    }
+    supplied_review_evidence = {key: value for key, value in review_evidence.items() if value}
+    supplied_optional = {key: value for key, value in other_optional.items() if value}
+    if args.authority_license_basis:
+        supplied_optional["authority_license_basis"] = args.authority_license_basis
+    missing_required = []
+    if not supplied_review_evidence:
+        missing_required.append("authority_review_evidence")
+    if not args.authority_license_basis:
+        missing_required.append("authority_license_basis")
+    return {
+        "required_fields": ["authority_review_evidence", "authority_license_basis"],
+        "review_evidence_fields": sorted(review_evidence),
+        "optional_fields": sorted(other_optional),
+        "missing_required_fields": missing_required,
+        "supplied_required_fields": supplied_review_evidence,
+        "supplied_optional_fields": supplied_optional,
+        "ready_if_authoritative_source_declared": not missing_required,
+        "notes": [
+            "This metadata describes the inventory-level source-authority review declaration only.",
+            "The bundle manifest still must declare reviewed provenance, mesh authority, joint limits, target frame, TCP offset, and base-to-board alignment before model-backed IK is trusted.",
+        ],
+    }
+
+
+def source_authority_review_status_for_candidate(
+    authoritative: bool,
+    review_input: dict[str, Any],
+) -> str:
+    if not authoritative:
+        return "not_applicable"
+    if review_input.get("ready_if_authoritative_source_declared") is True:
+        return "review_metadata_supplied"
+    return "review_metadata_missing"
+
+
+def source_authority_review_summary(
+    *,
+    authoritative_candidate_count: int,
+    review_input: dict[str, Any],
+) -> dict[str, Any]:
+    if authoritative_candidate_count <= 0:
+        status = "not_applicable_no_authoritative_candidate"
+        ready = False
+    elif review_input.get("ready_if_authoritative_source_declared") is True:
+        status = "review_metadata_supplied"
+        ready = True
+    else:
+        status = "review_metadata_missing"
+        ready = False
+    return {
+        "status": status,
+        "ready": ready,
+        "authoritative_candidate_count": authoritative_candidate_count,
+        "required_fields": review_input.get("required_fields", []),
+        "optional_fields": review_input.get("optional_fields", []),
+        "missing_required_fields": review_input.get("missing_required_fields", []),
+        "supplied_required_fields": review_input.get("supplied_required_fields", {}),
+        "supplied_optional_fields": review_input.get("supplied_optional_fields", {}),
+        "notes": review_input.get("notes", []),
+    }
+
+
 def candidate_id_for(path: Path) -> str:
     digest = hashlib.sha1(str(path).encode("utf-8")).hexdigest()[:12]
     return f"candidate_{digest}"
@@ -465,6 +582,7 @@ def build_candidate(
     sample_bytes: int,
     authoritative_paths: set[Path],
     authoritative_roots: set[Path],
+    authority_review_input: dict[str, Any],
 ) -> dict[str, Any]:
     path = normalize_path(path)
     exists = path.exists()
@@ -498,6 +616,10 @@ def build_candidate(
         authoritative_paths,
         authoritative_roots,
     )
+    authority_review_status = source_authority_review_status_for_candidate(
+        authoritative,
+        authority_review_input,
+    )
     contract_supported = suffix in SUPPORTED_SUFFIXES and exists
     direct_compatible = suffix in DIRECT_ROBOT_KINEMATICS_SUFFIXES and exists
 
@@ -507,6 +629,8 @@ def build_candidate(
         diagnostics.append("not_direct_robot_kinematics_urdf")
     if not authoritative:
         diagnostics.append("source_authority_not_verified")
+    elif authority_review_status != "review_metadata_supplied":
+        diagnostics.append("source_authority_review_metadata_missing")
     if provenance["provenance_status"] == "unknown":
         diagnostics.append("provenance_unknown")
     if provenance["license"]["status"] == "unknown":
@@ -537,6 +661,7 @@ def build_candidate(
         "provenance_status": provenance["provenance_status"],
         "license_status": provenance["license"]["status"],
         "source_authority_status": authority_status,
+        "source_authority_review_status": authority_review_status,
         "source_authority_evidence": authority_evidence,
         "authoritative": authoritative,
         "diagnostics": diagnostics,
@@ -610,6 +735,7 @@ def build_summary(
     roots: list[dict[str, Any]],
     candidates: list[dict[str, Any]],
     artifacts: dict[str, str],
+    source_authority_review_input: dict[str, Any],
 ) -> dict[str, Any]:
     authoritative_candidates = [candidate for candidate in candidates if candidate["authoritative"]]
     direct_candidates = [
@@ -622,6 +748,10 @@ def build_summary(
     ]
     best_candidate = sorted(candidates, key=candidate_sort_key)[0] if candidates else None
     status = "authoritative_model_found" if authoritative_candidates else "missing_authoritative_model"
+    authority_review = source_authority_review_summary(
+        authoritative_candidate_count=len(authoritative_candidates),
+        review_input=source_authority_review_input,
+    )
     diagnostics = []
     if not authoritative_candidates:
         diagnostics.append(
@@ -632,6 +762,19 @@ def build_summary(
                 "likely_candidate_count": len(likely_candidates),
                 "direct_contract_candidate_count": len(direct_candidates),
                 "missing_source_requirements": missing_source_requirements(),
+            }
+        )
+    elif not authority_review["ready"]:
+        diagnostics.append(
+            {
+                "diagnostic": "source_authority_review_metadata_missing",
+                "severity": "action_required",
+                "authoritative_candidate_count": len(authoritative_candidates),
+                "missing_required_fields": authority_review["missing_required_fields"],
+                "reason": (
+                    "An authoritative path/root was supplied, but inventory-level review metadata "
+                    "is incomplete. This is still not reviewed physical SO-101 authority."
+                ),
             }
         )
 
@@ -656,6 +799,7 @@ def build_summary(
         likely_candidate_count=len(likely_candidates),
         direct_contract_candidate_count=len(direct_candidates),
         authoritative_candidate_count=len(authoritative_candidates),
+        source_authority_review_ready=authority_review["ready"],
         recommended_contract_check=recommended_contract_check,
     )
 
@@ -678,6 +822,9 @@ def build_summary(
         "likely_candidate_count": len(likely_candidates),
         "direct_contract_candidate_count": len(direct_candidates),
         "authoritative_candidate_count": len(authoritative_candidates),
+        "source_authority_review_status": authority_review["status"],
+        "source_authority_review_ready": authority_review["ready"],
+        "source_authority_review": authority_review,
         "roots": roots,
         "candidates": candidates,
         "recommended_contract_check": recommended_contract_check,
@@ -726,25 +873,28 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `likely_candidate_count`: `{summary['likely_candidate_count']}`",
         f"- `direct_contract_candidate_count`: `{summary['direct_contract_candidate_count']}`",
         f"- `authoritative_candidate_count`: `{summary['authoritative_candidate_count']}`",
+        f"- `source_authority_review_status`: `{summary['source_authority_review_status']}`",
+        f"- `source_authority_review_ready`: `{str(summary['source_authority_review_ready']).lower()}`",
         f"- `next_required_action_ids`: `{', '.join(summary.get('next_required_action_ids') or []) if summary.get('next_required_action_ids') else 'none'}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `candidates_csv`: `{summary['artifacts']['candidates_csv']}`",
         "",
         "## Candidates",
         "",
-        "| Candidate | Relevance | Direct URDF | Authority | Provenance | Path |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| Candidate | Relevance | Direct URDF | Authority | Review Metadata | Provenance | Path |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     if not summary["candidates"]:
-        lines.append("| none | none | false | missing | unknown | n/a |")
+        lines.append("| none | none | false | missing | n/a | unknown | n/a |")
     else:
         for candidate in summary["candidates"]:
             lines.append(
-                "| `{candidate_id}` | `{relevance}` | `{direct}` | `{authority}` | `{provenance}` | `{path}` |".format(
+                "| `{candidate_id}` | `{relevance}` | `{direct}` | `{authority}` | `{review}` | `{provenance}` | `{path}` |".format(
                     candidate_id=candidate["candidate_id"],
                     relevance=candidate["likely_so101_relevance"],
                     direct=str(candidate["direct_robot_kinematics_compatible"]).lower(),
                     authority=candidate["source_authority_status"],
+                    review=candidate["source_authority_review_status"],
                     provenance=candidate["provenance_status"],
                     path=candidate["path"].replace("|", "/"),
                 )
@@ -794,6 +944,7 @@ def main() -> int:
 
     authoritative_paths = {normalize_path(path) for path in args.authoritative_path}
     authoritative_roots = {normalize_path(path) for path in args.authoritative_root}
+    authority_review_input = source_authority_review_input(args)
     root_records = build_root_records(roots, root_source)
 
     candidates: list[dict[str, Any]] = []
@@ -816,6 +967,7 @@ def main() -> int:
                     args.sample_bytes,
                     authoritative_paths,
                     authoritative_roots,
+                    authority_review_input,
                 )
             )
         root_record["candidate_count"] = root_candidate_count
@@ -830,7 +982,7 @@ def main() -> int:
         "candidates_csv": str(csv_path),
         "readme_md": str(readme_path),
     }
-    summary = build_summary(root_records, candidates, artifacts)
+    summary = build_summary(root_records, candidates, artifacts, authority_review_input)
 
     write_json(summary_path, summary)
     write_csv(csv_path, candidates)
@@ -845,6 +997,8 @@ def main() -> int:
                 "likely_candidate_count": summary["likely_candidate_count"],
                 "direct_contract_candidate_count": summary["direct_contract_candidate_count"],
                 "authoritative_candidate_count": summary["authoritative_candidate_count"],
+                "source_authority_review_status": summary["source_authority_review_status"],
+                "source_authority_review_ready": summary["source_authority_review_ready"],
                 "next_required_action_ids": summary["next_required_action_ids"],
                 "artifacts": artifacts,
             },
