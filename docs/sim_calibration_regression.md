@@ -580,9 +580,13 @@ reviewed manifest declaration. The nested object records those checks as
 `selected_authoritative_candidate_path_matches_bundle` and
 `selected_authoritative_candidate_sha256_matches_bundle`; `matched_by` is
 populated only as `selected_authoritative_candidate_path_and_sha256` when both
-identity checks close. An authoritative root alone is not enough to authorize a
-different model file in the same tree, and a path match with a digest mismatch is
-also blocked. The reviewed-authority matrix includes same-root unselected-model,
+identity checks close. If source authority is otherwise reported ready but the
+selected authoritative source model path is absent, the consistency status is
+`source_authoritative_model_path_missing` and the blocker points back to
+selecting the reviewed source model path. An authoritative root alone is not
+enough to authorize a different model file in the same tree, and a path match
+with a digest mismatch is also blocked. The reviewed-authority matrix includes
+missing selected source path, same-root unselected-model,
 source-digest-missing, bundle-declared-digest-missing, and digest-mismatch
 negative cases so even physical-motion-ready injected state remains blocked on
 those mismatches. If source or bundle authority is not ready yet, the consistency

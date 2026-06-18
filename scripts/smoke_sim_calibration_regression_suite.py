@@ -3888,6 +3888,10 @@ def so101_source_bundle_consistency_section(
         status = "bundle_model_path_missing"
         ready = False
         blocker = "select_reviewed_so101_model_path"
+    elif not selected_authoritative_candidate_path:
+        status = "source_authoritative_model_path_missing"
+        ready = False
+        blocker = "select_reviewed_authoritative_so101_source_model_path"
     elif not selected_path_matches_bundle:
         status = "source_bundle_model_path_mismatch"
         ready = False
@@ -4012,6 +4016,18 @@ def so101_reviewed_model_authority_gate_section(
                 "detail": (
                     "Use the same reviewed SO-101 model path in the source inventory "
                     "and the reviewed bundle manifest before closing model authority."
+                ),
+            }
+        ]
+    elif consistency_status == "source_authoritative_model_path_missing":
+        consistency_actions = [
+            {
+                "action_id": "select_reviewed_authoritative_so101_source_model_path",
+                "gate": "reviewed_model_authority",
+                "title": "Select reviewed authoritative SO-101 source model path",
+                "detail": (
+                    "Record selected_authoritative_candidate_path in the source inventory "
+                    "before comparing source authority with the reviewed bundle manifest."
                 ),
             }
         ]
@@ -4179,6 +4195,10 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
     consistency_status = source_bundle_consistency.get("status")
     if consistency_status == "bundle_model_path_missing":
         source_bundle_consistency_next_action_id = "select_reviewed_so101_model_path"
+    elif consistency_status == "source_authoritative_model_path_missing":
+        source_bundle_consistency_next_action_id = (
+            "select_reviewed_authoritative_so101_source_model_path"
+        )
     elif consistency_status == "source_bundle_model_digest_missing":
         source_bundle_consistency_next_action_id = "record_reviewed_so101_model_file_sha256"
     elif consistency_status == "source_bundle_model_digest_mismatch":

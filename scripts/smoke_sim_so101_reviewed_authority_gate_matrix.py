@@ -165,6 +165,23 @@ def source_ready(
     }
 
 
+def source_ready_missing_selected_path(summary_path: Path, model_path: Path) -> dict[str, Any]:
+    model = normalize_path(model_path)
+    return {
+        "source_authority_gate_status": "source_authority_ready",
+        "source_authority_blockers": [],
+        "next_required_for_goal": [],
+        "next_required_action_ids": [],
+        "selected_authoritative_candidate_path": None,
+        "selected_authoritative_candidate_sha256": SOURCE_MODEL_SHA256,
+        "source_configuration": {
+            "authoritative_model_paths": [model],
+            "authoritative_model_roots": [normalize_path(model_path.parent)],
+        },
+        "summary_path": str(summary_path),
+    }
+
+
 def bundle_missing(summary_path: Path) -> dict[str, Any]:
     return {
         "physical_so101_model_authority_ready": False,
@@ -412,6 +429,33 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                     "source_bundle_consistency",
                     "physical_reviewed_mujoco_motion_checked",
                 ],
+            },
+        },
+        {
+            "case_id": "source_ready_missing_selected_path_physical_bundle_ready",
+            "source": source_ready_missing_selected_path(
+                summary_dir / "source_ready_missing_selected_path.json",
+                source_model,
+            ),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_authoritative_model_path_missing",
+                "consistency_ready": False,
+                "development_fixture": True,
+                "blockers_contain": [
+                    "select_reviewed_authoritative_so101_source_model_path"
+                ],
+                "actions_contain": [
+                    "select_reviewed_authoritative_so101_source_model_path"
+                ],
+                "action_required_contains": ["source_bundle_consistency"],
+                "blocker_packet_next_actions_contain": [
+                    "select_reviewed_authoritative_so101_source_model_path"
+                ],
+                "selected_path_matches_bundle": False,
+                "selected_digest_matches_bundle": True,
             },
         },
         {
