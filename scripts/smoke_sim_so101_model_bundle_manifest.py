@@ -1933,13 +1933,16 @@ def build_review_packet(
         review_packet_row(index, row_value, action_map)
         for index, row_value in enumerate(rows, start=1)
     ]
-    review_action_ids = sorted(
-        {
-            action_id
-            for row_value in packet_rows
-            for action_id in row_value["review_action_ids"]
-        }
-    )
+    row_action_ids = {
+        action_id
+        for row_value in packet_rows
+        for action_id in row_value["review_action_ids"]
+    }
+    review_action_ids = [
+        action["action_id"]
+        for action in summary["next_required_for_goal"]
+        if action.get("action_id") in row_action_ids
+    ]
     packet = {
         "schema": REVIEW_PACKET_SCHEMA,
         "ok": True,
@@ -2378,8 +2381,15 @@ def main() -> int:
     manifest, manifest_request = load_manifest(args.manifest_path)
     summary, rows = build_summary(manifest, manifest_request, args.python, output_dir, artifacts)
     review_packet, review_packet_rows = build_review_packet(summary, rows)
+    next_required_action_ids = [
+        action["action_id"]
+        for action in summary["next_required_for_goal"]
+        if isinstance(action.get("action_id"), str) and action["action_id"]
+    ]
     summary.update(
         {
+            "next_required_action_ids": next_required_action_ids,
+            "next_required_action_count": len(next_required_action_ids),
             "review_packet_status": review_packet["status"],
             "review_packet_model_authority": review_packet["model_authority"],
             "review_packet_item_count": review_packet["review_item_count"],

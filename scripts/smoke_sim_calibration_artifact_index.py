@@ -2378,7 +2378,15 @@ def collect_so101_model_bundle_manifest_artifacts(
     asset_preflight_artifacts = asset_preflight_artifacts if isinstance(asset_preflight_artifacts, dict) else {}
     next_required = bundle.get("next_required_for_goal")
     next_required = [action for action in next_required if isinstance(action, dict)] if isinstance(next_required, list) else []
-    next_required_action_ids = unique_string_values([action.get("action_id") for action in next_required])
+    explicit_next_required_action_ids = bundle.get("next_required_action_ids")
+    next_required_action_ids = (
+        unique_string_values(explicit_next_required_action_ids)
+        if isinstance(explicit_next_required_action_ids, list)
+        else unique_string_values([action.get("action_id") for action in next_required])
+    )
+    next_required_action_count = bundle.get("next_required_action_count")
+    if not isinstance(next_required_action_count, int):
+        next_required_action_count = len(next_required)
     metrics = {
         "status": bundle.get("status"),
         "ok": bundle.get("ok"),
@@ -2407,7 +2415,7 @@ def collect_so101_model_bundle_manifest_artifacts(
         ),
         "next_required_for_goal": next_required,
         "next_required_action_ids": next_required_action_ids,
-        "next_required_action_count": len(next_required),
+        "next_required_action_count": next_required_action_count,
         "model_path_status": model_path.get("status"),
         "model_path": model_path.get("path"),
         "asset_root_status": asset_roots.get("status"),

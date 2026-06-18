@@ -3489,6 +3489,8 @@ def so101_model_bundle_manifest_section(
             "review_packet_development_fixture_evidence_not_physical_so101_truth"
         ),
         "next_required_for_goal": bundle.get("next_required_for_goal"),
+        "next_required_action_ids": bundle.get("next_required_action_ids"),
+        "next_required_action_count": bundle.get("next_required_action_count"),
         "manifest_request": {
             "status": manifest_request.get("status"),
             "path": manifest_request.get("path"),

@@ -145,7 +145,9 @@ The manifest checker also writes
 `so101_model_bundle_manifest_review_packet.json` and `.csv`. This packet is
 derived from the current checklist rows and ordered `next_required_for_goal`
 actions, so a missing or incomplete manifest has a deterministic operator review
-queue. It always reports `model_authority: "review_packet_not_authority"`,
+queue. Its `review_action_ids` must match the ordered `next_required_action_ids`
+shortcut instead of an alphabetic sort. It always reports
+`model_authority: "review_packet_not_authority"`,
 `observed_evidence_is_authority: false`, and
 `development_fixture_evidence_not_physical_so101_truth: true`; it does not
 upgrade diagnostic manifest fields to reviewed SO-101 truth.

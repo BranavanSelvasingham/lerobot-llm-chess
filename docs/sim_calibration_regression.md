@@ -509,7 +509,9 @@ The model bundle manifest summary and artifact-index metrics must expose
 `next_required_for_goal`, `next_required_action_ids`, and
 `next_required_action_count`; in default CI the first action remains
 `supply_reviewed_so101_model_bundle_manifest`, keeping reviewed SO-101 model
-authority ahead of downstream policy work.
+authority ahead of downstream policy work. The manifest review packet must keep
+`review_packet_action_ids` in that same priority order rather than sorting them
+alphabetically, so operator review follows the gate sequence.
 
 The artifact contract also includes dedicated `so101_mujoco_scene`,
 `so101_chess_env`, `so101_env_resets`, `so101_mujoco_contact_probe`,
@@ -575,7 +577,7 @@ A passing summary should show:
 - `calibration_session.selected_candidate` populated with the rank-1 candidate
 - `perception_fixture.status: "ok"` and fixture artifact paths populated
 - `sim_camera_pose_fixture.status: "ok"` with deterministic nominal and perturbed case IDs, frame paths, annotated-frame paths, and metadata paths populated
-- `so101_model_bundle_manifest.status: "model_bundle_manifest_not_supplied"`, `"model_bundle_manifest_unavailable"`, `"model_bundle_manifest_parse_error"`, `"model_bundle_manifest_schema_error"`, `"model_bundle_manifest_needs_follow_up"`, or `"model_bundle_manifest_ready_for_model_backed_ik"` with readiness, physical-authority gate status/blockers, model path, asset roots, joint limits, mesh evidence, target frame, TCP offset, base-to-board alignment, ordered `next_required_for_goal` actions, review-packet status/item count/action IDs, forwarding reason, and summary/CSV/review-packet/README artifact paths populated
+- `so101_model_bundle_manifest.status: "model_bundle_manifest_not_supplied"`, `"model_bundle_manifest_unavailable"`, `"model_bundle_manifest_parse_error"`, `"model_bundle_manifest_schema_error"`, `"model_bundle_manifest_needs_follow_up"`, or `"model_bundle_manifest_ready_for_model_backed_ik"` with readiness, physical-authority gate status/blockers, model path, asset roots, joint limits, mesh evidence, target frame, TCP offset, base-to-board alignment, ordered `next_required_for_goal` actions, matching ordered `next_required_action_ids` and `review_packet_action_ids`, forwarding reason, and summary/CSV/review-packet/README artifact paths populated
 - `so101_reviewed_mujoco_bundle.status: "reviewed_mujoco_bundle_not_ready"` in default CI or `"reviewed_mujoco_bundle_motion_checked"` when a ready manifest is supplied, with `reviewed_model_motion_checked`, `motion_authority_status`, physical-reviewed motion, fixture-motion, and non-physical motion-evidence fields recorded and summary/CSV/README artifact paths populated
 - `so101_model_source_inventory.status: "missing_authoritative_model"`, `"ambiguous_authoritative_model"`, or `"authoritative_model_found"` with candidate counts, authoritative candidate count, authoritative source-selection status, selected authoritative path when exactly one candidate is selected, source-authority review scope readiness/missing scope IDs, source-authority gate status/blockers, review-packet status/model-authority/item count/action IDs, false observed-evidence-as-authority and physical-authority-ready flags, recommended contract-check path when present, and summary/CSV/review-packet/README artifact paths populated
 - `so101_model_bundle_probe.status: "candidate_model_missing"`, `"candidate_model_unavailable"`, `"candidate_manifest_needs_review"`, or `"candidate_manifest_ready_for_model_backed_ik"` with `model_authority: "draft_candidate_not_reviewed"`, selected model path, model request status, observed source/joint/mesh hints, manifest status, review-packet status/item count, `missing_inputs`, `next_required_action_ids`, and summary/candidate-manifest/review-packet/checklist/README plus child contract/manifest-check artifacts populated; default CI must keep `ready_for_model_backed_ik: false`
