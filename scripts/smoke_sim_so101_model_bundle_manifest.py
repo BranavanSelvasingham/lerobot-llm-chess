@@ -34,6 +34,45 @@ JOINT_LIMIT_FIELDS = (
     "joint_limits",
     "joint_limit_authority",
 )
+AUTHORITY_STATUS_FIELDS = (
+    "source_authority_status",
+    "review_status",
+    "status",
+)
+AUTHORITY_REVIEW_FIELDS = (
+    "reviewed_by",
+    "reviewed_at",
+    "review_id",
+    "review_url",
+)
+REVIEWED_AUTHORITY_STATUSES = {
+    "reviewed",
+    "operator_reviewed",
+    "source_reviewed",
+    "model_bundle_reviewed",
+    "reviewed_so101_model_bundle",
+}
+SYNTHETIC_FIXTURE_AUTHORITY_STATUS = "synthetic_fixture_reviewed_for_automation_only"
+PROVENANCE_SOURCE_FIELDS = (
+    "source_url",
+    "source_uri",
+    "cad_url",
+    "repository_url",
+    "source_path",
+    "source_reference",
+)
+PROVENANCE_EXPORT_FIELDS = (
+    "export_tool",
+    "exporter",
+    "generated_by",
+)
+PROVENANCE_LICENSE_FIELDS = (
+    "license",
+    "license_url",
+    "license_file",
+    "license_review",
+    "license_basis",
+)
 ALIGNMENT_FIELDS = (
     "base_to_board_transform",
     "base_to_board_alignment",
@@ -199,6 +238,18 @@ def non_empty(value: Any) -> bool:
     if isinstance(value, (list, tuple, dict)):
         return bool(value)
     return True
+
+
+def has_any_non_empty_field(value: dict[str, Any], field_names: tuple[str, ...]) -> bool:
+    return any(non_empty(value.get(field_name)) for field_name in field_names)
+
+
+def first_non_empty_field(value: dict[str, Any], field_names: tuple[str, ...]) -> tuple[str | None, Any]:
+    for field_name in field_names:
+        field_value = value.get(field_name)
+        if non_empty(field_value):
+            return field_name, field_value
+    return None, None
 
 
 def load_manifest(manifest_path: Path | None) -> tuple[dict[str, Any] | None, dict[str, Any]]:
@@ -406,23 +457,92 @@ def inspect_asset_roots(manifest: dict[str, Any] | None, manifest_dir: Path | No
 
 def inspect_authority(manifest: dict[str, Any] | None) -> dict[str, Any]:
     value = manifest.get("authority") if manifest else None
-    if isinstance(value, dict) and value:
-        return {"status": "present", "value": value, "diagnostics": []}
+    if not isinstance(value, dict) or not value:
+        return {
+            "status": "missing",
+            "value": value,
+            "diagnostics": ["authority_missing_or_empty"],
+            "accepted_review_statuses": sorted(REVIEWED_AUTHORITY_STATUSES),
+        }
+
+    status_field, raw_status = first_non_empty_field(value, AUTHORITY_STATUS_FIELDS)
+    status_value = str(raw_status).strip().lower() if raw_status is not None else ""
+    review_field_present = has_any_non_empty_field(value, AUTHORITY_REVIEW_FIELDS)
+    diagnostics: list[str] = []
+    if not status_value:
+        diagnostics.append("authority_review_status_missing")
+    elif status_value not in REVIEWED_AUTHORITY_STATUSES and status_value != SYNTHETIC_FIXTURE_AUTHORITY_STATUS:
+        diagnostics.append(f"authority_review_status_not_accepted:{status_value}")
+    if not review_field_present:
+        diagnostics.append("authority_review_evidence_missing")
+
+    is_synthetic_fixture = status_value == SYNTHETIC_FIXTURE_AUTHORITY_STATUS
+    if is_synthetic_fixture and "hardware-free" not in str(value.get("scope", "")).lower():
+        diagnostics.append("synthetic_fixture_scope_missing_hardware_free")
+
+    review_status_ok = status_value in REVIEWED_AUTHORITY_STATUSES or (
+        is_synthetic_fixture and "synthetic_fixture_scope_missing_hardware_free" not in diagnostics
+    )
+    status = "present" if review_status_ok and review_field_present else "needs_review"
     return {
-        "status": "missing",
+        "status": status,
         "value": value,
-        "diagnostics": ["authority_missing_or_empty"],
+        "review_status_field": status_field,
+        "review_status": status_value or None,
+        "review_evidence_present": review_field_present,
+        "synthetic_fixture_only": is_synthetic_fixture,
+        "diagnostics": diagnostics,
+        "accepted_review_statuses": sorted(REVIEWED_AUTHORITY_STATUSES),
+        "notes": (
+            "Synthetic fixture authority is accepted only for hardware-free forwarding regression fixtures; "
+            "it is not physical SO-101 source authority."
+            if is_synthetic_fixture
+            else "Authority requires an accepted reviewed status plus reviewer/date/id/url evidence."
+        ),
     }
 
 
 def inspect_provenance(manifest: dict[str, Any] | None) -> dict[str, Any]:
     value = manifest.get("provenance") if manifest else None
-    if isinstance(value, dict) and value:
-        return {"status": "present", "value": value, "diagnostics": []}
+    if not isinstance(value, dict) or not value:
+        return {
+            "status": "missing",
+            "value": value,
+            "diagnostics": ["provenance_missing_or_empty"],
+            "required_field_groups": {
+                "source": list(PROVENANCE_SOURCE_FIELDS),
+                "export": list(PROVENANCE_EXPORT_FIELDS),
+                "license": list(PROVENANCE_LICENSE_FIELDS),
+            },
+        }
+
+    source_field, source_value = first_non_empty_field(value, PROVENANCE_SOURCE_FIELDS)
+    export_field, export_value = first_non_empty_field(value, PROVENANCE_EXPORT_FIELDS)
+    license_field, license_value = first_non_empty_field(value, PROVENANCE_LICENSE_FIELDS)
+    diagnostics: list[str] = []
+    if source_field is None:
+        diagnostics.append("provenance_source_reference_missing")
+    if export_field is None:
+        diagnostics.append("provenance_export_tool_missing")
+    if license_field is None:
+        diagnostics.append("provenance_license_basis_missing")
+
     return {
-        "status": "missing",
+        "status": "present" if not diagnostics else "needs_review",
         "value": value,
-        "diagnostics": ["provenance_missing_or_empty"],
+        "source_field": source_field,
+        "source_value": source_value,
+        "export_field": export_field,
+        "export_value": export_value,
+        "license_field": license_field,
+        "license_value": license_value,
+        "diagnostics": diagnostics,
+        "required_field_groups": {
+            "source": list(PROVENANCE_SOURCE_FIELDS),
+            "export": list(PROVENANCE_EXPORT_FIELDS),
+            "license": list(PROVENANCE_LICENSE_FIELDS),
+        },
+        "notes": "Provenance requires source reference, export tool, and license basis fields.",
     }
 
 

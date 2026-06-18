@@ -66,6 +66,10 @@ By default the generated candidate manifest leaves `authority` and
 calibrated TCP, or board-alignment values. That means the generated manifest
 remains diagnostic-only until an operator replaces those placeholders with
 reviewed fields and this checker reports `ready_for_model_backed_ik: true`.
+`authority` must include an accepted reviewed status plus reviewer/date/id/url
+evidence, and `provenance` must include a source reference, export tool, and
+license basis. A merely non-empty object is recorded as `needs_review` and does
+not satisfy readiness.
 
 To re-check a generated draft directly:
 
@@ -184,6 +188,22 @@ Explicit placeholders such as
 `base_to_board_alignment_placeholder` or `alignment_placeholders` are recorded,
 but they do not make the bundle ready for model-backed IK.
 
+Accepted authority review statuses are `reviewed`, `operator_reviewed`,
+`source_reviewed`, `model_bundle_reviewed`, and
+`reviewed_so101_model_bundle`. The checker also accepts
+`synthetic_fixture_reviewed_for_automation_only` only when the manifest scope
+is explicitly hardware-free; that path exists for regression fixtures and is
+not physical SO-101 source authority. Authority must also include at least one
+review evidence field: `reviewed_by`, `reviewed_at`, `review_id`, or
+`review_url`.
+
+Provenance must include at least one source field (`source_url`, `source_uri`,
+`cad_url`, `repository_url`, `source_path`, or `source_reference`), one export
+field (`export_tool`, `exporter`, or `generated_by`), and one license field
+(`license`, `license_url`, `license_file`, `license_review`, or
+`license_basis`). The probe's observed Onshape/export/license hints are review
+inputs only until copied into these reviewed manifest fields.
+
 `joint_limits_deg`, `joint_limits`, or `joint_limit_authority` must be present
 as an object covering every expected SO-101 joint: `shoulder_pan`,
 `shoulder_lift`, `elbow_flex`, `wrist_flex`, `wrist_roll`, and `gripper`.
@@ -198,7 +218,8 @@ true:
 - the manifest is loaded as a JSON object
 - `model_path` exists
 - `asset_roots` is present and all supplied roots are directories
-- non-empty `authority` and `provenance` objects are present
+- `authority` declares an accepted reviewed status plus review evidence
+- `provenance` declares source reference, export tool, and license basis fields
 - reviewed joint-limit authority covers every SO-101 joint
 - at least one mesh reference is visible to the asset preflight and all mesh
   references resolve
