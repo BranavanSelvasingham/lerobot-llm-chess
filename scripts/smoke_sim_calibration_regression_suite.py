@@ -77,6 +77,11 @@ SO101_MUJOCO_GRASP_PROBE_DIR_NAME = "so101_mujoco_grasp_probe"
 SO101_MUJOCO_GRASP_PROBE_SUMMARY_NAME = "so101_mujoco_grasp_probe_summary.json"
 SO101_MUJOCO_BOARD_PICK_PROBE_DIR_NAME = "so101_mujoco_board_pick_probe"
 SO101_MUJOCO_BOARD_PICK_PROBE_SUMMARY_NAME = "so101_mujoco_board_pick_probe_summary.json"
+SO101_TRAINING_READINESS_GATE_SCHEMA = "lerobot.sim.so101_training_readiness_gate.v1"
+SO101_TRAINING_READINESS_GATE_DIR_NAME = "so101_training_readiness_gate"
+SO101_TRAINING_READINESS_GATE_SUMMARY_NAME = "so101_training_readiness_gate.json"
+SO101_TRAINING_READINESS_GATE_CHECKLIST_NAME = "so101_training_readiness_gate_checklist.csv"
+SO101_TRAINING_READINESS_GATE_README_NAME = "README.md"
 SO101_TRAINING_ROLLOUTS_DIR_NAME = "so101_training_rollouts"
 SO101_TRAINING_ROLLOUTS_SUMMARY_NAME = "so101_training_rollouts_summary.json"
 BASELINE_CORNERS = [[32, 338], [594, 340], [540, 20], [86, 12]]
@@ -1386,6 +1391,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         f"- `{SO101_MUJOCO_CONTACT_PROBE_DIR_NAME}/{SO101_MUJOCO_CONTACT_PROBE_SUMMARY_NAME}`",
         f"- `{SO101_MUJOCO_GRASP_PROBE_DIR_NAME}/{SO101_MUJOCO_GRASP_PROBE_SUMMARY_NAME}`",
         f"- `{SO101_MUJOCO_BOARD_PICK_PROBE_DIR_NAME}/{SO101_MUJOCO_BOARD_PICK_PROBE_SUMMARY_NAME}`",
+        f"- `{SO101_TRAINING_READINESS_GATE_DIR_NAME}/{SO101_TRAINING_READINESS_GATE_SUMMARY_NAME}`",
+        f"- `{SO101_TRAINING_READINESS_GATE_DIR_NAME}/{SO101_TRAINING_READINESS_GATE_CHECKLIST_NAME}`",
+        f"- `{SO101_TRAINING_READINESS_GATE_DIR_NAME}/{SO101_TRAINING_READINESS_GATE_README_NAME}`",
         f"- `{SO101_TRAINING_ROLLOUTS_DIR_NAME}/{SO101_TRAINING_ROLLOUTS_SUMMARY_NAME}`",
         "- `gripper_camera_pov_review/gripper_camera_pov_review_summary.json`",
         "- `pick_place_scenario_matrix/scenario_matrix_summary.json`",
@@ -1629,6 +1637,21 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         (
             "- SO-101 reviewed model authority blockers: "
             f"`{markdown_list_value(so101_authority_gate.get('blockers'))}`."
+        ),
+        (
+            "- SO-101 training readiness gate: "
+            f"status `{summary.get('so101_training_readiness_gate', {}).get('status')}`; "
+            f"ready `{markdown_bool(summary.get('so101_training_readiness_gate', {}).get('ready'))}`; "
+            "reviewed model-backed board pick/place "
+            f"`{markdown_bool(summary.get('so101_training_readiness_gate', {}).get('reviewed_model_backed_board_source_pick_place'))}`; "
+            "rollout ready "
+            f"`{markdown_bool(summary.get('so101_training_readiness_gate', {}).get('rollout_ready_for_policy_training'))}`; "
+            "fixture evidence is not policy training truth "
+            f"`{markdown_bool(summary.get('so101_training_readiness_gate', {}).get('development_fixture_evidence_not_policy_training_truth'))}`."
+        ),
+        (
+            "- SO-101 training readiness blockers: "
+            f"`{markdown_list_value(summary.get('so101_training_readiness_gate', {}).get('blockers'))}`."
         ),
         (
             "- SO-101 model-source inventory evidence records repo-local model-source "
@@ -3581,6 +3604,217 @@ def write_so101_reviewed_model_authority_gate_artifacts(
     return payload
 
 
+def so101_training_readiness_gate_section(
+    reviewed_authority_gate: dict[str, Any],
+    board_pick: dict[str, Any],
+    training_rollouts: dict[str, Any],
+) -> dict[str, Any]:
+    reviewed_authority_ready = reviewed_authority_gate.get("ready") is True
+    reviewed_model_backed_board_pick_place = (
+        board_pick.get("board_source_pick_place_verified") is True
+        and board_pick.get("ready_for_model_backed_ik") is True
+        and board_pick.get("model_authority") not in {None, "development_scaffold_not_reviewed"}
+        and board_pick.get("robot_pose_seeded_for_source_fixture") is not True
+        and board_pick.get("manual_piece_pose_used_after_reset") is False
+    )
+    rollout_ready = (
+        training_rollouts.get("ready_for_policy_training") is True
+        and training_rollouts.get("model_authority") not in {
+            None,
+            "development_scaffold_not_reviewed",
+        }
+    )
+    blockers = unique_string_values(
+        [
+            *(
+                []
+                if reviewed_authority_ready
+                else reviewed_authority_gate.get("blockers", [])
+            ),
+            *(
+                []
+                if reviewed_model_backed_board_pick_place
+                else ["reviewed_model_backed_board_source_pick_place"]
+            ),
+            *(
+                []
+                if rollout_ready
+                else (
+                    training_rollouts.get("serious_policy_training_blockers")
+                    or ["reviewed_model_backed_training_rollouts"]
+                )
+            ),
+        ]
+    )
+    ready = reviewed_authority_ready and reviewed_model_backed_board_pick_place and rollout_ready
+    return {
+        "status": "serious_training_ready" if ready else "serious_training_blocked",
+        "ready": ready,
+        "reviewed_model_authority_ready": reviewed_authority_ready,
+        "reviewed_model_authority_status": reviewed_authority_gate.get("status"),
+        "reviewed_model_backed_board_source_pick_place": reviewed_model_backed_board_pick_place,
+        "board_pick_status": board_pick.get("status"),
+        "board_pick_model_authority": board_pick.get("model_authority"),
+        "board_pick_ready_for_model_backed_ik": board_pick.get("ready_for_model_backed_ik"),
+        "board_pick_robot_pose_seeded_for_source_fixture": board_pick.get(
+            "robot_pose_seeded_for_source_fixture"
+        ),
+        "board_pick_manual_piece_pose_used_after_reset": board_pick.get(
+            "manual_piece_pose_used_after_reset"
+        ),
+        "rollout_ready_for_policy_training": training_rollouts.get(
+            "ready_for_policy_training"
+        ),
+        "rollout_training_authority_status": training_rollouts.get(
+            "training_authority_status"
+        ),
+        "rollout_model_authority": training_rollouts.get("model_authority"),
+        "rollout_use": training_rollouts.get("rollout_use"),
+        "development_fixture_evidence_not_policy_training_truth": (
+            not ready
+            or board_pick.get("model_authority") == "development_scaffold_not_reviewed"
+            or training_rollouts.get("model_authority") == "development_scaffold_not_reviewed"
+        ),
+        "blockers": blockers,
+        "blocker_count": len(blockers),
+        "reviewed_model_authority_gate_summary_path": reviewed_authority_gate.get(
+            "summary_path"
+        ),
+        "board_pick_summary_path": board_pick.get("summary_path"),
+        "training_rollouts_summary_path": training_rollouts.get("summary_path"),
+        "notes": [
+            "This gate is false until the reviewed model-authority gate is ready, board-source pick/place is repeated with reviewed model-backed IK, and policy rollout evidence is no longer development-scaffold-only.",
+            "Development rollout JSONL remains useful for debugging and narrow imitation-curriculum tests, not serious policy training truth.",
+        ],
+    }
+
+
+def write_so101_training_readiness_gate_artifacts(
+    output_dir: Path,
+    gate: dict[str, Any],
+) -> dict[str, Any]:
+    gate_dir = output_dir / SO101_TRAINING_READINESS_GATE_DIR_NAME
+    summary_path = gate_dir / SO101_TRAINING_READINESS_GATE_SUMMARY_NAME
+    checklist_path = gate_dir / SO101_TRAINING_READINESS_GATE_CHECKLIST_NAME
+    readme_path = gate_dir / SO101_TRAINING_READINESS_GATE_README_NAME
+    artifacts = {
+        "summary_json": str(summary_path),
+        "checklist_csv": str(checklist_path),
+        "readme_md": str(readme_path),
+    }
+    payload = {
+        "schema": SO101_TRAINING_READINESS_GATE_SCHEMA,
+        **gate,
+        "ok": bool(gate.get("ready")),
+        "summary_path": str(summary_path),
+        "artifact_dir": str(gate_dir),
+        "artifacts": artifacts,
+    }
+    checklist_rows = [
+        {
+            "requirement_id": "reviewed_model_authority_ready",
+            "category": "reviewed_model_authority",
+            "status": "ok"
+            if gate.get("reviewed_model_authority_ready") is True
+            else "action_required",
+            "observed_value": markdown_bool(gate.get("reviewed_model_authority_ready")),
+            "expected_value": "true",
+            "blockers": "; ".join(gate.get("blockers", [])),
+            "notes": "Serious policy training must wait for reviewed SO-101 model authority.",
+        },
+        {
+            "requirement_id": "reviewed_model_backed_board_pick_place",
+            "category": "scripted_pick_place_evidence",
+            "status": "ok"
+            if gate.get("reviewed_model_backed_board_source_pick_place") is True
+            else "action_required",
+            "observed_value": markdown_bool(
+                gate.get("reviewed_model_backed_board_source_pick_place")
+            ),
+            "expected_value": "true",
+            "blockers": "; ".join(gate.get("blockers", [])),
+            "notes": "Development seeded board-source pick/place does not close the reviewed model-backed pick/place gate.",
+        },
+        {
+            "requirement_id": "policy_training_rollouts_ready",
+            "category": "training_rollouts",
+            "status": "ok"
+            if gate.get("rollout_ready_for_policy_training") is True
+            else "action_required",
+            "observed_value": markdown_bool(gate.get("rollout_ready_for_policy_training")),
+            "expected_value": "true",
+            "blockers": "; ".join(gate.get("blockers", [])),
+            "notes": "Development JSONL rollouts are debug/imitation-curriculum evidence only.",
+        },
+        {
+            "requirement_id": "development_fixture_caveat",
+            "category": "authority_boundary",
+            "status": "ok"
+            if gate.get("development_fixture_evidence_not_policy_training_truth") is True
+            else "review_required",
+            "observed_value": markdown_bool(
+                gate.get("development_fixture_evidence_not_policy_training_truth")
+            ),
+            "expected_value": "true while training is blocked or fixture-only evidence exists",
+            "blockers": "; ".join(gate.get("blockers", [])),
+            "notes": "This caveat prevents treating scaffold rollouts as serious training truth.",
+        },
+    ]
+    gate_dir.mkdir(parents=True, exist_ok=True)
+    write_json(summary_path, payload)
+    fieldnames = (
+        "requirement_id",
+        "category",
+        "status",
+        "observed_value",
+        "expected_value",
+        "blockers",
+        "notes",
+    )
+    with checklist_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in checklist_rows:
+            writer.writerow(row)
+    blocker_lines = (
+        [f"- `{blocker}`" for blocker in gate.get("blockers", [])]
+        if gate.get("blockers")
+        else ["- none"]
+    )
+    readme_path.write_text(
+        "\n".join(
+            [
+                "# SO-101 Training Readiness Gate",
+                "",
+                f"- Status: `{gate.get('status')}`",
+                f"- Ready: `{markdown_bool(gate.get('ready'))}`",
+                "- Reviewed model authority ready: "
+                f"`{markdown_bool(gate.get('reviewed_model_authority_ready'))}`",
+                "- Reviewed model-backed board-source pick/place: "
+                f"`{markdown_bool(gate.get('reviewed_model_backed_board_source_pick_place'))}`",
+                "- Rollout ready for policy training: "
+                f"`{markdown_bool(gate.get('rollout_ready_for_policy_training'))}`",
+                "- Development fixture evidence is not policy training truth: "
+                f"`{markdown_bool(gate.get('development_fixture_evidence_not_policy_training_truth'))}`",
+                "",
+                "## Blockers",
+                "",
+                *blocker_lines,
+                "",
+                "## Evidence Sources",
+                "",
+                f"- Reviewed model authority gate: `{gate.get('reviewed_model_authority_gate_summary_path')}`",
+                f"- Board-source pick/place: `{gate.get('board_pick_summary_path')}`",
+                f"- Training rollouts: `{gate.get('training_rollouts_summary_path')}`",
+                "",
+                "This artifact is a hardware-free readiness summary. It is ready only when reviewed authority, reviewed model-backed board-source pick/place, and policy-ready rollout evidence are all true.",
+                "",
+            ]
+        )
+    )
+    return payload
+
+
 def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
     visual_review = visual_review if isinstance(visual_review, dict) else {}
     contact_sheets = visual_review.get("contact_sheets")
@@ -4476,6 +4710,23 @@ def main() -> int:
         output_dir,
         so101_reviewed_authority_gate,
     )
+    so101_mujoco_board_pick_probe_section = so101_mujoco_smoke_section(
+        so101_mujoco_board_pick_probe,
+        so101_mujoco_board_pick_probe_summary_path,
+    )
+    so101_training_rollouts_section = so101_mujoco_smoke_section(
+        so101_training_rollouts,
+        so101_training_rollouts_summary_path,
+    )
+    so101_training_readiness_gate = so101_training_readiness_gate_section(
+        so101_reviewed_authority_gate,
+        so101_mujoco_board_pick_probe_section,
+        so101_training_rollouts_section,
+    )
+    so101_training_readiness_gate = write_so101_training_readiness_gate_artifacts(
+        output_dir,
+        so101_training_readiness_gate,
+    )
 
     required_ok = all(record["ok"] for record in child_records.values())
     selected_candidate = selected_from_session(session, int(args.select_rank))
@@ -4606,14 +4857,9 @@ def main() -> int:
             so101_mujoco_grasp_probe,
             so101_mujoco_grasp_probe_summary_path,
         ),
-        "so101_mujoco_board_pick_probe": so101_mujoco_smoke_section(
-            so101_mujoco_board_pick_probe,
-            so101_mujoco_board_pick_probe_summary_path,
-        ),
-        "so101_training_rollouts": so101_mujoco_smoke_section(
-            so101_training_rollouts,
-            so101_training_rollouts_summary_path,
-        ),
+        "so101_mujoco_board_pick_probe": so101_mujoco_board_pick_probe_section,
+        "so101_training_readiness_gate": so101_training_readiness_gate,
+        "so101_training_rollouts": so101_training_rollouts_section,
         "gripper_camera_pov_review": gripper_camera_pov_section(pov, pov_summary_path),
         "pick_place_scenario_matrix": matrix_summary_section(matrix, matrix_summary_path),
         "app_entrypoint_metadata": app_entrypoint_metadata_section(

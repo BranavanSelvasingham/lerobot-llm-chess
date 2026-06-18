@@ -285,17 +285,19 @@ The integrated suite also runs the SO-101 MuJoCo development gates as automatic
 evidence: `so101_reviewed_mujoco_bundle/`, `so101_mujoco_scene/`,
 `so101_chess_env/`, `so101_env_resets/`, `so101_mujoco_contact_probe/`,
 `so101_mujoco_grasp_probe/`, `so101_mujoco_board_pick_probe/`, and
-`so101_training_rollouts/`. These children
+`so101_training_readiness_gate/`, and `so101_training_rollouts/`. These children
 require Gymnasium and MuJoCo, generate or consume the development-only MJCF
 scaffold, validate resettable chess-piece freejoint state, prove board contact,
 record gripper-contact fixture evidence, verify development-fixture lift/place
 physics when contact, transfer, target placement, board contact, and retreat
 checks pass, verify seeded development board-source pick/place, and collect
 deterministic scripted rollout JSONL/CSV evidence only after the board-pick
-summary is supplied as a rollout prerequisite. They are priority automation
-gates for the 3D training path, but serious training remains blocked until the
-reviewed MuJoCo bundle gate reports motion checked and board-source pickup works
-with reviewed model-backed IK. See
+summary is supplied as a rollout prerequisite. The training-readiness gate
+aggregates reviewed model authority, reviewed model-backed board-source
+pick/place, and rollout authority into one explicit serious-training blocker.
+They are priority automation gates for the 3D training path, but serious
+training remains blocked until the reviewed MuJoCo bundle gate reports motion
+checked and board-source pickup works with reviewed model-backed IK. See
 [SO-101 reviewed MuJoCo bundle](sim_so101_reviewed_mujoco_bundle.md),
 [SO-101 MuJoCo scene](sim_so101_mujoco_scene.md),
 [SO-101 chess env](sim_so101_chess_env.md),
@@ -527,6 +529,7 @@ A passing summary should show:
 - `so101_mujoco_contact_probe.status: "ok"` with `all_piece_resets_ok: true`, `all_board_contacts_observed: true`, probe count populated, and summary/CSV/model/manifest/README artifact paths populated
 - `so101_mujoco_grasp_probe.status: "contact_grasp_lift_place_physics_verified"` with `gripper_contact_observed: true`, `two_finger_contact_observed: true`, `lift_verified: true`, `transfer_verified: true`, `place_without_manual_piece_pose_verified: true`, `release_contact_cleared: true`, `final_board_contact_observed: true`, `final_target_xy_error_m <= target_xy_tolerance_m`, `manual_piece_pose_used_after_fixture: false`, probe count populated, open `next_required_for_goal` items, and summary/CSV/model/manifest/README artifact paths populated
 - `so101_mujoco_board_pick_probe.status: "development_board_source_pick_place_verified"` with `source_pick_started_at_source: true`, `close_two_finger_contact_observed: true`, `lift_verified: true`, `board_contact_cleared_during_lift: true`, `transfer_verified: true`, `place_without_manual_piece_pose_verified: true`, `board_source_pick_place_verified: true`, `release_contact_cleared_after_retreat: true`, `final_board_contact_observed: true`, `final_target_xy_error_m <= target_xy_tolerance_m`, `manual_piece_pose_used_after_reset: false`, `robot_pose_seeded_for_source_fixture: true`, open `next_required_for_goal` items, and summary/CSV/model/manifest/README artifact paths populated
+- `so101_training_readiness_gate.status: "serious_training_blocked"` until reviewed model authority, reviewed model-backed board-source pick/place, and policy-ready rollout evidence are all true; the gate must expose `ready`, blocker count/list, `reviewed_model_authority_ready`, `reviewed_model_backed_board_source_pick_place`, `rollout_ready_for_policy_training`, `development_fixture_evidence_not_policy_training_truth`, and summary/checklist/README artifact paths
 - `so101_training_rollouts.status: "ok"` with scripted episodes/transitions populated, `all_mujoco_fallback_free: true`, `all_mujoco_piece_release_synced: true`, `development_prerequisites_satisfied: true`, `training_authority_status: "development_rollouts_prerequisites_verified_not_policy_ready"`, `ready_for_policy_training: false`, `board_pick_prerequisite.status: "development_board_pick_prerequisite_verified"`, serious-policy blockers including `reviewed_model_backed_board_source_pick_place`, and summary/JSONL/CSV/model/manifest/README artifact paths populated
 - `gripper_camera_pov_review.status: "ok"` with open/approach/grasp/release state IDs, frame paths, annotated-frame paths, metadata paths, metadata contract checks, target center geometry, gripper state, and piece visibility rows populated
 - `visual_review.status: "ok"` with gripper POV, pose fixture, and pick/place sequence contact-sheet PNG paths populated, distance-annotated pick/place sequence frames populated under `frame_sequences`, `depth_distance_scorecard.paths.png`/`.json` populated with the at-a-glance simulator-vs-baseline residual scorecard and missing-real-depth labels, `distance_metrics.paths.json`/`.csv` populated with simulator-ground-truth depth/distance fields, `perceived_depth_comparison.paths.json`/`.csv` populated with estimate-vs-ground-truth residual fields, `pnp_residual_diagnostics.paths.json`/`.csv` populated with source-comparability residual fields, `metadata_native_depth_view.paths.png`/`.json`/`.csv` populated with camera-model-aligned simulator projection/depth fields, and `recordings.*` populated with either a best-effort MP4 path or a skipped reason
@@ -536,7 +539,7 @@ A passing summary should show:
 - `pick_place_scenario_matrix.aggregate_status.ok: true` with four scenario IDs and release-frame paths populated
 - `pick_place_scenario_matrix.piece_visibility.all_scenarios_available: true` with per-scenario visible fraction, occlusion fraction, and gripper clearance values
 - `negative_check.status: "no_reference_media_selected"` when `--include-negative-check` is used
-- `artifact_index.status: "ok"` with `artifact_count > 0`, `missing_artifact_count: 0`, an existing `path`, and categories covering reference media inventory, real-reference comparison when selected media exists, real projection intake, ranked candidate, perception fixture, SimCamera pose fixture, SO-101 model-source inventory, SO-101 reviewed model authority gate, SO-101 model bundle probe, SO-101 model bundle manifest, SO-101 reviewed MuJoCo bundle, SO-101 model contract, IK reachability, SO-101 MuJoCo scene/env/reset/contact/grasp/rollout evidence, pick/place scenario, negative check, and logs
+- `artifact_index.status: "ok"` with `artifact_count > 0`, `missing_artifact_count: 0`, an existing `path`, and categories covering reference media inventory, real-reference comparison when selected media exists, real projection intake, ranked candidate, perception fixture, SimCamera pose fixture, SO-101 model-source inventory, SO-101 reviewed model authority gate, SO-101 model bundle probe, SO-101 model bundle manifest, SO-101 reviewed MuJoCo bundle, SO-101 model contract, IK reachability, SO-101 MuJoCo scene/env/reset/contact/grasp evidence, SO-101 training readiness, rollout evidence, pick/place scenario, negative check, and logs
 
 The `sim_camera_pose_fixture` signal is a simulator-only pose artifact. It freezes the synthetic camera marker clock inside the smoke process, renders a small deterministic set of SimCamera frames, and writes one `camera_metadata.json` per case with view/profile data, image size, camera matrix/intrinsics, zero distortion coefficients, named board-to-camera extrinsics, coordinate-frame convention notes, board corners, target square center, piece square center, gripper state, and image hashes. It compares perturbed and alternate views against the nominal gripper-open case for review, but does not use pixel deltas as thresholds.
 
@@ -612,6 +615,9 @@ Common artifact paths under the output directory:
 - `so101_model_bundle_probe/so101_model_bundle.candidate.json`
 - `so101_model_bundle_probe/so101_model_bundle_probe_checklist.csv`
 - `so101_model_bundle_probe/README.md`
+- `so101_training_readiness_gate/so101_training_readiness_gate.json`
+- `so101_training_readiness_gate/so101_training_readiness_gate_checklist.csv`
+- `so101_training_readiness_gate/README.md`
 - `so101_model_contract/so101_model_contract_summary.json`
 - `so101_model_contract/so101_model_contract_checklist.csv`
 - `so101_model_contract/README.md`

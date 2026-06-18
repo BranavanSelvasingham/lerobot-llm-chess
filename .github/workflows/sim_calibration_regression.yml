@@ -840,6 +840,38 @@ jobs:
           assert board_pick_prerequisite["board_source_pick_place_verified"] is True, board_pick_prerequisite
           assert board_pick_prerequisite["manual_piece_pose_used_after_reset"] is False, board_pick_prerequisite
           assert board_pick_prerequisite["robot_pose_seeded_for_source_fixture"] is True, board_pick_prerequisite
+
+          training_readiness_gate = summary["so101_training_readiness_gate"]
+          assert training_readiness_gate["status"] in {
+              "serious_training_blocked",
+              "serious_training_ready",
+          }, training_readiness_gate
+          assert isinstance(training_readiness_gate["ready"], bool), training_readiness_gate
+          assert training_readiness_gate["reviewed_model_authority_ready"] == (
+              reviewed_model_authority_gate["ready"] is True
+          ), training_readiness_gate
+          assert isinstance(training_readiness_gate["blockers"], list), training_readiness_gate
+          assert training_readiness_gate["blocker_count"] == len(training_readiness_gate["blockers"]), training_readiness_gate
+          assert isinstance(
+              training_readiness_gate["development_fixture_evidence_not_policy_training_truth"],
+              bool,
+          ), training_readiness_gate
+          if training_readiness_gate["ready"] is True:
+              assert training_readiness_gate["status"] == "serious_training_ready", training_readiness_gate
+              assert training_readiness_gate["blockers"] == [], training_readiness_gate
+          else:
+              assert training_readiness_gate["status"] == "serious_training_blocked", training_readiness_gate
+              assert training_readiness_gate["blockers"], training_readiness_gate
+              assert training_readiness_gate["ready"] is False, training_readiness_gate
+              assert training_readiness_gate["development_fixture_evidence_not_policy_training_truth"] is True, training_readiness_gate
+              assert "reviewed_model_backed_board_source_pick_place" in training_readiness_gate["blockers"], training_readiness_gate
+              assert training_readiness_gate["rollout_ready_for_policy_training"] is False, training_readiness_gate
+          training_readiness_artifacts = training_readiness_gate["artifacts"]
+          for key in ("summary_json", "checklist_csv", "readme_md"):
+              assert isinstance(training_readiness_artifacts.get(key), str) and Path(training_readiness_artifacts[key]).is_file(), (
+                  key,
+                  training_readiness_artifacts,
+              )
           matrix = summary["pick_place_scenario_matrix"]
           assert matrix["ok"] is True, matrix
           assert matrix["aggregate_status"]["ok"] is True, matrix["aggregate_status"]
@@ -934,6 +966,7 @@ jobs:
               "so101_mujoco_contact_probe",
               "so101_mujoco_grasp_probe",
               "so101_mujoco_board_pick_probe",
+              "so101_training_readiness_gate",
               "so101_training_rollouts",
               "pick_place_scenario",
               "negative_check",
@@ -1377,6 +1410,38 @@ jobs:
               and row.get("metrics", {}).get("final_target_xy_error_m") <= row.get("metrics", {}).get("target_xy_tolerance_m")
               for row in artifacts_by_category["so101_mujoco_board_pick_probe"]
           ), artifacts_by_category["so101_mujoco_board_pick_probe"]
+          assert any(
+              row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("status") in {
+                  "serious_training_blocked",
+                  "serious_training_ready",
+              }
+              for row in artifacts_by_category["so101_training_readiness_gate"]
+          ), artifacts_by_category["so101_training_readiness_gate"]
+          assert any(
+              row.get("kind") == "csv" and row.get("exists") is True
+              for row in artifacts_by_category["so101_training_readiness_gate"]
+          ), artifacts_by_category["so101_training_readiness_gate"]
+          assert any(
+              row.get("label") == "so101_training_readiness_gate:readme" and row.get("exists") is True
+              for row in artifacts_by_category["so101_training_readiness_gate"]
+          ), artifacts_by_category["so101_training_readiness_gate"]
+          for row in artifacts_by_category["so101_training_readiness_gate"]:
+              metrics = row.get("metrics", {})
+              assert metrics.get("ready") in {True, False}, metrics
+              assert metrics.get("reviewed_model_authority_ready") in {True, False, None}, metrics
+              assert metrics.get("reviewed_model_backed_board_source_pick_place") in {True, False, None}, metrics
+              assert metrics.get("rollout_ready_for_policy_training") in {True, False, None}, metrics
+              assert isinstance(metrics.get("blockers"), list), metrics
+              assert metrics.get("blocker_count") == len(metrics.get("blockers")), metrics
+              if metrics.get("ready") is True:
+                  assert metrics.get("status") == "serious_training_ready", metrics
+                  assert metrics.get("blockers") == [], metrics
+              else:
+                  assert metrics.get("status") == "serious_training_blocked", metrics
+                  assert metrics.get("blockers"), metrics
+                  assert metrics.get("development_fixture_evidence_not_policy_training_truth") is True, metrics
           assert any(
               row.get("label") == "so101_mujoco_scene:model_xml"
               and row.get("exists") is True

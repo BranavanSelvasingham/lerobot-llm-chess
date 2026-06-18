@@ -40,12 +40,13 @@ CATEGORY_ORDER = {
     "so101_mujoco_contact_probe": 26,
     "so101_mujoco_grasp_probe": 27,
     "so101_mujoco_board_pick_probe": 28,
-    "so101_training_rollouts": 29,
-    "gripper_camera_pov": 30,
-    "app_entrypoint": 31,
-    "pick_place_scenario": 32,
-    "negative_check": 33,
-    "logs": 34,
+    "so101_training_readiness_gate": 29,
+    "so101_training_rollouts": 30,
+    "gripper_camera_pov": 31,
+    "app_entrypoint": 32,
+    "pick_place_scenario": 33,
+    "negative_check": 34,
+    "logs": 35,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -2708,6 +2709,78 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
     }
 
 
+def collect_so101_training_readiness_gate_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    gate = suite.get("so101_training_readiness_gate")
+    gate = gate if isinstance(gate, dict) else {}
+    artifact_paths = gate.get("artifacts")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    metrics = {
+        "status": gate.get("status"),
+        "ok": gate.get("ok"),
+        "ready": gate.get("ready"),
+        "reviewed_model_authority_ready": gate.get("reviewed_model_authority_ready"),
+        "reviewed_model_authority_status": gate.get("reviewed_model_authority_status"),
+        "reviewed_model_backed_board_source_pick_place": gate.get(
+            "reviewed_model_backed_board_source_pick_place"
+        ),
+        "board_pick_status": gate.get("board_pick_status"),
+        "board_pick_model_authority": gate.get("board_pick_model_authority"),
+        "board_pick_ready_for_model_backed_ik": gate.get(
+            "board_pick_ready_for_model_backed_ik"
+        ),
+        "board_pick_robot_pose_seeded_for_source_fixture": gate.get(
+            "board_pick_robot_pose_seeded_for_source_fixture"
+        ),
+        "board_pick_manual_piece_pose_used_after_reset": gate.get(
+            "board_pick_manual_piece_pose_used_after_reset"
+        ),
+        "rollout_ready_for_policy_training": gate.get("rollout_ready_for_policy_training"),
+        "rollout_training_authority_status": gate.get("rollout_training_authority_status"),
+        "rollout_model_authority": gate.get("rollout_model_authority"),
+        "rollout_use": gate.get("rollout_use"),
+        "development_fixture_evidence_not_policy_training_truth": gate.get(
+            "development_fixture_evidence_not_policy_training_truth"
+        ),
+        "blockers": gate.get("blockers") or [],
+        "blocker_count": gate.get("blocker_count"),
+        "reviewed_model_authority_gate_summary_path": gate.get(
+            "reviewed_model_authority_gate_summary_path"
+        ),
+        "board_pick_summary_path": gate.get("board_pick_summary_path"),
+        "training_rollouts_summary_path": gate.get("training_rollouts_summary_path"),
+    }
+    for key, label_suffix in (
+        ("summary_json", "summary"),
+        ("checklist_csv", "checklist"),
+        ("readme_md", "readme"),
+    ):
+        add_path(
+            artifacts,
+            category="so101_training_readiness_gate",
+            label=f"so101_training_readiness_gate:{label_suffix}",
+            value=artifact_paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"so101_training_readiness_gate.artifacts.{key}",
+            metrics=metrics,
+        )
+    return {
+        **metrics,
+        "summary_path": artifact_paths.get("summary_json") or gate.get("summary_path"),
+        "checklist_csv_path": artifact_paths.get("checklist_csv"),
+        "readme_md_path": artifact_paths.get("readme_md"),
+        "artifact_paths": artifact_paths,
+    }
+
+
 def collect_so101_model_bundle_probe_artifacts(
     *,
     suite: dict[str, Any],
@@ -3420,6 +3493,13 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    so101_training_readiness_gate = collect_so101_training_readiness_gate_artifacts(
+        suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
     so101_training_rollouts = collect_so101_mujoco_smoke_artifacts(
         suite=suite,
         suite_key="so101_training_rollouts",
@@ -3531,6 +3611,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "so101_mujoco_contact_probe": so101_mujoco_contact_probe,
         "so101_mujoco_grasp_probe": so101_mujoco_grasp_probe,
         "so101_mujoco_board_pick_probe": so101_mujoco_board_pick_probe,
+        "so101_training_readiness_gate": so101_training_readiness_gate,
         "so101_training_rollouts": so101_training_rollouts,
         "gripper_camera_pov": gripper_camera_pov,
         "app_entrypoint_metadata_contract": app_entrypoint_metadata_contract,

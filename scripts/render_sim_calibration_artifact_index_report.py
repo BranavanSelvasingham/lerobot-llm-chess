@@ -41,12 +41,13 @@ CATEGORY_ORDER = {
     "so101_mujoco_contact_probe": 26,
     "so101_mujoco_grasp_probe": 27,
     "so101_mujoco_board_pick_probe": 28,
-    "so101_training_rollouts": 29,
-    "gripper_camera_pov": 30,
-    "app_entrypoint": 31,
-    "pick_place_scenario": 32,
-    "negative_check": 33,
-    "logs": 34,
+    "so101_training_readiness_gate": 29,
+    "so101_training_rollouts": 30,
+    "gripper_camera_pov": 31,
+    "app_entrypoint": 32,
+    "pick_place_scenario": 33,
+    "negative_check": 34,
+    "logs": 35,
 }
 CATEGORY_LABELS = {
     "reference_media_inventory": "Reference Media Inventory",
@@ -78,6 +79,7 @@ CATEGORY_LABELS = {
     "so101_mujoco_contact_probe": "SO-101 MuJoCo Contact Probe",
     "so101_mujoco_grasp_probe": "SO-101 MuJoCo Grasp Probe",
     "so101_mujoco_board_pick_probe": "SO-101 MuJoCo Board Pick Probe",
+    "so101_training_readiness_gate": "SO-101 Training Readiness Gate",
     "so101_training_rollouts": "SO-101 Training Rollouts",
     "gripper_camera_pov": "Gripper-Camera POV Review",
     "app_entrypoint": "App Entrypoint Metadata",
@@ -1374,6 +1376,34 @@ def so101_mujoco_smoke_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("episode_count", ""),
         metrics.get("transition_count", ""),
         compact_list(metrics.get("next_required_action_ids") or metrics.get("next_required_for_goal")),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def so101_training_readiness_gate_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("ready", ""),
+        metrics.get("reviewed_model_authority_ready", ""),
+        metrics.get("reviewed_model_authority_status", ""),
+        metrics.get("reviewed_model_backed_board_source_pick_place", ""),
+        metrics.get("board_pick_status", ""),
+        metrics.get("board_pick_model_authority", ""),
+        metrics.get("board_pick_ready_for_model_backed_ik", ""),
+        metrics.get("board_pick_robot_pose_seeded_for_source_fixture", ""),
+        metrics.get("rollout_ready_for_policy_training", ""),
+        metrics.get("rollout_training_authority_status", ""),
+        metrics.get("rollout_model_authority", ""),
+        metrics.get("rollout_use", ""),
+        metrics.get("development_fixture_evidence_not_policy_training_truth", ""),
+        metrics.get("blocker_count", ""),
+        compact_list(metrics.get("blockers")),
         "ok" if artifact.get("exists") is True else "missing",
     ]
 
@@ -2967,6 +2997,46 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         )
         if ik_reachability
         else ["_No IK reachability artifacts indexed._"]
+    )
+
+    so101_training_readiness_gate = grouped.get("so101_training_readiness_gate", [])
+    lines.extend(["", "### SO-101 Training Readiness Gate"])
+    lines.append(
+        "This gate is the hard boundary before serious policy training. It stays blocked "
+        "until reviewed model authority is ready, board-source pick/place has been repeated "
+        "with reviewed model-backed IK, and rollout evidence is no longer development-scaffold-only."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Ready",
+                "Authority Ready",
+                "Authority Status",
+                "Reviewed Board Pick",
+                "Board Pick Status",
+                "Board Pick Authority",
+                "Board Pick IK Ready",
+                "Seeded Pose",
+                "Rollout Ready",
+                "Rollout Authority Status",
+                "Rollout Authority",
+                "Rollout Use",
+                "Fixture Caveat",
+                "Blocker Count",
+                "Blockers",
+                "Artifact Status",
+            ],
+            [
+                so101_training_readiness_gate_row(row)
+                for row in so101_training_readiness_gate
+            ],
+        )
+        if so101_training_readiness_gate
+        else ["_No SO-101 training readiness gate artifacts indexed._"]
     )
 
     so101_mujoco_rows = []
