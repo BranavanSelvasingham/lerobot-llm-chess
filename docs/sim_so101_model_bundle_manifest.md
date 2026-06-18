@@ -44,8 +44,9 @@ counts, `observed_joint_limits_status`,
 `mesh_asset_review_missing_references`,
 `mesh_asset_review_unique_unresolved_reference_count`,
 `mesh_asset_review_unresolved_references`, `manifest_status`,
-`ready_for_model_backed_ik`, and `missing_inputs`. These are shortcuts for
-artifact review only; readiness is still decided by the nested manifest checker.
+`ready_for_model_backed_ik`, `missing_inputs`, `next_required_for_goal`, and
+`next_required_action_ids`. These are shortcuts for artifact review only;
+readiness is still decided by the nested manifest checker.
 Observed source hints, joint limits, and mesh references come from the candidate
 model structure and nearby files. They are not copied into `provenance`,
 `joint_limits_deg`, or `mesh_asset_authority` unless a reviewer makes them

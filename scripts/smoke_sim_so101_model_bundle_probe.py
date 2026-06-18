@@ -53,6 +53,22 @@ CSV_FIELDNAMES = (
 )
 
 
+def next_required_action_ids(actions: Any) -> list[str]:
+    if not isinstance(actions, list):
+        return []
+    result: list[str] = []
+    seen: set[str] = set()
+    for action in actions:
+        if not isinstance(action, dict):
+            continue
+        action_id = action.get("action_id")
+        if not isinstance(action_id, str) or not action_id or action_id in seen:
+            continue
+        seen.add(action_id)
+        result.append(action_id)
+    return result
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -312,6 +328,8 @@ def run_manifest_checker(
         "status": summary.get("status", result.get("status")),
         "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
         "missing_inputs": summary.get("missing_inputs", []),
+        "next_required_for_goal": summary.get("next_required_for_goal", []),
+        "next_required_action_ids": next_required_action_ids(summary.get("next_required_for_goal")),
         "model_path": summary.get("model_path"),
         "asset_roots": summary.get("asset_roots"),
         "target_frame": summary.get("target_frame"),
@@ -964,6 +982,7 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         f"- `manifest_status`: `{manifest.get('status')}`",
         f"- `ready_for_model_backed_ik`: `{str(manifest.get('ready_for_model_backed_ik')).lower()}`",
         f"- `manifest_missing_inputs`: `{', '.join(manifest.get('missing_inputs') or []) if manifest.get('missing_inputs') else 'none'}`",
+        f"- `next_required_action_ids`: `{', '.join(summary.get('next_required_action_ids') or []) if summary.get('next_required_action_ids') else 'none'}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `checklist_csv`: `{summary['artifacts']['checklist_csv']}`",
         "",
@@ -981,6 +1000,26 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
                 notes=str(notes).replace("|", "/"),
             )
         )
+    lines.extend(
+        [
+            "",
+            "## Next Required For Goal",
+            "",
+        ]
+    )
+    if summary.get("next_required_for_goal"):
+        for action in summary["next_required_for_goal"]:
+            lines.append(
+                "- `{priority}` `{action_id}`: {title} (`{missing_input}`)".format(
+                    priority=action.get("priority"),
+                    action_id=action.get("action_id"),
+                    title=action.get("title"),
+                    missing_input=action.get("missing_input"),
+                )
+            )
+            lines.append(f"  - {action.get('detail')}")
+    else:
+        lines.append("- none")
     lines.extend(
         [
             "",
@@ -1068,6 +1107,8 @@ def main() -> int:
     contract_excerpt = contract_result["diagnostic_excerpt"]
     asset_preflight_excerpt = contract_excerpt.get("model_asset_preflight") or {}
     manifest_excerpt = manifest_result["diagnostic_excerpt"]
+    next_required = manifest_excerpt.get("next_required_for_goal") or []
+    next_action_ids = manifest_excerpt.get("next_required_action_ids") or []
     summary = {
         "schema": SCHEMA,
         "ok": True,
@@ -1106,6 +1147,8 @@ def main() -> int:
         "manifest_status": manifest_excerpt.get("status"),
         "ready_for_model_backed_ik": manifest_excerpt.get("ready_for_model_backed_ik") is True,
         "missing_inputs": manifest_excerpt.get("missing_inputs") or [],
+        "next_required_for_goal": next_required,
+        "next_required_action_ids": next_action_ids,
         "hardware_skipped": True,
         "gui_skipped": True,
         "openai_skipped": True,
@@ -1196,6 +1239,7 @@ def main() -> int:
                 "manifest_status": summary["manifest_status"],
                 "ready_for_model_backed_ik": summary["ready_for_model_backed_ik"],
                 "missing_inputs": summary["missing_inputs"],
+                "next_required_action_ids": summary["next_required_action_ids"],
             },
             sort_keys=True,
         )
