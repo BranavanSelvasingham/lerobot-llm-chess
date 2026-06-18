@@ -410,22 +410,41 @@ jobs:
               "corner_diagonal_scene_a1_h8",
               "back_rank_to_edge_scene_b8_a4",
               "edge_to_center_scene_h2_d5",
+              "invalid_source_square_rejected",
+              "same_source_target_rejected",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
+          negative_case_ids = {
+              "invalid_source_square_rejected",
+              "same_source_target_rejected",
+          }
           for case in summary["cases"]:
               obs = case["observations"]
               assert obs["model_authority"] == "development_scaffold_not_reviewed", case
+              assert obs["ready_for_model_backed_ik"] is False, case
+              assert obs["ready_for_policy_training"] is False, case
+              assert obs["physical_authority"] is False, case
+              if case["case_id"] in negative_case_ids:
+                  assert obs["status"] == "invalid_task_configuration", case
+                  assert obs["mujoco_scene_validity_status"] == "invalid_task_configuration", case
+                  assert obs["model_load_ok"] is False, case
+                  assert obs["sim_robot_sync_ok"] is False, case
+                  assert obs["env_scripted_pick_place_complete"] is False, case
+                  assert obs["model_xml_exists"] is False, case
+                  assert obs["manifest_json_exists"] is False, case
+                  assert isinstance(obs["configuration_error"]["message"], str) and obs["configuration_error"]["message"], case
+                  continue
+              assert obs["status"] == "ok", case
               assert obs["square_geom_count"] == 64, case
               assert obs["target_frame_site_present"] is True, case
               assert obs["target_marker_present"] is True, case
               assert obs["model_load_ok"] is True, case
               assert obs["sim_robot_sync_ok"] is True, case
               assert obs["env_scripted_pick_place_complete"] is True, case
-              assert obs["ready_for_model_backed_ik"] is False, case
-              assert obs["ready_for_policy_training"] is False, case
-              assert obs["physical_authority"] is False, case
               assert obs["missing_required_geoms"] == [], case
               assert obs["missing_required_sites"] == [], case
+              assert obs["model_xml_exists"] is True, case
+              assert obs["manifest_json_exists"] is True, case
           for relative_path in (
               "so101_mujoco_scene_matrix_summary.json",
               "so101_mujoco_scene_matrix_cases.csv",

@@ -64,6 +64,8 @@ class SO101DevelopmentMJCFConfig:
     def __post_init__(self) -> None:
         _square_to_indices(self.piece_square)
         _square_to_indices(self.target_square)
+        if self.piece_square.strip().lower() == self.target_square.strip().lower():
+            raise ValueError("piece_square and target_square must differ.")
         if self.gripper_min_closure_m >= self.gripper_opening_m:
             raise ValueError("gripper_min_closure_m must be smaller than gripper_opening_m.")
         if self.contact_condim not in {1, 3, 4, 6}:

@@ -74,7 +74,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "case_id",
         "ok",
         "return_code",
+        "expected_return_code",
         "status",
+        "expected_status",
         "model_authority",
         "source_square",
         "target_square",
@@ -87,6 +89,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "ready_for_model_backed_ik",
         "ready_for_policy_training",
         "physical_authority",
+        "mujoco_scene_validity_status",
+        "configuration_error",
+        "model_xml_exists",
+        "manifest_json_exists",
         "summary_path",
         "errors",
     )
@@ -116,12 +122,26 @@ def read_json_object(path: Path, *, label: str) -> dict[str, Any]:
     return payload
 
 
-def case_specs() -> list[dict[str, str]]:
+def case_specs() -> list[dict[str, Any]]:
     return [
-        {"case_id": "center_file_scene_e4_e5", "source_square": "e4", "target_square": "e5"},
-        {"case_id": "corner_diagonal_scene_a1_h8", "source_square": "a1", "target_square": "h8"},
-        {"case_id": "back_rank_to_edge_scene_b8_a4", "source_square": "b8", "target_square": "a4"},
-        {"case_id": "edge_to_center_scene_h2_d5", "source_square": "h2", "target_square": "d5"},
+        {"case_id": "center_file_scene_e4_e5", "source_square": "e4", "target_square": "e5", "expect_ok": True},
+        {"case_id": "corner_diagonal_scene_a1_h8", "source_square": "a1", "target_square": "h8", "expect_ok": True},
+        {"case_id": "back_rank_to_edge_scene_b8_a4", "source_square": "b8", "target_square": "a4", "expect_ok": True},
+        {"case_id": "edge_to_center_scene_h2_d5", "source_square": "h2", "target_square": "d5", "expect_ok": True},
+        {
+            "case_id": "invalid_source_square_rejected",
+            "source_square": "z9",
+            "target_square": "e4",
+            "expect_ok": False,
+            "expected_error_contains": "Invalid chess square",
+        },
+        {
+            "case_id": "same_source_target_rejected",
+            "source_square": "e4",
+            "target_square": "e4",
+            "expect_ok": False,
+            "expected_error_contains": "piece_square and target_square must differ",
+        },
     ]
 
 
@@ -175,10 +195,26 @@ def summarize_case(
         if isinstance(summary.get("env_scripted_pick_place"), dict)
         else {}
     )
+    artifacts = summary.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    model_xml_path = artifacts.get("model_xml")
+    manifest_path = artifacts.get("manifest_json")
+    expect_ok = bool(spec.get("expect_ok", True))
+    expected_return_code = 0 if expect_ok else 1
+    expected_status = "ok" if expect_ok else "invalid_task_configuration"
+    expected_scene_validity_status = (
+        "development_scene_validated_not_physical_authority"
+        if expect_ok
+        else "invalid_task_configuration"
+    )
+    configuration_error = summary.get("configuration_error")
+    configuration_error = configuration_error if isinstance(configuration_error, dict) else {}
     observations = {
         "return_code": record.get("return_code"),
+        "expected_return_code": expected_return_code,
         "ok": summary.get("ok"),
         "status": summary.get("status"),
+        "expected_status": expected_status,
         "model_authority": summary.get("model_authority"),
         "source_square": summary.get("source_square"),
         "target_square": summary.get("target_square"),
@@ -192,13 +228,16 @@ def summarize_case(
         "ready_for_policy_training": summary.get("ready_for_policy_training"),
         "physical_authority": summary.get("observed_evidence_is_physical_so101_authority"),
         "mujoco_scene_validity_status": summary.get("mujoco_scene_validity_status"),
+        "configuration_error": configuration_error,
+        "model_xml_exists": isinstance(model_xml_path, str) and Path(model_xml_path).is_file(),
+        "manifest_json_exists": isinstance(manifest_path, str) and Path(manifest_path).is_file(),
         "missing_required_geoms": model_load.get("missing_required_geoms"),
         "missing_required_sites": model_load.get("missing_required_sites"),
-        "artifacts": summary.get("artifacts"),
+        "artifacts": artifacts,
     }
-    add_error(errors, f"{case_id}.return_code", record.get("return_code"), 0)
-    add_error(errors, f"{case_id}.ok", observations["ok"], True)
-    add_error(errors, f"{case_id}.status", observations["status"], "ok")
+    add_error(errors, f"{case_id}.return_code", record.get("return_code"), expected_return_code)
+    add_error(errors, f"{case_id}.ok", observations["ok"], expect_ok)
+    add_error(errors, f"{case_id}.status", observations["status"], expected_status)
     add_error(
         errors,
         f"{case_id}.model_authority",
@@ -207,36 +246,70 @@ def summarize_case(
     )
     add_error(errors, f"{case_id}.source_square", observations["source_square"], spec["source_square"])
     add_error(errors, f"{case_id}.target_square", observations["target_square"], spec["target_square"])
-    add_error(errors, f"{case_id}.square_geom_count", observations["square_geom_count"], 64)
-    add_error(errors, f"{case_id}.target_frame_site_present", observations["target_frame_site_present"], True)
-    add_error(errors, f"{case_id}.target_marker_present", observations["target_marker_present"], True)
-    add_error(errors, f"{case_id}.model_load_ok", observations["model_load_ok"], True)
-    add_error(errors, f"{case_id}.sim_robot_sync_ok", observations["sim_robot_sync_ok"], True)
-    add_error(
-        errors,
-        f"{case_id}.env_scripted_pick_place_complete",
-        observations["env_scripted_pick_place_complete"],
-        True,
-    )
+    if expect_ok:
+        add_error(errors, f"{case_id}.square_geom_count", observations["square_geom_count"], 64)
+        add_error(errors, f"{case_id}.target_frame_site_present", observations["target_frame_site_present"], True)
+        add_error(errors, f"{case_id}.target_marker_present", observations["target_marker_present"], True)
+        add_error(errors, f"{case_id}.model_load_ok", observations["model_load_ok"], True)
+        add_error(errors, f"{case_id}.sim_robot_sync_ok", observations["sim_robot_sync_ok"], True)
+        add_error(
+            errors,
+            f"{case_id}.env_scripted_pick_place_complete",
+            observations["env_scripted_pick_place_complete"],
+            True,
+        )
+        add_error(
+            errors,
+            f"{case_id}.mujoco_scene_validity_status",
+            observations["mujoco_scene_validity_status"],
+            expected_scene_validity_status,
+        )
+        add_error(errors, f"{case_id}.missing_required_geoms", observations["missing_required_geoms"], [])
+        add_error(errors, f"{case_id}.missing_required_sites", observations["missing_required_sites"], [])
+        add_error(errors, f"{case_id}.model_xml_exists", observations["model_xml_exists"], True)
+        add_error(errors, f"{case_id}.manifest_json_exists", observations["manifest_json_exists"], True)
+    else:
+        add_error(errors, f"{case_id}.square_geom_count", observations["square_geom_count"], None)
+        add_error(errors, f"{case_id}.target_frame_site_present", observations["target_frame_site_present"], None)
+        add_error(errors, f"{case_id}.target_marker_present", observations["target_marker_present"], None)
+        add_error(errors, f"{case_id}.model_load_ok", observations["model_load_ok"], False)
+        add_error(errors, f"{case_id}.sim_robot_sync_ok", observations["sim_robot_sync_ok"], False)
+        add_error(
+            errors,
+            f"{case_id}.env_scripted_pick_place_complete",
+            observations["env_scripted_pick_place_complete"],
+            False,
+        )
+        add_error(
+            errors,
+            f"{case_id}.mujoco_scene_validity_status",
+            observations["mujoco_scene_validity_status"],
+            expected_scene_validity_status,
+        )
+        add_error(errors, f"{case_id}.model_xml_exists", observations["model_xml_exists"], False)
+        add_error(errors, f"{case_id}.manifest_json_exists", observations["manifest_json_exists"], False)
+        expected_error = spec.get("expected_error_contains")
+        error_message = configuration_error.get("message")
+        if isinstance(expected_error, str) and expected_error not in str(error_message):
+            errors.append(f"{case_id}.configuration_error: expected {expected_error!r} in {error_message!r}")
     add_error(errors, f"{case_id}.ready_for_model_backed_ik", observations["ready_for_model_backed_ik"], False)
     add_error(errors, f"{case_id}.ready_for_policy_training", observations["ready_for_policy_training"], False)
     add_error(errors, f"{case_id}.physical_authority", observations["physical_authority"], False)
-    add_error(
-        errors,
-        f"{case_id}.mujoco_scene_validity_status",
-        observations["mujoco_scene_validity_status"],
-        "development_scene_validated_not_physical_authority",
-    )
-    add_error(errors, f"{case_id}.missing_required_geoms", observations["missing_required_geoms"], [])
-    add_error(errors, f"{case_id}.missing_required_sites", observations["missing_required_sites"], [])
     artifacts = observations["artifacts"]
     if not isinstance(artifacts, dict):
         errors.append(f"{case_id}.artifacts: expected dict")
     else:
-        for key in ("summary_json", "model_xml", "manifest_json", "steps_csv", "readme"):
+        required_keys = ("summary_json", "model_xml", "manifest_json", "steps_csv", "readme")
+        for key in required_keys:
             artifact_path = artifacts.get(key)
-            if not isinstance(artifact_path, str) or not Path(artifact_path).is_file():
+            if not isinstance(artifact_path, str):
                 errors.append(f"{case_id}.artifacts.{key}: expected existing path")
+                continue
+            if key in {"model_xml", "manifest_json"} and not expect_ok:
+                if Path(artifact_path).exists():
+                    errors.append(f"{case_id}.artifacts.{key}: expected absent path for invalid task")
+            elif not Path(artifact_path).is_file():
+                errors.append(f"{case_id}.artifacts.{key}: expected existing file")
 
     return {
         "case_id": case_id,
@@ -248,6 +321,9 @@ def summarize_case(
         "expected": {
             "source_square": spec["source_square"],
             "target_square": spec["target_square"],
+            "ok": expect_ok,
+            "return_code": expected_return_code,
+            "status": expected_status,
         },
         "observations": observations,
     }
@@ -286,7 +362,9 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "case_id": case["case_id"],
         "ok": case["ok"],
         "return_code": observations.get("return_code"),
+        "expected_return_code": observations.get("expected_return_code"),
         "status": observations.get("status"),
+        "expected_status": observations.get("expected_status"),
         "model_authority": observations.get("model_authority"),
         "source_square": observations.get("source_square"),
         "target_square": observations.get("target_square"),
@@ -299,6 +377,10 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "ready_for_model_backed_ik": observations.get("ready_for_model_backed_ik"),
         "ready_for_policy_training": observations.get("ready_for_policy_training"),
         "physical_authority": observations.get("physical_authority"),
+        "mujoco_scene_validity_status": observations.get("mujoco_scene_validity_status"),
+        "configuration_error": observations.get("configuration_error"),
+        "model_xml_exists": observations.get("model_xml_exists"),
+        "manifest_json_exists": observations.get("manifest_json_exists"),
         "summary_path": case["summary_path"],
         "errors": case["errors"],
     }

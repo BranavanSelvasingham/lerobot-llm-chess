@@ -39,6 +39,13 @@ The summary must report:
 - `sim_robot_mujoco_sync.after_status.fallback: null`
 - `env_scripted_pick_place.scripted_pick_place_complete: true`
 
+Invalid scene requests fail closed with artifacts instead of a traceback. For
+example, an invalid chess square or identical source/target square writes
+`so101_mujoco_scene_summary.json`, an empty steps CSV, and `README.md`, returns
+nonzero, reports `status: "invalid_task_configuration"`, keeps
+`ready_for_model_backed_ik: false` and `ready_for_policy_training: false`, and
+does not generate a model XML or manifest.
+
 For focused scene-placement coverage, run:
 
 ```bash
@@ -47,8 +54,9 @@ python scripts/smoke_sim_so101_mujoco_scene_matrix.py --output-dir /private/tmp/
 
 The matrix writes `so101_mujoco_scene_matrix_summary.json`,
 `so101_mujoco_scene_matrix_cases.csv`, and `README.md`. It validates generated
-development scenes across center, corner, back-rank, and edge placements while
-keeping every case labeled as non-authoritative development scaffolding.
+development scenes across center, corner, back-rank, and edge placements, plus
+fail-closed invalid-square and same-source/target cases, while keeping every
+case labeled as non-authoritative development scaffolding.
 
 This scene is intentionally not an authoritative model bundle. It is generated
 from approximate repo-local dimensions and exists to validate MuJoCo loading,

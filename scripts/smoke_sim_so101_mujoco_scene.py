@@ -30,6 +30,7 @@ SO101_JOINTS: tuple[str, ...] = (
     "wrist_roll",
     "gripper",
 )
+DEVELOPMENT_MODEL_AUTHORITY = "development_scaffold_not_reviewed"
 
 
 def parse_args() -> argparse.Namespace:
@@ -244,6 +245,67 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
     path.write_text("\n".join(lines) + "\n")
 
 
+def invalid_task_summary(
+    *,
+    args: argparse.Namespace,
+    deps: dict[str, bool],
+    summary_path: Path,
+    model_path: Path,
+    manifest_path: Path,
+    steps_path: Path,
+    readme_path: Path,
+    message: str,
+) -> dict[str, Any]:
+    summary = {
+        "schema": "lerobot.sim.so101_mujoco_scene_smoke.v1",
+        "ok": False,
+        "status": "invalid_task_configuration",
+        "model_authority": DEVELOPMENT_MODEL_AUTHORITY,
+        "observed_evidence_is_physical_so101_authority": False,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "mujoco_scene_validity_status": "invalid_task_configuration",
+        "source_square": args.source_square,
+        "target_square": args.target_square,
+        "configuration_error": {
+            "type": "ValueError",
+            "message": message,
+        },
+        "dependencies": deps,
+        "mujoco_model_load": {
+            "ok": False,
+            "status": "not_attempted_invalid_task_configuration",
+        },
+        "sim_robot_mujoco_sync": {
+            "ok": False,
+            "status": "not_attempted_invalid_task_configuration",
+        },
+        "env_scripted_pick_place": {
+            "scripted_pick_place_complete": False,
+            "status": "not_attempted_invalid_task_configuration",
+        },
+        "artifacts": {
+            "summary_json": str(summary_path),
+            "model_xml": str(model_path),
+            "manifest_json": str(manifest_path),
+            "steps_csv": str(steps_path),
+            "readme": str(readme_path),
+        },
+        "limitations": [
+            "Invalid task configuration is recorded as a fail-closed scene gate artifact.",
+            "No MuJoCo model, SimRobot sync, or Gymnasium scripted movement is attempted.",
+            "This failure is hardware-free and does not claim physical SO-101 evidence.",
+        ],
+        "next_required_for_goal": [
+            "Provide valid, distinct source and target chess squares before generating the MuJoCo scene.",
+        ],
+    }
+    write_json(summary_path, summary)
+    write_steps(steps_path, [])
+    write_readme(readme_path, summary)
+    return summary
+
+
 def main() -> int:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -287,7 +349,24 @@ def main() -> int:
         write_so101_development_mjcf,
     )
 
-    config = SO101DevelopmentMJCFConfig(piece_square=args.source_square, target_square=args.target_square)
+    try:
+        if args.max_steps <= 0:
+            raise ValueError("max_steps must be positive.")
+        config = SO101DevelopmentMJCFConfig(piece_square=args.source_square, target_square=args.target_square)
+    except ValueError as exc:
+        summary = invalid_task_summary(
+            args=args,
+            deps=deps,
+            summary_path=summary_path,
+            model_path=model_path,
+            manifest_path=manifest_path,
+            steps_path=steps_path,
+            readme_path=readme_path,
+            message=str(exc),
+        )
+        print(json.dumps({"ok": False, "status": summary["status"], "summary_json": str(summary_path)}, indent=2))
+        return 1
+
     manifest = write_so101_development_mjcf(model_path, config, manifest_path=manifest_path)
     model_load = validate_loaded_model(model_path)
     sim_robot_sync = validate_sim_robot(model_path)
