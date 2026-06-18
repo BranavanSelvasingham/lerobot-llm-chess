@@ -3370,6 +3370,9 @@ def so101_model_source_inventory_section(
         "selected_authoritative_candidate_path": inventory.get(
             "selected_authoritative_candidate_path"
         ),
+        "selected_authoritative_candidate_sha256": inventory.get(
+            "selected_authoritative_candidate_sha256"
+        ),
         "source_authority_review_status": inventory.get("source_authority_review_status"),
         "source_authority_review_ready": inventory.get("source_authority_review_ready"),
         "source_authority_review": inventory.get("source_authority_review"),
@@ -3755,6 +3758,19 @@ def normalized_gate_path(value: Any) -> str | None:
     return str(Path(value).expanduser().resolve(strict=False))
 
 
+def normalized_sha256(value: Any) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip().lower()
+    if text.startswith("sha256:"):
+        text = text.removeprefix("sha256:").strip()
+    if len(text) != 64:
+        return None
+    if any(char not in "0123456789abcdef" for char in text):
+        return None
+    return text
+
+
 def so101_source_bundle_consistency_section(
     source_inventory: dict[str, Any],
     bundle_manifest: dict[str, Any],
@@ -3790,11 +3806,30 @@ def so101_source_bundle_consistency_section(
     selected_authoritative_candidate_path = normalized_gate_path(
         source_inventory.get("selected_authoritative_candidate_path")
     )
+    selected_authoritative_candidate_sha256 = normalized_sha256(
+        source_inventory.get("selected_authoritative_candidate_sha256")
+    )
+    bundle_model_identity = bundle_manifest.get("model_identity")
+    bundle_model_identity = (
+        bundle_model_identity if isinstance(bundle_model_identity, dict) else {}
+    )
+    bundle_model_declared_sha256 = normalized_sha256(
+        bundle_model_identity.get("declared_sha256")
+    )
+    bundle_model_observed_sha256 = normalized_sha256(
+        bundle_model_identity.get("observed_sha256")
+    )
+    bundle_model_sha256 = bundle_model_declared_sha256 or bundle_model_observed_sha256
 
     selected_path_matches_bundle = bool(
         bundle_model_path
         and selected_authoritative_candidate_path
         and bundle_model_path == selected_authoritative_candidate_path
+    )
+    selected_digest_matches_bundle = bool(
+        selected_authoritative_candidate_sha256
+        and bundle_model_sha256
+        and selected_authoritative_candidate_sha256 == bundle_model_sha256
     )
 
     prerequisites_ready = source_authority_ready and physical_authority_ready
@@ -3806,17 +3841,25 @@ def so101_source_bundle_consistency_section(
         status = "bundle_model_path_missing"
         ready = False
         blocker = "select_reviewed_so101_model_path"
+    elif not selected_path_matches_bundle:
+        status = "source_bundle_model_path_mismatch"
+        ready = False
+        blocker = "align_source_inventory_with_bundle_manifest_model_path"
+    elif not selected_authoritative_candidate_sha256 or not bundle_model_sha256:
+        status = "source_bundle_model_digest_missing"
+        ready = False
+        blocker = "record_reviewed_so101_model_file_sha256"
+    elif not selected_digest_matches_bundle:
+        status = "source_bundle_model_digest_mismatch"
+        ready = False
+        blocker = "align_source_inventory_with_bundle_manifest_model_digest"
     elif selected_path_matches_bundle:
         status = "source_bundle_model_path_consistent"
         ready = True
         blocker = None
-    else:
-        status = "source_bundle_model_path_mismatch"
-        ready = False
-        blocker = "align_source_inventory_with_bundle_manifest_model_path"
     matched_by = (
-        "selected_authoritative_candidate_path"
-        if ready and selected_path_matches_bundle
+        "selected_authoritative_candidate_path_and_sha256"
+        if ready and selected_path_matches_bundle and selected_digest_matches_bundle
         else None
     )
 
@@ -3830,12 +3873,17 @@ def so101_source_bundle_consistency_section(
         "source_authoritative_model_roots": source_authoritative_roots,
         "selected_authoritative_candidate_path": selected_authoritative_candidate_path,
         "selected_authoritative_candidate_path_matches_bundle": selected_path_matches_bundle,
+        "selected_authoritative_candidate_sha256": selected_authoritative_candidate_sha256,
+        "bundle_model_declared_sha256": bundle_model_declared_sha256,
+        "bundle_model_observed_sha256": bundle_model_observed_sha256,
+        "bundle_model_sha256": bundle_model_sha256,
+        "selected_authoritative_candidate_sha256_matches_bundle": selected_digest_matches_bundle,
         "matched_by": matched_by,
         "blocker": blocker,
         "notes": [
-            "This check prevents source authority and bundle authority from closing on different model paths.",
+            "This check prevents source authority and bundle authority from closing on different model paths or digests.",
             "It is evaluated only after source authority and physical bundle authority are otherwise ready.",
-            "A bundle model path must match the selected authoritative model candidate path.",
+            "A bundle model path and digest must match the selected authoritative model candidate path and digest.",
         ],
     }
 
@@ -3910,6 +3958,30 @@ def so101_reviewed_model_authority_gate_section(
                 ),
             }
         ]
+    elif consistency_status == "source_bundle_model_digest_mismatch":
+        consistency_actions = [
+            {
+                "action_id": "align_source_inventory_with_bundle_manifest_model_digest",
+                "gate": "reviewed_model_authority",
+                "title": "Align source inventory and bundle model digests",
+                "detail": (
+                    "Use the same reviewed SO-101 model file digest in the source inventory "
+                    "and the reviewed bundle manifest before closing model authority."
+                ),
+            }
+        ]
+    elif consistency_status == "source_bundle_model_digest_missing":
+        consistency_actions = [
+            {
+                "action_id": "record_reviewed_so101_model_file_sha256",
+                "gate": "reviewed_model_authority",
+                "title": "Record reviewed SO-101 model digest",
+                "detail": (
+                    "Record the selected authoritative source SHA-256 and matching bundle "
+                    "model_sha256 before checking source-to-bundle identity consistency."
+                ),
+            }
+        ]
     elif consistency_status == "bundle_model_path_missing":
         consistency_actions = [
             {
@@ -3918,7 +3990,7 @@ def so101_reviewed_model_authority_gate_section(
                 "title": "Select reviewed SO-101 bundle model path",
                 "detail": (
                     "Record the reviewed SO-101 model path in the bundle manifest "
-                    "before checking source-to-bundle path consistency."
+                    "before checking source-to-bundle model identity consistency."
                 ),
             }
         ]
@@ -4011,9 +4083,9 @@ def so101_reviewed_model_authority_gate_section(
         ),
         "notes": [
             "This top-level gate is a summary over the source inventory, bundle manifest, and reviewed MuJoCo bundle artifacts.",
-            "It is ready only when source authority, physical bundle authority, source-to-bundle model-path consistency, and physical-reviewed MuJoCo motion are all true.",
+            "It is ready only when source authority, physical bundle authority, source-to-bundle model path/digest consistency, and physical-reviewed MuJoCo motion are all true.",
             "Physical-reviewed MuJoCo motion must have a matching child status and motion-authority status, not only a lone boolean flag.",
-            "The source-authority model path and bundle manifest model path must be consistent before authority can close.",
+            "The source-authority model path/digest and bundle manifest model path/digest must be consistent before authority can close.",
             "Development fixture evidence remains useful automation coverage but does not close reviewed physical SO-101 authority.",
         ],
     }
@@ -4084,7 +4156,7 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
         {
             "item_id": "source_bundle_consistency",
             "gate": "reviewed_model_authority",
-            "required_state": "source_bundle_model_path_consistent",
+            "required_state": "source_bundle_model_path_and_digest_consistent",
             "observed_ready": gate.get("source_bundle_consistency_ready") is True,
             "blocked_by_prior_requirements": (
                 source_bundle_consistency.get("status")
@@ -4264,7 +4336,7 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
         "items": items,
         "caveats": [
             "This packet is a blocker review aid, not reviewed physical SO-101 model authority.",
-            "The gate is ready only when source authority, physical bundle authority, source-to-bundle model-path consistency, and physical-reviewed MuJoCo motion are all true.",
+            "The gate is ready only when source authority, physical bundle authority, source-to-bundle model path/digest consistency, and physical-reviewed MuJoCo motion are all true.",
             "Development fixture evidence remains automation coverage and must not be used as physical calibration truth.",
         ],
     }
@@ -4373,9 +4445,14 @@ def write_so101_reviewed_model_authority_gate_artifacts(
             "blockers": "; ".join(
                 blocker
                 for blocker in gate.get("blockers", [])
-                if "align_source_inventory" in blocker or "model_path" in blocker
+                if (
+                    "align_source_inventory" in blocker
+                    or "model_path" in blocker
+                    or "model digest" in blocker
+                    or "model_sha256" in blocker
+                )
             ),
-            "notes": "The reviewed source inventory and reviewed bundle manifest must identify the same SO-101 model path.",
+            "notes": "The reviewed source inventory and reviewed bundle manifest must identify the same SO-101 model path and SHA-256 digest.",
         },
         {
             "requirement_id": "physical_reviewed_mujoco_motion_checked",
@@ -4457,7 +4534,7 @@ def write_so101_reviewed_model_authority_gate_artifacts(
                 f"- Source authority ready: `{markdown_bool(gate.get('source_authority_ready'))}`",
                 "- Physical SO-101 model authority ready: "
                 f"`{markdown_bool(gate.get('physical_so101_model_authority_ready'))}`",
-                "- Source/bundle model path consistency: "
+                "- Source/bundle model identity consistency: "
                 f"`{gate.get('source_bundle_consistency_status')}`",
                 "- Physical reviewed MuJoCo motion checked: "
                 f"`{markdown_bool(gate.get('physical_reviewed_model_motion_checked'))}`",
@@ -4482,7 +4559,7 @@ def write_so101_reviewed_model_authority_gate_artifacts(
                 f"- Bundle manifest: `{gate.get('bundle_manifest_summary_path')}`",
                 f"- Reviewed MuJoCo bundle: `{gate.get('reviewed_mujoco_bundle_summary_path')}`",
                 "",
-                "This artifact is a hardware-free gate summary. It is ready only when source authority, physical bundle authority, source-to-bundle model-path consistency, and physical-reviewed MuJoCo motion are all true.",
+                "This artifact is a hardware-free gate summary. It is ready only when source authority, physical bundle authority, source-to-bundle model path/digest consistency, and physical-reviewed MuJoCo motion are all true.",
                 "",
             ]
         )

@@ -24,6 +24,8 @@ DEFAULT_OUTPUT_DIR = (
     Path("/private/tmp") / "lerobot_sim" / "so101_reviewed_authority_gate_matrix"
 )
 SCHEMA = "lerobot.sim.so101_reviewed_authority_gate_matrix.v1"
+SOURCE_MODEL_SHA256 = "a" * 64
+BUNDLE_MODEL_SHA256 = "b" * 64
 
 
 def parse_args() -> argparse.Namespace:
@@ -138,7 +140,12 @@ def source_missing(summary_path: Path) -> dict[str, Any]:
     }
 
 
-def source_ready(summary_path: Path, model_path: Path) -> dict[str, Any]:
+def source_ready(
+    summary_path: Path,
+    model_path: Path,
+    *,
+    sha256: str | None = SOURCE_MODEL_SHA256,
+) -> dict[str, Any]:
     model = normalize_path(model_path)
     return {
         "source_authority_gate_status": "source_authority_ready",
@@ -146,6 +153,7 @@ def source_ready(summary_path: Path, model_path: Path) -> dict[str, Any]:
         "next_required_for_goal": [],
         "next_required_action_ids": [],
         "selected_authoritative_candidate_path": model,
+        "selected_authoritative_candidate_sha256": sha256,
         "source_configuration": {
             "authoritative_model_paths": [model],
             "authoritative_model_roots": [normalize_path(model_path.parent)],
@@ -174,7 +182,12 @@ def bundle_missing(summary_path: Path) -> dict[str, Any]:
     }
 
 
-def bundle_physical_ready(summary_path: Path, model_path: Path | None) -> dict[str, Any]:
+def bundle_physical_ready(
+    summary_path: Path,
+    model_path: Path | None,
+    *,
+    sha256: str | None = SOURCE_MODEL_SHA256,
+) -> dict[str, Any]:
     return {
         "physical_so101_model_authority_ready": True,
         "physical_authority_gate_status": "physical_reviewed_authority_ready",
@@ -183,6 +196,13 @@ def bundle_physical_ready(summary_path: Path, model_path: Path | None) -> dict[s
         "next_required_for_goal": [],
         "next_required_action_ids": [],
         "model_path": {"path": normalize_path(model_path) if model_path else None},
+        "model_identity": {
+            "status": "present" if sha256 else "missing",
+            "declared_sha256": sha256,
+            "observed_sha256": sha256,
+            "matches": bool(sha256),
+            "diagnostics": [] if sha256 else ["model_sha256_missing"],
+        },
         "summary_path": str(summary_path),
     }
 
@@ -206,6 +226,13 @@ def bundle_hardware_fixture(summary_path: Path, model_path: Path) -> dict[str, A
         ],
         "next_required_action_ids": ["supply_reviewed_so101_model_bundle_manifest"],
         "model_path": {"path": normalize_path(model_path)},
+        "model_identity": {
+            "status": "present",
+            "declared_sha256": SOURCE_MODEL_SHA256,
+            "observed_sha256": SOURCE_MODEL_SHA256,
+            "matches": True,
+            "diagnostics": [],
+        },
         "summary_path": str(summary_path),
     }
 
@@ -453,6 +480,27 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "source_ready_physical_bundle_digest_mismatch",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready(
+                summary_dir / "bundle_digest_mismatch.json",
+                source_model,
+                sha256=BUNDLE_MODEL_SHA256,
+            ),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_bundle_model_digest_mismatch",
+                "consistency_ready": False,
+                "development_fixture": True,
+                "blockers_contain": ["align_source_inventory_with_bundle_manifest_model_digest"],
+                "actions_contain": ["align_source_inventory_with_bundle_manifest_model_digest"],
+                "action_required_contains": ["source_bundle_consistency"],
+                "selected_path_matches_bundle": True,
+                "selected_digest_matches_bundle": False,
+            },
+        },
+        {
             "case_id": "source_ready_physical_bundle_motion_status_inconsistent",
             "source": source_ready(summary_dir / "source_ready.json", source_model),
             "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
@@ -653,7 +701,7 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
                 errors,
                 "matched_by",
                 source_bundle_consistency.get("matched_by"),
-                "selected_authoritative_candidate_path",
+                "selected_authoritative_candidate_path_and_sha256",
             )
             add_error(
                 errors,
@@ -662,6 +710,32 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
                     "selected_authoritative_candidate_path_matches_bundle"
                 ),
                 True,
+            )
+            add_error(
+                errors,
+                "selected_digest_matches_bundle",
+                source_bundle_consistency.get(
+                    "selected_authoritative_candidate_sha256_matches_bundle"
+                ),
+                True,
+            )
+        if "selected_path_matches_bundle" in expect:
+            add_error(
+                errors,
+                "selected_path_matches_bundle",
+                source_bundle_consistency.get(
+                    "selected_authoritative_candidate_path_matches_bundle"
+                ),
+                expect["selected_path_matches_bundle"],
+            )
+        if "selected_digest_matches_bundle" in expect:
+            add_error(
+                errors,
+                "selected_digest_matches_bundle",
+                source_bundle_consistency.get(
+                    "selected_authoritative_candidate_sha256_matches_bundle"
+                ),
+                expect["selected_digest_matches_bundle"],
             )
 
     if "blockers_exact" in expect:

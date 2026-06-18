@@ -1238,6 +1238,9 @@ def build_source_inventory_review_packet(summary: dict[str, Any]) -> dict[str, A
         "selected_authoritative_candidate_path": summary.get(
             "selected_authoritative_candidate_path"
         ),
+        "selected_authoritative_candidate_sha256": summary.get(
+            "selected_authoritative_candidate_sha256"
+        ),
         "review_candidate_item_count": len(review_candidates[:20]),
         "item_count": len(items),
         "item_ids": [item["item_id"] for item in items],
@@ -1568,6 +1571,11 @@ def build_summary(
             if selected_authoritative_candidate
             else None
         ),
+        "selected_authoritative_candidate_sha256": (
+            selected_authoritative_candidate["file_sha256"]
+            if selected_authoritative_candidate
+            else None
+        ),
         "source_authority_review_status": authority_review["status"],
         "source_authority_review_ready": authority_review["ready"],
         "source_authority_review": authority_review,
@@ -1706,6 +1714,7 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `authoritative_source_selection_status`: `{summary['authoritative_source_selection_status']}`",
         f"- `selected_authoritative_candidate_id`: `{summary.get('selected_authoritative_candidate_id') or 'none'}`",
         f"- `selected_authoritative_candidate_path`: `{summary.get('selected_authoritative_candidate_path') or 'none'}`",
+        f"- `selected_authoritative_candidate_sha256`: `{summary.get('selected_authoritative_candidate_sha256') or 'none'}`",
         f"- `source_authority_review_status`: `{summary['source_authority_review_status']}`",
         f"- `source_authority_review_ready`: `{str(summary['source_authority_review_ready']).lower()}`",
         f"- `source_authority_review_scope_ready`: `{str(summary['source_authority_review_scope_ready']).lower()}`",

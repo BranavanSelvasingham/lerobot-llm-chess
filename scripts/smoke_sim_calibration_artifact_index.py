@@ -2630,6 +2630,9 @@ def collect_so101_model_source_inventory_artifacts(
         "selected_authoritative_candidate_path": inventory.get(
             "selected_authoritative_candidate_path"
         ),
+        "selected_authoritative_candidate_sha256": inventory.get(
+            "selected_authoritative_candidate_sha256"
+        ),
         "source_authority_review_status": inventory.get("source_authority_review_status"),
         "source_authority_review_ready": inventory.get("source_authority_review_ready"),
         "source_authority_review": inventory.get("source_authority_review"),
@@ -2746,6 +2749,9 @@ def collect_so101_model_source_inventory_artifacts(
         ],
         "selected_authoritative_candidate_path": metrics[
             "selected_authoritative_candidate_path"
+        ],
+        "selected_authoritative_candidate_sha256": metrics[
+            "selected_authoritative_candidate_sha256"
         ],
         "source_authority_review_status": inventory.get("source_authority_review_status"),
         "source_authority_review_ready": inventory.get("source_authority_review_ready"),

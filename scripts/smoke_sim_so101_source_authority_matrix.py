@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import shutil
 import subprocess
@@ -60,6 +61,14 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def csv_cell(value: Any) -> str:
     if isinstance(value, (dict, list, tuple)):
         return json.dumps(value, sort_keys=True)
@@ -76,6 +85,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_count",
         "authoritative_candidate_count",
         "selected_authoritative_candidate_path",
+        "selected_authoritative_candidate_sha256",
         "source_authority_gate_status",
         "source_authority_review_status",
         "source_authority_review_ready",
@@ -228,6 +238,7 @@ def thin_review_args() -> list[str]:
 
 
 def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
+    single_model_sha256 = sha256_file(fixtures["single_model"])
     return [
         {
             "case_id": "missing_source_root",
@@ -377,6 +388,7 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "source_intake_status": "source_authority_ready_waiting_for_bundle_manifest",
                 "review_packet_status": "review_packet_source_authority_ready",
                 "selected_authoritative_candidate_path": str(normalize_path(fixtures["single_model"])),
+                "selected_authoritative_candidate_sha256": single_model_sha256,
                 "blockers_exact": [],
                 "actions_contain": [
                     "run_so101_model_bundle_probe",
@@ -404,6 +416,7 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "source_intake_status": "source_authority_ready_waiting_for_bundle_manifest",
                 "review_packet_status": "review_packet_source_authority_ready",
                 "selected_authoritative_candidate_path": str(normalize_path(fixtures["single_model"])),
+                "selected_authoritative_candidate_sha256": single_model_sha256,
                 "blockers_exact": [],
                 "actions_contain": [
                     "run_so101_model_bundle_probe",
@@ -672,6 +685,13 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
             inventory.get("selected_authoritative_candidate_path"),
             expect["selected_authoritative_candidate_path"],
         )
+    if "selected_authoritative_candidate_sha256" in expect:
+        add_error(
+            errors,
+            f"{case_id}.selected_authoritative_candidate_sha256",
+            inventory.get("selected_authoritative_candidate_sha256"),
+            expect["selected_authoritative_candidate_sha256"],
+        )
 
     return {
         "case_id": case_id,
@@ -692,6 +712,9 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
             ),
             "selected_authoritative_candidate_path": inventory.get(
                 "selected_authoritative_candidate_path"
+            ),
+            "selected_authoritative_candidate_sha256": inventory.get(
+                "selected_authoritative_candidate_sha256"
             ),
             "source_authority_gate_status": inventory.get("source_authority_gate_status"),
             "source_authority_blockers": inventory.get("source_authority_blockers"),

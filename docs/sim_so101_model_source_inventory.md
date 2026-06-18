@@ -163,7 +163,8 @@ The complete-source-review fixture must reach
 `source_intake_status: "source_authority_ready_waiting_for_bundle_manifest"`.
 The single-root ready fixture must resolve to the same
 `selected_authoritative_candidate_path` as the explicit authoritative-path
-fixture; this is the path later compared against the reviewed bundle manifest.
+fixture and expose the selected candidate SHA-256; those model identity fields
+are later compared against the reviewed bundle manifest.
 The ambiguous-root fixture must remain
 `source_authority_blocked_ambiguous_authoritative_model` and queue
 `select_single_authoritative_so101_model_source`. Every matrix case keeps

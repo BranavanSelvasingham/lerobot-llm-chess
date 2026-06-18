@@ -296,11 +296,11 @@ contract checker asset preflight.
 The top-level summary also exposes `so101_reviewed_model_authority_gate`, which
 aggregates the source inventory, bundle manifest, and reviewed MuJoCo handoff.
 It reports `reviewed_model_authority_ready` only when source authority,
-physical bundle authority, source-to-bundle model-path consistency, and
+physical bundle authority, source-to-bundle model path/digest consistency, and
 physical-reviewed MuJoCo motion are all true; otherwise it reports ordered
 blockers and keeps downstream fixture evidence separate from reviewed physical
 SO-101 truth. The source inventory must identify the same reviewed model path
-as the bundle manifest, or an authoritative source root that contains it. The
+and SHA-256 digest as the bundle manifest. The
 suite also writes the same
 gate under `so101_reviewed_model_authority_gate/` as JSON, CSV, blocker-packet,
 and README review artifacts so the current highest-priority blocker can be
@@ -551,20 +551,23 @@ The workflow also treats `reference_media_inventory`, `reference_media_compariso
 The SO-101 reviewed model authority gate contract also requires
 `source_bundle_consistency_ready`, `source_bundle_consistency_status`, and the
 nested `source_bundle_consistency` object in both the top-level summary and the
-artifact-index metrics. The gate only becomes ready when that status is
-`source_bundle_model_path_consistent` and the bundle model path matches the
-selected authoritative source candidate path. The nested object records that as
-`selected_authoritative_candidate_path_matches_bundle`; `matched_by` is populated
-only when the prerequisites are ready and the checked path match closes. An
-authoritative root alone is not enough to authorize a different model file in the
-same tree; the reviewed-authority matrix includes a same-root unselected-model
-negative case so even physical-motion-ready injected state remains blocked on
-that mismatch. If source or bundle authority is not ready yet, the consistency
-check remains `not_checked_prerequisites_not_ready` rather than overclaiming
-reviewed physical SO-101 authority. The blocker packet separates immediate
-`action_required` items from `blocked_by_prior_requirements` items so reviewed
-MuJoCo motion proof stays downstream of reviewed physical bundle authority and
-source/bundle model-path consistency.
+artifact-index metrics. The gate only becomes ready when the status is
+`source_bundle_model_path_consistent`, the bundle model path matches the selected
+authoritative source candidate path, and the selected source SHA-256 matches the
+bundle manifest model digest. The nested object records those checks as
+`selected_authoritative_candidate_path_matches_bundle` and
+`selected_authoritative_candidate_sha256_matches_bundle`; `matched_by` is
+populated only as `selected_authoritative_candidate_path_and_sha256` when both
+identity checks close. An authoritative root alone is not enough to authorize a
+different model file in the same tree, and a path match with a digest mismatch is
+also blocked. The reviewed-authority matrix includes same-root unselected-model
+and digest-mismatch negative cases so even physical-motion-ready injected state
+remains blocked on those mismatches. If source or bundle authority is not ready
+yet, the consistency check remains `not_checked_prerequisites_not_ready` rather
+than overclaiming reviewed physical SO-101 authority. The blocker packet
+separates immediate `action_required` items from `blocked_by_prior_requirements`
+items so reviewed MuJoCo motion proof stays downstream of reviewed physical
+bundle authority and source/bundle model identity consistency.
 The gate reports `physical_reviewed_model_motion_reported` separately from
 `physical_reviewed_model_motion_status_ready`; it only reports
 `physical_reviewed_model_motion_checked: true` when the reviewed-MuJoCo child
@@ -755,9 +758,9 @@ A passing summary should show:
 - `sim_camera_pose_fixture.status: "ok"` with deterministic nominal and perturbed case IDs, frame paths, annotated-frame paths, and metadata paths populated
 - `so101_model_bundle_manifest.status: "model_bundle_manifest_not_supplied"`, `"model_bundle_manifest_unavailable"`, `"model_bundle_manifest_parse_error"`, `"model_bundle_manifest_schema_error"`, `"model_bundle_manifest_needs_follow_up"`, or `"model_bundle_manifest_ready_for_model_backed_ik"` with readiness, physical-authority gate status/blockers, model path, asset roots, joint limits, mesh evidence, target frame, TCP offset, base-to-board alignment, ordered `next_required_for_goal` actions, matching ordered `next_required_action_ids` and `review_packet_action_ids`, forwarding reason, and summary/CSV/review-packet/README artifact paths populated. Accepted review metadata must provide reviewer identity plus at least one trace field (`reviewed_at`, `review_id`, or `review_url`); a lone non-placeholder reviewer string is insufficient for reviewed physical authority or fixture forwarding.
 - `so101_reviewed_mujoco_bundle.status: "reviewed_mujoco_bundle_not_ready"` in default CI or `"reviewed_mujoco_bundle_motion_checked"` when a ready manifest is supplied, with `reviewed_model_motion_checked`, `motion_authority_status`, physical-reviewed motion, fixture-motion, and non-physical motion-evidence fields recorded and summary/CSV/README artifact paths populated
-- `so101_model_source_inventory.status: "missing_authoritative_model"`, `"ambiguous_authoritative_model"`, or `"authoritative_model_found"` with candidate counts, authoritative candidate count, authoritative source-selection status, selected authoritative path when exactly one candidate is selected, source-authority review scope readiness/missing scope IDs, source-authority review evidence required/satisfied/missing groups, source-authority gate status/blockers, review-packet status/model-authority/item count/action IDs, false observed-evidence-as-authority and physical-authority-ready flags, recommended contract-check path when present, and summary/CSV/review-packet/README artifact paths populated. Accepted source-authority review evidence must provide reviewer identity plus at least one trace field (`reviewed_at`, `review_id`, or `review_url`); a lone non-placeholder reviewer string is insufficient for source authority.
+- `so101_model_source_inventory.status: "missing_authoritative_model"`, `"ambiguous_authoritative_model"`, or `"authoritative_model_found"` with candidate counts, authoritative candidate count, authoritative source-selection status, selected authoritative path and SHA-256 digest when exactly one candidate is selected, source-authority review scope readiness/missing scope IDs, source-authority review evidence required/satisfied/missing groups, source-authority gate status/blockers, review-packet status/model-authority/item count/action IDs, false observed-evidence-as-authority and physical-authority-ready flags, recommended contract-check path when present, and summary/CSV/review-packet/README artifact paths populated. Accepted source-authority review evidence must provide reviewer identity plus at least one trace field (`reviewed_at`, `review_id`, or `review_url`); a lone non-placeholder reviewer string is insufficient for source authority.
 - `so101_model_bundle_probe.status: "candidate_model_missing"`, `"candidate_model_unavailable"`, `"candidate_manifest_needs_review"`, or `"candidate_manifest_ready_for_model_backed_ik"` with `model_authority: "draft_candidate_not_reviewed"`, selected model path, model request status, observed source/joint/mesh hints, manifest status, review-packet status/item count, `missing_inputs`, `next_required_action_ids`, and summary/candidate-manifest/review-packet/checklist/README plus child contract/manifest-check artifacts populated; default CI must keep `ready_for_model_backed_ik: false`
-- `so101_reviewed_model_authority_gate.status: "reviewed_model_authority_blocked"` until source authority, physical bundle authority, source-to-bundle model-path consistency, and physical-reviewed MuJoCo motion are all true; the gate must expose `ready`, `blockers`, `blocker_count`, ordered `next_required_for_goal`/`next_required_action_ids`, source/bundle/consistency/motion readiness booleans, blocker-packet status/model-authority/item count/action-required IDs/blocked-by-prior IDs, `development_fixture_evidence_not_physical_so101_truth`, and summary/checklist/blocker-packet/README artifact paths
+- `so101_reviewed_model_authority_gate.status: "reviewed_model_authority_blocked"` until source authority, physical bundle authority, source-to-bundle model path/digest consistency, and physical-reviewed MuJoCo motion are all true; the gate must expose `ready`, `blockers`, `blocker_count`, ordered `next_required_for_goal`/`next_required_action_ids`, source/bundle/consistency/motion readiness booleans, blocker-packet status/model-authority/item count/action-required IDs/blocked-by-prior IDs, `development_fixture_evidence_not_physical_so101_truth`, and summary/checklist/blocker-packet/README artifact paths
 - `so101_model_source_inventory.source_configuration.scan_mode: "default_repo_roots"` in the default run or `"explicit_roots"` when `--so101-model-source-root` is supplied, with configured roots/authority lists preserved
 - `so101_model_contract.status: "missing_model"`, `"model_unavailable"`, `"model_contract_checked"`, `"model_contract_needs_follow_up"`, or `"model_suffix_supported_not_directly_usable"` with `model_request_status`, `robot_kinematics_status`, `target_frame`, and summary/CSV/README artifact paths populated
 - `so101_model_contract.model_asset_preflight.status: "missing_model"`, `"model_unavailable"`, `"asset_preflight_checked"`, `"asset_preflight_limited_diagnostics"`, or `"asset_preflight_needs_follow_up"` with mesh, present, missing, unresolved counts and nested summary/CSV/README artifact paths populated
