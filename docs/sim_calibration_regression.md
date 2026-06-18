@@ -576,8 +576,11 @@ the selected authoritative source candidate path, and the selected source
 SHA-256 matches the bundle manifest declared model digest. The observed digest
 of the resolved bundle
 model file is reported for diagnostics, but it does not substitute for the
-reviewed manifest declaration. The nested object records those checks as
-`selected_authoritative_candidate_path_matches_bundle` and
+reviewed manifest declaration. When the bundle child reports physical authority,
+the aggregate gate still fails closed if the observed digest is missing
+(`bundle_model_observed_digest_missing`) or conflicts with the reviewed
+declaration (`bundle_model_observed_digest_mismatch`). The nested object records
+those checks as `selected_authoritative_candidate_path_matches_bundle` and
 `selected_authoritative_candidate_sha256_matches_bundle`; `matched_by` is
 populated only as `selected_authoritative_candidate_path_and_sha256` when both
 identity checks close. If source authority is otherwise reported ready but the
@@ -587,7 +590,9 @@ selecting the reviewed source model path. An authoritative root alone is not
 enough to authorize a different model file in the same tree, and a path match
 with a digest mismatch is also blocked. The reviewed-authority matrix includes
 missing selected source path, same-root unselected-model,
-source-digest-missing, bundle-declared-digest-missing, and digest-mismatch
+source-digest-missing, bundle-declared-digest-missing,
+bundle-observed-digest-missing, bundle-observed-digest-mismatch, and
+source/bundle digest-mismatch
 negative cases so even physical-motion-ready injected state remains blocked on
 those mismatches. If source or bundle authority is not ready yet, the consistency
 check remains `not_checked_prerequisites_not_ready` rather than overclaiming

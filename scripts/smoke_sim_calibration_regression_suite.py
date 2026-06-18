@@ -3867,6 +3867,14 @@ def so101_source_bundle_consistency_section(
         bundle_model_identity.get("observed_sha256")
     )
     bundle_model_sha256 = bundle_model_declared_sha256
+    bundle_observed_digest_missing = bool(
+        bundle_model_declared_sha256 and not bundle_model_observed_sha256
+    )
+    bundle_observed_digest_conflicts_with_declared = bool(
+        bundle_model_declared_sha256
+        and bundle_model_observed_sha256
+        and bundle_model_declared_sha256 != bundle_model_observed_sha256
+    )
 
     selected_path_matches_bundle = bool(
         bundle_model_path
@@ -3900,6 +3908,14 @@ def so101_source_bundle_consistency_section(
         status = "source_bundle_model_digest_missing"
         ready = False
         blocker = "record_reviewed_so101_model_file_sha256"
+    elif bundle_observed_digest_missing:
+        status = "bundle_model_observed_digest_missing"
+        ready = False
+        blocker = "verify_reviewed_so101_bundle_model_file_sha256"
+    elif bundle_observed_digest_conflicts_with_declared:
+        status = "bundle_model_observed_digest_mismatch"
+        ready = False
+        blocker = "inspect_reviewed_so101_bundle_model_file_sha256"
     elif not selected_digest_matches_bundle:
         status = "source_bundle_model_digest_mismatch"
         ready = False
@@ -3928,6 +3944,12 @@ def so101_source_bundle_consistency_section(
         "bundle_model_declared_sha256": bundle_model_declared_sha256,
         "bundle_model_observed_sha256": bundle_model_observed_sha256,
         "bundle_model_sha256": bundle_model_sha256,
+        "bundle_model_observed_sha256_missing": bundle_observed_digest_missing,
+        "bundle_model_observed_sha256_matches_declared": bool(
+            bundle_model_declared_sha256
+            and bundle_model_observed_sha256
+            and bundle_model_declared_sha256 == bundle_model_observed_sha256
+        ),
         "selected_authoritative_candidate_sha256_matches_bundle": selected_digest_matches_bundle,
         "matched_by": matched_by,
         "blocker": blocker,
@@ -3935,7 +3957,7 @@ def so101_source_bundle_consistency_section(
             "This check prevents source authority and bundle authority from closing on different model paths or digests.",
             "It is evaluated only after source authority and physical bundle authority are otherwise ready.",
             "The bundle manifest declared digest must match the selected authoritative model candidate digest.",
-            "The observed bundle model digest is diagnostic evidence and does not substitute for a reviewed manifest declaration.",
+            "The observed bundle model digest is diagnostic evidence and does not substitute for a reviewed manifest declaration, but it must not be missing or conflict with the declared digest when the bundle claims physical authority.",
         ],
     }
 
@@ -4040,6 +4062,32 @@ def so101_reviewed_model_authority_gate_section(
                 "detail": (
                     "Use the same reviewed SO-101 model file digest in the source inventory "
                     "and the reviewed bundle manifest before closing model authority."
+                ),
+            }
+        ]
+    elif consistency_status == "bundle_model_observed_digest_missing":
+        consistency_actions = [
+            {
+                "action_id": "verify_reviewed_so101_bundle_model_file_sha256",
+                "gate": "reviewed_model_authority",
+                "title": "Verify reviewed SO-101 bundle model file digest",
+                "detail": (
+                    "Re-run the reviewed bundle manifest check against a readable "
+                    "model file so the observed SHA-256 can be compared with the "
+                    "reviewed manifest declaration."
+                ),
+            }
+        ]
+    elif consistency_status == "bundle_model_observed_digest_mismatch":
+        consistency_actions = [
+            {
+                "action_id": "inspect_reviewed_so101_bundle_model_file_sha256",
+                "gate": "reviewed_model_authority",
+                "title": "Inspect reviewed SO-101 bundle model file digest",
+                "detail": (
+                    "Resolve the mismatch between the bundle manifest's reviewed "
+                    "model SHA-256 declaration and the observed model file digest "
+                    "before closing SO-101 model authority."
                 ),
             }
         ]
@@ -4201,6 +4249,14 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
         )
     elif consistency_status == "source_bundle_model_digest_missing":
         source_bundle_consistency_next_action_id = "record_reviewed_so101_model_file_sha256"
+    elif consistency_status == "bundle_model_observed_digest_missing":
+        source_bundle_consistency_next_action_id = (
+            "verify_reviewed_so101_bundle_model_file_sha256"
+        )
+    elif consistency_status == "bundle_model_observed_digest_mismatch":
+        source_bundle_consistency_next_action_id = (
+            "inspect_reviewed_so101_bundle_model_file_sha256"
+        )
     elif consistency_status == "source_bundle_model_digest_mismatch":
         source_bundle_consistency_next_action_id = (
             "align_source_inventory_with_bundle_manifest_model_digest"
@@ -4340,6 +4396,8 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
                     or "model_sha256" in blocker
                     or "sha256" in blocker
                     or "record_reviewed_so101_model_file_sha256" in blocker
+                    or "verify_reviewed_so101_bundle_model_file_sha256" in blocker
+                    or "inspect_reviewed_so101_bundle_model_file_sha256" in blocker
                 )
             )
             or (

@@ -74,6 +74,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "physical_bundle_ready",
         "source_bundle_consistency_status",
         "source_bundle_consistency_ready",
+        "bundle_model_observed_sha256_missing",
+        "bundle_model_observed_sha256_matches_declared",
         "physical_reviewed_model_motion_checked",
         "physical_reviewed_model_motion_reported",
         "physical_reviewed_model_motion_status_ready",
@@ -603,6 +605,74 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "source_ready_physical_bundle_observed_digest_missing",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready(
+                summary_dir / "bundle_observed_digest_missing.json",
+                source_model,
+                declared_sha256=SOURCE_MODEL_SHA256,
+                observed_sha256=None,
+            ),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "expect": {
+                "ready": False,
+                "consistency_status": "bundle_model_observed_digest_missing",
+                "consistency_ready": False,
+                "development_fixture": True,
+                "blockers_contain": [
+                    "verify_reviewed_so101_bundle_model_file_sha256"
+                ],
+                "actions_contain": [
+                    "verify_reviewed_so101_bundle_model_file_sha256"
+                ],
+                "action_required_contains": ["source_bundle_consistency"],
+                "blocker_packet_next_actions_contain": [
+                    "verify_reviewed_so101_bundle_model_file_sha256"
+                ],
+                "selected_path_matches_bundle": True,
+                "selected_digest_matches_bundle": True,
+                "bundle_declared_sha256": SOURCE_MODEL_SHA256,
+                "bundle_observed_sha256": None,
+                "bundle_model_sha256": SOURCE_MODEL_SHA256,
+                "bundle_observed_sha256_missing": True,
+                "bundle_observed_sha256_matches_declared": False,
+            },
+        },
+        {
+            "case_id": "source_ready_physical_bundle_observed_digest_mismatch",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready(
+                summary_dir / "bundle_observed_digest_mismatch.json",
+                source_model,
+                declared_sha256=SOURCE_MODEL_SHA256,
+                observed_sha256=BUNDLE_MODEL_SHA256,
+            ),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "expect": {
+                "ready": False,
+                "consistency_status": "bundle_model_observed_digest_mismatch",
+                "consistency_ready": False,
+                "development_fixture": True,
+                "blockers_contain": [
+                    "inspect_reviewed_so101_bundle_model_file_sha256"
+                ],
+                "actions_contain": [
+                    "inspect_reviewed_so101_bundle_model_file_sha256"
+                ],
+                "action_required_contains": ["source_bundle_consistency"],
+                "blocker_packet_next_actions_contain": [
+                    "inspect_reviewed_so101_bundle_model_file_sha256"
+                ],
+                "selected_path_matches_bundle": True,
+                "selected_digest_matches_bundle": True,
+                "bundle_declared_sha256": SOURCE_MODEL_SHA256,
+                "bundle_observed_sha256": BUNDLE_MODEL_SHA256,
+                "bundle_model_sha256": SOURCE_MODEL_SHA256,
+                "bundle_observed_sha256_missing": False,
+                "bundle_observed_sha256_matches_declared": False,
+            },
+        },
+        {
             "case_id": "source_ready_physical_bundle_digest_mismatch",
             "source": source_ready(summary_dir / "source_ready.json", source_model),
             "bundle": bundle_physical_ready(
@@ -944,6 +1014,22 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
                 source_bundle_consistency.get("bundle_model_sha256"),
                 expect["bundle_model_sha256"],
             )
+        if "bundle_observed_sha256_missing" in expect:
+            add_error(
+                errors,
+                "bundle_observed_sha256_missing",
+                source_bundle_consistency.get("bundle_model_observed_sha256_missing"),
+                expect["bundle_observed_sha256_missing"],
+            )
+        if "bundle_observed_sha256_matches_declared" in expect:
+            add_error(
+                errors,
+                "bundle_observed_sha256_matches_declared",
+                source_bundle_consistency.get(
+                    "bundle_model_observed_sha256_matches_declared"
+                ),
+                expect["bundle_observed_sha256_matches_declared"],
+            )
 
     if "blockers_exact" in expect:
         add_error(errors, "blockers", gate.get("blockers"), expect["blockers_exact"])
@@ -1027,6 +1113,8 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
 def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
     gate = case["gate"]
     blocker_packet = case["blocker_packet"]
+    consistency = gate.get("source_bundle_consistency")
+    consistency = consistency if isinstance(consistency, dict) else {}
     return {
         "case_id": case["case_id"],
         "ok": case["ok"],
@@ -1037,6 +1125,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "physical_bundle_ready": gate.get("physical_so101_model_authority_ready"),
         "source_bundle_consistency_status": gate.get("source_bundle_consistency_status"),
         "source_bundle_consistency_ready": gate.get("source_bundle_consistency_ready"),
+        "bundle_model_observed_sha256_missing": consistency.get(
+            "bundle_model_observed_sha256_missing"
+        ),
+        "bundle_model_observed_sha256_matches_declared": consistency.get(
+            "bundle_model_observed_sha256_matches_declared"
+        ),
         "physical_reviewed_model_motion_checked": gate.get(
             "physical_reviewed_model_motion_checked"
         ),
