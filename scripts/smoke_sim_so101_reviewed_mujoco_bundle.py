@@ -463,10 +463,15 @@ def build_not_ready_summary(
             "When no ready reviewed manifest exists, the gate records the missing inputs without inventing model authority.",
             "MuJoCo motion is attempted only after the bundle manifest reports ready_for_model_backed_ik true.",
         ],
-        "next_required_for_goal": [
-            "Supply a reviewed SO-101 model bundle manifest.",
-            "Make the manifest checker report ready_for_model_backed_ik true.",
-            "Then require this gate to load the reviewed model in MuJoCo and move every SO-101 joint.",
+        "next_required_for_goal": manifest_summary.get("next_required_for_goal") or [
+            {
+                "priority": 1,
+                "missing_input": "ready_reviewed_model_bundle",
+                "action_id": "make_reviewed_manifest_ready",
+                "gate": "reviewed_model_authority",
+                "title": "Make the reviewed SO-101 manifest ready",
+                "detail": "Make the manifest checker report ready_for_model_backed_ik true, then rerun the reviewed MuJoCo bundle gate.",
+            }
         ],
     }
     rows = [

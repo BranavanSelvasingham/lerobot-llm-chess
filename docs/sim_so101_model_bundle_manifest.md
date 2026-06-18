@@ -111,9 +111,11 @@ fields. A nonexistent manifest path reports
 Every summary also reports `model_authority`,
 `physical_so101_model_authority_ready`,
 `hardware_free_regression_fixture_ready`, and
-`synthetic_fixture_authority_fields`. A manifest can be ready for automation
-with only synthetic hardware-free fixture authority, but that readiness is
-classified as
+`synthetic_fixture_authority_fields`. It also reports
+`next_required_for_goal`, an ordered action list derived from the current
+`missing_inputs` so the reviewed-model-authority gate has an explicit priority
+queue. A manifest can be ready for automation with only synthetic hardware-free
+fixture authority, but that readiness is classified as
 `hardware_free_regression_fixture_not_physical_so101_authority` and does not
 close the reviewed physical SO-101 model-authority gate.
 

@@ -398,6 +398,12 @@ preflight and must expose summary/CSV/README artifacts plus status, mesh
 reference count, present count, missing count, and unresolved count before the
 IK reachability section.
 
+The model bundle manifest summary and artifact-index metrics must expose
+`next_required_for_goal`, `next_required_action_ids`, and
+`next_required_action_count`; in default CI the first action remains
+`supply_reviewed_so101_model_bundle_manifest`, keeping reviewed SO-101 model
+authority ahead of downstream policy work.
+
 The artifact contract also includes dedicated `so101_mujoco_scene`,
 `so101_chess_env`, `so101_env_resets`, `so101_mujoco_contact_probe`,
 `so101_mujoco_grasp_probe`, `so101_mujoco_board_pick_probe`, and
@@ -461,7 +467,7 @@ A passing summary should show:
 - `calibration_session.selected_candidate` populated with the rank-1 candidate
 - `perception_fixture.status: "ok"` and fixture artifact paths populated
 - `sim_camera_pose_fixture.status: "ok"` with deterministic nominal and perturbed case IDs, frame paths, annotated-frame paths, and metadata paths populated
-- `so101_model_bundle_manifest.status: "model_bundle_manifest_not_supplied"`, `"model_bundle_manifest_unavailable"`, `"model_bundle_manifest_parse_error"`, `"model_bundle_manifest_schema_error"`, `"model_bundle_manifest_needs_follow_up"`, or `"model_bundle_manifest_ready_for_model_backed_ik"` with readiness, model path, asset roots, joint limits, mesh evidence, target frame, TCP offset, base-to-board alignment, forwarding reason, and summary/CSV/README artifact paths populated
+- `so101_model_bundle_manifest.status: "model_bundle_manifest_not_supplied"`, `"model_bundle_manifest_unavailable"`, `"model_bundle_manifest_parse_error"`, `"model_bundle_manifest_schema_error"`, `"model_bundle_manifest_needs_follow_up"`, or `"model_bundle_manifest_ready_for_model_backed_ik"` with readiness, model path, asset roots, joint limits, mesh evidence, target frame, TCP offset, base-to-board alignment, ordered `next_required_for_goal` actions, forwarding reason, and summary/CSV/README artifact paths populated
 - `so101_reviewed_mujoco_bundle.status: "reviewed_mujoco_bundle_not_ready"` in default CI or `"reviewed_mujoco_bundle_motion_checked"` when a ready manifest is supplied, with `reviewed_model_motion_checked` recorded and summary/CSV/README artifact paths populated
 - `so101_model_source_inventory.status: "missing_authoritative_model"` or `"authoritative_model_found"` with candidate counts, authoritative candidate count, recommended contract-check path when present, and summary/CSV/README artifact paths populated
 - `so101_model_source_inventory.source_configuration.scan_mode: "default_repo_roots"` in the default run or `"explicit_roots"` when `--so101-model-source-root` is supplied, with configured roots/authority lists preserved

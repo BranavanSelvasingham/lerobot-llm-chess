@@ -1022,6 +1022,11 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
     so101_bundle_tcp = so101_bundle_tcp if isinstance(so101_bundle_tcp, dict) else {}
     so101_bundle_alignment = so101_bundle.get("base_to_board_alignment")
     so101_bundle_alignment = so101_bundle_alignment if isinstance(so101_bundle_alignment, dict) else {}
+    so101_bundle_next_action_ids = [
+        action.get("action_id")
+        for action in so101_bundle.get("next_required_for_goal", [])
+        if isinstance(action, dict) and action.get("action_id")
+    ]
     so101_reviewed_mujoco_bundle = summary.get("so101_reviewed_mujoco_bundle")
     so101_reviewed_mujoco_bundle = (
         so101_reviewed_mujoco_bundle if isinstance(so101_reviewed_mujoco_bundle, dict) else {}
@@ -1408,6 +1413,10 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             f"target frame `{so101_bundle.get('target_frame', {}).get('value') if isinstance(so101_bundle.get('target_frame'), dict) else None}`; "
             f"TCP field `{so101_bundle_tcp.get('field')}`; alignment "
             f"`{so101_bundle_alignment.get('status')}`."
+        ),
+        (
+            "- SO-101 model bundle next required actions: "
+            f"`{markdown_list_value(so101_bundle_next_action_ids)}`."
         ),
         (
             "- SO-101 model bundle forwarding: "
@@ -2903,6 +2912,7 @@ def so101_model_bundle_manifest_section(
         "physical_so101_model_authority_ready": bundle.get("physical_so101_model_authority_ready"),
         "hardware_free_regression_fixture_ready": bundle.get("hardware_free_regression_fixture_ready"),
         "synthetic_fixture_authority_fields": bundle.get("synthetic_fixture_authority_fields"),
+        "next_required_for_goal": bundle.get("next_required_for_goal"),
         "manifest_request": {
             "status": manifest_request.get("status"),
             "path": manifest_request.get("path"),

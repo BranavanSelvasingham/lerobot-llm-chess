@@ -1260,6 +1260,8 @@ def so101_model_bundle_manifest_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("physical_so101_model_authority_ready", ""),
         metrics.get("hardware_free_regression_fixture_ready", ""),
         compact_list(metrics.get("synthetic_fixture_authority_fields")),
+        metrics.get("next_required_action_count", ""),
+        compact_list(metrics.get("next_required_action_ids")),
         metrics.get("model_path", ""),
         compact_list(metrics.get("asset_roots")),
         metrics.get("joint_limits_status", ""),
@@ -1303,7 +1305,7 @@ def so101_mujoco_smoke_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("final_target_xy_error_m", ""),
         metrics.get("episode_count", ""),
         metrics.get("transition_count", ""),
-        compact_list(metrics.get("next_required_for_goal")),
+        compact_list(metrics.get("next_required_action_ids") or metrics.get("next_required_for_goal")),
         "ok" if artifact.get("exists") is True else "missing",
     ]
 
@@ -2703,6 +2705,8 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Physical Authority",
                 "Fixture Ready",
                 "Synthetic Fields",
+                "Action Count",
+                "Next Actions",
                 "Model Path",
                 "Asset Roots",
                 "Joint Limits",

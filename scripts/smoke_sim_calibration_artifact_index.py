@@ -954,6 +954,18 @@ def unique_string_values(values: list[Any]) -> list[str]:
     return result
 
 
+def next_required_action_labels(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    labels: list[Any] = []
+    for item in value:
+        if isinstance(item, dict):
+            labels.append(item.get("action_id"))
+        else:
+            labels.append(item)
+    return unique_string_values(labels)
+
+
 def real_depth_capture_plan_case_metrics(
     case: dict[str, Any],
     aggregate_metrics: dict[str, Any],
@@ -2184,6 +2196,9 @@ def collect_so101_mujoco_smoke_artifacts(
     artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
     dependencies = smoke.get("dependencies")
     dependencies = dependencies if isinstance(dependencies, dict) else {}
+    next_required = smoke.get("next_required_for_goal")
+    next_required = next_required if isinstance(next_required, list) else []
+    next_required_action_ids = next_required_action_labels(next_required)
     metrics = {
         "status": smoke.get("status"),
         "ok": smoke.get("ok"),
@@ -2232,7 +2247,8 @@ def collect_so101_mujoco_smoke_artifacts(
         "transition_count": smoke.get("transition_count"),
         "all_scripted_pick_place_complete": smoke.get("all_scripted_pick_place_complete"),
         "all_mujoco_piece_release_synced": smoke.get("all_mujoco_piece_release_synced"),
-        "next_required_for_goal": smoke.get("next_required_for_goal"),
+        "next_required_for_goal": next_required,
+        "next_required_action_ids": next_required_action_ids,
     }
     for key, value in sorted(artifact_paths.items()):
         add_path(
@@ -2352,6 +2368,9 @@ def collect_so101_model_bundle_manifest_artifacts(
     asset_preflight = asset_preflight if isinstance(asset_preflight, dict) else {}
     asset_preflight_artifacts = asset_preflight.get("artifacts")
     asset_preflight_artifacts = asset_preflight_artifacts if isinstance(asset_preflight_artifacts, dict) else {}
+    next_required = bundle.get("next_required_for_goal")
+    next_required = [action for action in next_required if isinstance(action, dict)] if isinstance(next_required, list) else []
+    next_required_action_ids = unique_string_values([action.get("action_id") for action in next_required])
     metrics = {
         "status": bundle.get("status"),
         "ok": bundle.get("ok"),
@@ -2362,6 +2381,9 @@ def collect_so101_model_bundle_manifest_artifacts(
         "physical_so101_model_authority_ready": bundle.get("physical_so101_model_authority_ready"),
         "hardware_free_regression_fixture_ready": bundle.get("hardware_free_regression_fixture_ready"),
         "synthetic_fixture_authority_fields": bundle.get("synthetic_fixture_authority_fields"),
+        "next_required_for_goal": next_required,
+        "next_required_action_ids": next_required_action_ids,
+        "next_required_action_count": len(next_required),
         "model_path_status": model_path.get("status"),
         "model_path": model_path.get("path"),
         "asset_root_status": asset_roots.get("status"),
@@ -2464,6 +2486,9 @@ def collect_so101_model_bundle_manifest_artifacts(
         "contract_checker": contract,
         "model_asset_preflight": asset_preflight,
         "missing_inputs": bundle.get("missing_inputs"),
+        "next_required_for_goal": next_required,
+        "next_required_action_ids": next_required_action_ids,
+        "next_required_action_count": len(next_required),
         "forwarding": forwarding,
     }
 

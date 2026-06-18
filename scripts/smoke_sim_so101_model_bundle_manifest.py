@@ -234,6 +234,122 @@ REQUIRED_INPUTS = (
         "requirement": "Non-blocking SO-101 model contract checker and nested mesh asset preflight diagnostics.",
     },
 )
+NEXT_ACTION_ORDER = (
+    "--manifest-path",
+    "model_path",
+    "authority",
+    "provenance",
+    "asset_roots",
+    "mesh_assets",
+    "mesh_asset_authority",
+    "joint_limits_deg",
+    "joint_limit_authority",
+    "target_frame",
+    "target_frame_authority",
+    "tcp_offset_m",
+    "tcp_offset_authority",
+    "base_to_board_transform",
+    "base_to_board_alignment_authority",
+    "non_blocking_contract_checker_result",
+)
+NEXT_ACTIONS = {
+    "--manifest-path": {
+        "action_id": "supply_reviewed_so101_model_bundle_manifest",
+        "gate": "reviewed_model_authority",
+        "title": "Supply a reviewed SO-101 model bundle manifest",
+        "detail": "Create or provide the JSON manifest that declares the selected SO-101 model bundle.",
+    },
+    "model_path": {
+        "action_id": "select_reviewed_so101_model_path",
+        "gate": "reviewed_model_authority",
+        "title": "Select the reviewed SO-101 URDF/MJCF model path",
+        "detail": "Set manifest.model_path to the reviewed model file, resolved relative to the manifest directory or as an absolute path.",
+    },
+    "authority": {
+        "action_id": "record_reviewed_model_source_authority",
+        "gate": "reviewed_model_authority",
+        "title": "Record reviewed model source authority",
+        "detail": "Fill authority with an accepted review status plus reviewer/date/id/url evidence.",
+    },
+    "provenance": {
+        "action_id": "record_model_provenance",
+        "gate": "reviewed_model_authority",
+        "title": "Record model provenance and license basis",
+        "detail": "Fill provenance with source reference, export tool, and license basis before trusting the bundle.",
+    },
+    "asset_roots": {
+        "action_id": "declare_model_asset_roots",
+        "gate": "reviewed_model_authority",
+        "title": "Declare repeatable model asset roots",
+        "detail": "Set manifest.asset_roots, using an explicit empty list only when the model directory alone resolves meshes.",
+    },
+    "mesh_assets": {
+        "action_id": "resolve_so101_mesh_assets",
+        "gate": "reviewed_model_authority",
+        "title": "Resolve SO-101 mesh assets",
+        "detail": "Provide reviewed mesh roots/assets until the nested asset preflight has no missing or unresolved references.",
+    },
+    "mesh_asset_authority": {
+        "action_id": "record_mesh_asset_authority",
+        "gate": "reviewed_model_authority",
+        "title": "Record reviewed mesh/asset-root authority",
+        "detail": "Add mesh_asset_authority or an accepted mesh review field with review evidence.",
+    },
+    "joint_limits_deg": {
+        "action_id": "declare_reviewed_joint_limits",
+        "gate": "reviewed_model_authority",
+        "title": "Declare reviewed SO-101 joint limits",
+        "detail": "Provide numeric lower/upper limits for shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, and gripper.",
+    },
+    "joint_limit_authority": {
+        "action_id": "record_joint_limit_authority",
+        "gate": "reviewed_model_authority",
+        "title": "Record reviewed joint-limit authority",
+        "detail": "Add joint_limit_authority or an accepted joint-limit review field with review evidence.",
+    },
+    "target_frame": {
+        "action_id": "declare_target_frame",
+        "gate": "reviewed_model_authority",
+        "title": "Declare the SO-101 target frame",
+        "detail": "Set target_frame explicitly, normally gripper_frame_link for the current simulator contract.",
+    },
+    "target_frame_authority": {
+        "action_id": "record_target_frame_authority",
+        "gate": "reviewed_model_authority",
+        "title": "Record reviewed target-frame authority",
+        "detail": "Add target_frame_authority or an accepted TCP-frame review field proving the target frame is the intended gripper/TCP reference.",
+    },
+    "tcp_offset_m": {
+        "action_id": "calibrate_tcp_offset",
+        "gate": "reviewed_model_authority",
+        "title": "Calibrate target-frame to TCP/gripper offset",
+        "detail": "Provide tcp_offset_m or an accepted alias as x/y/z meters.",
+    },
+    "tcp_offset_authority": {
+        "action_id": "record_tcp_offset_authority",
+        "gate": "reviewed_model_authority",
+        "title": "Record reviewed TCP/gripper offset authority",
+        "detail": "Add tcp_offset_authority or an accepted TCP calibration review field with review evidence.",
+    },
+    "base_to_board_transform": {
+        "action_id": "calibrate_base_to_board_transform",
+        "gate": "reviewed_model_authority",
+        "title": "Calibrate base-to-board transform",
+        "detail": "Provide base_to_board_transform or base_to_board_alignment with translation and rotation fields.",
+    },
+    "base_to_board_alignment_authority": {
+        "action_id": "record_base_to_board_alignment_authority",
+        "gate": "reviewed_model_authority",
+        "title": "Record reviewed base-to-board alignment authority",
+        "detail": "Add base_to_board_alignment_authority or an accepted alignment review field with review evidence.",
+    },
+    "non_blocking_contract_checker_result": {
+        "action_id": "clear_model_contract_and_asset_preflight",
+        "gate": "mujoco_scene_validity",
+        "title": "Clear model contract and asset preflight diagnostics",
+        "detail": "Rerun the child SO-101 model contract checker until the static joint/frame contract and mesh asset preflight are non-blocking.",
+    },
+}
 CSV_FIELDNAMES = (
     "requirement_id",
     "category",
@@ -1565,6 +1681,33 @@ def model_authority_class(ready: bool, synthetic_flags: dict[str, bool]) -> str:
     return "reviewed_bundle_required"
 
 
+def build_next_required_for_goal(missing_inputs: list[str]) -> list[dict[str, Any]]:
+    missing_set = set(missing_inputs)
+    ordered_inputs = [item for item in NEXT_ACTION_ORDER if item in missing_set]
+    ordered_inputs.extend(sorted(missing_set.difference(ordered_inputs)))
+
+    actions: list[dict[str, Any]] = []
+    for index, missing_input in enumerate(ordered_inputs, start=1):
+        safe_input = missing_input.strip("-").replace("-", "_")
+        template = NEXT_ACTIONS.get(
+            missing_input,
+            {
+                "action_id": f"resolve_{safe_input}",
+                "gate": "reviewed_model_authority",
+                "title": f"Resolve missing input: {missing_input}",
+                "detail": "Fill or review this manifest input, then rerun the checker.",
+            },
+        )
+        actions.append(
+            {
+                "priority": index,
+                "missing_input": missing_input,
+                **template,
+            }
+        )
+    return actions
+
+
 def build_checklist_rows(
     manifest_request: dict[str, Any],
     model_path: dict[str, Any],
@@ -1794,6 +1937,21 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
     else:
         lines.append("- none")
 
+    lines.extend(["", "## Next Required For Goal", ""])
+    if summary["next_required_for_goal"]:
+        for action in summary["next_required_for_goal"]:
+            lines.append(
+                "- `{priority}` `{action_id}`: {title} (`{missing_input}`)".format(
+                    priority=action["priority"],
+                    action_id=action["action_id"],
+                    title=action["title"],
+                    missing_input=action["missing_input"],
+                )
+            )
+            lines.append(f"  - {action['detail']}")
+    else:
+        lines.append("- none")
+
     lines.extend(
         [
             "",
@@ -1853,6 +2011,7 @@ def build_summary(
         for missing_input in (check["missing_inputs"] or [])
     ]
     ready = not missing_inputs
+    next_required_for_goal = build_next_required_for_goal(sorted(set(missing_inputs)))
     synthetic_flags = synthetic_fixture_authority_flags(
         authority,
         joint_limits,
@@ -1891,6 +2050,7 @@ def build_summary(
         "contract_checker": contract,
         "field_checks": field_checks,
         "missing_inputs": sorted(set(missing_inputs)),
+        "next_required_for_goal": next_required_for_goal,
         "artifacts": artifacts,
         "limitations": [
             "This checker is hardware-free and never opens robot motors, serial ports, cameras, GUI flows, OpenAI calls, or network resources.",
@@ -1948,6 +2108,7 @@ def main() -> int:
                 "physical_so101_model_authority_ready": summary["physical_so101_model_authority_ready"],
                 "hardware_free_regression_fixture_ready": summary["hardware_free_regression_fixture_ready"],
                 "missing_inputs": summary["missing_inputs"],
+                "next_required_for_goal": summary["next_required_for_goal"],
                 "manifest_path": summary["manifest_request"]["path"],
                 "model_path": summary["model_path"]["path"],
                 "asset_roots": summary["asset_roots"]["asset_roots"],
