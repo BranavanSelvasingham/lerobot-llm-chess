@@ -131,13 +131,18 @@ suite records them in
 `calibration_regression_summary.json.so101_model_source_inventory.source_configuration`,
 mirrors them in `so101_model_source_inventory_config`, preserves the exact child
 command in `child_commands.so101_model_source_inventory.command`, and surfaces
-them in `artifact_index.json` and `artifact_index_report.md`.
+them in `artifact_index.json` and `artifact_index_report.md`. The source
+inventory summary also exposes `source_authority_gate_status` and
+`source_authority_blockers` so missing authoritative source or missing review
+metadata remains machine-readable before any bundle manifest is trusted.
 
 This reviewed-source mode still does not import, copy, or fabricate model
 assets. An empty reviewed root is valid evidence that no authoritative source
 was found: the suite should still exit `0` with
 `so101_model_source_inventory.status: "missing_authoritative_model"`,
-`candidate_count: 0`, and `authoritative_candidate_count: 0`. `--ik-model-path`
+`candidate_count: 0`, `authoritative_candidate_count: 0`, and
+`source_authority_gate_status` set to
+`source_authority_blocked_missing_authoritative_model`. `--ik-model-path`
 continues to mean "try this model path in the contract checker and IK drill";
 it never marks source authority for the inventory. To use the same file as an
 authoritative source, pass it separately through
@@ -457,7 +462,7 @@ The suite orchestrates these existing smoke scripts as subprocesses and records 
 - `smoke_sim_perception_regression_fixture.py` packages the selected ranked candidate into perception fixture evidence.
 - `smoke_sim_camera_pose_fixture.py` renders deterministic nominal, perturbed, overview, and gripper-state SimCamera pose review frames plus per-case metadata.
 - `smoke_sim_so101_model_bundle_manifest.py` records deterministic SO-101 model bundle manifest evidence, including default no-manifest diagnostics, reviewed manifest fields, child contract/preflight diagnostics, readiness, and downstream forwarding decisions.
-- `smoke_sim_so101_model_source_inventory.py` records deterministic repo-local SO-101 model-source inventory evidence, candidate/provenance/authority counts, and explicit missing-authoritative-model diagnostics before contract or IK checks.
+- `smoke_sim_so101_model_source_inventory.py` records deterministic repo-local SO-101 model-source inventory evidence, candidate/provenance/authority counts, source-authority gate status/blockers, and explicit missing-authoritative-model diagnostics before contract or IK checks.
 - `smoke_sim_so101_model_contract.py` records deterministic model availability, RobotKinematics usability, joint/frame/TCP contract, nested asset-preflight mesh evidence, and missing alignment inputs before model-backed IK residuals are trusted.
 - `smoke_sim_ik_reachability_drill.py` records deterministic Cartesian, delta, and radial command feasibility evidence plus explicit missing-model fallback diagnostics.
 - `smoke_sim_so101_mujoco_scene.py` validates the development-only SO-101 MuJoCo chess scene, joint sync, board/piece collision geoms, and scripted env loop.
@@ -491,7 +496,7 @@ A passing summary should show:
 - `sim_camera_pose_fixture.status: "ok"` with deterministic nominal and perturbed case IDs, frame paths, annotated-frame paths, and metadata paths populated
 - `so101_model_bundle_manifest.status: "model_bundle_manifest_not_supplied"`, `"model_bundle_manifest_unavailable"`, `"model_bundle_manifest_parse_error"`, `"model_bundle_manifest_schema_error"`, `"model_bundle_manifest_needs_follow_up"`, or `"model_bundle_manifest_ready_for_model_backed_ik"` with readiness, physical-authority gate status/blockers, model path, asset roots, joint limits, mesh evidence, target frame, TCP offset, base-to-board alignment, ordered `next_required_for_goal` actions, forwarding reason, and summary/CSV/README artifact paths populated
 - `so101_reviewed_mujoco_bundle.status: "reviewed_mujoco_bundle_not_ready"` in default CI or `"reviewed_mujoco_bundle_motion_checked"` when a ready manifest is supplied, with `reviewed_model_motion_checked`, `motion_authority_status`, physical-reviewed motion, fixture-motion, and non-physical motion-evidence fields recorded and summary/CSV/README artifact paths populated
-- `so101_model_source_inventory.status: "missing_authoritative_model"` or `"authoritative_model_found"` with candidate counts, authoritative candidate count, recommended contract-check path when present, and summary/CSV/README artifact paths populated
+- `so101_model_source_inventory.status: "missing_authoritative_model"` or `"authoritative_model_found"` with candidate counts, authoritative candidate count, source-authority gate status/blockers, recommended contract-check path when present, and summary/CSV/README artifact paths populated
 - `so101_model_source_inventory.source_configuration.scan_mode: "default_repo_roots"` in the default run or `"explicit_roots"` when `--so101-model-source-root` is supplied, with configured roots/authority lists preserved
 - `so101_model_contract.status: "missing_model"`, `"model_unavailable"`, `"model_contract_checked"`, `"model_contract_needs_follow_up"`, or `"model_suffix_supported_not_directly_usable"` with `model_request_status`, `robot_kinematics_status`, `target_frame`, and summary/CSV/README artifact paths populated
 - `so101_model_contract.model_asset_preflight.status: "missing_model"`, `"model_unavailable"`, `"asset_preflight_checked"`, `"asset_preflight_limited_diagnostics"`, or `"asset_preflight_needs_follow_up"` with mesh, present, missing, unresolved counts and nested summary/CSV/README artifact paths populated

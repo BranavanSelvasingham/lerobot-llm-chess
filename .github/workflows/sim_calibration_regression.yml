@@ -556,6 +556,13 @@ jobs:
           }, source_inventory
           assert isinstance(source_inventory["source_authority_review_ready"], bool), source_inventory
           assert isinstance(source_inventory["source_authority_review"], dict), source_inventory
+          assert source_inventory["source_authority_gate_status"] in {
+              "source_authority_blocked_missing_authoritative_model",
+              "source_authority_blocked_review_metadata",
+              "source_authority_ready",
+          }, source_inventory
+          assert isinstance(source_inventory["source_authority_blockers"], list), source_inventory
+          assert all(isinstance(blocker, str) and blocker for blocker in source_inventory["source_authority_blockers"]), source_inventory
           source_authority_review = source_inventory["source_authority_review"]
           assert isinstance(source_authority_review.get("diagnostics"), list), source_authority_review
           assert isinstance(source_authority_review.get("review_evidence_valid_fields"), list), source_authority_review
@@ -582,10 +589,17 @@ jobs:
               assert source_inventory["authoritative_candidate_count"] == 0, source_inventory
               assert source_inventory["source_authority_review_status"] == "not_applicable_no_authoritative_candidate", source_inventory
               assert source_inventory["source_authority_review_ready"] is False, source_inventory
+              assert source_inventory["source_authority_gate_status"] == "source_authority_blocked_missing_authoritative_model", source_inventory
+              assert "review_and_declare_authoritative_so101_model_source" in source_inventory["source_authority_blockers"], source_inventory
               assert source_inventory["diagnostics"], source_inventory
               assert "review_and_declare_authoritative_so101_model_source" in source_inventory["next_required_action_ids"], source_inventory
           if source_inventory["authoritative_candidate_count"] > 0 and source_inventory["source_authority_review_ready"] is False:
+              assert source_inventory["source_authority_gate_status"] == "source_authority_blocked_review_metadata", source_inventory
+              assert "record_source_authority_review_metadata" in source_inventory["source_authority_blockers"], source_inventory
               assert "record_source_authority_review_metadata" in source_inventory["next_required_action_ids"], source_inventory
+          if source_inventory["authoritative_candidate_count"] > 0 and source_inventory["source_authority_review_ready"] is True:
+              assert source_inventory["source_authority_gate_status"] == "source_authority_ready", source_inventory
+              assert source_inventory["source_authority_blockers"] == [], source_inventory
           source_inventory_artifacts = source_inventory["artifacts"]
           for key in ("summary_json", "candidates_csv", "readme_md"):
               assert isinstance(source_inventory_artifacts.get(key), str) and Path(source_inventory_artifacts[key]).is_file(), (
@@ -1075,6 +1089,13 @@ jobs:
               }, metrics
               assert isinstance(metrics.get("source_authority_review_ready"), bool), metrics
               assert isinstance(metrics.get("source_authority_review"), dict), metrics
+              assert metrics.get("source_authority_gate_status") in {
+                  "source_authority_blocked_missing_authoritative_model",
+                  "source_authority_blocked_review_metadata",
+                  "source_authority_ready",
+              }, metrics
+              assert isinstance(metrics.get("source_authority_blockers"), list), metrics
+              assert all(isinstance(blocker, str) and blocker for blocker in metrics.get("source_authority_blockers")), metrics
               source_authority_review = metrics.get("source_authority_review")
               assert isinstance(source_authority_review.get("diagnostics"), list), source_authority_review
               assert isinstance(source_authority_review.get("review_evidence_valid_fields"), list), source_authority_review

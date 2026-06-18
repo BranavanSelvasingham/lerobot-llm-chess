@@ -12,7 +12,7 @@ The script writes:
 - `so101_model_source_candidates.csv`
 - `README.md`
 
-It exits `0` even when no candidates exist. In that state the JSON reports `ok: true`, `status: "missing_authoritative_model"`, `candidate_count: 0`, `authoritative_candidate_count: 0`, a `missing_authoritative_model` diagnostic listing the source inputs still required, and `next_required_for_goal`/`next_required_action_ids` entries that keep the operator sequence explicit.
+It exits `0` even when no candidates exist. In that state the JSON reports `ok: true`, `status: "missing_authoritative_model"`, `candidate_count: 0`, `authoritative_candidate_count: 0`, `source_authority_gate_status: "source_authority_blocked_missing_authoritative_model"`, a `source_authority_blockers` list for the missing source-authority work, a `missing_authoritative_model` diagnostic listing the source inputs still required, and `next_required_for_goal`/`next_required_action_ids` entries that keep the operator sequence explicit.
 
 The full hardware-free simulator calibration regression suite now runs this
 inventory automatically under `so101_model_source_inventory/` before
@@ -39,7 +39,12 @@ review-evidence field: `--so101-source-authority-reviewed-by`,
 `--so101-source-authority-review-url`. Without those metadata fields the
 inventory can report an authoritative candidate, but it also reports
 `source_authority_review_status: "review_metadata_missing"` and queues
-`record_source_authority_review_metadata`.
+`record_source_authority_review_metadata`. The summary keeps
+`source_authority_gate_status` as one of
+`source_authority_blocked_missing_authoritative_model`,
+`source_authority_blocked_review_metadata`, or `source_authority_ready`, and
+keeps `source_authority_blockers` empty only when an authoritative candidate and
+non-placeholder source-authority review metadata are both present.
 
 Review evidence must be non-placeholder metadata. Values such as `TODO`, `TBD`,
 `unknown`, `placeholder`, or `review required` are preserved in the summary as
@@ -54,7 +59,8 @@ inventing a model. The suite preserves the configured values under
 `calibration_regression_summary.json.so101_model_source_inventory.source_configuration`,
 mirrors them in `so101_model_source_inventory_config`, writes the exact forwarded
 child command under `child_commands.so101_model_source_inventory.command`, and
-surfaces them in the generated artifact index/report.
+surfaces them in the generated artifact index/report, including the source
+authority gate status and blocker list.
 
 After selecting a candidate model source, run the focused
 [SO-101 model asset preflight](sim_so101_model_asset_preflight.md) before the
@@ -99,6 +105,8 @@ Key fields:
 - `status: "missing_authoritative_model"`
 - `candidate_count: 0`
 - `authoritative_candidate_count: 0`
+- `source_authority_gate_status: "source_authority_blocked_missing_authoritative_model"`
+- `source_authority_blockers: ["scan_or_supply_so101_model_source_root", "review_and_declare_authoritative_so101_model_source"]`
 - `artifacts.summary_json: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_inventory_summary.json`
 - `artifacts.candidates_csv: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_candidates.csv`
 

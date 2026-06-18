@@ -150,6 +150,34 @@ def action_ids(actions: list[dict[str, Any]]) -> list[str]:
     return [action["action_id"] for action in actions if action.get("action_id")]
 
 
+def source_authority_gate_status(
+    *,
+    authoritative_candidate_count: int,
+    source_authority_review_ready: bool,
+) -> str:
+    if authoritative_candidate_count <= 0:
+        return "source_authority_blocked_missing_authoritative_model"
+    if not source_authority_review_ready:
+        return "source_authority_blocked_review_metadata"
+    return "source_authority_ready"
+
+
+def source_authority_blockers(
+    *,
+    candidate_count: int,
+    authoritative_candidate_count: int,
+    source_authority_review_ready: bool,
+) -> list[str]:
+    blockers: list[str] = []
+    if candidate_count <= 0:
+        blockers.append("scan_or_supply_so101_model_source_root")
+    if authoritative_candidate_count <= 0:
+        blockers.append("review_and_declare_authoritative_so101_model_source")
+    elif not source_authority_review_ready:
+        blockers.append("record_source_authority_review_metadata")
+    return blockers
+
+
 PLACEHOLDER_REVIEW_EVIDENCE_VALUES = {
     "na",
     "n/a",
@@ -865,6 +893,11 @@ def build_summary(
         source_authority_review_ready=authority_review["ready"],
         recommended_contract_check=recommended_contract_check,
     )
+    source_blockers = source_authority_blockers(
+        candidate_count=len(candidates),
+        authoritative_candidate_count=len(authoritative_candidates),
+        source_authority_review_ready=authority_review["ready"],
+    )
 
     return {
         "schema": SCHEMA,
@@ -888,6 +921,11 @@ def build_summary(
         "source_authority_review_status": authority_review["status"],
         "source_authority_review_ready": authority_review["ready"],
         "source_authority_review": authority_review,
+        "source_authority_gate_status": source_authority_gate_status(
+            authoritative_candidate_count=len(authoritative_candidates),
+            source_authority_review_ready=authority_review["ready"],
+        ),
+        "source_authority_blockers": source_blockers,
         "roots": roots,
         "candidates": candidates,
         "recommended_contract_check": recommended_contract_check,
@@ -938,6 +976,8 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `authoritative_candidate_count`: `{summary['authoritative_candidate_count']}`",
         f"- `source_authority_review_status`: `{summary['source_authority_review_status']}`",
         f"- `source_authority_review_ready`: `{str(summary['source_authority_review_ready']).lower()}`",
+        f"- `source_authority_gate_status`: `{summary['source_authority_gate_status']}`",
+        f"- `source_authority_blockers`: `{', '.join(summary.get('source_authority_blockers') or []) if summary.get('source_authority_blockers') else 'none'}`",
         f"- `next_required_action_ids`: `{', '.join(summary.get('next_required_action_ids') or []) if summary.get('next_required_action_ids') else 'none'}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `candidates_csv`: `{summary['artifacts']['candidates_csv']}`",
@@ -1062,6 +1102,8 @@ def main() -> int:
                 "authoritative_candidate_count": summary["authoritative_candidate_count"],
                 "source_authority_review_status": summary["source_authority_review_status"],
                 "source_authority_review_ready": summary["source_authority_review_ready"],
+                "source_authority_gate_status": summary["source_authority_gate_status"],
+                "source_authority_blockers": summary["source_authority_blockers"],
                 "next_required_action_ids": summary["next_required_action_ids"],
                 "artifacts": artifacts,
             },

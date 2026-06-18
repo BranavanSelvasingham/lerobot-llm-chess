@@ -3012,6 +3012,8 @@ def so101_model_source_inventory_section(
         "source_authority_review_status": inventory.get("source_authority_review_status"),
         "source_authority_review_ready": inventory.get("source_authority_review_ready"),
         "source_authority_review": inventory.get("source_authority_review"),
+        "source_authority_gate_status": inventory.get("source_authority_gate_status"),
+        "source_authority_blockers": inventory.get("source_authority_blockers") or [],
         "root_count": inventory.get("root_count"),
         "source_configuration": source_configuration,
         "configured_model_source_roots": source_configuration.get("model_source_roots"),
