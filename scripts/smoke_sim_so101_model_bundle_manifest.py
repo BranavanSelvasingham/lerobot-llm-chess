@@ -23,6 +23,26 @@ EXPECTED_SO101_JOINTS = (
     "wrist_roll",
     "gripper",
 )
+TARGET_FRAME_REVIEW_FIELDS = (
+    "target_frame_authority",
+    "target_frame_review",
+    "tcp_frame_authority",
+    "target_frame_metadata",
+)
+TARGET_FRAME_STATUS_FIELDS = (
+    "target_frame_authority_status",
+    "target_frame_review_status",
+    "review_status",
+    "status",
+)
+REVIEWED_TARGET_FRAME_STATUSES = {
+    "reviewed",
+    "operator_reviewed",
+    "target_frame_reviewed",
+    "tcp_frame_reviewed",
+    "model_bundle_reviewed",
+}
+SYNTHETIC_FIXTURE_TARGET_FRAME_STATUS = "synthetic_fixture_reviewed_for_automation_only"
 TCP_OFFSET_FIELDS = (
     "tcp_offset_m",
     "gripper_tip_offset_m",
@@ -199,7 +219,7 @@ REQUIRED_INPUTS = (
     },
     {
         "input": "target_frame",
-        "requirement": f"Target frame name; defaults to {EXPECTED_TARGET_FRAME!r} when omitted.",
+        "requirement": f"Reviewed target frame name; diagnostics may default to {EXPECTED_TARGET_FRAME!r} when omitted.",
     },
     {
         "input": "tcp_offset_m",
@@ -830,14 +850,25 @@ def inspect_target_frame(manifest: dict[str, Any] | None) -> dict[str, Any]:
     raw = manifest.get("target_frame") if manifest else None
     if raw is None:
         return {
-            "status": "defaulted",
+            "status": "missing",
             "value": EXPECTED_TARGET_FRAME,
-            "diagnostics": [],
-            "notes": f"target_frame omitted; defaulted to {EXPECTED_TARGET_FRAME}.",
+            "defaulted_value": EXPECTED_TARGET_FRAME,
+            "diagnostics": ["target_frame_missing"],
+            "notes": f"target_frame omitted; diagnostics use {EXPECTED_TARGET_FRAME} but readiness requires an explicit reviewed target frame.",
         }
     if isinstance(raw, str) and raw.strip():
         diagnostics = [] if raw == EXPECTED_TARGET_FRAME else ["target_frame_differs_from_default"]
-        return {"status": "present", "value": raw, "diagnostics": diagnostics}
+        review = inspect_target_frame_review(manifest, raw)
+        if review["status"] != "present":
+            diagnostics.extend(review.get("diagnostics", []))
+        return {
+            "status": "present" if review["status"] == "present" else "needs_review",
+            "value": raw,
+            "review": review,
+            "review_status": review.get("status"),
+            "review_diagnostics": review.get("diagnostics", []),
+            "diagnostics": diagnostics,
+        }
     return {
         "status": "invalid",
         "value": raw,
@@ -936,6 +967,33 @@ def inspect_tcp_offset_review(
         ),
         review_note="TCP offset readiness requires accepted review status plus reviewer/date/id/url evidence.",
     )
+
+
+def inspect_target_frame_review(
+    manifest: dict[str, Any],
+    raw_value: str,
+) -> dict[str, Any]:
+    candidates: list[tuple[str, Any]] = []
+    for review_field in TARGET_FRAME_REVIEW_FIELDS:
+        if review_field in manifest:
+            candidates.append((review_field, manifest.get(review_field)))
+    review = inspect_review_metadata(
+        candidates,
+        status_fields=TARGET_FRAME_STATUS_FIELDS,
+        accepted_statuses=REVIEWED_TARGET_FRAME_STATUSES,
+        synthetic_status=SYNTHETIC_FIXTURE_TARGET_FRAME_STATUS,
+        diagnostic_prefix="target_frame_authority",
+        synthetic_scope_diagnostic="synthetic_target_frame_scope_missing_hardware_free",
+        synthetic_note=(
+            "Synthetic fixture target-frame authority is accepted only for hardware-free forwarding regression fixtures; "
+            "it is not physical SO-101 TCP-frame truth."
+        ),
+        review_note="Target-frame readiness requires accepted review status plus reviewer/date/id/url evidence.",
+    )
+    return {
+        **review,
+        "target_frame": raw_value,
+    }
 
 
 def inspect_tcp_offset(manifest: dict[str, Any] | None) -> dict[str, Any]:
@@ -1384,6 +1442,15 @@ def alignment_missing_inputs(alignment: dict[str, Any]) -> list[str] | None:
     return ["base_to_board_transform"]
 
 
+def target_frame_missing_inputs(target_frame: dict[str, Any]) -> list[str] | None:
+    status = target_frame.get("status")
+    if status == "present":
+        return None
+    if status == "needs_review":
+        return ["target_frame_authority"]
+    return ["target_frame"]
+
+
 def build_field_checks(
     manifest_request: dict[str, Any],
     model_path: dict[str, Any],
@@ -1445,8 +1512,8 @@ def build_field_checks(
         },
         {
             "requirement_id": "target_frame",
-            "ok": target_frame["status"] in {"present", "defaulted"},
-            "missing_inputs": None if target_frame["status"] in {"present", "defaulted"} else ["target_frame"],
+            "ok": target_frame["status"] == "present",
+            "missing_inputs": target_frame_missing_inputs(target_frame),
             "diagnostics": target_frame.get("diagnostics", []),
         },
         {
@@ -1583,14 +1650,14 @@ def build_checklist_rows(
         row(
             "target_frame",
             "tcp_frame",
-            "ok" if target_frame["status"] in {"present", "defaulted"} else "action_required",
+            "ok" if target_frame["status"] == "present" else "action_required",
             "info",
-            "manifest.target_frame",
+            f"manifest.target_frame|{'|'.join(TARGET_FRAME_REVIEW_FIELDS)}",
             target_frame,
-            EXPECTED_TARGET_FRAME,
-            None if target_frame["status"] in {"present", "defaulted"} else ["target_frame"],
+            {"target_frame": EXPECTED_TARGET_FRAME, "review_authority": True},
+            target_frame_missing_inputs(target_frame),
             target_frame.get("diagnostics", []),
-            "Omitted target_frame defaults to gripper_frame_link.",
+            "Readiness requires an explicit target_frame plus reviewed target-frame authority.",
         ),
         row(
             "tcp_offset_m",

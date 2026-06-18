@@ -77,6 +77,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "provenance_status",
         "joint_limits_status",
         "mesh_assets_status",
+        "target_frame_status",
         "tcp_offset_status",
         "alignment_status",
         "missing_inputs",
@@ -116,6 +117,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `weak_review_manifest`: `{summary['fixtures']['weak_review_manifest_path']}`",
         f"- `weak_joint_limits_manifest`: `{summary['fixtures']['weak_joint_limits_manifest_path']}`",
         f"- `weak_mesh_manifest`: `{summary['fixtures']['weak_mesh_manifest_path']}`",
+        f"- `weak_target_frame_manifest`: `{summary['fixtures']['weak_target_frame_manifest_path']}`",
         f"- `weak_tcp_manifest`: `{summary['fixtures']['weak_tcp_manifest_path']}`",
         f"- `weak_alignment_manifest`: `{summary['fixtures']['weak_alignment_manifest_path']}`",
         f"- `explicit_model_path`: `{summary['fixtures']['explicit_model_path']}`",
@@ -124,20 +126,21 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         "",
         "## Cases",
         "",
-        "| Case | Status | Authority | Provenance | Joint Limits | Mesh Assets | TCP | Alignment | Reviewed MuJoCo | Forwarding | Artifact index missing | Summary |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Case | Status | Authority | Provenance | Joint Limits | Mesh Assets | Target Frame | TCP | Alignment | Reviewed MuJoCo | Forwarding | Artifact index missing | Summary |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for case in summary["cases"]:
         forwarding = case["observations"]["bundle_forwarding"]
         reviewed_mujoco = case["observations"]["reviewed_mujoco_bundle"]
         lines.append(
-            "| `{case_id}` | `{status}` | `{authority}` | `{provenance}` | `{joint_limits}` | `{mesh_assets}` | `{tcp}` | `{alignment}` | `{reviewed_status}`, motion `{motion}` | source `{source}`, diagnostic `{diagnostic}` | `{missing}` | `{summary_path}` |".format(
+            "| `{case_id}` | `{status}` | `{authority}` | `{provenance}` | `{joint_limits}` | `{mesh_assets}` | `{target_frame}` | `{tcp}` | `{alignment}` | `{reviewed_status}`, motion `{motion}` | source `{source}`, diagnostic `{diagnostic}` | `{missing}` | `{summary_path}` |".format(
                 case_id=case["case_id"],
                 status=case["status"],
                 authority=case["observations"].get("bundle_authority_status"),
                 provenance=case["observations"].get("bundle_provenance_status"),
                 joint_limits=case["observations"].get("bundle_joint_limits_status"),
                 mesh_assets=case["observations"].get("bundle_mesh_assets_status"),
+                target_frame=case["observations"].get("bundle_target_frame_status"),
                 tcp=case["observations"].get("bundle_tcp_offset_status"),
                 alignment=case["observations"].get("bundle_alignment_status"),
                 reviewed_status=reviewed_mujoco.get("status"),
@@ -253,6 +256,12 @@ def manifest_payload(*, ready: bool, model_filename: str = "synthetic_so101.urdf
             "license": "test-only",
         },
         "target_frame": EXPECTED_TARGET_FRAME,
+        "target_frame_authority": {
+            "target_frame_authority_status": "synthetic_fixture_reviewed_for_automation_only",
+            "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
+            "reviewed_at": "2026-06-18",
+            "scope": "hardware-free forwarding regression only",
+        },
         "joint_limits_deg": {
             "shoulder_pan": [-110.0, 110.0],
             "shoulder_lift": [-110.0, 110.0],
@@ -323,6 +332,12 @@ def weak_mesh_asset_authority_manifest_payload(model_filename: str) -> dict[str,
     return payload
 
 
+def weak_target_frame_authority_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload.pop("target_frame_authority", None)
+    return payload
+
+
 def weak_tcp_offset_authority_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload.pop("tcp_offset_authority", None)
@@ -342,6 +357,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_review_dir = fixture_dir / "weak_review_bundle"
     weak_joint_limits_dir = fixture_dir / "weak_joint_limits_bundle"
     weak_mesh_dir = fixture_dir / "weak_mesh_bundle"
+    weak_target_frame_dir = fixture_dir / "weak_target_frame_bundle"
     weak_tcp_dir = fixture_dir / "weak_tcp_bundle"
     weak_alignment_dir = fixture_dir / "weak_alignment_bundle"
     explicit_dir = fixture_dir / "explicit_cli"
@@ -352,6 +368,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_review_dir,
         weak_joint_limits_dir,
         weak_mesh_dir,
+        weak_target_frame_dir,
         weak_tcp_dir,
         weak_alignment_dir,
     ):
@@ -370,6 +387,8 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_joint_limits_model_path.write_text(mjcf_with_mesh_reference())
     weak_mesh_model_path = weak_mesh_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_mesh_model_path.write_text(mjcf_with_mesh_reference())
+    weak_target_frame_model_path = weak_target_frame_dir / "model" / "synthetic_so101_mujoco.xml"
+    weak_target_frame_model_path.write_text(mjcf_with_mesh_reference())
     weak_tcp_model_path = weak_tcp_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_tcp_model_path.write_text(mjcf_with_mesh_reference())
     weak_alignment_model_path = weak_alignment_dir / "model" / "synthetic_so101_mujoco.xml"
@@ -384,6 +403,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_review_manifest_path = weak_review_dir / "so101_model_bundle.weak_review.json"
     weak_joint_limits_manifest_path = weak_joint_limits_dir / "so101_model_bundle.weak_joint_limits.json"
     weak_mesh_manifest_path = weak_mesh_dir / "so101_model_bundle.weak_mesh_assets.json"
+    weak_target_frame_manifest_path = weak_target_frame_dir / "so101_model_bundle.weak_target_frame.json"
     weak_tcp_manifest_path = weak_tcp_dir / "so101_model_bundle.weak_tcp_offset.json"
     weak_alignment_manifest_path = weak_alignment_dir / "so101_model_bundle.weak_alignment.json"
     write_json(ready_manifest_path, manifest_payload(ready=True, model_filename=ready_model_path.name))
@@ -401,6 +421,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_mesh_asset_authority_manifest_payload(model_filename=weak_mesh_model_path.name),
     )
     write_json(
+        weak_target_frame_manifest_path,
+        weak_target_frame_authority_manifest_payload(model_filename=weak_target_frame_model_path.name),
+    )
+    write_json(
         weak_tcp_manifest_path,
         weak_tcp_offset_authority_manifest_payload(model_filename=weak_tcp_model_path.name),
     )
@@ -415,6 +439,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "weak_review_manifest_path": weak_review_manifest_path,
         "weak_joint_limits_manifest_path": weak_joint_limits_manifest_path,
         "weak_mesh_manifest_path": weak_mesh_manifest_path,
+        "weak_target_frame_manifest_path": weak_target_frame_manifest_path,
         "weak_tcp_manifest_path": weak_tcp_manifest_path,
         "weak_alignment_manifest_path": weak_alignment_manifest_path,
         "ready_model_path": ready_model_path,
@@ -422,6 +447,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "weak_review_model_path": weak_review_model_path,
         "weak_joint_limits_model_path": weak_joint_limits_model_path,
         "weak_mesh_model_path": weak_mesh_model_path,
+        "weak_target_frame_model_path": weak_target_frame_model_path,
         "weak_tcp_model_path": weak_tcp_model_path,
         "weak_alignment_model_path": weak_alignment_model_path,
         "explicit_model_path": explicit_model_path,
@@ -542,6 +568,7 @@ def summarize_case(
         assert_true(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
         assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
         assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
         assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
         assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
         if not isinstance(get_nested(bundle, ("mesh_assets", "mesh_reference_count")), int) or get_nested(bundle, ("mesh_assets", "mesh_reference_count")) <= 0:
@@ -577,6 +604,7 @@ def summarize_case(
         assert_true(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
         assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
         assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
         assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
         assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
         assert_equal(
@@ -627,6 +655,7 @@ def summarize_case(
             "placeholder_only",
         )
         assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
         assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
     elif expectation == "weak_review_not_forwarded":
         assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
@@ -651,6 +680,7 @@ def summarize_case(
             errors.append(f"{case_id}.missing_inputs: expected authority and provenance, got {missing_inputs!r}")
         assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
         assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
         assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
         assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
     elif expectation == "weak_joint_limit_authority_not_forwarded":
@@ -676,6 +706,7 @@ def summarize_case(
         if not isinstance(missing_inputs, list) or "joint_limit_authority" not in missing_inputs:
             errors.append(f"{case_id}.missing_inputs: expected joint_limit_authority, got {missing_inputs!r}")
         assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
         assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
         assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
     elif expectation == "weak_mesh_asset_authority_not_forwarded":
@@ -701,6 +732,33 @@ def summarize_case(
         missing_inputs = bundle.get("missing_inputs")
         if not isinstance(missing_inputs, list) or "mesh_asset_authority" not in missing_inputs:
             errors.append(f"{case_id}.missing_inputs: expected mesh_asset_authority, got {missing_inputs!r}")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
+        assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
+        assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
+    elif expectation == "weak_target_frame_authority_not_forwarded":
+        assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_not_ready",
+        )
+        assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
+        assert_equal(
+            errors,
+            f"{case_id}.diagnostic_reason",
+            forwarding.get("diagnostic_only_reason"),
+            "bundle_not_ready_for_model_backed_ik:model_bundle_manifest_needs_follow_up",
+        )
+        assert_equal(errors, f"{case_id}.authority_status", bundle.get("authority_status"), "present")
+        assert_equal(errors, f"{case_id}.provenance_status", bundle.get("provenance_status"), "present")
+        assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
+        assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "needs_review")
+        missing_inputs = bundle.get("missing_inputs")
+        if not isinstance(missing_inputs, list) or "target_frame_authority" not in missing_inputs:
+            errors.append(f"{case_id}.missing_inputs: expected target_frame_authority, got {missing_inputs!r}")
         assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
         assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
     elif expectation == "weak_tcp_offset_authority_not_forwarded":
@@ -723,6 +781,7 @@ def summarize_case(
         assert_equal(errors, f"{case_id}.provenance_status", bundle.get("provenance_status"), "present")
         assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
         assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
         assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "needs_review")
         assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
         missing_inputs = bundle.get("missing_inputs")
@@ -748,6 +807,7 @@ def summarize_case(
         assert_equal(errors, f"{case_id}.provenance_status", bundle.get("provenance_status"), "present")
         assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
         assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
         assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
         assert_equal(
             errors,
@@ -778,6 +838,7 @@ def summarize_case(
             "bundle_provenance_status": bundle.get("provenance_status"),
             "bundle_joint_limits_status": get_nested(bundle, ("joint_limits", "status")),
             "bundle_mesh_assets_status": get_nested(bundle, ("mesh_assets", "status")),
+            "bundle_target_frame_status": get_nested(bundle, ("target_frame", "status")),
             "bundle_tcp_offset_status": get_nested(bundle, ("tcp_offset", "status")),
             "bundle_alignment_status": get_nested(bundle, ("base_to_board_alignment", "status")),
             "bundle_missing_inputs": bundle.get("missing_inputs"),
@@ -786,6 +847,7 @@ def summarize_case(
             "bundle_asset_preflight": bundle_preflight,
             "bundle_joint_limits": bundle.get("joint_limits"),
             "bundle_mesh_assets": bundle.get("mesh_assets"),
+            "bundle_target_frame": bundle.get("target_frame"),
             "bundle_tcp_offset": bundle.get("tcp_offset"),
             "bundle_alignment": bundle.get("base_to_board_alignment"),
             "reviewed_mujoco_bundle": reviewed_mujoco,
@@ -808,6 +870,7 @@ def flatten_case_rows(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "provenance_status": case["observations"].get("bundle_provenance_status"),
                 "joint_limits_status": case["observations"].get("bundle_joint_limits_status"),
                 "mesh_assets_status": case["observations"].get("bundle_mesh_assets_status"),
+                "target_frame_status": case["observations"].get("bundle_target_frame_status"),
                 "tcp_offset_status": case["observations"].get("bundle_tcp_offset_status"),
                 "alignment_status": case["observations"].get("bundle_alignment_status"),
                 "missing_inputs": case["observations"].get("bundle_missing_inputs"),
@@ -872,6 +935,12 @@ def main() -> int:
             "manifest_path": fixtures["weak_mesh_manifest_path"],
             "explicit_model_path": None,
             "expectation": "weak_mesh_asset_authority_not_forwarded",
+        },
+        {
+            "case_id": "weak_target_frame_authority_not_forwarded",
+            "manifest_path": fixtures["weak_target_frame_manifest_path"],
+            "explicit_model_path": None,
+            "expectation": "weak_target_frame_authority_not_forwarded",
         },
         {
             "case_id": "weak_tcp_offset_authority_not_forwarded",

@@ -3,9 +3,10 @@
 Use this hardware-free checker when a reviewed SO-101 model bundle should drive
 future model-backed IK calibration. It verifies that one JSON manifest declares
 the kinematic model path, mesh asset roots, source authority/provenance, target
-frame, reviewed joint-limit authority, TCP/gripper-tip offset, mesh evidence,
-and base-to-board alignment inputs before the simulator treats Cartesian,
-delta, or radial reachability residuals as trustworthy.
+frame plus reviewed target-frame authority, reviewed joint-limit authority,
+TCP/gripper-tip offset, mesh evidence, and base-to-board alignment inputs before
+the simulator treats Cartesian, delta, or radial reachability residuals as
+trustworthy.
 
 ## Probe/Generator Flow
 
@@ -61,11 +62,12 @@ diagnostics match the rest of the simulator gate.
 By default the generated candidate manifest leaves `authority` and
 `provenance` as empty objects and stores TODO details in
 `authority_placeholder` and `provenance_placeholder`. It also writes
-`joint_limits_placeholder`, `tcp_offset_placeholder`, and
-`base_to_board_alignment_placeholder` instead of inventing reviewed limits,
-calibrated TCP, or board-alignment values. That means the generated manifest
-remains diagnostic-only until an operator replaces those placeholders with
-reviewed fields and this checker reports `ready_for_model_backed_ik: true`.
+`target_frame_authority_placeholder`, `joint_limits_placeholder`,
+`tcp_offset_placeholder`, and `base_to_board_alignment_placeholder` instead of
+inventing reviewed target-frame authority, limits, calibrated TCP, or
+board-alignment values. That means the generated manifest remains
+diagnostic-only until an operator replaces those placeholders with reviewed
+fields and this checker reports `ready_for_model_backed_ik: true`.
 `authority` must include an accepted reviewed status plus reviewer/date/id/url
 evidence, and `provenance` must include a source reference, export tool, and
 license basis. A merely non-empty object is recorded as `needs_review` and does
@@ -73,10 +75,12 @@ not satisfy readiness. Joint-limit values also need review evidence: numeric
 limits without `joint_limit_authority` or an accepted review marker are recorded
 as `needs_review`. Mesh references also need review evidence: resolved mesh
 files without `mesh_asset_authority` or an accepted mesh/asset-root review
-marker are recorded as `needs_review`. Numeric TCP offsets and base-to-board
-transforms also need review evidence through `tcp_offset_authority` and
-`base_to_board_alignment_authority`; otherwise they remain diagnostic inputs
-only.
+marker are recorded as `needs_review`. The target frame also needs review
+evidence through `target_frame_authority` or an accepted TCP-frame review
+marker; otherwise the frame name remains diagnostic only. Numeric TCP offsets
+and base-to-board transforms also need review evidence through
+`tcp_offset_authority` and `base_to_board_alignment_authority`; otherwise they
+remain diagnostic inputs only.
 
 To re-check a generated draft directly:
 
@@ -155,6 +159,12 @@ resolved from the manifest directory.
     "license": "reviewed-license-or-notice"
   },
   "target_frame": "gripper_frame_link",
+  "target_frame_authority": {
+    "target_frame_authority_status": "reviewed",
+    "reviewed_by": "operator-or-review-id",
+    "reviewed_at": "2026-06-16",
+    "source": "reviewed model target frame or TCP-frame record"
+  },
   "joint_limits_deg": {
     "shoulder_pan": [-110.0, 110.0],
     "shoulder_lift": [-110.0, 110.0],
@@ -208,8 +218,10 @@ resolved from the manifest directory.
 ```
 
 Accepted TCP aliases are `tcp_offset_m`, `gripper_tip_offset_m`,
-`target_frame_to_tcp_m`, and `tool_center_point_offset_m`. Omitted
-`target_frame` defaults to `gripper_frame_link`.
+`target_frame_to_tcp_m`, and `tool_center_point_offset_m`. Diagnostic output
+may use `gripper_frame_link` when `target_frame` is omitted, but readiness
+requires an explicit `target_frame` plus accepted reviewed target-frame
+authority.
 
 `asset_roots` must be present. An explicit empty list is valid when the model
 directory alone resolves mesh paths, but readiness still requires at least one
@@ -260,6 +272,16 @@ hardware-free regression fixtures. Review evidence must include at least one of
 without this review metadata remain diagnostic evidence, not reviewed physical
 SO-101 mesh truth.
 
+Target-frame authority must be declared in `target_frame_authority`,
+`target_frame_review`, `tcp_frame_authority`, or `target_frame_metadata`.
+Accepted target-frame review statuses are `reviewed`, `operator_reviewed`,
+`target_frame_reviewed`, `tcp_frame_reviewed`, and `model_bundle_reviewed`,
+plus `synthetic_fixture_reviewed_for_automation_only` only for explicitly
+hardware-free regression fixtures. Review evidence must include at least one of
+`reviewed_by`, `reviewed_at`, `review_id`, or `review_url`. A frame name
+without this metadata remains diagnostic evidence, not reviewed physical
+SO-101 TCP-frame truth.
+
 TCP/gripper-tip offset authority must be declared in `tcp_offset_authority`,
 `tcp_offset_review`, `gripper_tip_offset_review`, or `tcp_calibration`.
 Accepted TCP review statuses are `reviewed`, `operator_reviewed`,
@@ -300,7 +322,8 @@ true:
   references resolve
 - mesh/asset-root authority includes an accepted review status plus review
   evidence
-- the target frame is present or defaulted
+- the target frame is explicitly declared and includes accepted target-frame
+  review authority
 - a valid x/y/z TCP offset in meters is present and includes accepted TCP
   review authority
 - a real `base_to_board_transform` or `base_to_board_alignment` is populated
@@ -312,8 +335,8 @@ true:
 - the nested asset preflight has no missing or unresolved mesh references
 
 Any missing input appears in `missing_inputs`, in the CSV checklist, and in the
-README. Missing authority, provenance, TCP, or alignment data is never treated
-as success.
+README. Missing authority, provenance, target-frame authority, TCP, or alignment
+data is never treated as success.
 
 ## Relationship To Existing Checks
 
@@ -331,8 +354,9 @@ recorded in the
 The probe/generator sits between the inventory and the reviewed manifest. Use
 the inventory to find likely local model files, use the probe to turn a selected
 candidate plus separate mesh roots into a reviewed-manifest draft with contract
-and asset-preflight diagnostics, then fill authority, provenance, TCP, and
-base-to-board values before relying on the manifest checker for readiness.
+and asset-preflight diagnostics, then fill authority, provenance, target-frame
+authority, TCP, and base-to-board values before relying on the manifest checker
+for readiness.
 
 The manifest checker invokes the
 [SO-101 model contract checker](sim_so101_model_contract.md) as a child whenever
