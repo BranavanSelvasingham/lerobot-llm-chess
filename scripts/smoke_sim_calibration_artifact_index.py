@@ -2735,6 +2735,18 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
         ),
         "blockers": gate.get("blockers") or [],
         "blocker_count": gate.get("blocker_count"),
+        "blocker_packet_status": gate.get("blocker_packet_status"),
+        "blocker_packet_model_authority": gate.get("blocker_packet_model_authority"),
+        "blocker_packet_item_count": gate.get("blocker_packet_item_count"),
+        "blocker_packet_action_required_count": gate.get(
+            "blocker_packet_action_required_count"
+        ),
+        "blocker_packet_action_required_item_ids": gate.get(
+            "blocker_packet_action_required_item_ids"
+        )
+        or [],
+        "blocker_packet_next_action_ids": gate.get("blocker_packet_next_action_ids")
+        or [],
         "source_inventory_summary_path": gate.get("source_inventory_summary_path"),
         "bundle_manifest_summary_path": gate.get("bundle_manifest_summary_path"),
         "reviewed_mujoco_bundle_summary_path": gate.get(
@@ -2744,6 +2756,8 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
     for key, label_suffix in (
         ("summary_json", "summary"),
         ("checklist_csv", "checklist"),
+        ("blocker_packet_json", "blocker_packet"),
+        ("blocker_packet_csv", "blocker_packet_rows"),
         ("readme_md", "readme"),
     ):
         add_path(
@@ -2761,6 +2775,8 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
         **metrics,
         "summary_path": artifact_paths.get("summary_json") or gate.get("summary_path"),
         "checklist_csv_path": artifact_paths.get("checklist_csv"),
+        "blocker_packet_json_path": artifact_paths.get("blocker_packet_json"),
+        "blocker_packet_csv_path": artifact_paths.get("blocker_packet_csv"),
         "readme_md_path": artifact_paths.get("readme_md"),
         "artifact_paths": artifact_paths,
     }

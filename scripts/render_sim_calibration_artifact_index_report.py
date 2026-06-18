@@ -1284,6 +1284,11 @@ def so101_reviewed_model_authority_gate_row(artifact: dict[str, Any]) -> list[An
         metrics.get("development_fixture_evidence_not_physical_so101_truth", ""),
         metrics.get("blocker_count", ""),
         compact_list(metrics.get("blockers")),
+        metrics.get("blocker_packet_status", ""),
+        metrics.get("blocker_packet_model_authority", ""),
+        metrics.get("blocker_packet_item_count", ""),
+        metrics.get("blocker_packet_action_required_count", ""),
+        compact_list(metrics.get("blocker_packet_next_action_ids")),
         "ok" if artifact.get("exists") is True else "missing",
     ]
 
@@ -2837,6 +2842,11 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Fixture Caveat",
                 "Blocker Count",
                 "Blockers",
+                "Blocker Packet",
+                "Packet Authority",
+                "Packet Items",
+                "Action Required",
+                "Packet Next Actions",
                 "Artifact Status",
             ],
             [

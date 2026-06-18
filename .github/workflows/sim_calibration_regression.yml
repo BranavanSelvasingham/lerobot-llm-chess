@@ -721,19 +721,30 @@ jobs:
               reviewed_model_authority_gate["development_fixture_evidence_not_physical_so101_truth"],
               bool,
           ), reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["blocker_packet_status"] == reviewed_model_authority_gate["status"], reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["blocker_packet_model_authority"] == "blocker_packet_not_authority", reviewed_model_authority_gate
+          assert isinstance(reviewed_model_authority_gate["blocker_packet_item_count"], int), reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["blocker_packet_item_count"] >= 3, reviewed_model_authority_gate
+          assert isinstance(reviewed_model_authority_gate["blocker_packet_action_required_count"], int), reviewed_model_authority_gate
+          assert isinstance(reviewed_model_authority_gate["blocker_packet_action_required_item_ids"], list), reviewed_model_authority_gate
+          assert len(reviewed_model_authority_gate["blocker_packet_action_required_item_ids"]) == reviewed_model_authority_gate["blocker_packet_action_required_count"], reviewed_model_authority_gate
+          assert isinstance(reviewed_model_authority_gate["blocker_packet_next_action_ids"], list), reviewed_model_authority_gate
           if reviewed_model_authority_gate["ready"] is True:
               assert reviewed_model_authority_gate["status"] == "reviewed_model_authority_ready", reviewed_model_authority_gate
               assert reviewed_model_authority_gate["blockers"] == [], reviewed_model_authority_gate
+              assert reviewed_model_authority_gate["blocker_packet_action_required_count"] == 0, reviewed_model_authority_gate
           else:
               assert reviewed_model_authority_gate["status"] == "reviewed_model_authority_blocked", reviewed_model_authority_gate
               assert reviewed_model_authority_gate["blockers"], reviewed_model_authority_gate
               assert reviewed_model_authority_gate["ready"] is False, reviewed_model_authority_gate
+              assert reviewed_model_authority_gate["blocker_packet_action_required_count"] > 0, reviewed_model_authority_gate
+              assert reviewed_model_authority_gate["blocker_packet_next_action_ids"], reviewed_model_authority_gate
               assert (
                   reviewed_model_authority_gate["development_fixture_evidence_not_physical_so101_truth"]
                   is True
               ), reviewed_model_authority_gate
           reviewed_authority_artifacts = reviewed_model_authority_gate["artifacts"]
-          for key in ("summary_json", "checklist_csv", "readme_md"):
+          for key in ("summary_json", "checklist_csv", "blocker_packet_json", "blocker_packet_csv", "readme_md"):
               assert isinstance(reviewed_authority_artifacts.get(key), str) and Path(reviewed_authority_artifacts[key]).is_file(), (
                   key,
                   reviewed_authority_artifacts,
@@ -1314,6 +1325,18 @@ jobs:
               row.get("label") == "so101_reviewed_model_authority_gate:readme" and row.get("exists") is True
               for row in artifacts_by_category["so101_reviewed_model_authority_gate"]
           ), artifacts_by_category["so101_reviewed_model_authority_gate"]
+          assert any(
+              row.get("label") == "so101_reviewed_model_authority_gate:blocker_packet"
+              and row.get("kind") == "json"
+              and row.get("exists") is True
+              for row in artifacts_by_category["so101_reviewed_model_authority_gate"]
+          ), artifacts_by_category["so101_reviewed_model_authority_gate"]
+          assert any(
+              row.get("label") == "so101_reviewed_model_authority_gate:blocker_packet_rows"
+              and row.get("kind") == "csv"
+              and row.get("exists") is True
+              for row in artifacts_by_category["so101_reviewed_model_authority_gate"]
+          ), artifacts_by_category["so101_reviewed_model_authority_gate"]
           for row in artifacts_by_category["so101_reviewed_model_authority_gate"]:
               metrics = row.get("metrics", {})
               assert metrics.get("ready") in {True, False}, metrics
@@ -1322,12 +1345,21 @@ jobs:
               assert metrics.get("physical_reviewed_model_motion_checked") in {True, False, None}, metrics
               assert isinstance(metrics.get("blockers"), list), metrics
               assert metrics.get("blocker_count") == len(metrics.get("blockers")), metrics
+              assert metrics.get("blocker_packet_status") == metrics.get("status"), metrics
+              assert metrics.get("blocker_packet_model_authority") == "blocker_packet_not_authority", metrics
+              assert isinstance(metrics.get("blocker_packet_item_count"), int), metrics
+              assert metrics.get("blocker_packet_item_count") >= 3, metrics
+              assert isinstance(metrics.get("blocker_packet_action_required_count"), int), metrics
+              assert isinstance(metrics.get("blocker_packet_next_action_ids"), list), metrics
               if metrics.get("ready") is True:
                   assert metrics.get("status") == "reviewed_model_authority_ready", metrics
                   assert metrics.get("blockers") == [], metrics
+                  assert metrics.get("blocker_packet_action_required_count") == 0, metrics
               else:
                   assert metrics.get("status") == "reviewed_model_authority_blocked", metrics
                   assert metrics.get("blockers"), metrics
+                  assert metrics.get("blocker_packet_action_required_count") > 0, metrics
+                  assert metrics.get("blocker_packet_next_action_ids"), metrics
                   assert metrics.get("development_fixture_evidence_not_physical_so101_truth") is True, metrics
           assert any(
               row.get("kind") == "json"
@@ -1651,6 +1683,8 @@ jobs:
           assert "Reference capture manifest diagnostics:" in entrypoint_text, entrypoint_text
           assert "`so101_model_bundle_manifest/so101_model_bundle_manifest_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_model_bundle_manifest/so101_model_bundle_manifest_checklist.csv`" in entrypoint_text, entrypoint_text
+          assert "`so101_reviewed_model_authority_gate/so101_reviewed_model_authority_blocker_packet.json`" in entrypoint_text, entrypoint_text
+          assert "`so101_reviewed_model_authority_gate/so101_reviewed_model_authority_blocker_packet.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_checklist.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_inventory_summary.json`" in entrypoint_text, entrypoint_text
@@ -1854,6 +1888,8 @@ jobs:
               "fixture/fixture_summary.json",
               "sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json",
               "so101_model_bundle_manifest/so101_model_bundle_manifest_summary.json",
+              "so101_reviewed_model_authority_gate/so101_reviewed_model_authority_blocker_packet.json",
+              "so101_reviewed_model_authority_gate/so101_reviewed_model_authority_blocker_packet.csv",
               "so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_summary.json",
               "so101_model_source_inventory/so101_model_source_inventory_summary.json",
               "so101_model_source_inventory/so101_model_source_inventory_review_packet.json",
@@ -1966,6 +2002,9 @@ jobs:
               f"- `physical_reviewed_model_motion_checked`: `{summary['so101_reviewed_model_authority_gate']['physical_reviewed_model_motion_checked']}`",
               f"- `development_fixture_evidence_not_physical_so101_truth`: `{summary['so101_reviewed_model_authority_gate']['development_fixture_evidence_not_physical_so101_truth']}`",
               f"- `blockers`: `{summary['so101_reviewed_model_authority_gate']['blockers']}`",
+              f"- `blocker_packet_status`: `{summary['so101_reviewed_model_authority_gate']['blocker_packet_status']}`",
+              f"- `blocker_packet_action_required_count`: `{summary['so101_reviewed_model_authority_gate']['blocker_packet_action_required_count']}`",
+              f"- `blocker_packet_next_action_ids`: `{summary['so101_reviewed_model_authority_gate']['blocker_packet_next_action_ids']}`",
               "",
               "SO-101 model source inventory:",
               f"- `status`: `{summary['so101_model_source_inventory']['status']}`",

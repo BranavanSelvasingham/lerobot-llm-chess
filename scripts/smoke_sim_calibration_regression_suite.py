@@ -74,6 +74,12 @@ SO101_REVIEWED_MODEL_AUTHORITY_GATE_SCHEMA = "lerobot.sim.so101_reviewed_model_a
 SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME = "so101_reviewed_model_authority_gate"
 SO101_REVIEWED_MODEL_AUTHORITY_GATE_SUMMARY_NAME = "so101_reviewed_model_authority_gate.json"
 SO101_REVIEWED_MODEL_AUTHORITY_GATE_CHECKLIST_NAME = "so101_reviewed_model_authority_gate_checklist.csv"
+SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_JSON_NAME = (
+    "so101_reviewed_model_authority_blocker_packet.json"
+)
+SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_CSV_NAME = (
+    "so101_reviewed_model_authority_blocker_packet.csv"
+)
 SO101_REVIEWED_MODEL_AUTHORITY_GATE_README_NAME = "README.md"
 SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME = "so101_reviewed_mujoco_bundle"
 SO101_REVIEWED_MUJOCO_BUNDLE_SUMMARY_NAME = "so101_reviewed_mujoco_bundle_summary.json"
@@ -271,6 +277,14 @@ def parse_args() -> argparse.Namespace:
 def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n")
+
+
+def csv_cell(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list, tuple)):
+        return json.dumps(value, sort_keys=True)
+    return str(value)
 
 
 def markdown_bool(value: Any) -> str:
@@ -1379,6 +1393,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `so101_model_bundle_manifest/README.md`",
         f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_SUMMARY_NAME}`",
         f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_CHECKLIST_NAME}`",
+        f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_JSON_NAME}`",
+        f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_CSV_NAME}`",
         f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_README_NAME}`",
         f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/{SO101_REVIEWED_MUJOCO_BUNDLE_SUMMARY_NAME}`",
         f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/so101_reviewed_mujoco_bundle_checklist.csv`",
@@ -3532,6 +3548,148 @@ def so101_reviewed_model_authority_gate_section(
     }
 
 
+def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[str, Any]:
+    item_specs = [
+        {
+            "item_id": "source_authority_ready",
+            "gate": "reviewed_model_authority",
+            "required_state": "source_authority_ready",
+            "observed_ready": gate.get("source_authority_ready") is True,
+            "evidence_artifact_path": gate.get("source_inventory_summary_path"),
+            "next_action_id": "review_and_declare_authoritative_so101_model_source",
+            "operator_action": (
+                "Review provenance/license/source authority and rerun the source inventory "
+                "with authoritative path/root plus review metadata."
+            ),
+        },
+        {
+            "item_id": "physical_bundle_authority_ready",
+            "gate": "reviewed_model_authority",
+            "required_state": "physical_so101_model_authority_ready",
+            "observed_ready": gate.get("physical_so101_model_authority_ready") is True,
+            "evidence_artifact_path": gate.get("bundle_manifest_summary_path"),
+            "next_action_id": "supply_reviewed_so101_model_bundle_manifest",
+            "operator_action": (
+                "Supply a reviewed SO-101 model bundle manifest with mesh roots, reviewed "
+                "joint limits, target frame, TCP offset, and base-to-board alignment."
+            ),
+        },
+        {
+            "item_id": "physical_reviewed_mujoco_motion_checked",
+            "gate": "mujoco_scene_validity",
+            "required_state": "physical_reviewed_model_motion_checked",
+            "observed_ready": gate.get("physical_reviewed_model_motion_checked") is True,
+            "evidence_artifact_path": gate.get("reviewed_mujoco_bundle_summary_path"),
+            "next_action_id": "prove_physical_reviewed_model_motion",
+            "operator_action": (
+                "Load the reviewed bundle in MuJoCo, map all SO-101 joints, find the target "
+                "frame, and prove SimRobot joint motion without fallback behavior."
+            ),
+        },
+    ]
+    items: list[dict[str, Any]] = []
+    all_blockers = gate.get("blockers") or []
+    for priority, spec in enumerate(item_specs, start=1):
+        status = "ready" if spec["observed_ready"] else "action_required"
+        related_blockers = [
+            blocker
+            for blocker in all_blockers
+            if (
+                spec["item_id"] == "source_authority_ready"
+                and ("source" in blocker or "authoritative" in blocker)
+            )
+            or (
+                spec["item_id"] == "physical_bundle_authority_ready"
+                and (
+                    "manifest" in blocker
+                    or "mesh" in blocker
+                    or "joint" in blocker
+                    or "target" in blocker
+                    or "tcp" in blocker
+                    or "base" in blocker
+                    or "contract" in blocker
+                )
+            )
+            or (
+                spec["item_id"] == "physical_reviewed_mujoco_motion_checked"
+                and ("mujoco" in blocker or "motion" in blocker)
+            )
+        ]
+        if not related_blockers and not spec["observed_ready"]:
+            related_blockers = [spec["next_action_id"]]
+        items.append(
+            {
+                "priority": priority,
+                **spec,
+                "status": status,
+                "blockers": related_blockers,
+                "development_fixture_evidence_not_physical_so101_truth": gate.get(
+                    "development_fixture_evidence_not_physical_so101_truth"
+                )
+                is True,
+            }
+        )
+
+    if gate.get("development_fixture_evidence_not_physical_so101_truth") is True:
+        items.append(
+            {
+                "priority": len(items) + 1,
+                "item_id": "development_fixture_authority_boundary",
+                "gate": "authority_boundary",
+                "required_state": "development_fixture_evidence_not_physical_so101_truth",
+                "observed_ready": True,
+                "status": "caveat_enforced",
+                "evidence_artifact_path": gate.get("summary_path"),
+                "next_action_id": "do_not_promote_fixture_evidence_to_physical_truth",
+                "operator_action": (
+                    "Keep development scaffold evidence as automation coverage only until the "
+                    "reviewed source, bundle, and MuJoCo motion gates are all ready."
+                ),
+                "blockers": [],
+                "development_fixture_evidence_not_physical_so101_truth": True,
+            }
+        )
+
+    action_required_item_ids = [
+        item["item_id"] for item in items if item.get("status") == "action_required"
+    ]
+    return {
+        "schema": "lerobot.sim.so101_reviewed_model_authority_blocker_packet.v1",
+        "ok": True,
+        "status": (
+            "reviewed_model_authority_ready"
+            if gate.get("ready") is True
+            else "reviewed_model_authority_blocked"
+        ),
+        "model_authority": "blocker_packet_not_authority",
+        "ready": gate.get("ready") is True,
+        "action_required_item_ids": action_required_item_ids,
+        "action_required_count": len(action_required_item_ids),
+        "item_count": len(items),
+        "item_ids": [item["item_id"] for item in items],
+        "next_action_ids": [
+            item["next_action_id"]
+            for item in items
+            if item.get("status") == "action_required" and item.get("next_action_id")
+        ],
+        "source_inventory_summary_path": gate.get("source_inventory_summary_path"),
+        "bundle_manifest_summary_path": gate.get("bundle_manifest_summary_path"),
+        "reviewed_mujoco_bundle_summary_path": gate.get(
+            "reviewed_mujoco_bundle_summary_path"
+        ),
+        "development_fixture_evidence_not_physical_so101_truth": gate.get(
+            "development_fixture_evidence_not_physical_so101_truth"
+        )
+        is True,
+        "items": items,
+        "caveats": [
+            "This packet is a blocker review aid, not reviewed physical SO-101 model authority.",
+            "The gate is ready only when source authority, physical bundle authority, and physical-reviewed MuJoCo motion are all true.",
+            "Development fixture evidence remains automation coverage and must not be used as physical calibration truth.",
+        ],
+    }
+
+
 def write_so101_reviewed_model_authority_gate_artifacts(
     output_dir: Path,
     gate: dict[str, Any],
@@ -3539,12 +3697,26 @@ def write_so101_reviewed_model_authority_gate_artifacts(
     gate_dir = output_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME
     summary_path = gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_SUMMARY_NAME
     checklist_path = gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_CHECKLIST_NAME
+    blocker_packet_path = (
+        gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_JSON_NAME
+    )
+    blocker_packet_csv_path = (
+        gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_CSV_NAME
+    )
     readme_path = gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_README_NAME
     artifacts = {
         "summary_json": str(summary_path),
         "checklist_csv": str(checklist_path),
+        "blocker_packet_json": str(blocker_packet_path),
+        "blocker_packet_csv": str(blocker_packet_csv_path),
         "readme_md": str(readme_path),
     }
+    blocker_packet = so101_reviewed_model_authority_blocker_packet(
+        {
+            **gate,
+            "summary_path": str(summary_path),
+        }
+    )
     payload = {
         "schema": SO101_REVIEWED_MODEL_AUTHORITY_GATE_SCHEMA,
         **gate,
@@ -3564,6 +3736,15 @@ def write_so101_reviewed_model_authority_gate_artifacts(
                 "reviewed_mujoco_bundle_summary_path"
             ),
         },
+        "blocker_packet_status": blocker_packet["status"],
+        "blocker_packet_model_authority": blocker_packet["model_authority"],
+        "blocker_packet_item_count": blocker_packet["item_count"],
+        "blocker_packet_action_required_count": blocker_packet["action_required_count"],
+        "blocker_packet_action_required_item_ids": blocker_packet[
+            "action_required_item_ids"
+        ],
+        "blocker_packet_next_action_ids": blocker_packet["next_action_ids"],
+        "blocker_packet": blocker_packet,
     }
     checklist_rows = [
         {
@@ -3635,6 +3816,25 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         writer.writeheader()
         for row in checklist_rows:
             writer.writerow(row)
+    write_json(blocker_packet_path, blocker_packet)
+    blocker_fieldnames = (
+        "priority",
+        "item_id",
+        "gate",
+        "required_state",
+        "status",
+        "observed_ready",
+        "next_action_id",
+        "evidence_artifact_path",
+        "blockers",
+        "operator_action",
+        "development_fixture_evidence_not_physical_so101_truth",
+    )
+    with blocker_packet_csv_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=blocker_fieldnames)
+        writer.writeheader()
+        for item in blocker_packet["items"]:
+            writer.writerow({field: csv_cell(item.get(field)) for field in blocker_fieldnames})
     blocker_lines = (
         [f"- `{blocker}`" for blocker in gate.get("blockers", [])]
         if gate.get("blockers")
@@ -3654,6 +3854,8 @@ def write_so101_reviewed_model_authority_gate_artifacts(
                 f"`{markdown_bool(gate.get('physical_reviewed_model_motion_checked'))}`",
                 "- Development fixture evidence is not physical SO-101 truth: "
                 f"`{markdown_bool(gate.get('development_fixture_evidence_not_physical_so101_truth'))}`",
+                f"- Blocker packet: `{blocker_packet_path}`",
+                f"- Blocker packet rows: `{blocker_packet_csv_path}`",
                 "",
                 "## Blockers",
                 "",
