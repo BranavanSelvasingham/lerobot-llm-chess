@@ -80,6 +80,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_bundle_status",
         "reviewed_mujoco_motion_authority_status",
         "development_fixture_evidence_not_physical_so101_truth",
+        "development_fixture_evidence_present",
         "blockers",
         "next_required_action_ids",
         "blocker_packet_action_required_item_ids",
@@ -191,6 +192,7 @@ def bundle_physical_ready(
     sha256: str | None = SOURCE_MODEL_SHA256,
     declared_sha256: Any = UNSET,
     observed_sha256: Any = UNSET,
+    fixture_ready: bool = False,
 ) -> dict[str, Any]:
     declared = sha256 if declared_sha256 is UNSET else declared_sha256
     observed = sha256 if observed_sha256 is UNSET else observed_sha256
@@ -204,7 +206,7 @@ def bundle_physical_ready(
         "physical_so101_model_authority_ready": True,
         "physical_authority_gate_status": "physical_reviewed_authority_ready",
         "physical_authority_blockers": [],
-        "hardware_free_regression_fixture_ready": False,
+        "hardware_free_regression_fixture_ready": fixture_ready,
         "next_required_for_goal": [],
         "next_required_action_ids": [],
         "model_path": {"path": normalize_path(model_path) if model_path else None},
@@ -293,12 +295,16 @@ def motion_hardware_fixture(summary_path: Path) -> dict[str, Any]:
     }
 
 
-def motion_physical_ready(summary_path: Path) -> dict[str, Any]:
+def motion_physical_ready(
+    summary_path: Path,
+    *,
+    fixture_motion_checked: bool = False,
+) -> dict[str, Any]:
     return {
         "status": "reviewed_mujoco_bundle_motion_checked",
         "motion_authority_status": "physical_reviewed_model_motion_checked",
         "physical_reviewed_model_motion_checked": True,
-        "hardware_free_fixture_motion_checked": False,
+        "hardware_free_fixture_motion_checked": fixture_motion_checked,
         "next_required_for_goal": [],
         "summary_path": str(summary_path),
     }
@@ -644,6 +650,59 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "source_ready_physical_bundle_with_fixture_ready_conflict",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready(
+                summary_dir / "bundle_ready_fixture_conflict.json",
+                source_model,
+                fixture_ready=True,
+            ),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_bundle_model_path_and_digest_consistent",
+                "consistency_ready": True,
+                "development_fixture": True,
+                "development_fixture_present": True,
+                "blockers_contain": [
+                    "replace_development_fixture_evidence_with_reviewed_physical_so101_authority"
+                ],
+                "actions_contain": [
+                    "replace_development_fixture_evidence_with_reviewed_physical_so101_authority"
+                ],
+                "action_required_contains": ["development_fixture_authority_boundary"],
+                "blocker_packet_next_actions_contain": [
+                    "replace_development_fixture_evidence_with_reviewed_physical_so101_authority"
+                ],
+            },
+        },
+        {
+            "case_id": "source_ready_physical_motion_with_fixture_motion_conflict",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready(
+                summary_dir / "motion_ready_fixture_conflict.json",
+                fixture_motion_checked=True,
+            ),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_bundle_model_path_and_digest_consistent",
+                "consistency_ready": True,
+                "development_fixture": True,
+                "development_fixture_present": True,
+                "blockers_contain": [
+                    "replace_development_fixture_evidence_with_reviewed_physical_so101_authority"
+                ],
+                "actions_contain": [
+                    "replace_development_fixture_evidence_with_reviewed_physical_so101_authority"
+                ],
+                "action_required_contains": ["development_fixture_authority_boundary"],
+                "blocker_packet_next_actions_contain": [
+                    "replace_development_fixture_evidence_with_reviewed_physical_so101_authority"
+                ],
+            },
+        },
+        {
             "case_id": "all_ready_contract_state",
             "source": source_ready(summary_dir / "source_ready.json", source_model),
             "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
@@ -733,6 +792,13 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             "physical_reviewed_model_motion_status_ready",
             gate.get("physical_reviewed_model_motion_status_ready"),
             expect["motion_status_ready"],
+        )
+    if "development_fixture_present" in expect:
+        add_error(
+            errors,
+            "development_fixture_evidence_present",
+            gate.get("development_fixture_evidence_present"),
+            expect["development_fixture_present"],
         )
     if "reviewed_mujoco_bundle_status" in expect:
         add_error(
@@ -942,6 +1008,9 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "development_fixture_evidence_not_physical_so101_truth": gate.get(
             "development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "development_fixture_evidence_present": gate.get(
+            "development_fixture_evidence_present"
         ),
         "blockers": gate.get("blockers"),
         "next_required_action_ids": gate.get("next_required_action_ids"),

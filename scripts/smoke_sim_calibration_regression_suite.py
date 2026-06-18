@@ -3945,9 +3945,12 @@ def so101_reviewed_model_authority_gate_section(
         source_inventory.get("source_authority_gate_status") == "source_authority_ready"
     )
     physical_authority_ready = bundle_manifest.get("physical_so101_model_authority_ready") is True
+    bundle_fixture_ready = bundle_manifest.get("hardware_free_regression_fixture_ready") is True
     physical_reviewed_motion_reported = (
         reviewed_mujoco_bundle.get("physical_reviewed_model_motion_checked") is True
     )
+    fixture_motion_checked = reviewed_mujoco_bundle.get("hardware_free_fixture_motion_checked") is True
+    development_fixture_evidence_present = bundle_fixture_ready or fixture_motion_checked
     reviewed_mujoco_bundle_status = reviewed_mujoco_bundle.get("status")
     reviewed_mujoco_motion_authority_status = reviewed_mujoco_bundle.get(
         "motion_authority_status"
@@ -3972,6 +3975,7 @@ def so101_reviewed_model_authority_gate_section(
         and physical_authority_ready
         and source_bundle_consistency_ready
         and physical_reviewed_motion_ready
+        and not development_fixture_evidence_present
     )
 
     blockers = unique_string_values(
@@ -3990,6 +3994,11 @@ def so101_reviewed_model_authority_gate_section(
                     "load_reviewed_model_in_mujoco",
                     "prove_physical_reviewed_model_motion",
                 ]
+            ),
+            *(
+                ["replace_development_fixture_evidence_with_reviewed_physical_so101_authority"]
+                if development_fixture_evidence_present
+                else []
             ),
         ]
     )
@@ -4068,11 +4077,30 @@ def so101_reviewed_model_authority_gate_section(
         if not physical_reviewed_motion_ready
         else []
     )
+    fixture_boundary_actions = (
+        [
+            {
+                "action_id": (
+                    "replace_development_fixture_evidence_with_reviewed_physical_so101_authority"
+                ),
+                "gate": "reviewed_model_authority",
+                "title": "Replace fixture-only evidence before closing authority",
+                "detail": (
+                    "Resolve any hardware-free fixture readiness or fixture-motion flags "
+                    "before treating the aggregate SO-101 model authority gate as reviewed "
+                    "physical truth."
+                ),
+            }
+        ]
+        if development_fixture_evidence_present
+        else []
+    )
     next_required_for_goal = prioritized_gate_actions(
         source_inventory.get("next_required_for_goal"),
         bundle_manifest.get("next_required_for_goal"),
         reviewed_mujoco_bundle.get("next_required_for_goal"),
         consistency_actions,
+        fixture_boundary_actions,
         motion_actions,
     )
     source_next_required = source_inventory.get("next_required_action_ids")
@@ -4102,6 +4130,7 @@ def so101_reviewed_model_authority_gate_section(
         "source_authority_ready": source_authority_ready,
         "source_authority_gate_status": source_inventory.get("source_authority_gate_status"),
         "physical_so101_model_authority_ready": physical_authority_ready,
+        "hardware_free_regression_fixture_ready": bundle_fixture_ready,
         "physical_authority_gate_status": bundle_manifest.get("physical_authority_gate_status"),
         "source_bundle_consistency_ready": source_bundle_consistency_ready,
         "source_bundle_consistency_status": source_bundle_consistency.get("status"),
@@ -4109,6 +4138,8 @@ def so101_reviewed_model_authority_gate_section(
         "physical_reviewed_model_motion_checked": physical_reviewed_motion_ready,
         "physical_reviewed_model_motion_reported": physical_reviewed_motion_reported,
         "physical_reviewed_model_motion_status_ready": physical_reviewed_motion_status_ready,
+        "hardware_free_fixture_motion_checked": fixture_motion_checked,
+        "development_fixture_evidence_present": development_fixture_evidence_present,
         "reviewed_mujoco_bundle_status": reviewed_mujoco_bundle_status,
         "reviewed_mujoco_motion_authority_status": reviewed_mujoco_motion_authority_status,
         "blockers": blockers,
@@ -4126,12 +4157,12 @@ def so101_reviewed_model_authority_gate_section(
         "reviewed_mujoco_bundle_summary_path": reviewed_mujoco_bundle.get("summary_path"),
         "development_fixture_evidence_not_physical_so101_truth": (
             not ready
-            or bundle_manifest.get("hardware_free_regression_fixture_ready") is True
-            or reviewed_mujoco_bundle.get("hardware_free_fixture_motion_checked") is True
+            or development_fixture_evidence_present
         ),
         "notes": [
             "This top-level gate is a summary over the source inventory, bundle manifest, and reviewed MuJoCo bundle artifacts.",
             "It is ready only when source authority, physical bundle authority, source-to-bundle model path/digest consistency, and physical-reviewed MuJoCo motion are all true.",
+            "Any hardware-free fixture readiness or fixture-motion evidence fails the aggregate gate closed, even if another child summary also reports a physical-ready flag.",
             "Physical-reviewed MuJoCo motion must have a matching child status and motion-authority status, not only a lone boolean flag.",
             "The source-authority model path/digest and bundle manifest model path/digest must be consistent before authority can close.",
             "Development fixture evidence remains useful automation coverage but does not close reviewed physical SO-101 authority.",
@@ -4339,7 +4370,30 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
             }
         )
 
-    if gate.get("development_fixture_evidence_not_physical_so101_truth") is True:
+    if gate.get("development_fixture_evidence_present") is True:
+        items.append(
+            {
+                "priority": len(items) + 1,
+                "item_id": "development_fixture_authority_boundary",
+                "gate": "authority_boundary",
+                "required_state": "no_development_fixture_evidence_in_ready_gate",
+                "observed_ready": False,
+                "status": "action_required",
+                "evidence_artifact_path": gate.get("summary_path"),
+                "next_action_id": (
+                    "replace_development_fixture_evidence_with_reviewed_physical_so101_authority"
+                ),
+                "operator_action": (
+                    "Resolve hardware-free fixture readiness or fixture-motion evidence "
+                    "before treating the aggregate gate as reviewed physical SO-101 truth."
+                ),
+                "blockers": [
+                    "replace_development_fixture_evidence_with_reviewed_physical_so101_authority"
+                ],
+                "development_fixture_evidence_not_physical_so101_truth": True,
+            }
+        )
+    elif gate.get("development_fixture_evidence_not_physical_so101_truth") is True:
         items.append(
             {
                 "priority": len(items) + 1,

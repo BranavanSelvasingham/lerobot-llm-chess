@@ -300,10 +300,12 @@ The top-level summary also exposes `so101_reviewed_model_authority_gate`, which
 aggregates the source inventory, bundle manifest, and reviewed MuJoCo handoff.
 It reports `reviewed_model_authority_ready` only when source authority,
 physical bundle authority, source-to-bundle model path/digest consistency, and
-physical-reviewed MuJoCo motion are all true; otherwise it reports ordered
-blockers and keeps downstream fixture evidence separate from reviewed physical
-SO-101 truth. The source inventory must identify the same reviewed model path
-and SHA-256 digest as the bundle manifest. The
+physical-reviewed MuJoCo motion are all true, and when no child summary is
+still carrying hardware-free fixture readiness or fixture-motion evidence;
+otherwise it reports ordered blockers and keeps downstream fixture evidence
+separate from reviewed physical SO-101 truth. The source inventory must
+identify the same reviewed model path and SHA-256 digest as the bundle
+manifest. The
 suite also writes the same
 gate under `so101_reviewed_model_authority_gate/` as JSON, CSV, blocker-packet,
 and README review artifacts so the current highest-priority blocker can be
@@ -518,7 +520,9 @@ fixture-only, motion-missing, and all-ready injected gate states without treatin
 the matrix itself as reviewed physical SO-101 evidence. The matrix also verifies
 that physical-reviewed MuJoCo motion needs a consistent child status and
 `motion_authority_status`; a lone true motion boolean cannot close reviewed
-model authority. It also runs the focused
+model authority. It also verifies that contradictory child summaries with both
+physical-ready and fixture-only evidence fail the aggregate authority gate
+closed. It also runs the focused
 `so101_reviewed_mujoco_bundle_matrix` smoke to prove missing/not-ready manifests
 do not attempt motion, `--require-ready-reviewed-model` fails closed,
 placeholder review metadata stays `needs_review` without MuJoCo motion,
