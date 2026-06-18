@@ -502,6 +502,9 @@ jobs:
           assert isinstance(source_inventory["likely_candidate_count"], int), source_inventory
           assert isinstance(source_inventory["direct_contract_candidate_count"], int), source_inventory
           assert isinstance(source_inventory["authoritative_candidate_count"], int), source_inventory
+          assert isinstance(source_inventory["next_required_for_goal"], list), source_inventory
+          assert isinstance(source_inventory["next_required_action_ids"], list), source_inventory
+          assert source_inventory["next_required_action_ids"], source_inventory
           assert source_inventory["candidate_count"] >= source_inventory["likely_candidate_count"], source_inventory
           assert source_inventory["likely_candidate_count"] >= source_inventory["direct_contract_candidate_count"], source_inventory
           source_configuration = source_inventory["source_configuration"]
@@ -520,6 +523,7 @@ jobs:
           if source_inventory["status"] == "missing_authoritative_model":
               assert source_inventory["authoritative_candidate_count"] == 0, source_inventory
               assert source_inventory["diagnostics"], source_inventory
+              assert "review_and_declare_authoritative_so101_model_source" in source_inventory["next_required_action_ids"], source_inventory
           source_inventory_artifacts = source_inventory["artifacts"]
           for key in ("summary_json", "candidates_csv", "readme_md"):
               assert isinstance(source_inventory_artifacts.get(key), str) and Path(source_inventory_artifacts[key]).is_file(), (
@@ -1000,6 +1004,12 @@ jobs:
               row.get("label") == "so101_model_source_inventory:readme" and row.get("exists") is True
               for row in artifacts_by_category["so101_model_source_inventory"]
           ), artifacts_by_category["so101_model_source_inventory"]
+          for row in artifacts_by_category["so101_model_source_inventory"]:
+              metrics = row.get("metrics", {})
+              assert isinstance(metrics.get("next_required_for_goal"), list), metrics
+              assert isinstance(metrics.get("next_required_action_ids"), list), metrics
+              assert metrics.get("next_required_action_count") == len(metrics.get("next_required_for_goal")), metrics
+              assert metrics.get("next_required_action_ids"), metrics
           assert any(
               row.get("kind") == "json"
               and row.get("exists") is True

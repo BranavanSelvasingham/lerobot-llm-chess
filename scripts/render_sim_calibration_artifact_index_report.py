@@ -1241,6 +1241,8 @@ def so101_model_source_inventory_row(artifact: dict[str, Any]) -> list[Any]:
         source_root_summary(metrics),
         source_authority_summary(metrics),
         metrics.get("recommended_contract_check_path", ""),
+        metrics.get("next_required_action_count", ""),
+        compact_list(metrics.get("next_required_action_ids")),
         "ok" if artifact.get("exists") is True else "missing",
     ]
 
@@ -2674,6 +2676,8 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Configured Roots",
                 "Authority Inputs",
                 "Recommended Contract Path",
+                "Action Count",
+                "Next Actions",
                 "Artifact Status",
             ],
             [so101_model_source_inventory_row(row) for row in so101_model_source_inventory],

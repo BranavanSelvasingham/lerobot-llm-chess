@@ -2846,6 +2846,8 @@ def so101_model_source_inventory_section(
             if recommended_contract_check
             else None
         ),
+        "next_required_for_goal": inventory.get("next_required_for_goal") or [],
+        "next_required_action_ids": inventory.get("next_required_action_ids") or [],
         "diagnostics": diagnostics,
         "artifacts": {
             "summary_json": artifacts.get("summary_json")

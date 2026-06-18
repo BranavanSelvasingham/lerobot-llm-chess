@@ -2586,6 +2586,9 @@ def collect_so101_model_source_inventory_artifacts(
         or recommended_contract_check.get("candidate_path"),
         "recommended_contract_check_candidate_id": recommended_contract_check.get("candidate_id"),
         "recommended_contract_check_authoritative": recommended_contract_check.get("authoritative"),
+        "next_required_for_goal": inventory.get("next_required_for_goal") or [],
+        "next_required_action_ids": inventory.get("next_required_action_ids") or [],
+        "next_required_action_count": len(inventory.get("next_required_for_goal") or []),
     }
     for key, label_suffix in (
         ("summary_json", "summary"),
@@ -2616,6 +2619,9 @@ def collect_so101_model_source_inventory_artifacts(
         "source_configuration": source_configuration,
         "recommended_contract_check_path": metrics["recommended_contract_check_path"],
         "recommended_contract_check": recommended_contract_check or None,
+        "next_required_for_goal": inventory.get("next_required_for_goal") or [],
+        "next_required_action_ids": inventory.get("next_required_action_ids") or [],
+        "next_required_action_count": metrics["next_required_action_count"],
         "diagnostics": inventory.get("diagnostics"),
     }
 

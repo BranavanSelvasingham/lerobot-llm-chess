@@ -74,6 +74,69 @@ CSV_FIELDNAMES = (
     "diagnostics",
 )
 
+SOURCE_INVENTORY_ACTIONS = {
+    "scan_or_supply_so101_model_source_root": {
+        "gate": "reviewed_model_authority",
+        "title": "Scan or supply a local SO-101 model-source root",
+        "detail": "Run the inventory with --root or --extra-root pointing at candidate SO-101 URDF/MJCF/Xacro sources.",
+    },
+    "review_and_declare_authoritative_so101_model_source": {
+        "gate": "reviewed_model_authority",
+        "title": "Review and declare the authoritative SO-101 model source",
+        "detail": "After provenance, license, and source authority review, rerun with --authoritative-path or --authoritative-root.",
+    },
+    "run_so101_model_bundle_probe": {
+        "gate": "reviewed_model_authority",
+        "title": "Generate a reviewed-bundle manifest draft",
+        "detail": "Run smoke_sim_so101_model_bundle_probe.py with the selected model path and mesh roots to produce review artifacts.",
+    },
+    "supply_reviewed_so101_model_bundle_manifest": {
+        "gate": "reviewed_model_authority",
+        "title": "Supply the reviewed SO-101 model bundle manifest",
+        "detail": "Provide the manifest to smoke_sim_so101_model_bundle_manifest.py so readiness can be checked together with meshes, authority, TCP, and board alignment.",
+    },
+}
+
+
+def source_inventory_next_required(
+    *,
+    candidate_count: int,
+    likely_candidate_count: int,
+    direct_contract_candidate_count: int,
+    authoritative_candidate_count: int,
+    recommended_contract_check: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    action_ids: list[str] = []
+    if candidate_count <= 0:
+        action_ids.append("scan_or_supply_so101_model_source_root")
+    if authoritative_candidate_count <= 0:
+        action_ids.append("review_and_declare_authoritative_so101_model_source")
+    if recommended_contract_check:
+        action_ids.append("run_so101_model_bundle_probe")
+    elif direct_contract_candidate_count > 0 or likely_candidate_count > 0:
+        action_ids.append("run_so101_model_bundle_probe")
+    action_ids.append("supply_reviewed_so101_model_bundle_manifest")
+
+    seen: set[str] = set()
+    actions: list[dict[str, Any]] = []
+    for action_id in action_ids:
+        if action_id in seen:
+            continue
+        seen.add(action_id)
+        template = SOURCE_INVENTORY_ACTIONS[action_id]
+        actions.append(
+            {
+                "priority": len(actions) + 1,
+                "action_id": action_id,
+                **template,
+            }
+        )
+    return actions
+
+
+def action_ids(actions: list[dict[str, Any]]) -> list[str]:
+    return [action["action_id"] for action in actions if action.get("action_id")]
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -588,6 +651,14 @@ def build_summary(
             "authoritative": best_candidate["authoritative"],
         }
 
+    next_required_for_goal = source_inventory_next_required(
+        candidate_count=len(candidates),
+        likely_candidate_count=len(likely_candidates),
+        direct_contract_candidate_count=len(direct_candidates),
+        authoritative_candidate_count=len(authoritative_candidates),
+        recommended_contract_check=recommended_contract_check,
+    )
+
     return {
         "schema": SCHEMA,
         "ok": True,
@@ -610,6 +681,8 @@ def build_summary(
         "roots": roots,
         "candidates": candidates,
         "recommended_contract_check": recommended_contract_check,
+        "next_required_for_goal": next_required_for_goal,
+        "next_required_action_ids": action_ids(next_required_for_goal),
         "diagnostics": diagnostics,
         "artifacts": artifacts,
         "limitations": [
@@ -653,6 +726,7 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `likely_candidate_count`: `{summary['likely_candidate_count']}`",
         f"- `direct_contract_candidate_count`: `{summary['direct_contract_candidate_count']}`",
         f"- `authoritative_candidate_count`: `{summary['authoritative_candidate_count']}`",
+        f"- `next_required_action_ids`: `{', '.join(summary.get('next_required_action_ids') or []) if summary.get('next_required_action_ids') else 'none'}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `candidates_csv`: `{summary['artifacts']['candidates_csv']}`",
         "",
@@ -675,6 +749,25 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
                     path=candidate["path"].replace("|", "/"),
                 )
             )
+    lines.extend(
+        [
+            "",
+            "## Next Required For Goal",
+            "",
+        ]
+    )
+    if summary.get("next_required_for_goal"):
+        for action in summary["next_required_for_goal"]:
+            lines.append(
+                "- `{priority}` `{action_id}`: {title}".format(
+                    priority=action.get("priority"),
+                    action_id=action.get("action_id"),
+                    title=action.get("title"),
+                )
+            )
+            lines.append(f"  - {action.get('detail')}")
+    else:
+        lines.append("- none")
     lines.extend(
         [
             "",
@@ -752,6 +845,7 @@ def main() -> int:
                 "likely_candidate_count": summary["likely_candidate_count"],
                 "direct_contract_candidate_count": summary["direct_contract_candidate_count"],
                 "authoritative_candidate_count": summary["authoritative_candidate_count"],
+                "next_required_action_ids": summary["next_required_action_ids"],
                 "artifacts": artifacts,
             },
             sort_keys=True,

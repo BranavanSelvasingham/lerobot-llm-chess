@@ -12,7 +12,7 @@ The script writes:
 - `so101_model_source_candidates.csv`
 - `README.md`
 
-It exits `0` even when no candidates exist. In that state the JSON reports `ok: true`, `status: "missing_authoritative_model"`, `candidate_count: 0`, `authoritative_candidate_count: 0`, and a `missing_authoritative_model` diagnostic listing the source inputs still required.
+It exits `0` even when no candidates exist. In that state the JSON reports `ok: true`, `status: "missing_authoritative_model"`, `candidate_count: 0`, `authoritative_candidate_count: 0`, a `missing_authoritative_model` diagnostic listing the source inputs still required, and `next_required_for_goal`/`next_required_action_ids` entries that keep the operator sequence explicit.
 
 The full hardware-free simulator calibration regression suite now runs this
 inventory automatically under `so101_model_source_inventory/` before
