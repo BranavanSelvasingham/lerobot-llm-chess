@@ -660,6 +660,7 @@ jobs:
               "reviewed_authority_but_board_still_development",
               "board_draft_authority_rejected",
               "board_seeded_reviewed_authority_rejected",
+              "board_manual_reset_pose_reviewed_authority_rejected",
               "rollout_raw_ready_development_authority_rejected",
               "rollout_reviewed_authority_not_ready",
               "all_ready_reviewed_contract_state",
@@ -677,6 +678,11 @@ jobs:
           seeded = by_case["board_seeded_reviewed_authority_rejected"]["gate"]
           assert seeded["board_pick_reviewed_model_authority_ready"] is True, seeded
           assert seeded["reviewed_model_backed_board_source_pick_place"] is False, seeded
+          manual = by_case["board_manual_reset_pose_reviewed_authority_rejected"]["gate"]
+          assert manual["board_pick_reviewed_model_authority_ready"] is True, manual
+          assert manual["board_pick_manual_piece_pose_used_after_reset"] is True, manual
+          assert manual["reviewed_model_backed_board_source_pick_place"] is False, manual
+          assert manual["ready"] is False, manual
           ready = by_case["all_ready_reviewed_contract_state"]["gate"]
           assert ready["ready"] is True, ready
           assert ready["development_fixture_evidence_not_policy_training_truth"] is False, ready

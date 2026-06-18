@@ -273,6 +273,28 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "board_manual_reset_pose_reviewed_authority_rejected",
+            "authority": authority_ready,
+            "board": board_pick_state(
+                summaries / "board_manual_reset_pose_reviewed.json",
+                model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+                ready_for_model_backed_ik=True,
+                seeded_source_pose=False,
+                manual_piece_pose_after_reset=True,
+            ),
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": False,
+                "board_authority": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "blockers_contain": ["reviewed_model_backed_board_source_pick_place"],
+            },
+        },
+        {
             "case_id": "rollout_raw_ready_development_authority_rejected",
             "authority": authority_ready,
             "board": board_reviewed,

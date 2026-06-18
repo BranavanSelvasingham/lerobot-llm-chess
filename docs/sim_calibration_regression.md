@@ -508,8 +508,9 @@ allow debug imitation rollouts while missing/failed board-pick prerequisites and
 too-short rollout budgets fail closed without becoming policy-training
 authority. It also runs the focused
 `so101_training_readiness_gate_matrix` contract smoke to prove development,
-draft, fixture-seeded, raw-rollout-ready, and all-ready injected states do not
-cross the serious-training boundary without reviewed model authority. The
+draft, fixture-seeded, manually reset-pose-corrected, raw-rollout-ready, and
+all-ready injected states do not cross the serious-training boundary without
+reviewed model authority. The
 workflow asserts the motion-authority fields so hardware-free fixture motion remains labeled as
 automation coverage, not reviewed physical SO-101 truth. TCP/gripper offset,
 base-to-board alignment, and board-source pickup with reviewed model-backed IK
@@ -605,7 +606,10 @@ It reports `model_authority: "training_readiness_contract_matrix_not_authority"`
 `ready_for_policy_training: false` even though it includes an
 `all_ready_reviewed_contract_state` case to exercise the ready branch. That case
 is a state-machine guard only; it is not evidence that serious policy training is
-ready.
+ready. The matrix also rejects a board-pick state that carries reviewed model
+authority and raw model-backed IK readiness but used manual piece-pose correction
+after reset, because serious training needs repeatable board-source pick/place
+from the reset scene state.
 
 The SO-101 model-source inventory artifact contract also includes
 `so101_model_source_intake_checklist.json` and `.csv`. The checklist must mirror
