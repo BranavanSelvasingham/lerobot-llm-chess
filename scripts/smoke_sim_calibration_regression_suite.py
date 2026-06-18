@@ -268,6 +268,19 @@ def markdown_list_value(values: Any) -> str:
     return "; ".join(str(value) for value in values)
 
 
+def unique_string_values(values: list[Any]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for value in values:
+        if not isinstance(value, str) or not value:
+            continue
+        if value in seen:
+            continue
+        seen.add(value)
+        unique.append(value)
+    return unique
+
+
 def first_non_empty_mapping_value(value: dict[str, Any], field_names: tuple[str, ...]) -> Any:
     for field_name in field_names:
         field_value = value.get(field_name)
@@ -1201,6 +1214,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
     so101_reviewed_mujoco_bundle = (
         so101_reviewed_mujoco_bundle if isinstance(so101_reviewed_mujoco_bundle, dict) else {}
     )
+    so101_authority_gate = summary.get("so101_reviewed_model_authority_gate")
+    so101_authority_gate = so101_authority_gate if isinstance(so101_authority_gate, dict) else {}
     so101_contract = summary.get("so101_model_contract")
     so101_contract = so101_contract if isinstance(so101_contract, dict) else {}
     so101_contract_config = summary.get("so101_model_contract_config")
@@ -1548,6 +1563,22 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         (
             "- Gripper-camera POV evidence records target center, projected square geometry, "
             "gripper opening, and synthetic visibility/occlusion/clearance rows."
+        ),
+        (
+            "- SO-101 reviewed model authority gate: "
+            f"status `{so101_authority_gate.get('status')}`; ready "
+            f"`{markdown_bool(so101_authority_gate.get('ready'))}`; source authority "
+            f"`{markdown_bool(so101_authority_gate.get('source_authority_ready'))}`; "
+            f"physical bundle authority "
+            f"`{markdown_bool(so101_authority_gate.get('physical_so101_model_authority_ready'))}`; "
+            f"physical reviewed MuJoCo motion "
+            f"`{markdown_bool(so101_authority_gate.get('physical_reviewed_model_motion_checked'))}`; "
+            "fixture evidence is not physical SO-101 truth "
+            f"`{markdown_bool(so101_authority_gate.get('development_fixture_evidence_not_physical_so101_truth'))}`."
+        ),
+        (
+            "- SO-101 reviewed model authority blockers: "
+            f"`{markdown_list_value(so101_authority_gate.get('blockers'))}`."
         ),
         (
             "- SO-101 model-source inventory evidence records repo-local model-source "
@@ -3198,6 +3229,63 @@ def so101_model_bundle_manifest_section(
     }
 
 
+def so101_reviewed_model_authority_gate_section(
+    source_inventory: dict[str, Any],
+    bundle_manifest: dict[str, Any],
+    reviewed_mujoco_bundle: dict[str, Any],
+) -> dict[str, Any]:
+    source_authority_ready = (
+        source_inventory.get("source_authority_gate_status") == "source_authority_ready"
+    )
+    physical_authority_ready = bundle_manifest.get("physical_so101_model_authority_ready") is True
+    physical_reviewed_motion_ready = (
+        reviewed_mujoco_bundle.get("physical_reviewed_model_motion_checked") is True
+    )
+    ready = source_authority_ready and physical_authority_ready and physical_reviewed_motion_ready
+
+    blockers = unique_string_values(
+        [
+            *(source_inventory.get("source_authority_blockers") or []),
+            *(bundle_manifest.get("physical_authority_blockers") or []),
+            *(
+                []
+                if physical_reviewed_motion_ready
+                else [
+                    "load_reviewed_model_in_mujoco",
+                    "prove_physical_reviewed_model_motion",
+                ]
+            ),
+        ]
+    )
+    return {
+        "status": "reviewed_model_authority_ready"
+        if ready
+        else "reviewed_model_authority_blocked",
+        "ready": ready,
+        "source_authority_ready": source_authority_ready,
+        "source_authority_gate_status": source_inventory.get("source_authority_gate_status"),
+        "physical_so101_model_authority_ready": physical_authority_ready,
+        "physical_authority_gate_status": bundle_manifest.get("physical_authority_gate_status"),
+        "physical_reviewed_model_motion_checked": physical_reviewed_motion_ready,
+        "reviewed_mujoco_bundle_status": reviewed_mujoco_bundle.get("status"),
+        "blockers": blockers,
+        "blocker_count": len(blockers),
+        "source_inventory_summary_path": source_inventory.get("summary_path"),
+        "bundle_manifest_summary_path": bundle_manifest.get("summary_path"),
+        "reviewed_mujoco_bundle_summary_path": reviewed_mujoco_bundle.get("summary_path"),
+        "development_fixture_evidence_not_physical_so101_truth": (
+            not ready
+            or bundle_manifest.get("hardware_free_regression_fixture_ready") is True
+            or reviewed_mujoco_bundle.get("hardware_free_fixture_motion_checked") is True
+        ),
+        "notes": [
+            "This top-level gate is a summary over the source inventory, bundle manifest, and reviewed MuJoCo bundle artifacts.",
+            "It is ready only when source authority, physical bundle authority, and physical-reviewed MuJoCo motion are all true.",
+            "Development fixture evidence remains useful automation coverage but does not close reviewed physical SO-101 authority.",
+        ],
+    }
+
+
 def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
     visual_review = visual_review if isinstance(visual_review, dict) else {}
     contact_sheets = visual_review.get("contact_sheets")
@@ -4040,6 +4128,27 @@ def main() -> int:
         child_records["negative_empty_inventory_comparison_set"] = negative_record
     child_records["app_entrypoint_metadata"] = app_entrypoint_record
 
+    so101_source_inventory_section = so101_model_source_inventory_section(
+        so101_model_source_inventory,
+        so101_model_source_inventory_summary_path,
+        so101_source_config,
+    )
+    so101_bundle_manifest_section = so101_model_bundle_manifest_section(
+        so101_model_bundle_manifest,
+        so101_model_bundle_manifest_summary_path,
+        so101_bundle_config,
+        so101_bundle_forwarding,
+    )
+    so101_reviewed_mujoco_bundle_section = so101_mujoco_smoke_section(
+        so101_reviewed_mujoco_bundle,
+        so101_reviewed_mujoco_bundle_summary_path,
+    )
+    so101_reviewed_authority_gate = so101_reviewed_model_authority_gate_section(
+        so101_source_inventory_section,
+        so101_bundle_manifest_section,
+        so101_reviewed_mujoco_bundle_section,
+    )
+
     required_ok = all(record["ok"] for record in child_records.values())
     selected_candidate = selected_from_session(session, int(args.select_rank))
     summary_path = output_dir / "calibration_regression_summary.json"
@@ -4136,21 +4245,10 @@ def main() -> int:
             pose_fixture,
             pose_fixture_summary_path,
         ),
-        "so101_model_source_inventory": so101_model_source_inventory_section(
-            so101_model_source_inventory,
-            so101_model_source_inventory_summary_path,
-            so101_source_config,
-        ),
-        "so101_model_bundle_manifest": so101_model_bundle_manifest_section(
-            so101_model_bundle_manifest,
-            so101_model_bundle_manifest_summary_path,
-            so101_bundle_config,
-            so101_bundle_forwarding,
-        ),
-        "so101_reviewed_mujoco_bundle": so101_mujoco_smoke_section(
-            so101_reviewed_mujoco_bundle,
-            so101_reviewed_mujoco_bundle_summary_path,
-        ),
+        "so101_model_source_inventory": so101_source_inventory_section,
+        "so101_model_bundle_manifest": so101_bundle_manifest_section,
+        "so101_reviewed_mujoco_bundle": so101_reviewed_mujoco_bundle_section,
+        "so101_reviewed_model_authority_gate": so101_reviewed_authority_gate,
         "so101_model_contract": so101_model_contract_section(
             so101_model_contract,
             so101_model_contract_summary_path,

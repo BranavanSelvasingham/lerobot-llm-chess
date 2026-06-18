@@ -606,6 +606,38 @@ jobs:
                   key,
                   source_inventory_artifacts,
               )
+          reviewed_model_authority_gate = summary["so101_reviewed_model_authority_gate"]
+          assert reviewed_model_authority_gate["status"] in {
+              "reviewed_model_authority_blocked",
+              "reviewed_model_authority_ready",
+          }, reviewed_model_authority_gate
+          assert isinstance(reviewed_model_authority_gate["ready"], bool), reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["source_authority_ready"] == (
+              source_inventory["source_authority_gate_status"] == "source_authority_ready"
+          ), reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["physical_so101_model_authority_ready"] == (
+              bundle_manifest["physical_so101_model_authority_ready"] is True
+          ), reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["physical_reviewed_model_motion_checked"] == (
+              reviewed_mujoco_bundle["physical_reviewed_model_motion_checked"] is True
+          ), reviewed_model_authority_gate
+          assert isinstance(reviewed_model_authority_gate["blockers"], list), reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["blocker_count"] == len(reviewed_model_authority_gate["blockers"]), reviewed_model_authority_gate
+          assert isinstance(
+              reviewed_model_authority_gate["development_fixture_evidence_not_physical_so101_truth"],
+              bool,
+          ), reviewed_model_authority_gate
+          if reviewed_model_authority_gate["ready"] is True:
+              assert reviewed_model_authority_gate["status"] == "reviewed_model_authority_ready", reviewed_model_authority_gate
+              assert reviewed_model_authority_gate["blockers"] == [], reviewed_model_authority_gate
+          else:
+              assert reviewed_model_authority_gate["status"] == "reviewed_model_authority_blocked", reviewed_model_authority_gate
+              assert reviewed_model_authority_gate["blockers"], reviewed_model_authority_gate
+              assert reviewed_model_authority_gate["ready"] is False, reviewed_model_authority_gate
+              assert (
+                  reviewed_model_authority_gate["development_fixture_evidence_not_physical_so101_truth"]
+                  is True
+              ), reviewed_model_authority_gate
           so101_contract = summary["so101_model_contract"]
           assert so101_contract["ok"] is True, so101_contract
           assert so101_contract["status"] in {
@@ -1650,6 +1682,15 @@ jobs:
               f"- `media_assets_copied_into_repo`: `{summary['reference_capture_manifest']['media_assets_copied_into_repo']}`",
               f"- `diagnostics`: `{summary['reference_capture_manifest']['diagnostics']}`",
               "- Readiness is an input gate only; it is not physical calibration truth.",
+              "",
+              "SO-101 reviewed model authority gate:",
+              f"- `status`: `{summary['so101_reviewed_model_authority_gate']['status']}`",
+              f"- `ready`: `{summary['so101_reviewed_model_authority_gate']['ready']}`",
+              f"- `source_authority_ready`: `{summary['so101_reviewed_model_authority_gate']['source_authority_ready']}`",
+              f"- `physical_so101_model_authority_ready`: `{summary['so101_reviewed_model_authority_gate']['physical_so101_model_authority_ready']}`",
+              f"- `physical_reviewed_model_motion_checked`: `{summary['so101_reviewed_model_authority_gate']['physical_reviewed_model_motion_checked']}`",
+              f"- `development_fixture_evidence_not_physical_so101_truth`: `{summary['so101_reviewed_model_authority_gate']['development_fixture_evidence_not_physical_so101_truth']}`",
+              f"- `blockers`: `{summary['so101_reviewed_model_authority_gate']['blockers']}`",
               "",
               "SO-101 model source inventory:",
               f"- `status`: `{summary['so101_model_source_inventory']['status']}`",

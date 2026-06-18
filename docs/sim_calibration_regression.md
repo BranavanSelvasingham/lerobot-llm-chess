@@ -248,6 +248,13 @@ derive the downstream contract/IK model path and contract asset roots from the
 manifest. Explicit `--ik-model-asset-root` values still take precedence for the
 contract checker asset preflight.
 
+The top-level summary also exposes `so101_reviewed_model_authority_gate`, which
+aggregates the source inventory, bundle manifest, and reviewed MuJoCo handoff.
+It reports `reviewed_model_authority_ready` only when source authority,
+physical bundle authority, and physical-reviewed MuJoCo motion are all true;
+otherwise it reports ordered blockers and keeps downstream fixture evidence
+separate from reviewed physical SO-101 truth.
+
 The suite also records the reviewed MuJoCo handoff under
 `so101_reviewed_mujoco_bundle/`. It consumes the bundle manifest checker's
 summary, exits successfully with `reviewed_mujoco_bundle_not_ready` while no
@@ -461,7 +468,7 @@ The suite orchestrates these existing smoke scripts as subprocesses and records 
 - `smoke_sim_calibration_session_report.py` ranks baseline and perturbed local SimCamera candidates.
 - `smoke_sim_perception_regression_fixture.py` packages the selected ranked candidate into perception fixture evidence.
 - `smoke_sim_camera_pose_fixture.py` renders deterministic nominal, perturbed, overview, and gripper-state SimCamera pose review frames plus per-case metadata.
-- `smoke_sim_so101_model_bundle_manifest.py` records deterministic SO-101 model bundle manifest evidence, including default no-manifest diagnostics, reviewed manifest fields, child contract/preflight diagnostics, readiness, and downstream forwarding decisions.
+- `smoke_sim_so101_model_bundle_manifest.py` records deterministic SO-101 model bundle manifest evidence, including default no-manifest diagnostics, reviewed manifest fields, child contract/preflight diagnostics, readiness, and downstream forwarding decisions. The suite aggregates this with source-inventory and reviewed-MuJoCo evidence under `so101_reviewed_model_authority_gate`.
 - `smoke_sim_so101_model_source_inventory.py` records deterministic repo-local SO-101 model-source inventory evidence, candidate/provenance/authority counts, source-authority gate status/blockers, and explicit missing-authoritative-model diagnostics before contract or IK checks.
 - `smoke_sim_so101_model_contract.py` records deterministic model availability, RobotKinematics usability, joint/frame/TCP contract, nested asset-preflight mesh evidence, and missing alignment inputs before model-backed IK residuals are trusted.
 - `smoke_sim_ik_reachability_drill.py` records deterministic Cartesian, delta, and radial command feasibility evidence plus explicit missing-model fallback diagnostics.
@@ -497,6 +504,7 @@ A passing summary should show:
 - `so101_model_bundle_manifest.status: "model_bundle_manifest_not_supplied"`, `"model_bundle_manifest_unavailable"`, `"model_bundle_manifest_parse_error"`, `"model_bundle_manifest_schema_error"`, `"model_bundle_manifest_needs_follow_up"`, or `"model_bundle_manifest_ready_for_model_backed_ik"` with readiness, physical-authority gate status/blockers, model path, asset roots, joint limits, mesh evidence, target frame, TCP offset, base-to-board alignment, ordered `next_required_for_goal` actions, forwarding reason, and summary/CSV/README artifact paths populated
 - `so101_reviewed_mujoco_bundle.status: "reviewed_mujoco_bundle_not_ready"` in default CI or `"reviewed_mujoco_bundle_motion_checked"` when a ready manifest is supplied, with `reviewed_model_motion_checked`, `motion_authority_status`, physical-reviewed motion, fixture-motion, and non-physical motion-evidence fields recorded and summary/CSV/README artifact paths populated
 - `so101_model_source_inventory.status: "missing_authoritative_model"` or `"authoritative_model_found"` with candidate counts, authoritative candidate count, source-authority gate status/blockers, recommended contract-check path when present, and summary/CSV/README artifact paths populated
+- `so101_reviewed_model_authority_gate.status: "reviewed_model_authority_blocked"` until source authority, physical bundle authority, and physical-reviewed MuJoCo motion are all true; the gate must expose `ready`, `blockers`, `blocker_count`, source/bundle/motion readiness booleans, and `development_fixture_evidence_not_physical_so101_truth`
 - `so101_model_source_inventory.source_configuration.scan_mode: "default_repo_roots"` in the default run or `"explicit_roots"` when `--so101-model-source-root` is supplied, with configured roots/authority lists preserved
 - `so101_model_contract.status: "missing_model"`, `"model_unavailable"`, `"model_contract_checked"`, `"model_contract_needs_follow_up"`, or `"model_suffix_supported_not_directly_usable"` with `model_request_status`, `robot_kinematics_status`, `target_frame`, and summary/CSV/README artifact paths populated
 - `so101_model_contract.model_asset_preflight.status: "missing_model"`, `"model_unavailable"`, `"asset_preflight_checked"`, `"asset_preflight_limited_diagnostics"`, or `"asset_preflight_needs_follow_up"` with mesh, present, missing, unresolved counts and nested summary/CSV/README artifact paths populated
