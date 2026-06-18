@@ -393,7 +393,9 @@ manifests to remain not ready and not forward, requires accepted review metadata
 to include reviewer identity plus at least one trace field (`reviewed_at`,
 `review_id`, or `review_url`), requires the current simulator-contract target frame
 `gripper_frame_link` to be declared and visible in the actual model before
-forwarding, and requires
+forwarding, requires malformed TCP-offset and base-to-board transform payloads
+to remain diagnostic-only instead of forwarding to downstream contract/IK
+checks, and requires
 `artifact_index.missing_artifact_count: 0` for every suite case.
 
 To exercise the same suite with declared reference-media metadata, pass an optional manifest:

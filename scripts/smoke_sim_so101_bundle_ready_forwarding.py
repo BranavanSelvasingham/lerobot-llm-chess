@@ -1339,6 +1339,38 @@ def summarize_case(
         missing_inputs = bundle.get("missing_inputs")
         if not isinstance(missing_inputs, list) or "tcp_offset_authority" not in missing_inputs:
             errors.append(f"{case_id}.missing_inputs: expected tcp_offset_authority, got {missing_inputs!r}")
+    elif expectation == "invalid_tcp_offset_not_forwarded":
+        assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_not_ready",
+        )
+        assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
+        assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
+        assert_equal(
+            errors,
+            f"{case_id}.diagnostic_reason",
+            forwarding.get("diagnostic_only_reason"),
+            "bundle_not_ready_for_model_backed_ik:model_bundle_manifest_needs_follow_up",
+        )
+        assert_false(errors, f"{case_id}.used_for_downstream_contract", forwarding.get("used_for_downstream_contract"))
+        assert_equal(errors, f"{case_id}.ik_model_path_source", forwarding.get("ik_model_path_source"), "not_supplied")
+        assert_equal(errors, f"{case_id}.authority_status", bundle.get("authority_status"), "present")
+        assert_equal(errors, f"{case_id}.provenance_status", bundle.get("provenance_status"), "present")
+        assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
+        assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
+        assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "invalid")
+        assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
+        missing_inputs = bundle.get("missing_inputs")
+        if not isinstance(missing_inputs, list) or "tcp_offset_m" not in missing_inputs:
+            errors.append(f"{case_id}.missing_inputs: expected tcp_offset_m, got {missing_inputs!r}")
+        diagnostics = get_nested(bundle, ("tcp_offset", "diagnostics"), [])
+        if "missing_axis:z" not in diagnostics:
+            errors.append(f"{case_id}.tcp_offset_diagnostic_missing:{diagnostics!r}")
     elif expectation == "weak_alignment_authority_not_forwarded":
         assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
         assert_equal(
@@ -1371,6 +1403,43 @@ def summarize_case(
         missing_inputs = bundle.get("missing_inputs")
         if not isinstance(missing_inputs, list) or "base_to_board_alignment_authority" not in missing_inputs:
             errors.append(f"{case_id}.missing_inputs: expected base_to_board_alignment_authority, got {missing_inputs!r}")
+    elif expectation == "invalid_alignment_transform_not_forwarded":
+        assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_not_ready",
+        )
+        assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
+        assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
+        assert_equal(
+            errors,
+            f"{case_id}.diagnostic_reason",
+            forwarding.get("diagnostic_only_reason"),
+            "bundle_not_ready_for_model_backed_ik:model_bundle_manifest_needs_follow_up",
+        )
+        assert_false(errors, f"{case_id}.used_for_downstream_contract", forwarding.get("used_for_downstream_contract"))
+        assert_equal(errors, f"{case_id}.ik_model_path_source", forwarding.get("ik_model_path_source"), "not_supplied")
+        assert_equal(errors, f"{case_id}.authority_status", bundle.get("authority_status"), "present")
+        assert_equal(errors, f"{case_id}.provenance_status", bundle.get("provenance_status"), "present")
+        assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
+        assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
+        assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
+        assert_equal(
+            errors,
+            f"{case_id}.alignment_status",
+            get_nested(bundle, ("base_to_board_alignment", "status")),
+            "invalid",
+        )
+        missing_inputs = bundle.get("missing_inputs")
+        if not isinstance(missing_inputs, list) or "base_to_board_transform" not in missing_inputs:
+            errors.append(f"{case_id}.missing_inputs: expected base_to_board_transform, got {missing_inputs!r}")
+        diagnostics = get_nested(bundle, ("base_to_board_alignment", "diagnostics"), [])
+        if "base_to_board_rotation_rpy_missing" not in diagnostics:
+            errors.append(f"{case_id}.alignment_diagnostic_missing:{diagnostics!r}")
     else:
         errors.append(f"{case_id}.unknown_expectation:{expectation}")
 
@@ -1541,10 +1610,22 @@ def main() -> int:
             "expectation": "weak_tcp_offset_authority_not_forwarded",
         },
         {
+            "case_id": "invalid_tcp_offset_not_forwarded",
+            "manifest_path": fixtures["invalid_tcp_manifest_path"],
+            "explicit_model_path": None,
+            "expectation": "invalid_tcp_offset_not_forwarded",
+        },
+        {
             "case_id": "weak_alignment_authority_not_forwarded",
             "manifest_path": fixtures["weak_alignment_manifest_path"],
             "explicit_model_path": None,
             "expectation": "weak_alignment_authority_not_forwarded",
+        },
+        {
+            "case_id": "invalid_alignment_transform_not_forwarded",
+            "manifest_path": fixtures["invalid_alignment_manifest_path"],
+            "explicit_model_path": None,
+            "expectation": "invalid_alignment_transform_not_forwarded",
         },
     ]
 
