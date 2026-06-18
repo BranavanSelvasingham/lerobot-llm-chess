@@ -486,7 +486,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             "motion": motion_missing(summary_dir / "motion_missing.json"),
             "expect": {
                 "ready": False,
-                "consistency_status": "source_bundle_model_path_consistent",
+                "consistency_status": "source_bundle_model_path_and_digest_consistent",
                 "consistency_ready": True,
                 "development_fixture": True,
                 "blockers_contain": [
@@ -583,7 +583,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             "motion": motion_inconsistent_status(summary_dir / "motion_inconsistent.json"),
             "expect": {
                 "ready": False,
-                "consistency_status": "source_bundle_model_path_consistent",
+                "consistency_status": "source_bundle_model_path_and_digest_consistent",
                 "consistency_ready": True,
                 "development_fixture": True,
                 "motion_reported": True,
@@ -632,7 +632,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             "motion": motion_hardware_fixture(summary_dir / "motion_fixture.json"),
             "expect": {
                 "ready": False,
-                "consistency_status": "source_bundle_model_path_consistent",
+                "consistency_status": "source_bundle_model_path_and_digest_consistent",
                 "consistency_ready": True,
                 "development_fixture": True,
                 "blockers_contain": ["load_reviewed_model_in_mujoco"],
@@ -650,7 +650,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
             "expect": {
                 "ready": True,
-                "consistency_status": "source_bundle_model_path_consistent",
+                "consistency_status": "source_bundle_model_path_and_digest_consistent",
                 "consistency_ready": True,
                 "development_fixture": False,
                 "blockers_exact": [],

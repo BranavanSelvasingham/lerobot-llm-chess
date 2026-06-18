@@ -3901,7 +3901,7 @@ def so101_source_bundle_consistency_section(
         ready = False
         blocker = "align_source_inventory_with_bundle_manifest_model_digest"
     elif selected_path_matches_bundle:
-        status = "source_bundle_model_path_consistent"
+        status = "source_bundle_model_path_and_digest_consistent"
         ready = True
         blocker = None
     matched_by = (
@@ -4505,7 +4505,7 @@ def write_so101_reviewed_model_authority_gate_artifacts(
                 else "action_required"
             ),
             "observed_value": gate.get("source_bundle_consistency_status"),
-            "expected_value": "source_bundle_model_path_consistent",
+            "expected_value": "source_bundle_model_path_and_digest_consistent",
             "blockers": "; ".join(
                 blocker
                 for blocker in gate.get("blockers", [])

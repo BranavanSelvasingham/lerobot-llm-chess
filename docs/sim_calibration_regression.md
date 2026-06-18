@@ -567,9 +567,10 @@ The SO-101 reviewed model authority gate contract also requires
 `source_bundle_consistency_ready`, `source_bundle_consistency_status`, and the
 nested `source_bundle_consistency` object in both the top-level summary and the
 artifact-index metrics. The gate only becomes ready when the status is
-`source_bundle_model_path_consistent`, the bundle model path matches the selected
-authoritative source candidate path, and the selected source SHA-256 matches the
-bundle manifest declared model digest. The observed digest of the resolved bundle
+`source_bundle_model_path_and_digest_consistent`, the bundle model path matches
+the selected authoritative source candidate path, and the selected source
+SHA-256 matches the bundle manifest declared model digest. The observed digest
+of the resolved bundle
 model file is reported for diagnostics, but it does not substitute for the
 reviewed manifest declaration. The nested object records those checks as
 `selected_authoritative_candidate_path_matches_bundle` and
