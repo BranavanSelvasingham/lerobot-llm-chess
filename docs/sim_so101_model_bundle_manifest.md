@@ -90,8 +90,10 @@ license basis. The manifest must also declare `model_sha256` (or an accepted
 alias such as `model_file_sha256`) matching the resolved `model_path` file. A
 missing, malformed, or mismatched digest records `model_identity` as not ready
 and lists `model_sha256` in `missing_inputs`; this prevents an already-reviewed
-path from silently changing contents. A merely non-empty object is recorded as
-`needs_review` and does not satisfy readiness. Joint-limit values also need
+path from silently changing contents. The reviewed-authority source/bundle
+consistency gate uses this declared digest for authority matching; the observed
+file digest is diagnostic evidence only. A merely non-empty object is recorded
+as `needs_review` and does not satisfy readiness. Joint-limit values also need
 review evidence: numeric
 limits without `joint_limit_authority` or an accepted review marker are recorded
 as `needs_review`. Mesh references also need review evidence: resolved mesh

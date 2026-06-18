@@ -3855,7 +3855,7 @@ def so101_source_bundle_consistency_section(
     bundle_model_observed_sha256 = normalized_sha256(
         bundle_model_identity.get("observed_sha256")
     )
-    bundle_model_sha256 = bundle_model_declared_sha256 or bundle_model_observed_sha256
+    bundle_model_sha256 = bundle_model_declared_sha256
 
     selected_path_matches_bundle = bool(
         bundle_model_path
@@ -3864,8 +3864,8 @@ def so101_source_bundle_consistency_section(
     )
     selected_digest_matches_bundle = bool(
         selected_authoritative_candidate_sha256
-        and bundle_model_sha256
-        and selected_authoritative_candidate_sha256 == bundle_model_sha256
+        and bundle_model_declared_sha256
+        and selected_authoritative_candidate_sha256 == bundle_model_declared_sha256
     )
 
     prerequisites_ready = source_authority_ready and physical_authority_ready
@@ -3881,7 +3881,7 @@ def so101_source_bundle_consistency_section(
         status = "source_bundle_model_path_mismatch"
         ready = False
         blocker = "align_source_inventory_with_bundle_manifest_model_path"
-    elif not selected_authoritative_candidate_sha256 or not bundle_model_sha256:
+    elif not selected_authoritative_candidate_sha256 or not bundle_model_declared_sha256:
         status = "source_bundle_model_digest_missing"
         ready = False
         blocker = "record_reviewed_so101_model_file_sha256"
@@ -3919,7 +3919,8 @@ def so101_source_bundle_consistency_section(
         "notes": [
             "This check prevents source authority and bundle authority from closing on different model paths or digests.",
             "It is evaluated only after source authority and physical bundle authority are otherwise ready.",
-            "A bundle model path and digest must match the selected authoritative model candidate path and digest.",
+            "The bundle manifest declared digest must match the selected authoritative model candidate digest.",
+            "The observed bundle model digest is diagnostic evidence and does not substitute for a reviewed manifest declaration.",
         ],
     }
 

@@ -26,6 +26,7 @@ DEFAULT_OUTPUT_DIR = (
 SCHEMA = "lerobot.sim.so101_reviewed_authority_gate_matrix.v1"
 SOURCE_MODEL_SHA256 = "a" * 64
 BUNDLE_MODEL_SHA256 = "b" * 64
+UNSET = object()
 
 
 def parse_args() -> argparse.Namespace:
@@ -188,7 +189,17 @@ def bundle_physical_ready(
     model_path: Path | None,
     *,
     sha256: str | None = SOURCE_MODEL_SHA256,
+    declared_sha256: Any = UNSET,
+    observed_sha256: Any = UNSET,
 ) -> dict[str, Any]:
+    declared = sha256 if declared_sha256 is UNSET else declared_sha256
+    observed = sha256 if observed_sha256 is UNSET else observed_sha256
+    diagnostics: list[str] = []
+    if not declared:
+        diagnostics.append("model_sha256_missing")
+    elif observed and observed != declared:
+        diagnostics.append("model_sha256_mismatch")
+    matches = bool(declared and observed and declared == observed)
     return {
         "physical_so101_model_authority_ready": True,
         "physical_authority_gate_status": "physical_reviewed_authority_ready",
@@ -198,11 +209,11 @@ def bundle_physical_ready(
         "next_required_action_ids": [],
         "model_path": {"path": normalize_path(model_path) if model_path else None},
         "model_identity": {
-            "status": "present" if sha256 else "missing",
-            "declared_sha256": sha256,
-            "observed_sha256": sha256,
-            "matches": bool(sha256),
-            "diagnostics": [] if sha256 else ["model_sha256_missing"],
+            "status": "present" if declared and observed else "missing",
+            "declared_sha256": declared,
+            "observed_sha256": observed,
+            "matches": matches,
+            "diagnostics": diagnostics,
         },
         "summary_path": str(summary_path),
     }
@@ -514,6 +525,34 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "source_ready_physical_bundle_declared_digest_missing",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready(
+                summary_dir / "bundle_declared_digest_missing.json",
+                source_model,
+                declared_sha256=None,
+                observed_sha256=SOURCE_MODEL_SHA256,
+            ),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_bundle_model_digest_missing",
+                "consistency_ready": False,
+                "development_fixture": True,
+                "blockers_contain": ["record_reviewed_so101_model_file_sha256"],
+                "actions_contain": ["record_reviewed_so101_model_file_sha256"],
+                "action_required_contains": ["source_bundle_consistency"],
+                "blocker_packet_next_actions_contain": [
+                    "record_reviewed_so101_model_file_sha256"
+                ],
+                "selected_path_matches_bundle": True,
+                "selected_digest_matches_bundle": False,
+                "bundle_declared_sha256": None,
+                "bundle_observed_sha256": SOURCE_MODEL_SHA256,
+                "bundle_model_sha256": None,
+            },
+        },
+        {
             "case_id": "source_ready_physical_bundle_digest_mismatch",
             "source": source_ready(summary_dir / "source_ready.json", source_model),
             "bundle": bundle_physical_ready(
@@ -773,6 +812,27 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
                     "selected_authoritative_candidate_sha256_matches_bundle"
                 ),
                 expect["selected_digest_matches_bundle"],
+            )
+        if "bundle_declared_sha256" in expect:
+            add_error(
+                errors,
+                "bundle_declared_sha256",
+                source_bundle_consistency.get("bundle_model_declared_sha256"),
+                expect["bundle_declared_sha256"],
+            )
+        if "bundle_observed_sha256" in expect:
+            add_error(
+                errors,
+                "bundle_observed_sha256",
+                source_bundle_consistency.get("bundle_model_observed_sha256"),
+                expect["bundle_observed_sha256"],
+            )
+        if "bundle_model_sha256" in expect:
+            add_error(
+                errors,
+                "bundle_model_sha256",
+                source_bundle_consistency.get("bundle_model_sha256"),
+                expect["bundle_model_sha256"],
             )
 
     if "blockers_exact" in expect:
