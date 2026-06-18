@@ -20,8 +20,9 @@ The summary carries the manifest checker's `model_authority`,
 `hardware_free_regression_fixture_ready`, and
 `synthetic_fixture_authority_fields` fields. It also carries the manifest
 checker diagnostics for source authority, provenance, joint-limit authority,
-mesh-asset authority, target-frame authority, TCP offset, and base-to-board
-alignment so the direct MuJoCo handoff gate shows why a bundle is not ready
+model-file identity, mesh-asset authority, target-frame authority, TCP offset,
+and base-to-board alignment so the direct MuJoCo handoff gate shows why a bundle
+is not ready
 without attempting motion. Placeholder review metadata such as `TODO` or `TBD`
 must keep those authority fields in `needs_review`, leave
 `ready_for_model_backed_ik: false`, and keep
@@ -36,8 +37,9 @@ mistaken for reviewed physical SO-101 authority.
 
 With no manifest, or with a manifest whose bundle checker does not report
 `ready_for_model_backed_ik: true` after checking reviewed joint limits, mesh
-evidence, target-frame authority, TCP offset, and base-to-board alignment, the
-smoke exits `0` with `status: "reviewed_mujoco_bundle_not_ready"` and
+evidence, model-file SHA-256 identity, target-frame authority, TCP offset, and
+base-to-board alignment, the smoke exits `0` with
+`status: "reviewed_mujoco_bundle_not_ready"` and
 `reviewed_model_motion_checked: false`. In that not-ready state,
 `motion_authority_status` is `not_checked_manifest_not_ready`, and all motion
 authority booleans are `false`.

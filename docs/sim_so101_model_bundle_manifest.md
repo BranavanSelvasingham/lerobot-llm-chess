@@ -2,9 +2,10 @@
 
 Use this hardware-free checker when a reviewed SO-101 model bundle should drive
 future model-backed IK calibration. It verifies that one JSON manifest declares
-the kinematic model path, mesh asset roots, source authority/provenance, target
-frame plus reviewed target-frame authority, reviewed joint-limit authority,
-TCP/gripper-tip offset, mesh evidence, and base-to-board alignment inputs before
+the kinematic model path, reviewed model-file SHA-256 digest, mesh asset roots,
+source authority/provenance, target frame plus reviewed target-frame authority,
+reviewed joint-limit authority, TCP/gripper-tip offset, mesh evidence, and
+base-to-board alignment inputs before
 the simulator treats Cartesian, delta, or radial reachability residuals as
 trustworthy.
 
@@ -85,8 +86,13 @@ diagnostic-only until an operator replaces those placeholders with reviewed
 fields and this checker reports `ready_for_model_backed_ik: true`.
 `authority` must include an accepted reviewed status plus reviewer/date/id/url
 evidence, and `provenance` must include a source reference, export tool, and
-license basis. A merely non-empty object is recorded as `needs_review` and does
-not satisfy readiness. Joint-limit values also need review evidence: numeric
+license basis. The manifest must also declare `model_sha256` (or an accepted
+alias such as `model_file_sha256`) matching the resolved `model_path` file. A
+missing, malformed, or mismatched digest records `model_identity` as not ready
+and lists `model_sha256` in `missing_inputs`; this prevents an already-reviewed
+path from silently changing contents. A merely non-empty object is recorded as
+`needs_review` and does not satisfy readiness. Joint-limit values also need
+review evidence: numeric
 limits without `joint_limit_authority` or an accepted review marker are recorded
 as `needs_review`. Mesh references also need review evidence: resolved mesh
 files without `mesh_asset_authority` or an accepted mesh/asset-root review
@@ -138,7 +144,10 @@ Every summary also reports `model_authority`,
 `physical_authority_gate_status`, `physical_authority_blockers`,
 `physical_so101_model_authority_ready`,
 `hardware_free_regression_fixture_ready`, and
-`synthetic_fixture_authority_fields`. It also reports
+`synthetic_fixture_authority_fields`. The `model_identity` section records the
+declared digest field, observed `model_path` SHA-256, match status, and any
+`model_sha256_missing`, `model_sha256_invalid`, or `model_sha256_mismatch`
+diagnostics. It also reports
 `next_required_for_goal`, an ordered action list derived from the current
 `missing_inputs` so the reviewed-model-authority gate has an explicit priority
 queue. A manifest can be ready for automation with only synthetic hardware-free
@@ -197,6 +206,8 @@ indexes it in `artifact_index.json` as the
 manifest stays diagnostic-only. If readiness is true and no explicit
 `--ik-model-path` was supplied, the suite may derive the downstream model path
 for the contract checker and IK reachability drill from `manifest.model_path`.
+Digest mismatches keep readiness false, so a stale reviewed path is not forwarded
+as model-backed IK authority.
 If no explicit `--ik-model-asset-root` values were supplied, the suite also
 forwards manifest `asset_roots` to the contract checker's nested asset
 preflight. Explicit suite CLI values take precedence and the forwarding reason

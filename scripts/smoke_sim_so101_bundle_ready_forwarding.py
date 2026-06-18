@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import shutil
 import subprocess
@@ -67,12 +68,26 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def write_manifest_json(path: Path, payload: dict[str, Any], model_path: Path) -> None:
+    payload["model_sha256"] = sha256_file(model_path)
+    write_json(path, payload)
+
+
 def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
     fieldnames = (
         "case_id",
         "ok",
         "suite_status",
         "bundle_ready",
+        "model_identity_status",
         "authority_status",
         "provenance_status",
         "joint_limits_status",
@@ -136,16 +151,17 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         "",
         "## Cases",
         "",
-        "| Case | Status | Authority | Provenance | Joint Limits | Mesh Assets | Target Frame | TCP | Alignment | Reviewed MuJoCo | Motion Authority | Forwarding | Artifact index missing | Summary |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Case | Status | Model Identity | Authority | Provenance | Joint Limits | Mesh Assets | Target Frame | TCP | Alignment | Reviewed MuJoCo | Motion Authority | Forwarding | Artifact index missing | Summary |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for case in summary["cases"]:
         forwarding = case["observations"]["bundle_forwarding"]
         reviewed_mujoco = case["observations"]["reviewed_mujoco_bundle"]
         lines.append(
-            "| `{case_id}` | `{status}` | `{authority}` | `{provenance}` | `{joint_limits}` | `{mesh_assets}` | `{target_frame}` | `{tcp}` | `{alignment}` | `{reviewed_status}`, motion `{motion}` | `{motion_authority}` | source `{source}`, diagnostic `{diagnostic}` | `{missing}` | `{summary_path}` |".format(
+            "| `{case_id}` | `{status}` | `{model_identity}` | `{authority}` | `{provenance}` | `{joint_limits}` | `{mesh_assets}` | `{target_frame}` | `{tcp}` | `{alignment}` | `{reviewed_status}`, motion `{motion}` | `{motion_authority}` | source `{source}`, diagnostic `{diagnostic}` | `{missing}` | `{summary_path}` |".format(
                 case_id=case["case_id"],
                 status=case["status"],
+                model_identity=case["observations"].get("bundle_model_identity_status"),
                 authority=case["observations"].get("bundle_authority_status"),
                 provenance=case["observations"].get("bundle_provenance_status"),
                 joint_limits=case["observations"].get("bundle_joint_limits_status"),
@@ -491,6 +507,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     explicit_dir.mkdir(parents=True, exist_ok=True)
     explicit_model_path = explicit_dir / "explicit_cli_so101.urdf"
     explicit_model_path.write_text(synthetic_urdf(include_mesh=False))
+    placeholder_model_path = placeholder_dir / "model" / "synthetic_so101.urdf"
 
     ready_manifest_path = bundle_dir / "so101_model_bundle.ready.json"
     placeholder_manifest_path = placeholder_dir / "so101_model_bundle.placeholder.json"
@@ -508,55 +525,71 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     invalid_tcp_manifest_path = invalid_tcp_dir / "so101_model_bundle.invalid_tcp_offset.json"
     weak_alignment_manifest_path = weak_alignment_dir / "so101_model_bundle.weak_alignment.json"
     invalid_alignment_manifest_path = invalid_alignment_dir / "so101_model_bundle.invalid_alignment.json"
-    write_json(ready_manifest_path, manifest_payload(ready=True, model_filename=ready_model_path.name))
-    write_json(placeholder_manifest_path, manifest_payload(ready=False))
-    write_json(
+    write_manifest_json(
+        ready_manifest_path,
+        manifest_payload(ready=True, model_filename=ready_model_path.name),
+        ready_model_path,
+    )
+    write_manifest_json(placeholder_manifest_path, manifest_payload(ready=False), placeholder_model_path)
+    write_manifest_json(
         placeholder_review_manifest_path,
         placeholder_review_metadata_manifest_payload(model_filename=placeholder_review_model_path.name),
+        placeholder_review_model_path,
     )
-    write_json(
+    write_manifest_json(
         thin_review_manifest_path,
         thin_review_evidence_manifest_payload(model_filename=thin_review_model_path.name),
+        thin_review_model_path,
     )
-    write_json(
+    write_manifest_json(
         weak_review_manifest_path,
         weak_review_manifest_payload(model_filename=weak_review_model_path.name),
+        weak_review_model_path,
     )
-    write_json(
+    write_manifest_json(
         weak_joint_limits_manifest_path,
         weak_joint_limit_authority_manifest_payload(model_filename=weak_joint_limits_model_path.name),
+        weak_joint_limits_model_path,
     )
-    write_json(
+    write_manifest_json(
         weak_mesh_manifest_path,
         weak_mesh_asset_authority_manifest_payload(model_filename=weak_mesh_model_path.name),
+        weak_mesh_model_path,
     )
-    write_json(
+    write_manifest_json(
         weak_target_frame_manifest_path,
         weak_target_frame_authority_manifest_payload(model_filename=weak_target_frame_model_path.name),
+        weak_target_frame_model_path,
     )
-    write_json(
+    write_manifest_json(
         wrong_target_frame_manifest_path,
         wrong_target_frame_manifest_payload(model_filename=wrong_target_frame_model_path.name),
+        wrong_target_frame_model_path,
     )
-    write_json(
+    write_manifest_json(
         model_missing_target_frame_manifest_path,
         manifest_payload(ready=True, model_filename=model_missing_target_frame_path.name),
+        model_missing_target_frame_path,
     )
-    write_json(
+    write_manifest_json(
         weak_tcp_manifest_path,
         weak_tcp_offset_authority_manifest_payload(model_filename=weak_tcp_model_path.name),
+        weak_tcp_model_path,
     )
-    write_json(
+    write_manifest_json(
         invalid_tcp_manifest_path,
         invalid_tcp_offset_manifest_payload(model_filename=invalid_tcp_model_path.name),
+        invalid_tcp_model_path,
     )
-    write_json(
+    write_manifest_json(
         weak_alignment_manifest_path,
         weak_alignment_authority_manifest_payload(model_filename=weak_alignment_model_path.name),
+        weak_alignment_model_path,
     )
-    write_json(
+    write_manifest_json(
         invalid_alignment_manifest_path,
         invalid_alignment_transform_manifest_payload(model_filename=invalid_alignment_model_path.name),
+        invalid_alignment_model_path,
     )
 
     return {
@@ -820,6 +853,17 @@ def summarize_case(
             errors,
             f"{case_id}.bundle_hardware_free_regression_fixture_ready",
             bundle.get("hardware_free_regression_fixture_ready"),
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.model_identity_status",
+            get_nested(bundle, ("model_identity", "status")),
+            "present",
+        )
+        assert_true(
+            errors,
+            f"{case_id}.model_identity_matches",
+            get_nested(bundle, ("model_identity", "matches")),
         )
         assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
         assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
@@ -1464,6 +1508,8 @@ def summarize_case(
             ),
             "bundle_synthetic_fixture_authority_fields": bundle.get("synthetic_fixture_authority_fields"),
             "bundle_forwarding": forwarding,
+            "bundle_model_identity_status": get_nested(bundle, ("model_identity", "status")),
+            "bundle_model_identity_matches": get_nested(bundle, ("model_identity", "matches")),
             "bundle_authority_status": bundle.get("authority_status"),
             "bundle_provenance_status": bundle.get("provenance_status"),
             "bundle_joint_limits_status": get_nested(bundle, ("joint_limits", "status")),
@@ -1497,6 +1543,7 @@ def flatten_case_rows(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "ok": case["ok"],
                 "suite_status": case["observations"]["suite_status"],
                 "bundle_ready": case["observations"]["bundle_ready"],
+                "model_identity_status": case["observations"].get("bundle_model_identity_status"),
                 "authority_status": case["observations"].get("bundle_authority_status"),
                 "provenance_status": case["observations"].get("bundle_provenance_status"),
                 "joint_limits_status": case["observations"].get("bundle_joint_limits_status"),

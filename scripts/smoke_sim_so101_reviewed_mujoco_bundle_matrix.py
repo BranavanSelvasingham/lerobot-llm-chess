@@ -108,12 +108,18 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
     mismatched_joint_limits_path = fixture_dir / "so101_model_bundle.mismatched_joint_limits.json"
     write_json(mismatched_joint_limits_path, mismatched_joint_limits)
 
+    mismatched_model_sha = json_clone(ready_payload)
+    mismatched_model_sha["model_sha256"] = "0" * 64
+    mismatched_model_sha_path = fixture_dir / "so101_model_bundle.mismatched_model_sha.json"
+    write_json(mismatched_model_sha_path, mismatched_model_sha)
+
     return {
         "nonfinite_joint_limits_manifest_path": nonfinite_joint_limits_path,
         "nonfinite_tcp_manifest_path": nonfinite_tcp_path,
         "nonfinite_alignment_manifest_path": nonfinite_alignment_path,
         "nonstandard_json_constant_manifest_path": nonstandard_json_constant_path,
         "mismatched_joint_limits_manifest_path": mismatched_joint_limits_path,
+        "mismatched_model_sha_manifest_path": mismatched_model_sha_path,
     }
 
 
@@ -134,6 +140,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "gate_ok",
         "status",
         "manifest_status",
+        "model_identity_status",
         "authority_status",
         "provenance_status",
         "joint_limits_status",
@@ -376,6 +383,25 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "mismatched_model_sha_not_ready",
+            "manifest_path": fixtures["mismatched_model_sha_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "model_identity_status": "invalid",
+                "missing_inputs_contains": ["model_sha256"],
+                "model_identity_diagnostics_contains": ["model_sha256_mismatch"],
+            },
+        },
+        {
             "case_id": "ready_manifest_mismatched_mujoco_joint_limits",
             "manifest_path": fixtures["mismatched_joint_limits_manifest_path"],
             "require_ready": False,
@@ -543,6 +569,7 @@ def summarize_case(
                         f"{case_id}.missing_inputs: missing {expected_input!r} in {missing_inputs!r}"
                     )
     for expect_key, summary_key in (
+        ("model_identity_status", "model_identity"),
         ("authority_status", "authority"),
         ("provenance_status", "provenance"),
         ("joint_limits_status", "joint_limits"),
@@ -572,6 +599,7 @@ def summarize_case(
             expect["alignment_status"],
         )
     for diagnostics_key, summary_key in (
+        ("model_identity_diagnostics_contains", "model_identity"),
         ("authority_diagnostics_contains", "authority"),
         ("provenance_diagnostics_contains", "provenance"),
         ("joint_limits_diagnostics_contains", "joint_limits"),
@@ -624,6 +652,8 @@ def summarize_case(
             "gate_ok": summary.get("ok"),
             "status": summary.get("status"),
             "manifest_status": summary.get("manifest_status"),
+            "model_identity_status": (summary.get("model_identity") or {}).get("status"),
+            "model_identity_diagnostics": (summary.get("model_identity") or {}).get("diagnostics"),
             "authority_status": (summary.get("authority") or {}).get("status"),
             "provenance_status": (summary.get("provenance") or {}).get("status"),
             "joint_limits_status": (summary.get("joint_limits") or {}).get("status"),
@@ -675,6 +705,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "gate_ok": observations.get("gate_ok"),
         "status": observations.get("status"),
         "manifest_status": observations.get("manifest_status"),
+        "model_identity_status": observations.get("model_identity_status"),
         "authority_status": observations.get("authority_status"),
         "provenance_status": observations.get("provenance_status"),
         "joint_limits_status": observations.get("joint_limits_status"),

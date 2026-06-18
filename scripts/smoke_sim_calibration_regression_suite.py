@@ -3577,6 +3577,8 @@ def so101_model_bundle_manifest_section(
     manifest_request = manifest_request if isinstance(manifest_request, dict) else {}
     model_path = bundle.get("model_path")
     model_path = model_path if isinstance(model_path, dict) else {}
+    model_identity = bundle.get("model_identity")
+    model_identity = model_identity if isinstance(model_identity, dict) else {}
     asset_roots = bundle.get("asset_roots")
     asset_roots = asset_roots if isinstance(asset_roots, dict) else {}
     target_frame = bundle.get("target_frame")
@@ -3645,8 +3647,18 @@ def so101_model_bundle_manifest_section(
             "raw": model_path.get("raw"),
             "path": model_path.get("path"),
             "exists": model_path.get("exists"),
+            "is_file": model_path.get("is_file"),
             "suffix": model_path.get("suffix"),
+            "sha256": model_path.get("sha256"),
             "diagnostics": model_path.get("diagnostics"),
+        },
+        "model_identity": {
+            "status": model_identity.get("status"),
+            "field": model_identity.get("field"),
+            "declared_sha256": model_identity.get("declared_sha256"),
+            "observed_sha256": model_identity.get("observed_sha256"),
+            "matches": model_identity.get("matches"),
+            "diagnostics": model_identity.get("diagnostics"),
         },
         "asset_roots": {
             "status": asset_roots.get("status"),

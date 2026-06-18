@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import subprocess
@@ -144,6 +145,12 @@ REVIEWED_AUTHORITY_STATUSES = {
 }
 SYNTHETIC_FIXTURE_AUTHORITY_STATUS = "synthetic_fixture_reviewed_for_automation_only"
 SYNTHETIC_FIXTURE_JOINT_LIMIT_STATUS = "synthetic_fixture_reviewed_for_automation_only"
+MODEL_SHA256_FIELDS = (
+    "model_sha256",
+    "model_file_sha256",
+    "model_digest",
+    "model_file_digest",
+)
 PROVENANCE_SOURCE_FIELDS = (
     "source_url",
     "source_uri",
@@ -224,6 +231,10 @@ REQUIRED_INPUTS = (
         "requirement": "SO-101 kinematic model path, absolute or relative to the manifest directory.",
     },
     {
+        "input": "model_sha256",
+        "requirement": "Reviewed SHA-256 digest for the exact SO-101 model file referenced by model_path.",
+    },
+    {
         "input": "asset_roots",
         "requirement": "Explicit mesh/asset root list, even when empty because the model directory is sufficient.",
     },
@@ -263,6 +274,7 @@ REQUIRED_INPUTS = (
 NEXT_ACTION_ORDER = (
     "--manifest-path",
     "model_path",
+    "model_sha256",
     "authority",
     "provenance",
     "asset_roots",
@@ -290,6 +302,12 @@ NEXT_ACTIONS = {
         "gate": "reviewed_model_authority",
         "title": "Select the reviewed SO-101 URDF/MJCF model path",
         "detail": "Set manifest.model_path to the reviewed model file, resolved relative to the manifest directory or as an absolute path.",
+    },
+    "model_sha256": {
+        "action_id": "record_reviewed_so101_model_file_sha256",
+        "gate": "reviewed_model_authority",
+        "title": "Record the reviewed SO-101 model file digest",
+        "detail": "Set manifest.model_sha256 to the SHA-256 digest of the exact reviewed model file so path contents cannot drift silently.",
     },
     "authority": {
         "action_id": "record_reviewed_model_source_authority",
@@ -743,6 +761,19 @@ def find_first_field(manifest: dict[str, Any], field_names: tuple[str, ...]) -> 
     return None, None
 
 
+def sha256_file(path: Path) -> str | None:
+    if not path.is_file():
+        return None
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError:
+        return None
+    return digest.hexdigest()
+
+
 def inspect_model_path(manifest: dict[str, Any] | None, manifest_dir: Path | None) -> dict[str, Any]:
     if not manifest or not non_empty(manifest.get("model_path")):
         return {
@@ -750,18 +781,88 @@ def inspect_model_path(manifest: dict[str, Any] | None, manifest_dir: Path | Non
             "raw": None,
             "path": None,
             "exists": False,
+            "is_file": False,
+            "sha256": None,
             "diagnostics": ["model_path_missing"],
         }
 
     raw = str(manifest["model_path"])
     resolved = resolve_manifest_relative(raw, manifest_dir)
+    exists = resolved.exists()
+    is_file = resolved.is_file()
+    diagnostics: list[str] = []
+    if not exists:
+        diagnostics.append("model_path_unavailable")
+    elif not is_file:
+        diagnostics.append("model_path_not_file")
     return {
-        "status": "present" if resolved.exists() else "unavailable",
+        "status": "present" if is_file else "unavailable",
         "raw": raw,
         "path": str(resolved),
-        "exists": resolved.exists(),
+        "exists": exists,
+        "is_file": is_file,
         "suffix": resolved.suffix.lower(),
-        "diagnostics": [] if resolved.exists() else ["model_path_unavailable"],
+        "sha256": sha256_file(resolved),
+        "diagnostics": diagnostics,
+    }
+
+
+def normalize_sha256(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = value.strip().lower()
+    if text.startswith("sha256:"):
+        text = text.removeprefix("sha256:").strip()
+    if len(text) != 64:
+        return None
+    if any(char not in "0123456789abcdef" for char in text):
+        return None
+    return text
+
+
+def inspect_model_identity(
+    manifest: dict[str, Any] | None,
+    model_path: dict[str, Any],
+) -> dict[str, Any]:
+    observed_sha256 = model_path.get("sha256")
+    if not manifest:
+        return {
+            "status": "missing",
+            "field": None,
+            "declared_sha256": None,
+            "observed_sha256": observed_sha256,
+            "matches": False,
+            "diagnostics": ["model_sha256_missing"],
+        }
+
+    field, raw_value = find_first_field(manifest, MODEL_SHA256_FIELDS)
+    if field is None:
+        return {
+            "status": "missing",
+            "field": None,
+            "declared_sha256": None,
+            "observed_sha256": observed_sha256,
+            "matches": False,
+            "diagnostics": ["model_sha256_missing"],
+        }
+
+    declared_sha256 = normalize_sha256(raw_value)
+    diagnostics: list[str] = []
+    if declared_sha256 is None:
+        diagnostics.append("model_sha256_invalid")
+    if not observed_sha256:
+        diagnostics.append("model_sha256_observed_unavailable")
+    if declared_sha256 is not None and observed_sha256 and declared_sha256 != observed_sha256:
+        diagnostics.append("model_sha256_mismatch")
+
+    matches = declared_sha256 is not None and bool(observed_sha256) and declared_sha256 == observed_sha256
+    return {
+        "status": "present" if matches else "invalid",
+        "field": field,
+        "declared_sha256": declared_sha256,
+        "observed_sha256": observed_sha256,
+        "matches": matches,
+        "diagnostics": diagnostics,
     }
 
 
@@ -1754,6 +1855,7 @@ def target_frame_missing_inputs(target_frame: dict[str, Any]) -> list[str] | Non
 def build_field_checks(
     manifest_request: dict[str, Any],
     model_path: dict[str, Any],
+    model_identity: dict[str, Any],
     asset_roots: dict[str, Any],
     authority: dict[str, Any],
     provenance: dict[str, Any],
@@ -1779,6 +1881,12 @@ def build_field_checks(
             "ok": model_path["status"] == "present",
             "missing_inputs": None if model_path["status"] == "present" else ["model_path"],
             "diagnostics": model_path.get("diagnostics", []),
+        },
+        {
+            "requirement_id": "model_sha256",
+            "ok": model_identity["status"] == "present",
+            "missing_inputs": None if model_identity["status"] == "present" else ["model_sha256"],
+            "diagnostics": model_identity.get("diagnostics", []),
         },
         {
             "requirement_id": "asset_roots",
@@ -1932,6 +2040,8 @@ def review_packet_manifest_fields(row_value: dict[str, Any]) -> list[str]:
         return ["--manifest-path"]
     if requirement_id == "model_path":
         return ["model_path"]
+    if requirement_id == "model_sha256":
+        return list(MODEL_SHA256_FIELDS)
     if requirement_id == "asset_roots":
         return ["asset_roots"]
     if requirement_id == "authority":
@@ -2066,6 +2176,7 @@ def build_review_packet(
 def build_checklist_rows(
     manifest_request: dict[str, Any],
     model_path: dict[str, Any],
+    model_identity: dict[str, Any],
     asset_roots: dict[str, Any],
     authority: dict[str, Any],
     provenance: dict[str, Any],
@@ -2103,6 +2214,18 @@ def build_checklist_rows(
             None if model_path["status"] == "present" else ["model_path"],
             model_path.get("diagnostics", []),
             "Relative model paths resolve from the manifest directory.",
+        ),
+        row(
+            "model_sha256",
+            "model_identity",
+            "ok" if model_identity["status"] == "present" else "action_required",
+            "warning",
+            f"manifest.{'|'.join(MODEL_SHA256_FIELDS)}",
+            model_identity,
+            {"matches_resolved_model_file_sha256": True},
+            None if model_identity["status"] == "present" else ["model_sha256"],
+            model_identity.get("diagnostics", []),
+            "The reviewed manifest must pin the exact model file contents so a path cannot silently drift after review.",
         ),
         row(
             "asset_roots",
@@ -2343,6 +2466,7 @@ def build_summary(
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     manifest_dir = Path(manifest_request["path"]).parent if manifest_request.get("path") else None
     model_path = inspect_model_path(manifest, manifest_dir)
+    model_identity = inspect_model_identity(manifest, model_path)
     asset_roots = inspect_asset_roots(manifest, manifest_dir)
     authority = inspect_authority(manifest)
     provenance = inspect_provenance(manifest)
@@ -2355,6 +2479,7 @@ def build_summary(
     field_checks = build_field_checks(
         manifest_request,
         model_path,
+        model_identity,
         asset_roots,
         authority,
         provenance,
@@ -2410,6 +2535,7 @@ def build_summary(
         "manifest_request": manifest_request,
         "manifest": manifest,
         "model_path": model_path,
+        "model_identity": model_identity,
         "asset_roots": asset_roots,
         "authority": authority,
         "provenance": provenance,
@@ -2433,6 +2559,7 @@ def build_summary(
     rows = build_checklist_rows(
         manifest_request,
         model_path,
+        model_identity,
         asset_roots,
         authority,
         provenance,

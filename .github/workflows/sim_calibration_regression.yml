@@ -366,6 +366,7 @@ jobs:
               "invalid_nonfinite_tcp_offset_not_ready",
               "invalid_base_to_board_transform_not_ready",
               "invalid_nonfinite_base_to_board_transform_not_ready",
+              "mismatched_model_sha_not_ready",
               "ready_manifest_mismatched_mujoco_joint_limits",
               "ready_synthetic_fixture_motion_not_physical",
           ], summary["case_ids"]
@@ -432,6 +433,13 @@ jobs:
           assert nonfinite_alignment["observations"]["alignment_status"] == "invalid", nonfinite_alignment
           assert "base_to_board_transform" in nonfinite_alignment["observations"]["missing_inputs"], nonfinite_alignment
           assert nonfinite_alignment["observations"]["reviewed_model_motion_checked"] is False, nonfinite_alignment
+          mismatched_sha = by_case["mismatched_model_sha_not_ready"]
+          assert mismatched_sha["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", mismatched_sha
+          assert mismatched_sha["observations"]["ready_for_model_backed_ik"] is False, mismatched_sha
+          assert mismatched_sha["observations"]["model_identity_status"] == "invalid", mismatched_sha
+          assert "model_sha256" in mismatched_sha["observations"]["missing_inputs"], mismatched_sha
+          assert mismatched_sha["observations"]["reviewed_model_motion_checked"] is False, mismatched_sha
+          assert mismatched_sha["observations"]["motion_authority_status"] == "not_checked_manifest_not_ready", mismatched_sha
           mismatched_limits = by_case["ready_manifest_mismatched_mujoco_joint_limits"]
           assert mismatched_limits["record"]["return_code"] == 1, mismatched_limits
           assert mismatched_limits["observations"]["status"] == "reviewed_mujoco_bundle_motion_failed", mismatched_limits
@@ -1039,6 +1047,8 @@ jobs:
           assert pose_fixture["gui_skipped"] is True, pose_fixture
           bundle_manifest = summary["so101_model_bundle_manifest"]
           assert bundle_manifest["ok"] is True, bundle_manifest
+          assert isinstance(bundle_manifest["model_identity"], dict), bundle_manifest
+          assert bundle_manifest["model_identity"]["status"] in {"missing", "invalid", "present", None}, bundle_manifest
           assert bundle_manifest["status"] in {
               "model_bundle_manifest_not_supplied",
               "model_bundle_manifest_unavailable",
@@ -1117,6 +1127,8 @@ jobs:
           ), bundle_manifest
           bundle_request = bundle_manifest["manifest_request"]
           if bundle_manifest["ready_for_model_backed_ik"] is True:
+              assert bundle_manifest["model_identity"]["status"] == "present", bundle_manifest
+              assert bundle_manifest["model_identity"]["matches"] is True, bundle_manifest
               assert bundle_manifest["joint_limits"]["status"] == "present", bundle_manifest
               assert bundle_manifest["mesh_assets"]["status"] == "present", bundle_manifest
               assert bundle_manifest["mesh_assets"]["mesh_reference_count"] > 0, bundle_manifest
@@ -3013,6 +3025,8 @@ jobs:
               f"- `model_authority`: `{summary['so101_model_bundle_manifest']['model_authority']}`",
               f"- `physical_so101_model_authority_ready`: `{summary['so101_model_bundle_manifest']['physical_so101_model_authority_ready']}`",
               f"- `hardware_free_regression_fixture_ready`: `{summary['so101_model_bundle_manifest']['hardware_free_regression_fixture_ready']}`",
+              f"- `model_identity_status`: `{summary['so101_model_bundle_manifest']['model_identity']['status']}`",
+              f"- `model_identity_matches`: `{summary['so101_model_bundle_manifest']['model_identity']['matches']}`",
               f"- `next_required_action_ids`: `{[action.get('action_id') for action in summary['so101_model_bundle_manifest']['next_required_for_goal']]}`",
               f"- `manifest_path`: `{summary['so101_model_bundle_manifest']['manifest_request']['path']}`",
               f"- `model_path`: `{summary['so101_model_bundle_manifest']['model_path']['path']}`",
