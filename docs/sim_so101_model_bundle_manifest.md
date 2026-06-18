@@ -33,16 +33,22 @@ The saved probe summary repeats the review-critical fields at top level:
 `asset_preflight_status`, asset-preflight mesh/present/missing/unresolved
 counts, `observed_joint_limits_status`,
 `observed_joint_limits_complete`, `observed_joint_limits_deg`,
-`observed_joint_limits_missing_joints`, `mesh_asset_review_status`,
+`observed_joint_limits_missing_joints`, `observed_source_hints_status`,
+`observed_source_hints_onshape_urls`,
+`observed_source_hints_export_tool_hints`,
+`observed_source_hints_license_status`,
+`observed_source_hints_license_path`, `observed_source_hints_sha256`,
+`mesh_asset_review_status`,
 `mesh_asset_review_unique_missing_reference_count`,
 `mesh_asset_review_missing_references`,
 `mesh_asset_review_unique_unresolved_reference_count`,
 `mesh_asset_review_unresolved_references`, `manifest_status`,
 `ready_for_model_backed_ik`, and `missing_inputs`. These are shortcuts for
 artifact review only; readiness is still decided by the nested manifest checker.
-Observed joint limits and mesh references come from the candidate model
-structure and are not copied into `joint_limits_deg` or treated as reviewed mesh
-authority unless a reviewer makes them authoritative.
+Observed source hints, joint limits, and mesh references come from the candidate
+model structure and nearby files. They are not copied into `provenance`,
+`joint_limits_deg`, or reviewed mesh authority unless a reviewer makes them
+authoritative.
 
 With no `--model-path`, it still exits `0`, emits a candidate manifest template
 with an empty `model_path`, and reports `candidate_model_missing`. With a

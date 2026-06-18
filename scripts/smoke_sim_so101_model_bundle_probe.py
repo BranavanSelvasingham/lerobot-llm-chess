@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -17,6 +19,18 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_CHECKER_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_contract.py"
 MANIFEST_CHECKER_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_bundle_manifest.py"
 EXPECTED_TARGET_FRAME = "gripper_frame_link"
+SOURCE_SAMPLE_BYTES = 256_000
+URL_PATTERN = re.compile(r"https?://[^\s\"'<>]+")
+ONSHAPE_URL_PATTERN = re.compile(r"https://cad\.onshape\.com/[^\s\"'<>]+")
+LICENSE_FILENAMES = (
+    "LICENSE",
+    "LICENSE.md",
+    "LICENSE.txt",
+    "COPYING",
+    "COPYING.md",
+    "NOTICE",
+    "NOTICE.md",
+)
 EXPECTED_SO101_JOINTS = (
     "shoulder_pan",
     "shoulder_lift",
@@ -124,6 +138,48 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow({field: csv_value(row.get(field)) for field in CSV_FIELDNAMES})
+
+
+def sha256_file(path: Path) -> str | None:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except Exception:
+        return None
+    return digest.hexdigest()
+
+
+def read_text_sample(path: Path, max_bytes: int = SOURCE_SAMPLE_BYTES) -> tuple[str, str | None]:
+    try:
+        data = path.read_bytes()[:max(0, max_bytes)]
+    except Exception as exc:
+        return "", f"{type(exc).__name__}: {exc}"
+    return data.decode("utf-8", errors="replace"), None
+
+
+def nearest_license_file(path: Path) -> dict[str, Any]:
+    if path is None:
+        return {"status": "not_checked", "path": None, "checked_directories": []}
+    start = path.parent if path.is_file() else path
+    checked: list[str] = []
+    current = start
+    for _ in range(8):
+        checked.append(str(current))
+        for file_name in LICENSE_FILENAMES:
+            candidate = current / file_name
+            if candidate.is_file():
+                return {
+                    "status": "license_file_detected",
+                    "path": str(candidate),
+                    "file_name": file_name,
+                    "checked_directories": checked,
+                }
+        if current.parent == current:
+            break
+        current = current.parent
+    return {"status": "license_file_not_found", "path": None, "checked_directories": checked}
 
 
 def run_child(command: list[str], summary_path: Path) -> dict[str, Any]:
@@ -341,6 +397,73 @@ def inspect_asset_roots(asset_roots: list[Path]) -> dict[str, Any]:
     }
 
 
+def observed_source_hints_from_model(model_path: Path | None) -> dict[str, Any]:
+    if model_path is None:
+        return {
+            "status": "model_not_supplied",
+            "model_path": None,
+            "exists": False,
+            "diagnostics": ["model_path_missing"],
+            "review_required": True,
+            "notes": (
+                "Source hints are review evidence only. They do not populate the "
+                "reviewed provenance manifest field."
+            ),
+        }
+
+    exists = model_path.exists()
+    digest = sha256_file(model_path) if exists else None
+    sample_text, sample_error = read_text_sample(model_path) if exists else ("", "model_path_unavailable")
+    urls = sorted(set(URL_PATTERN.findall(sample_text)))
+    onshape_urls = sorted(set(ONSHAPE_URL_PATTERN.findall(sample_text)))
+    export_tool_hints = []
+    lowered = sample_text.lower()
+    if "onshape-to-robot" in lowered:
+        export_tool_hints.append("onshape-to-robot")
+    license_info = nearest_license_file(model_path) if exists else {
+        "status": "not_checked",
+        "path": None,
+        "checked_directories": [],
+    }
+
+    diagnostics: list[str] = []
+    if sample_error:
+        diagnostics.append(f"source_sample_unavailable:{sample_error}")
+    if not onshape_urls and not export_tool_hints:
+        diagnostics.append("cad_export_source_not_observed")
+    if license_info.get("status") != "license_file_detected":
+        diagnostics.append("nearby_license_file_not_observed")
+
+    if onshape_urls or export_tool_hints:
+        status = "source_reference_detected"
+    elif license_info.get("status") == "license_file_detected":
+        status = "license_context_detected"
+    elif digest:
+        status = "model_fingerprint_only"
+    else:
+        status = "source_hints_unavailable"
+
+    return {
+        "status": status,
+        "model_path": str(model_path),
+        "exists": exists,
+        "file_size_bytes": model_path.stat().st_size if exists else None,
+        "sha256": digest,
+        "sample_bytes": SOURCE_SAMPLE_BYTES,
+        "urls": urls,
+        "onshape_urls": onshape_urls,
+        "export_tool_hints": export_tool_hints,
+        "license": license_info,
+        "diagnostics": diagnostics,
+        "review_required": True,
+        "notes": (
+            "Detected source URLs, export tools, license files, and file fingerprints "
+            "are provenance review aids only. They do not populate the manifest "
+            "provenance object or create source authority."
+        ),
+    }
+
+
 def observed_joint_limits_from_contract(contract_result: dict[str, Any]) -> dict[str, Any]:
     summary = contract_result.get("summary")
     summary = summary if isinstance(summary, dict) else {}
@@ -508,6 +631,7 @@ def build_candidate_manifest(
     authority_placeholder: dict[str, Any],
     provenance: dict[str, Any],
     provenance_placeholder: dict[str, Any],
+    observed_source_hints: dict[str, Any],
     contract_result: dict[str, Any],
     observed_joint_limits: dict[str, Any],
     mesh_asset_review: dict[str, Any],
@@ -526,6 +650,7 @@ def build_candidate_manifest(
         "authority_placeholder": authority_placeholder,
         "provenance": provenance,
         "provenance_placeholder": provenance_placeholder,
+        "observed_source_hints_from_model": observed_source_hints,
         "target_frame": target_frame,
         "joint_limits_placeholder": {
             "status": "TODO_reviewed_joint_limits_required",
@@ -568,6 +693,7 @@ def build_candidate_manifest(
             "The probe does not copy, ingest, or modify model/mesh assets.",
             "Extra probe_child_diagnostics fields are for operator review; the bundle manifest checker derives readiness from the declared manifest fields.",
             "Populate joint_limits_deg or an equivalent joint-limit authority field before expecting ready_for_model_backed_ik.",
+            "observed_source_hints_from_model is raw candidate evidence for review only; copy source URL/export/license fields into provenance only after separate authority review.",
             "observed_joint_limits_deg_from_model is raw candidate evidence for review only; copy it into joint_limits_deg only after separate authority review.",
             "observed_mesh_asset_references_from_model is raw candidate evidence for review only; supply reviewed asset roots before expecting mesh readiness.",
         ],
@@ -606,6 +732,7 @@ def build_rows(
     authority_placeholder: dict[str, Any],
     provenance: dict[str, Any],
     provenance_placeholder: dict[str, Any],
+    observed_source_hints: dict[str, Any],
     contract_result: dict[str, Any],
     manifest_result: dict[str, Any],
     observed_joint_limits: dict[str, Any],
@@ -675,6 +802,23 @@ def build_rows(
             None if provenance else ["provenance"],
             [] if provenance else [provenance_placeholder],
             "Defaults to an empty provenance object so placeholders are not treated as reviewed provenance.",
+        ),
+        row(
+            "observed_candidate_source_hints",
+            "provenance",
+            "ok"
+            if observed_source_hints.get("status")
+            in {"source_reference_detected", "license_context_detected", "model_fingerprint_only"}
+            else "action_required",
+            "info",
+            observed_source_hints,
+            {"reviewed_manifest_field_still_required": "provenance"},
+            None
+            if observed_source_hints.get("status")
+            in {"source_reference_detected", "license_context_detected", "model_fingerprint_only"}
+            else ["source_provenance_hints"],
+            observed_source_hints.get("diagnostics", []),
+            "Raw source hints help review; they do not satisfy reviewed provenance.",
         ),
         row(
             "tcp_offset_m",
@@ -785,6 +929,10 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         f"- `asset_preflight_status`: `{asset_preflight.get('status')}`",
         f"- `asset_preflight_missing_asset_count`: `{asset_preflight.get('missing_asset_count')}`",
         f"- `asset_preflight_unresolved_reference_count`: `{asset_preflight.get('unresolved_reference_count')}`",
+        f"- `observed_source_hints_status`: `{summary.get('observed_source_hints_status')}`",
+        f"- `observed_source_hints_export_tool_hints`: `{', '.join(summary.get('observed_source_hints_export_tool_hints') or []) if summary.get('observed_source_hints_export_tool_hints') else 'none'}`",
+        f"- `observed_source_hints_onshape_urls`: `{', '.join(summary.get('observed_source_hints_onshape_urls') or []) if summary.get('observed_source_hints_onshape_urls') else 'none'}`",
+        f"- `observed_source_hints_license_status`: `{summary.get('observed_source_hints_license_status')}`",
         f"- `observed_joint_limits_status`: `{summary.get('observed_joint_limits_status')}`",
         f"- `observed_joint_limits_complete`: `{str(summary.get('observed_joint_limits_complete')).lower()}`",
         f"- `observed_joint_limits_missing_joints`: `{', '.join(summary.get('observed_joint_limits_missing_joints') or []) if summary.get('observed_joint_limits_missing_joints') else 'none'}`",
@@ -817,6 +965,7 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
             "## Next Inputs",
             "",
             "- Replace empty `authority` and `provenance` placeholders with reviewed source fields.",
+            "- Review `observed_source_hints_from_model` before copying source URL/export/license evidence into `provenance`.",
             "- Supply reviewed mesh asset roots that resolve every `mesh_asset_review_missing_references` entry.",
             "- Replace `tcp_offset_placeholder` with one accepted calibrated TCP/gripper-tip offset field.",
             "- Replace `base_to_board_alignment_placeholder` with a real base-to-board transform/alignment.",
@@ -837,6 +986,7 @@ def main() -> int:
     asset_root_config = inspect_asset_roots(asset_roots)
     authority, authority_placeholder = build_authority(args)
     provenance, provenance_placeholder = build_provenance(args)
+    observed_source_hints = observed_source_hints_from_model(model_path)
 
     contract_result = run_contract_checker(
         args.python,
@@ -857,6 +1007,7 @@ def main() -> int:
         authority_placeholder=authority_placeholder,
         provenance=provenance,
         provenance_placeholder=provenance_placeholder,
+        observed_source_hints=observed_source_hints,
         contract_result=contract_result,
         observed_joint_limits=observed_joint_limits,
         mesh_asset_review=mesh_asset_review,
@@ -871,6 +1022,7 @@ def main() -> int:
         authority_placeholder=authority_placeholder,
         provenance=provenance,
         provenance_placeholder=provenance_placeholder,
+        observed_source_hints=observed_source_hints,
         contract_result=contract_result,
         manifest_result=manifest_result,
         observed_joint_limits=observed_joint_limits,
@@ -905,6 +1057,16 @@ def main() -> int:
         "asset_preflight_present_asset_count": asset_preflight_excerpt.get("present_asset_count"),
         "asset_preflight_missing_asset_count": asset_preflight_excerpt.get("missing_asset_count"),
         "asset_preflight_unresolved_reference_count": asset_preflight_excerpt.get("unresolved_reference_count"),
+        "observed_source_hints_status": observed_source_hints.get("status"),
+        "observed_source_hints_onshape_urls": observed_source_hints.get("onshape_urls"),
+        "observed_source_hints_export_tool_hints": observed_source_hints.get("export_tool_hints"),
+        "observed_source_hints_license_status": (
+            observed_source_hints.get("license") or {}
+        ).get("status"),
+        "observed_source_hints_license_path": (
+            observed_source_hints.get("license") or {}
+        ).get("path"),
+        "observed_source_hints_sha256": observed_source_hints.get("sha256"),
         "observed_joint_limits_status": observed_joint_limits.get("status"),
         "observed_joint_limits_complete": observed_joint_limits.get("complete"),
         "observed_joint_limits_deg": observed_joint_limits.get("values_deg"),
@@ -985,6 +1147,16 @@ def main() -> int:
                 ],
                 "asset_preflight_unresolved_reference_count": summary[
                     "asset_preflight_unresolved_reference_count"
+                ],
+                "observed_source_hints_status": summary["observed_source_hints_status"],
+                "observed_source_hints_export_tool_hints": summary[
+                    "observed_source_hints_export_tool_hints"
+                ],
+                "observed_source_hints_onshape_urls": summary[
+                    "observed_source_hints_onshape_urls"
+                ],
+                "observed_source_hints_license_status": summary[
+                    "observed_source_hints_license_status"
                 ],
                 "observed_joint_limits_status": summary["observed_joint_limits_status"],
                 "observed_joint_limits_complete": summary["observed_joint_limits_complete"],

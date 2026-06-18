@@ -144,6 +144,15 @@ Result:
 - `asset_preflight_status`: `asset_preflight_needs_follow_up`
 - `manifest_status`: `model_bundle_manifest_needs_follow_up`
 - `ready_for_model_backed_ik`: `false`
+- `observed_source_hints_status`: `source_reference_detected`
+- `observed_source_hints_export_tool_hints`: `onshape-to-robot`
+- `observed_source_hints_onshape_urls`:
+  `https://cad.onshape.com/documents/7715cc284bb430fe6dab4ffd/w/4fd0791b683777b02f8d975a/e/826c553ede3b7592eb9ca800`
+- `observed_source_hints_license_status`: `license_file_detected`
+- `observed_source_hints_license_path`:
+  `/Users/branavan/GitHub/lerobot-chess/LICENSE`
+- `observed_source_hints_sha256`:
+  `3a65d2d35e68a8d2f0c2cc176d19b884506543c93ba72980145b80abe276022c`
 - `observed_joint_limits_status`: `observed_unreviewed_limits_complete`
 - `observed_joint_limits_complete`: `true`
 - `mesh_asset_review_status`: `missing_mesh_assets_detected`
@@ -158,6 +167,9 @@ Result:
   `/private/tmp/lerobot_sim/so101_real_model_probe_owner_check/so101_model_bundle.candidate.json`
 - `checklist_csv`:
   `/private/tmp/lerobot_sim/so101_real_model_probe_owner_check/so101_model_bundle_probe_checklist.csv`
+
+The observed source hints are review evidence only. They do not populate
+`provenance`, satisfy `authority`, or make the bundle ready for model-backed IK.
 
 Nested contract/asset artifacts:
 
