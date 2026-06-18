@@ -12,6 +12,8 @@ The script writes:
 - `so101_model_source_candidates.csv`
 - `so101_model_source_inventory_review_packet.json`
 - `so101_model_source_inventory_review_packet.csv`
+- `so101_model_source_intake_checklist.json`
+- `so101_model_source_intake_checklist.csv`
 - `README.md`
 
 It exits `0` even when no candidates exist. In that state the JSON reports `ok: true`, `status: "missing_authoritative_model"`, `candidate_count: 0`, `authoritative_candidate_count: 0`, `source_authority_gate_status: "source_authority_blocked_missing_authoritative_model"`, a `source_authority_blockers` list for the missing source-authority work, a `missing_authoritative_model` diagnostic listing the source inputs still required, and `next_required_for_goal`/`next_required_action_ids` entries that keep the operator sequence explicit.
@@ -22,6 +24,13 @@ The review packet mirrors that operator sequence with `review_packet_status`,
 `review_packet_physical_so101_model_authority_ready` flags. It is intake for
 human review; it does not make candidate filenames, joint names, provenance
 hints, or local fixture evidence reviewed physical SO-101 truth.
+The source-intake checklist is narrower: it records the scanned roots, missing
+source-authority review fields/scopes, `source_intake_status`,
+`source_intake_action_ids`, and command templates for the current
+`next_required_action_ids`. It reports
+`source_intake_model_authority: "source_intake_not_authority"` plus false
+observed-evidence and physical-authority flags, so it remains operator guidance
+rather than reviewed SO-101 model authority.
 
 The full hardware-free simulator calibration regression suite now runs this
 inventory automatically under `so101_model_source_inventory/` before
@@ -144,6 +153,8 @@ Key fields:
 - `artifacts.candidates_csv: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_candidates.csv`
 - `artifacts.review_packet_json: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_inventory_review_packet.json`
 - `artifacts.review_packet_csv: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_inventory_review_packet.csv`
+- `artifacts.source_intake_checklist_json: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_intake_checklist.json`
+- `artifacts.source_intake_checklist_csv: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_intake_checklist.csv`
 
 Empty-root validation:
 

@@ -16,6 +16,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = "lerobot.sim.so101_model_source_inventory.v1"
 REVIEW_PACKET_SCHEMA = "lerobot.sim.so101_model_source_inventory_review_packet.v1"
+SOURCE_INTAKE_SCHEMA = "lerobot.sim.so101_model_source_intake_checklist.v1"
 DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "so101_model_source_inventory"
 SUPPORTED_SUFFIXES = {".urdf", ".xacro", ".xml", ".mjcf"}
 DIRECT_ROBOT_KINEMATICS_SUFFIXES = {".urdf"}
@@ -90,6 +91,16 @@ REVIEW_PACKET_FIELDNAMES = (
     "next_action_id",
     "evidence",
     "operator_action",
+)
+SOURCE_INTAKE_FIELDNAMES = (
+    "priority",
+    "action_id",
+    "status",
+    "gate",
+    "title",
+    "detail",
+    "command",
+    "required_inputs",
 )
 SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS = (
     "model_identity",
@@ -1193,6 +1204,171 @@ def build_source_inventory_review_packet(summary: dict[str, Any]) -> dict[str, A
     }
 
 
+def source_intake_status(summary: dict[str, Any]) -> str:
+    candidate_count = int(summary.get("candidate_count") or 0)
+    authoritative_candidate_count = int(summary.get("authoritative_candidate_count") or 0)
+    if candidate_count <= 0:
+        return "source_root_required"
+    if authoritative_candidate_count <= 0:
+        return "source_authority_review_required"
+    if authoritative_candidate_count > 1:
+        return "single_source_selection_required"
+    if summary.get("source_authority_review_ready") is not True:
+        return "source_review_metadata_required"
+    return "source_authority_ready_waiting_for_bundle_manifest"
+
+
+def source_intake_command_template(action_id: str) -> list[str]:
+    if action_id == "scan_or_supply_so101_model_source_root":
+        return [
+            "python",
+            "scripts/smoke_sim_so101_model_source_inventory.py",
+            "--root",
+            "<absolute-so101-model-source-root>",
+            "--output-dir",
+            "/private/tmp/lerobot_sim/so101_model_source_inventory_external",
+        ]
+    if action_id in {
+        "review_and_declare_authoritative_so101_model_source",
+        "record_source_authority_review_metadata",
+        "select_single_authoritative_so101_model_source",
+    }:
+        return [
+            "python",
+            "scripts/smoke_sim_so101_model_source_inventory.py",
+            "--root",
+            "<absolute-so101-model-source-root>",
+            "--authoritative-path",
+            "<absolute-reviewed-so101-model-file>",
+            "--authority-license-basis",
+            "<reviewed-license-or-redistribution-basis>",
+            "--authority-review-scope",
+            "model_identity",
+            "--authority-review-scope",
+            "provenance",
+            "--authority-review-scope",
+            "license",
+            "--authority-reviewed-by",
+            "<reviewer-or-review-system>",
+            "--authority-reviewed-at",
+            "<YYYY-MM-DD>",
+            "--output-dir",
+            "/private/tmp/lerobot_sim/so101_model_source_inventory_reviewed",
+        ]
+    if action_id == "run_so101_model_bundle_probe":
+        return [
+            "python",
+            "scripts/smoke_sim_so101_model_bundle_probe.py",
+            "--model-path",
+            "<absolute-reviewed-so101-model-file>",
+            "--output-dir",
+            "/private/tmp/lerobot_sim/so101_model_bundle_probe_review_draft",
+        ]
+    if action_id == "supply_reviewed_so101_model_bundle_manifest":
+        return [
+            "python",
+            "scripts/smoke_sim_so101_model_bundle_manifest.py",
+            "--manifest-path",
+            "<reviewed-so101-model-bundle-manifest.json>",
+            "--output-dir",
+            "/private/tmp/lerobot_sim/so101_model_bundle_manifest_reviewed",
+        ]
+    return []
+
+
+def build_source_intake_checklist(summary: dict[str, Any]) -> dict[str, Any]:
+    source_authority_review = summary.get("source_authority_review")
+    source_authority_review = (
+        source_authority_review if isinstance(source_authority_review, dict) else {}
+    )
+    actions: list[dict[str, Any]] = []
+    for action in summary.get("next_required_for_goal") or []:
+        if not isinstance(action, dict):
+            continue
+        action_id = action.get("action_id")
+        if not isinstance(action_id, str) or not action_id:
+            continue
+        actions.append(
+            {
+                "priority": len(actions) + 1,
+                "action_id": action_id,
+                "status": "pending",
+                "gate": action.get("gate"),
+                "title": action.get("title"),
+                "detail": action.get("detail"),
+                "command": source_intake_command_template(action_id),
+                "required_inputs": (
+                    source_authority_review.get("missing_required_fields") or []
+                    if action_id
+                    in {
+                        "review_and_declare_authoritative_so101_model_source",
+                        "record_source_authority_review_metadata",
+                        "select_single_authoritative_so101_model_source",
+                    }
+                    else []
+                ),
+            }
+        )
+    return {
+        "schema": SOURCE_INTAKE_SCHEMA,
+        "ok": True,
+        "status": source_intake_status(summary),
+        "model_authority": "source_intake_not_authority",
+        "source_inventory_status": summary.get("status"),
+        "source_authority_gate_status": summary.get("source_authority_gate_status"),
+        "source_authority_review_status": summary.get("source_authority_review_status"),
+        "source_authority_review_ready": summary.get("source_authority_review_ready"),
+        "source_authority_review_scope_ready": summary.get(
+            "source_authority_review_scope_ready"
+        ),
+        "candidate_count": summary.get("candidate_count"),
+        "likely_candidate_count": summary.get("likely_candidate_count"),
+        "direct_contract_candidate_count": summary.get("direct_contract_candidate_count"),
+        "authoritative_candidate_count": summary.get("authoritative_candidate_count"),
+        "scanned_roots": [
+            {
+                "path": root.get("path"),
+                "exists": root.get("exists"),
+                "is_file": root.get("is_file"),
+                "source_root_type": root.get("source_root_type"),
+                "candidate_count": root.get("candidate_count"),
+            }
+            for root in summary.get("roots") or []
+            if isinstance(root, dict)
+        ],
+        "root_count": summary.get("root_count"),
+        "required_review_scope_ids": summary.get("source_authority_required_review_scope_ids")
+        or [],
+        "supplied_review_scope_ids": summary.get("source_authority_supplied_review_scope_ids")
+        or [],
+        "missing_review_scope_ids": summary.get("source_authority_missing_review_scope_ids")
+        or [],
+        "missing_required_fields": source_authority_review.get("missing_required_fields")
+        or [],
+        "review_evidence_valid_fields": source_authority_review.get(
+            "review_evidence_valid_fields"
+        )
+        or [],
+        "review_evidence_placeholder_fields": source_authority_review.get(
+            "review_evidence_placeholder_fields"
+        )
+        or [],
+        "next_required_for_goal": summary.get("next_required_for_goal") or [],
+        "next_required_action_ids": summary.get("next_required_action_ids") or [],
+        "action_count": len(actions),
+        "actions": actions,
+        "observed_evidence_is_authority": False,
+        "physical_so101_model_authority_ready": False,
+        "development_fixture_evidence_not_physical_so101_truth": True,
+        "artifacts": summary.get("artifacts"),
+        "caveats": [
+            "This source-intake checklist is operator guidance, not reviewed physical SO-101 authority.",
+            "A candidate path is still untrusted until source identity, provenance, license, and reviewer evidence are explicit.",
+            "A source-authority-ready inventory still requires a reviewed model bundle manifest before MuJoCo motion or training gates can close.",
+        ],
+    }
+
+
 def build_summary(
     roots: list[dict[str, Any]],
     candidates: list[dict[str, Any]],
@@ -1393,6 +1569,27 @@ def build_summary(
             "review_packet": review_packet,
         }
     )
+    source_intake_checklist = build_source_intake_checklist(summary)
+    summary.update(
+        {
+            "source_intake_status": source_intake_checklist["status"],
+            "source_intake_model_authority": source_intake_checklist["model_authority"],
+            "source_intake_action_count": source_intake_checklist["action_count"],
+            "source_intake_action_ids": [
+                action["action_id"] for action in source_intake_checklist["actions"]
+            ],
+            "source_intake_observed_evidence_is_authority": source_intake_checklist[
+                "observed_evidence_is_authority"
+            ],
+            "source_intake_physical_so101_model_authority_ready": source_intake_checklist[
+                "physical_so101_model_authority_ready"
+            ],
+            "source_intake_development_fixture_evidence_not_physical_so101_truth": source_intake_checklist[
+                "development_fixture_evidence_not_physical_so101_truth"
+            ],
+            "source_intake_checklist": source_intake_checklist,
+        }
+    )
     return summary
 
 
@@ -1427,6 +1624,15 @@ def write_review_packet_csv(path: Path, review_packet: dict[str, Any]) -> None:
             writer.writerow({field: csv_value(item.get(field)) for field in REVIEW_PACKET_FIELDNAMES})
 
 
+def write_source_intake_csv(path: Path, source_intake: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=SOURCE_INTAKE_FIELDNAMES)
+        writer.writeheader()
+        for action in source_intake.get("actions") or []:
+            writer.writerow({field: csv_value(action.get(field)) for field in SOURCE_INTAKE_FIELDNAMES})
+
+
 def write_markdown(path: Path, summary: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
@@ -1454,10 +1660,18 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `review_packet_item_count`: `{summary['review_packet_item_count']}`",
         f"- `review_packet_observed_evidence_is_authority`: `{str(summary['review_packet_observed_evidence_is_authority']).lower()}`",
         f"- `review_packet_development_fixture_evidence_not_physical_so101_truth`: `{str(summary['review_packet_development_fixture_evidence_not_physical_so101_truth']).lower()}`",
+        f"- `source_intake_status`: `{summary['source_intake_status']}`",
+        f"- `source_intake_model_authority`: `{summary['source_intake_model_authority']}`",
+        f"- `source_intake_action_ids`: `{', '.join(summary.get('source_intake_action_ids') or []) if summary.get('source_intake_action_ids') else 'none'}`",
+        f"- `source_intake_observed_evidence_is_authority`: `{str(summary['source_intake_observed_evidence_is_authority']).lower()}`",
+        f"- `source_intake_physical_so101_model_authority_ready`: `{str(summary['source_intake_physical_so101_model_authority_ready']).lower()}`",
+        f"- `source_intake_development_fixture_evidence_not_physical_so101_truth`: `{str(summary['source_intake_development_fixture_evidence_not_physical_so101_truth']).lower()}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `candidates_csv`: `{summary['artifacts']['candidates_csv']}`",
         f"- `review_packet_json`: `{summary['artifacts']['review_packet_json']}`",
         f"- `review_packet_csv`: `{summary['artifacts']['review_packet_csv']}`",
+        f"- `source_intake_checklist_json`: `{summary['artifacts']['source_intake_checklist_json']}`",
+        f"- `source_intake_checklist_csv`: `{summary['artifacts']['source_intake_checklist_csv']}`",
         "",
         "## Candidates",
         "",
@@ -1525,6 +1739,27 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
     lines.extend(
         [
             "",
+            "## Source Intake Checklist",
+            "",
+            "This checklist focuses the first unresolved gate action. It is operator guidance only, not reviewed physical SO-101 authority.",
+            "",
+            "| Priority | Action | Status | Command |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for action in summary["source_intake_checklist"].get("actions") or []:
+        command = " ".join(str(part) for part in action.get("command") or []) or "n/a"
+        lines.append(
+            "| `{priority}` | `{action_id}` | `{status}` | `{command}` |".format(
+                priority=action.get("priority"),
+                action_id=action.get("action_id"),
+                status=action.get("status"),
+                command=command.replace("|", "/"),
+            )
+        )
+    lines.extend(
+        [
+            "",
             "## Missing Authoritative Source Requirements",
             "",
         ]
@@ -1582,20 +1817,26 @@ def main() -> int:
     csv_path = output_dir / "so101_model_source_candidates.csv"
     review_packet_path = output_dir / "so101_model_source_inventory_review_packet.json"
     review_packet_csv_path = output_dir / "so101_model_source_inventory_review_packet.csv"
+    source_intake_path = output_dir / "so101_model_source_intake_checklist.json"
+    source_intake_csv_path = output_dir / "so101_model_source_intake_checklist.csv"
     readme_path = output_dir / "README.md"
     artifacts = {
         "summary_json": str(summary_path),
         "candidates_csv": str(csv_path),
         "review_packet_json": str(review_packet_path),
         "review_packet_csv": str(review_packet_csv_path),
+        "source_intake_checklist_json": str(source_intake_path),
+        "source_intake_checklist_csv": str(source_intake_csv_path),
         "readme_md": str(readme_path),
     }
     summary = build_summary(root_records, candidates, artifacts, authority_review_input)
 
     write_json(summary_path, summary)
     write_json(review_packet_path, summary["review_packet"])
+    write_json(source_intake_path, summary["source_intake_checklist"])
     write_csv(csv_path, candidates)
     write_review_packet_csv(review_packet_csv_path, summary["review_packet"])
+    write_source_intake_csv(source_intake_csv_path, summary["source_intake_checklist"])
     write_markdown(readme_path, summary)
 
     print(
@@ -1627,6 +1868,19 @@ def main() -> int:
                 ],
                 "review_packet_development_fixture_evidence_not_physical_so101_truth": summary[
                     "review_packet_development_fixture_evidence_not_physical_so101_truth"
+                ],
+                "source_intake_status": summary["source_intake_status"],
+                "source_intake_model_authority": summary["source_intake_model_authority"],
+                "source_intake_action_count": summary["source_intake_action_count"],
+                "source_intake_action_ids": summary["source_intake_action_ids"],
+                "source_intake_observed_evidence_is_authority": summary[
+                    "source_intake_observed_evidence_is_authority"
+                ],
+                "source_intake_physical_so101_model_authority_ready": summary[
+                    "source_intake_physical_so101_model_authority_ready"
+                ],
+                "source_intake_development_fixture_evidence_not_physical_so101_truth": summary[
+                    "source_intake_development_fixture_evidence_not_physical_so101_truth"
                 ],
                 "artifacts": artifacts,
             },

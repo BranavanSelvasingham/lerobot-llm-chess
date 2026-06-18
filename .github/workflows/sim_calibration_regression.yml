@@ -668,6 +668,36 @@ jobs:
           assert source_inventory["review_packet_observed_evidence_is_authority"] is False, source_inventory
           assert source_inventory["review_packet_development_fixture_evidence_not_physical_so101_truth"] is True, source_inventory
           assert source_inventory["review_packet_physical_so101_model_authority_ready"] is False, source_inventory
+          assert source_inventory["source_intake_status"] in {
+              "source_root_required",
+              "source_authority_review_required",
+              "single_source_selection_required",
+              "source_review_metadata_required",
+              "source_authority_ready_waiting_for_bundle_manifest",
+          }, source_inventory
+          assert source_inventory["source_intake_model_authority"] == "source_intake_not_authority", source_inventory
+          assert isinstance(source_inventory["source_intake_action_count"], int), source_inventory
+          assert isinstance(source_inventory["source_intake_action_ids"], list), source_inventory
+          assert source_inventory["source_intake_action_ids"] == source_inventory["next_required_action_ids"], source_inventory
+          assert source_inventory["source_intake_action_count"] == len(source_inventory["source_intake_action_ids"]), source_inventory
+          assert source_inventory["source_intake_observed_evidence_is_authority"] is False, source_inventory
+          assert source_inventory["source_intake_physical_so101_model_authority_ready"] is False, source_inventory
+          assert source_inventory["source_intake_development_fixture_evidence_not_physical_so101_truth"] is True, source_inventory
+          source_intake_checklist = source_inventory["source_intake_checklist"]
+          assert isinstance(source_intake_checklist, dict), source_inventory
+          assert source_intake_checklist["model_authority"] == "source_intake_not_authority", source_intake_checklist
+          assert source_intake_checklist["observed_evidence_is_authority"] is False, source_intake_checklist
+          assert source_intake_checklist["physical_so101_model_authority_ready"] is False, source_intake_checklist
+          assert source_intake_checklist["development_fixture_evidence_not_physical_so101_truth"] is True, source_intake_checklist
+          assert source_intake_checklist["next_required_action_ids"] == source_inventory["next_required_action_ids"], source_intake_checklist
+          assert isinstance(source_intake_checklist["scanned_roots"], list), source_intake_checklist
+          assert len(source_intake_checklist["scanned_roots"]) == source_inventory["root_count"], source_intake_checklist
+          assert isinstance(source_intake_checklist["actions"], list), source_intake_checklist
+          assert len(source_intake_checklist["actions"]) == source_inventory["source_intake_action_count"], source_intake_checklist
+          assert [
+              action["action_id"] for action in source_intake_checklist["actions"]
+          ] == source_inventory["source_intake_action_ids"], source_intake_checklist
+          assert all(isinstance(action.get("command"), list) for action in source_intake_checklist["actions"]), source_intake_checklist
           assert source_inventory["candidate_count"] >= source_inventory["likely_candidate_count"], source_inventory
           assert source_inventory["likely_candidate_count"] >= source_inventory["direct_contract_candidate_count"], source_inventory
           source_configuration = source_inventory["source_configuration"]
@@ -692,6 +722,8 @@ jobs:
                   "review_packet_waiting_for_model_source_root",
                   "review_packet_source_candidates_need_authority_review",
               }, source_inventory
+              if source_inventory["candidate_count"] == 0:
+                  assert source_inventory["source_intake_status"] == "source_root_required", source_inventory
               assert "review_and_declare_authoritative_so101_model_source" in source_inventory["source_authority_blockers"], source_inventory
               assert source_inventory["diagnostics"], source_inventory
               assert "review_and_declare_authoritative_so101_model_source" in source_inventory["next_required_action_ids"], source_inventory
@@ -701,6 +733,7 @@ jobs:
               assert source_inventory["selected_authoritative_candidate_path"] is None, source_inventory
               assert source_inventory["source_authority_gate_status"] == "source_authority_blocked_ambiguous_authoritative_model", source_inventory
               assert source_inventory["review_packet_status"] == "review_packet_multiple_authoritative_candidates_need_selection", source_inventory
+              assert source_inventory["source_intake_status"] == "single_source_selection_required", source_inventory
               assert "select_single_authoritative_so101_model_source" in source_inventory["source_authority_blockers"], source_inventory
               assert "select_single_authoritative_so101_model_source" in source_inventory["next_required_action_ids"], source_inventory
               assert any(
@@ -710,6 +743,7 @@ jobs:
           if source_inventory["authoritative_candidate_count"] == 1 and source_inventory["source_authority_review_ready"] is False:
               assert source_inventory["source_authority_gate_status"] == "source_authority_blocked_review_metadata", source_inventory
               assert source_inventory["review_packet_status"] == "review_packet_source_authority_review_metadata_needed", source_inventory
+              assert source_inventory["source_intake_status"] == "source_review_metadata_required", source_inventory
               assert "record_source_authority_review_metadata" in source_inventory["source_authority_blockers"], source_inventory
               assert "record_source_authority_review_metadata" in source_inventory["next_required_action_ids"], source_inventory
           if source_inventory["authoritative_candidate_count"] == 1 and source_inventory["source_authority_review_ready"] is True:
@@ -720,8 +754,9 @@ jobs:
               assert source_inventory["selected_authoritative_candidate_path"] in source_inventory["authoritative_candidate_paths"], source_inventory
               assert source_inventory["source_authority_review_scope_ready"] is True, source_inventory
               assert source_inventory["source_authority_missing_review_scope_ids"] == [], source_inventory
+              assert source_inventory["source_intake_status"] == "source_authority_ready_waiting_for_bundle_manifest", source_inventory
           source_inventory_artifacts = source_inventory["artifacts"]
-          for key in ("summary_json", "candidates_csv", "review_packet_json", "review_packet_csv", "readme_md"):
+          for key in ("summary_json", "candidates_csv", "review_packet_json", "review_packet_csv", "source_intake_checklist_json", "source_intake_checklist_csv", "readme_md"):
               assert isinstance(source_inventory_artifacts.get(key), str) and Path(source_inventory_artifacts[key]).is_file(), (
                   key,
                   source_inventory_artifacts,
@@ -1422,6 +1457,18 @@ jobs:
               and row.get("exists") is True
               for row in artifacts_by_category["so101_model_source_inventory"]
           ), artifacts_by_category["so101_model_source_inventory"]
+          assert any(
+              row.get("label") == "so101_model_source_inventory:source_intake_checklist"
+              and row.get("kind") == "json"
+              and row.get("exists") is True
+              for row in artifacts_by_category["so101_model_source_inventory"]
+          ), artifacts_by_category["so101_model_source_inventory"]
+          assert any(
+              row.get("label") == "so101_model_source_inventory:source_intake_checklist_rows"
+              and row.get("kind") == "csv"
+              and row.get("exists") is True
+              for row in artifacts_by_category["so101_model_source_inventory"]
+          ), artifacts_by_category["so101_model_source_inventory"]
           for row in artifacts_by_category["so101_model_source_inventory"]:
               metrics = row.get("metrics", {})
               assert metrics.get("source_authority_review_status") in {
@@ -1481,6 +1528,21 @@ jobs:
               assert metrics.get("review_packet_observed_evidence_is_authority") is False, metrics
               assert metrics.get("review_packet_development_fixture_evidence_not_physical_so101_truth") is True, metrics
               assert metrics.get("review_packet_physical_so101_model_authority_ready") is False, metrics
+              assert metrics.get("source_intake_status") in {
+                  "source_root_required",
+                  "source_authority_review_required",
+                  "single_source_selection_required",
+                  "source_review_metadata_required",
+                  "source_authority_ready_waiting_for_bundle_manifest",
+              }, metrics
+              assert metrics.get("source_intake_model_authority") == "source_intake_not_authority", metrics
+              assert isinstance(metrics.get("source_intake_action_count"), int), metrics
+              assert isinstance(metrics.get("source_intake_action_ids"), list), metrics
+              assert metrics.get("source_intake_action_ids") == metrics.get("next_required_action_ids"), metrics
+              assert metrics.get("source_intake_action_count") == len(metrics.get("source_intake_action_ids")), metrics
+              assert metrics.get("source_intake_observed_evidence_is_authority") is False, metrics
+              assert metrics.get("source_intake_physical_so101_model_authority_ready") is False, metrics
+              assert metrics.get("source_intake_development_fixture_evidence_not_physical_so101_truth") is True, metrics
           assert any(
               row.get("kind") == "json"
               and row.get("exists") is True
@@ -1935,6 +1997,8 @@ jobs:
           assert "`so101_model_source_inventory/so101_model_source_candidates.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_inventory_review_packet.json`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_inventory_review_packet.csv`" in entrypoint_text, entrypoint_text
+          assert "`so101_model_source_inventory/so101_model_source_intake_checklist.json`" in entrypoint_text, entrypoint_text
+          assert "`so101_model_source_inventory/so101_model_source_intake_checklist.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_mujoco_scene/so101_mujoco_scene_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_chess_env/so101_chess_env_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_env_resets/so101_env_resets_summary.json`" in entrypoint_text, entrypoint_text
@@ -2138,6 +2202,8 @@ jobs:
               "so101_model_source_inventory/so101_model_source_inventory_summary.json",
               "so101_model_source_inventory/so101_model_source_inventory_review_packet.json",
               "so101_model_source_inventory/so101_model_source_inventory_review_packet.csv",
+              "so101_model_source_inventory/so101_model_source_intake_checklist.json",
+              "so101_model_source_inventory/so101_model_source_intake_checklist.csv",
               "so101_model_contract/so101_model_contract_summary.json",
               "ik_reachability_drill/ik_reachability_drill_summary.json",
               "so101_mujoco_scene/so101_mujoco_scene_summary.json",
