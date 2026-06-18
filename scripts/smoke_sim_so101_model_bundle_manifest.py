@@ -29,6 +29,26 @@ TCP_OFFSET_FIELDS = (
     "target_frame_to_tcp_m",
     "tool_center_point_offset_m",
 )
+TCP_OFFSET_REVIEW_FIELDS = (
+    "tcp_offset_authority",
+    "tcp_offset_review",
+    "gripper_tip_offset_review",
+    "tcp_calibration",
+)
+TCP_OFFSET_STATUS_FIELDS = (
+    "tcp_offset_authority_status",
+    "tcp_calibration_status",
+    "review_status",
+    "status",
+)
+REVIEWED_TCP_OFFSET_STATUSES = {
+    "reviewed",
+    "operator_reviewed",
+    "tcp_offset_reviewed",
+    "tcp_calibration_reviewed",
+    "model_bundle_reviewed",
+}
+SYNTHETIC_FIXTURE_TCP_OFFSET_STATUS = "synthetic_fixture_reviewed_for_automation_only"
 JOINT_LIMIT_FIELDS = (
     "joint_limits_deg",
     "joint_limits",
@@ -121,6 +141,29 @@ ALIGNMENT_FIELDS = (
     "base_to_board_transform",
     "base_to_board_alignment",
 )
+ALIGNMENT_REVIEW_FIELDS = (
+    "base_to_board_alignment_authority",
+    "base_to_board_authority",
+    "base_to_board_alignment_review",
+    "base_to_board_review",
+    "alignment_calibration",
+)
+ALIGNMENT_STATUS_FIELDS = (
+    "base_to_board_alignment_authority_status",
+    "base_to_board_authority_status",
+    "alignment_calibration_status",
+    "review_status",
+    "status",
+)
+REVIEWED_ALIGNMENT_STATUSES = {
+    "reviewed",
+    "operator_reviewed",
+    "base_to_board_reviewed",
+    "alignment_reviewed",
+    "calibration_reviewed",
+    "model_bundle_reviewed",
+}
+SYNTHETIC_FIXTURE_ALIGNMENT_STATUS = "synthetic_fixture_reviewed_for_automation_only"
 ALIGNMENT_PLACEHOLDER_FIELDS = (
     "base_to_board_alignment_placeholder",
     "alignment_placeholders",
@@ -160,11 +203,11 @@ REQUIRED_INPUTS = (
     },
     {
         "input": "tcp_offset_m",
-        "requirement": "Calibrated target-frame to TCP/gripper-tip offset as x/y/z meters.",
+        "requirement": "Calibrated target-frame to TCP/gripper-tip offset as x/y/z meters with review authority.",
     },
     {
         "input": "base_to_board_transform",
-        "requirement": "Calibrated base-to-board transform, not only a placeholder.",
+        "requirement": "Calibrated base-to-board transform with review authority, not only a placeholder.",
     },
     {
         "input": "contract_checker_result",
@@ -364,9 +407,9 @@ def load_manifest(manifest_path: Path | None) -> tuple[dict[str, Any] | None, di
     }
 
 
-def vector3_status(value: Any) -> dict[str, Any]:
+def vector_status(value: Any, axes: tuple[str, str, str]) -> dict[str, Any]:
     if isinstance(value, dict):
-        missing = [axis for axis in ("x", "y", "z") if axis not in value]
+        missing = [axis for axis in axes if axis not in value]
         if missing:
             return {
                 "present": True,
@@ -375,7 +418,7 @@ def vector3_status(value: Any) -> dict[str, Any]:
                 "diagnostics": [f"missing_axis:{axis}" for axis in missing],
             }
         try:
-            vector = {axis: float(value[axis]) for axis in ("x", "y", "z")}
+            vector = {axis: float(value[axis]) for axis in axes}
         except (TypeError, ValueError) as exc:
             return {
                 "present": True,
@@ -401,8 +444,12 @@ def vector3_status(value: Any) -> dict[str, Any]:
         "present": value is not None,
         "valid": False,
         "value": value,
-        "diagnostics": ["expected_x_y_z_object_or_len3_list"],
+        "diagnostics": [f"expected_{'_'.join(axes)}_object_or_len3_list"],
     }
+
+
+def vector3_status(value: Any) -> dict[str, Any]:
+    return vector_status(value, ("x", "y", "z"))
 
 
 def find_first_field(manifest: dict[str, Any], field_names: tuple[str, ...]) -> tuple[str | None, Any]:
@@ -798,6 +845,99 @@ def inspect_target_frame(manifest: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
+def inspect_review_metadata(
+    candidates: list[tuple[str, Any]],
+    *,
+    status_fields: tuple[str, ...],
+    accepted_statuses: set[str],
+    synthetic_status: str,
+    diagnostic_prefix: str,
+    synthetic_scope_diagnostic: str,
+    synthetic_note: str,
+    review_note: str,
+) -> dict[str, Any]:
+    review_source = None
+    review_source_field = None
+    for candidate_field, candidate_value in candidates:
+        if not isinstance(candidate_value, dict):
+            continue
+        has_status = has_any_non_empty_field(candidate_value, status_fields)
+        has_review = has_any_non_empty_field(candidate_value, AUTHORITY_REVIEW_FIELDS)
+        if has_status or has_review:
+            review_source = candidate_value
+            review_source_field = candidate_field
+            break
+
+    if not isinstance(review_source, dict):
+        return {
+            "status": "missing",
+            "field": None,
+            "value": None,
+            "review_status": None,
+            "review_evidence_present": False,
+            "synthetic_fixture_only": False,
+            "accepted_review_statuses": sorted(accepted_statuses),
+            "diagnostics": [f"{diagnostic_prefix}_review_missing"],
+        }
+
+    status_field, raw_status = first_non_empty_field(review_source, status_fields)
+    status_value = str(raw_status).strip().lower() if raw_status is not None else ""
+    review_field_present = has_any_non_empty_field(review_source, AUTHORITY_REVIEW_FIELDS)
+    diagnostics: list[str] = []
+    if not status_value:
+        diagnostics.append(f"{diagnostic_prefix}_review_status_missing")
+    elif status_value not in accepted_statuses and status_value != synthetic_status:
+        diagnostics.append(f"{diagnostic_prefix}_review_status_not_accepted:{status_value}")
+    if not review_field_present:
+        diagnostics.append(f"{diagnostic_prefix}_review_evidence_missing")
+
+    is_synthetic_fixture = status_value == synthetic_status
+    if is_synthetic_fixture and "hardware-free" not in str(review_source.get("scope", "")).lower():
+        diagnostics.append(synthetic_scope_diagnostic)
+
+    review_status_ok = status_value in accepted_statuses or (
+        is_synthetic_fixture and synthetic_scope_diagnostic not in diagnostics
+    )
+    return {
+        "status": "present" if review_status_ok and review_field_present else "needs_review",
+        "field": review_source_field,
+        "value": review_source,
+        "review_status_field": status_field,
+        "review_status": status_value or None,
+        "review_evidence_present": review_field_present,
+        "synthetic_fixture_only": is_synthetic_fixture,
+        "accepted_review_statuses": sorted(accepted_statuses),
+        "diagnostics": diagnostics,
+        "notes": synthetic_note if is_synthetic_fixture else review_note,
+    }
+
+
+def inspect_tcp_offset_review(
+    manifest: dict[str, Any],
+    field_name: str,
+    raw_value: Any,
+) -> dict[str, Any]:
+    candidates: list[tuple[str, Any]] = []
+    if isinstance(raw_value, dict):
+        candidates.append((field_name, raw_value))
+    for review_field in TCP_OFFSET_REVIEW_FIELDS:
+        if review_field in manifest:
+            candidates.append((review_field, manifest.get(review_field)))
+    return inspect_review_metadata(
+        candidates,
+        status_fields=TCP_OFFSET_STATUS_FIELDS,
+        accepted_statuses=REVIEWED_TCP_OFFSET_STATUSES,
+        synthetic_status=SYNTHETIC_FIXTURE_TCP_OFFSET_STATUS,
+        diagnostic_prefix="tcp_offset_authority",
+        synthetic_scope_diagnostic="synthetic_tcp_offset_scope_missing_hardware_free",
+        synthetic_note=(
+            "Synthetic fixture TCP offset authority is accepted only for hardware-free forwarding regression fixtures; "
+            "it is not physical SO-101 TCP truth."
+        ),
+        review_note="TCP offset readiness requires accepted review status plus reviewer/date/id/url evidence.",
+    )
+
+
 def inspect_tcp_offset(manifest: dict[str, Any] | None) -> dict[str, Any]:
     if not manifest:
         return {
@@ -815,12 +955,88 @@ def inspect_tcp_offset(manifest: dict[str, Any] | None) -> dict[str, Any]:
             "diagnostics": ["tcp_offset_missing"],
         }
     vector = vector3_status(value)
+    review = inspect_tcp_offset_review(manifest, field_name, value)
+    diagnostics = list(vector["diagnostics"])
+    if vector["valid"] and review["status"] != "present":
+        diagnostics.extend(review.get("diagnostics", []))
     return {
-        "status": "present" if vector["valid"] else "invalid",
+        "status": "present" if not diagnostics else "needs_review" if vector["valid"] else "invalid",
         "field": field_name,
         "value": vector["value"],
-        "diagnostics": vector["diagnostics"],
+        "review": review,
+        "review_status": review.get("status"),
+        "review_diagnostics": review.get("diagnostics", []),
+        "diagnostics": diagnostics,
     }
+
+
+def alignment_transform_status(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {
+            "valid": False,
+            "value": value,
+            "diagnostics": ["base_to_board_transform_not_object"],
+        }
+
+    translation_field, translation_value = find_first_field(
+        value,
+        ("translation_m", "translation", "position_m"),
+    )
+    rotation_field, rotation_value = find_first_field(
+        value,
+        ("rotation_rpy_rad", "rotation_rpy", "rpy_rad"),
+    )
+    diagnostics: list[str] = []
+    normalized: dict[str, Any] = {}
+    if translation_field is None:
+        diagnostics.append("base_to_board_translation_missing")
+    else:
+        translation = vector3_status(translation_value)
+        normalized["translation"] = {
+            "field": translation_field,
+            "value": translation["value"],
+        }
+        diagnostics.extend(f"translation:{diagnostic}" for diagnostic in translation["diagnostics"])
+    if rotation_field is None:
+        diagnostics.append("base_to_board_rotation_rpy_missing")
+    else:
+        rotation = vector_status(rotation_value, ("roll", "pitch", "yaw"))
+        normalized["rotation_rpy"] = {
+            "field": rotation_field,
+            "value": rotation["value"],
+        }
+        diagnostics.extend(f"rotation_rpy:{diagnostic}" for diagnostic in rotation["diagnostics"])
+    return {
+        "valid": not diagnostics,
+        "value": normalized if normalized else value,
+        "diagnostics": diagnostics,
+    }
+
+
+def inspect_alignment_review(
+    manifest: dict[str, Any],
+    field_name: str,
+    raw_value: Any,
+) -> dict[str, Any]:
+    candidates: list[tuple[str, Any]] = []
+    if isinstance(raw_value, dict):
+        candidates.append((field_name, raw_value))
+    for review_field in ALIGNMENT_REVIEW_FIELDS:
+        if review_field in manifest:
+            candidates.append((review_field, manifest.get(review_field)))
+    return inspect_review_metadata(
+        candidates,
+        status_fields=ALIGNMENT_STATUS_FIELDS,
+        accepted_statuses=REVIEWED_ALIGNMENT_STATUSES,
+        synthetic_status=SYNTHETIC_FIXTURE_ALIGNMENT_STATUS,
+        diagnostic_prefix="base_to_board_alignment_authority",
+        synthetic_scope_diagnostic="synthetic_base_to_board_alignment_scope_missing_hardware_free",
+        synthetic_note=(
+            "Synthetic fixture base-to-board alignment authority is accepted only for hardware-free forwarding regression fixtures; "
+            "it is not physical SO-101 board-alignment truth."
+        ),
+        review_note="Base-to-board alignment readiness requires accepted review status plus reviewer/date/id/url evidence.",
+    )
 
 
 def inspect_alignment(manifest: dict[str, Any] | None) -> dict[str, Any]:
@@ -836,13 +1052,22 @@ def inspect_alignment(manifest: dict[str, Any] | None) -> dict[str, Any]:
 
     field_name, value = find_first_field(manifest, ALIGNMENT_FIELDS)
     if field_name is not None and non_empty(value):
+        transform = alignment_transform_status(value)
+        review = inspect_alignment_review(manifest, field_name, value)
+        diagnostics = list(transform["diagnostics"])
+        if transform["valid"] and review["status"] != "present":
+            diagnostics.extend(review.get("diagnostics", []))
         return {
-            "status": "present",
+            "status": "present" if not diagnostics else "needs_review" if transform["valid"] else "invalid",
             "field": field_name,
             "value": value,
+            "transform": transform,
+            "review": review,
+            "review_status": review.get("status"),
+            "review_diagnostics": review.get("diagnostics", []),
             "placeholder_field": None,
             "placeholder_value": None,
-            "diagnostics": [],
+            "diagnostics": diagnostics,
         }
 
     placeholder_field, placeholder_value = find_first_field(manifest, ALIGNMENT_PLACEHOLDER_FIELDS)
@@ -1141,6 +1366,24 @@ def joint_limit_missing_inputs(joint_limits: dict[str, Any]) -> list[str] | None
     return ["joint_limits_deg"]
 
 
+def tcp_offset_missing_inputs(tcp_offset: dict[str, Any]) -> list[str] | None:
+    status = tcp_offset.get("status")
+    if status == "present":
+        return None
+    if status == "needs_review":
+        return ["tcp_offset_authority"]
+    return ["tcp_offset_m"]
+
+
+def alignment_missing_inputs(alignment: dict[str, Any]) -> list[str] | None:
+    status = alignment.get("status")
+    if status == "present":
+        return None
+    if status == "needs_review":
+        return ["base_to_board_alignment_authority"]
+    return ["base_to_board_transform"]
+
+
 def build_field_checks(
     manifest_request: dict[str, Any],
     model_path: dict[str, Any],
@@ -1209,15 +1452,13 @@ def build_field_checks(
         {
             "requirement_id": "tcp_offset_m",
             "ok": tcp_offset["status"] == "present",
-            "missing_inputs": None if tcp_offset["status"] == "present" else ["tcp_offset_m"],
+            "missing_inputs": tcp_offset_missing_inputs(tcp_offset),
             "diagnostics": tcp_offset.get("diagnostics", []),
         },
         {
             "requirement_id": "base_to_board_transform",
             "ok": alignment["status"] == "present",
-            "missing_inputs": None
-            if alignment["status"] == "present"
-            else ["base_to_board_transform"],
+            "missing_inputs": alignment_missing_inputs(alignment),
             "diagnostics": alignment.get("diagnostics", []),
         },
         {
@@ -1358,10 +1599,10 @@ def build_checklist_rows(
             "warning",
             f"manifest.{'|'.join(TCP_OFFSET_FIELDS)}",
             tcp_offset,
-            {"x": "meters", "y": "meters", "z": "meters"},
-            None if tcp_offset["status"] == "present" else ["tcp_offset_m"],
+            {"x": "meters", "y": "meters", "z": "meters", "review_authority": True},
+            tcp_offset_missing_inputs(tcp_offset),
             tcp_offset.get("diagnostics", []),
-            "Accepted aliases are tcp_offset_m, gripper_tip_offset_m, target_frame_to_tcp_m, and tool_center_point_offset_m.",
+            "Accepted aliases are tcp_offset_m, gripper_tip_offset_m, target_frame_to_tcp_m, and tool_center_point_offset_m; readiness also requires reviewed TCP authority.",
         ),
         row(
             "base_to_board_transform",
@@ -1370,10 +1611,15 @@ def build_checklist_rows(
             "warning",
             f"manifest.{'|'.join(ALIGNMENT_FIELDS + ALIGNMENT_PLACEHOLDER_FIELDS)}",
             alignment,
-            {"calibrated_transform": True},
-            None if alignment["status"] == "present" else ["base_to_board_transform"],
+            {
+                "calibrated_transform": True,
+                "translation_m": "x/y/z meters",
+                "rotation_rpy_rad": "roll/pitch/yaw radians",
+                "review_authority": True,
+            },
+            alignment_missing_inputs(alignment),
             alignment.get("diagnostics", []),
-            "Explicit placeholders are recorded but do not make the bundle ready for model-backed IK.",
+            "Explicit placeholders are recorded but do not make the bundle ready; readiness requires reviewed base-to-board alignment authority.",
         ),
         row(
             "contract_checker_result",
@@ -1429,6 +1675,7 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         f"- `mesh_assets_status`: `{summary['mesh_assets']['status']}`",
         f"- `mesh_reference_count`: `{summary['mesh_assets']['mesh_reference_count']}`",
         f"- `target_frame`: `{summary['target_frame']['value']}`",
+        f"- `tcp_offset_status`: `{summary['tcp_offset']['status']}`",
         f"- `tcp_offset_field`: `{summary['tcp_offset']['field']}`",
         f"- `alignment_status`: `{summary['base_to_board_alignment']['status']}`",
         f"- `contract_status`: `{contract.get('status')}`",

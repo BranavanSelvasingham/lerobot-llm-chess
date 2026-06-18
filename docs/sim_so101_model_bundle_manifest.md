@@ -73,7 +73,10 @@ not satisfy readiness. Joint-limit values also need review evidence: numeric
 limits without `joint_limit_authority` or an accepted review marker are recorded
 as `needs_review`. Mesh references also need review evidence: resolved mesh
 files without `mesh_asset_authority` or an accepted mesh/asset-root review
-marker are recorded as `needs_review`.
+marker are recorded as `needs_review`. Numeric TCP offsets and base-to-board
+transforms also need review evidence through `tcp_offset_authority` and
+`base_to_board_alignment_authority`; otherwise they remain diagnostic inputs
+only.
 
 To re-check a generated draft directly:
 
@@ -177,6 +180,12 @@ resolved from the manifest directory.
     "y": 0.0,
     "z": 0.0
   },
+  "tcp_offset_authority": {
+    "tcp_offset_authority_status": "reviewed",
+    "reviewed_by": "operator-or-review-id",
+    "reviewed_at": "2026-06-16",
+    "source": "reviewed TCP/gripper-tip calibration record"
+  },
   "base_to_board_transform": {
     "translation_m": {
       "x": 0.0,
@@ -188,6 +197,12 @@ resolved from the manifest directory.
       "pitch": 0.0,
       "yaw": 0.0
     }
+  },
+  "base_to_board_alignment_authority": {
+    "base_to_board_alignment_authority_status": "reviewed",
+    "reviewed_by": "operator-or-review-id",
+    "reviewed_at": "2026-06-16",
+    "source": "reviewed board registration or calibration record"
   }
 }
 ```
@@ -245,6 +260,30 @@ hardware-free regression fixtures. Review evidence must include at least one of
 without this review metadata remain diagnostic evidence, not reviewed physical
 SO-101 mesh truth.
 
+TCP/gripper-tip offset authority must be declared in `tcp_offset_authority`,
+`tcp_offset_review`, `gripper_tip_offset_review`, or `tcp_calibration`.
+Accepted TCP review statuses are `reviewed`, `operator_reviewed`,
+`tcp_offset_reviewed`, `tcp_calibration_reviewed`, and
+`model_bundle_reviewed`, plus
+`synthetic_fixture_reviewed_for_automation_only` only for explicitly
+hardware-free regression fixtures. Review evidence must include at least one of
+`reviewed_by`, `reviewed_at`, `review_id`, or `review_url`. Numeric TCP offsets
+without this metadata remain diagnostic evidence, not reviewed physical SO-101
+TCP truth.
+
+Base-to-board alignment authority must be declared in
+`base_to_board_alignment_authority`, `base_to_board_authority`,
+`base_to_board_alignment_review`, `base_to_board_review`, or
+`alignment_calibration`. Accepted alignment review statuses are `reviewed`,
+`operator_reviewed`, `base_to_board_reviewed`, `alignment_reviewed`,
+`calibration_reviewed`, and `model_bundle_reviewed`, plus
+`synthetic_fixture_reviewed_for_automation_only` only for explicitly
+hardware-free regression fixtures. Review evidence must include at least one of
+`reviewed_by`, `reviewed_at`, `review_id`, or `review_url`. The transform value
+must include x/y/z translation and roll/pitch/yaw rotation fields; a non-empty
+object without that shape or without review metadata does not make the bundle
+ready.
+
 ## Readiness Rule
 
 The checker reports `ready_for_model_backed_ik: true` only when all of these are
@@ -262,8 +301,11 @@ true:
 - mesh/asset-root authority includes an accepted review status plus review
   evidence
 - the target frame is present or defaulted
-- a valid x/y/z TCP offset in meters is present
+- a valid x/y/z TCP offset in meters is present and includes accepted TCP
+  review authority
 - a real `base_to_board_transform` or `base_to_board_alignment` is populated
+  with translation/rotation fields and includes accepted alignment review
+  authority
 - the child SO-101 model contract checker reports `model_contract_checked`, or
   the URDF has the expected static joint/frame contract and the only runtime
   follow-up is missing optional `placo`
