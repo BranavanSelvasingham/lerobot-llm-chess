@@ -309,6 +309,8 @@ jobs:
               "source_ready_physical_bundle_observed_digest_mismatch",
               "source_ready_physical_bundle_digest_mismatch",
               "source_ready_physical_bundle_motion_status_inconsistent",
+              "source_ready_physical_bundle_motion_model_path_mismatch",
+              "source_ready_physical_bundle_motion_model_digest_mismatch",
               "source_ready_hardware_free_bundle_fixture",
               "source_ready_physical_bundle_fixture_motion_not_physical",
               "source_ready_physical_bundle_with_fixture_ready_conflict",
@@ -419,6 +421,28 @@ jobs:
           assert inconsistent_motion["reviewed_mujoco_bundle_status"] == "reviewed_mujoco_bundle_not_ready", inconsistent_motion
           assert inconsistent_motion["reviewed_mujoco_motion_authority_status"] == "not_checked_manifest_not_ready", inconsistent_motion
           assert "prove_physical_reviewed_model_motion" in inconsistent_motion["next_required_action_ids"], inconsistent_motion
+          motion_path_mismatch_case = by_case["source_ready_physical_bundle_motion_model_path_mismatch"]
+          motion_path_mismatch = motion_path_mismatch_case["gate"]
+          assert motion_path_mismatch["ready"] is False, motion_path_mismatch
+          assert motion_path_mismatch["source_bundle_consistency_status"] == "source_bundle_model_path_and_digest_consistent", motion_path_mismatch
+          assert motion_path_mismatch["reviewed_mujoco_motion_bundle_consistency_status"] == "reviewed_mujoco_motion_model_path_mismatch", motion_path_mismatch
+          assert motion_path_mismatch["reviewed_mujoco_motion_bundle_consistency"]["reviewed_mujoco_motion_model_path_matches_bundle"] is False, motion_path_mismatch
+          assert motion_path_mismatch["reviewed_mujoco_motion_bundle_consistency"]["reviewed_mujoco_motion_model_sha256_matches_bundle"] is True, motion_path_mismatch
+          assert motion_path_mismatch["physical_reviewed_model_motion_child_ready"] is True, motion_path_mismatch
+          assert motion_path_mismatch["physical_reviewed_model_motion_checked"] is False, motion_path_mismatch
+          assert "align_reviewed_mujoco_motion_with_bundle_model_path" in motion_path_mismatch["next_required_action_ids"], motion_path_mismatch
+          assert "align_reviewed_mujoco_motion_with_bundle_model_path" in motion_path_mismatch_case["blocker_packet"]["next_action_ids"], motion_path_mismatch_case
+          motion_digest_mismatch_case = by_case["source_ready_physical_bundle_motion_model_digest_mismatch"]
+          motion_digest_mismatch = motion_digest_mismatch_case["gate"]
+          assert motion_digest_mismatch["ready"] is False, motion_digest_mismatch
+          assert motion_digest_mismatch["source_bundle_consistency_status"] == "source_bundle_model_path_and_digest_consistent", motion_digest_mismatch
+          assert motion_digest_mismatch["reviewed_mujoco_motion_bundle_consistency_status"] == "reviewed_mujoco_motion_model_digest_mismatch", motion_digest_mismatch
+          assert motion_digest_mismatch["reviewed_mujoco_motion_bundle_consistency"]["reviewed_mujoco_motion_model_path_matches_bundle"] is True, motion_digest_mismatch
+          assert motion_digest_mismatch["reviewed_mujoco_motion_bundle_consistency"]["reviewed_mujoco_motion_model_sha256_matches_bundle"] is False, motion_digest_mismatch
+          assert motion_digest_mismatch["physical_reviewed_model_motion_child_ready"] is True, motion_digest_mismatch
+          assert motion_digest_mismatch["physical_reviewed_model_motion_checked"] is False, motion_digest_mismatch
+          assert "align_reviewed_mujoco_motion_with_bundle_model_digest" in motion_digest_mismatch["next_required_action_ids"], motion_digest_mismatch
+          assert "align_reviewed_mujoco_motion_with_bundle_model_digest" in motion_digest_mismatch_case["blocker_packet"]["next_action_ids"], motion_digest_mismatch_case
           fixture_motion = by_case["source_ready_physical_bundle_fixture_motion_not_physical"]["gate"]
           assert fixture_motion["ready"] is False, fixture_motion
           assert fixture_motion["source_bundle_consistency_status"] == "source_bundle_model_path_and_digest_consistent", fixture_motion

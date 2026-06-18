@@ -4010,6 +4010,99 @@ def so101_source_bundle_consistency_section(
     }
 
 
+def so101_reviewed_mujoco_motion_bundle_consistency_section(
+    bundle_manifest: dict[str, Any],
+    reviewed_mujoco_bundle: dict[str, Any],
+    *,
+    physical_authority_ready: bool,
+    source_bundle_consistency_ready: bool,
+    physical_reviewed_motion_child_ready: bool,
+) -> dict[str, Any]:
+    bundle_model_path = normalized_gate_path(
+        (bundle_manifest.get("model_path") or {}).get("path")
+        if isinstance(bundle_manifest.get("model_path"), dict)
+        else None
+    )
+    motion_model_path = normalized_gate_path(
+        (reviewed_mujoco_bundle.get("model_path") or {}).get("path")
+        if isinstance(reviewed_mujoco_bundle.get("model_path"), dict)
+        else None
+    )
+    bundle_model_identity = bundle_manifest.get("model_identity")
+    bundle_model_identity = (
+        bundle_model_identity if isinstance(bundle_model_identity, dict) else {}
+    )
+    motion_model_identity = reviewed_mujoco_bundle.get("model_identity")
+    motion_model_identity = (
+        motion_model_identity if isinstance(motion_model_identity, dict) else {}
+    )
+    bundle_model_declared_sha256 = normalized_sha256(
+        bundle_model_identity.get("declared_sha256")
+    )
+    motion_model_declared_sha256 = normalized_sha256(
+        motion_model_identity.get("declared_sha256")
+    )
+    prerequisites_ready = (
+        physical_authority_ready
+        and source_bundle_consistency_ready
+        and physical_reviewed_motion_child_ready
+    )
+    model_path_matches = bool(
+        bundle_model_path and motion_model_path and bundle_model_path == motion_model_path
+    )
+    model_digest_matches = bool(
+        bundle_model_declared_sha256
+        and motion_model_declared_sha256
+        and bundle_model_declared_sha256 == motion_model_declared_sha256
+    )
+    if not prerequisites_ready:
+        status = "not_checked_prerequisites_not_ready"
+        ready = False
+        blocker = None
+    elif not motion_model_path:
+        status = "reviewed_mujoco_motion_model_path_missing"
+        ready = False
+        blocker = "rerun_reviewed_mujoco_motion_with_bundle_model_path"
+    elif not bundle_model_path:
+        status = "bundle_model_path_missing"
+        ready = False
+        blocker = "select_reviewed_so101_model_path"
+    elif not model_path_matches:
+        status = "reviewed_mujoco_motion_model_path_mismatch"
+        ready = False
+        blocker = "align_reviewed_mujoco_motion_with_bundle_model_path"
+    elif not motion_model_declared_sha256 or not bundle_model_declared_sha256:
+        status = "reviewed_mujoco_motion_model_digest_missing"
+        ready = False
+        blocker = "record_reviewed_mujoco_motion_model_sha256"
+    elif not model_digest_matches:
+        status = "reviewed_mujoco_motion_model_digest_mismatch"
+        ready = False
+        blocker = "align_reviewed_mujoco_motion_with_bundle_model_digest"
+    else:
+        status = "reviewed_mujoco_motion_matches_bundle_model_identity"
+        ready = True
+        blocker = None
+
+    return {
+        "ready": ready,
+        "status": status,
+        "checked": prerequisites_ready,
+        "prerequisites_ready": prerequisites_ready,
+        "bundle_model_path": bundle_model_path,
+        "reviewed_mujoco_motion_model_path": motion_model_path,
+        "reviewed_mujoco_motion_model_path_matches_bundle": model_path_matches,
+        "bundle_model_declared_sha256": bundle_model_declared_sha256,
+        "reviewed_mujoco_motion_model_declared_sha256": motion_model_declared_sha256,
+        "reviewed_mujoco_motion_model_sha256_matches_bundle": model_digest_matches,
+        "blocker": blocker,
+        "notes": [
+            "This check prevents physical-reviewed MuJoCo motion evidence from closing authority for a different model path or digest than the reviewed bundle manifest.",
+            "It is evaluated only after source-to-bundle identity is ready and the reviewed-MuJoCo child reports physical motion ready.",
+        ],
+    }
+
+
 def so101_reviewed_model_authority_gate_section(
     source_inventory: dict[str, Any],
     bundle_manifest: dict[str, Any],
@@ -4034,7 +4127,7 @@ def so101_reviewed_model_authority_gate_section(
         and reviewed_mujoco_motion_authority_status
         == "physical_reviewed_model_motion_checked"
     )
-    physical_reviewed_motion_ready = (
+    physical_reviewed_motion_child_ready = (
         physical_reviewed_motion_reported and physical_reviewed_motion_status_ready
     )
     source_bundle_consistency = so101_source_bundle_consistency_section(
@@ -4044,6 +4137,22 @@ def so101_reviewed_model_authority_gate_section(
         physical_authority_ready=physical_authority_ready,
     )
     source_bundle_consistency_ready = source_bundle_consistency.get("ready") is True
+    reviewed_mujoco_motion_bundle_consistency = (
+        so101_reviewed_mujoco_motion_bundle_consistency_section(
+            bundle_manifest,
+            reviewed_mujoco_bundle,
+            physical_authority_ready=physical_authority_ready,
+            source_bundle_consistency_ready=source_bundle_consistency_ready,
+            physical_reviewed_motion_child_ready=physical_reviewed_motion_child_ready,
+        )
+    )
+    reviewed_mujoco_motion_bundle_consistency_ready = (
+        reviewed_mujoco_motion_bundle_consistency.get("ready") is True
+    )
+    physical_reviewed_motion_ready = (
+        physical_reviewed_motion_child_ready
+        and reviewed_mujoco_motion_bundle_consistency_ready
+    )
     ready = (
         source_authority_ready
         and physical_authority_ready
@@ -4063,7 +4172,12 @@ def so101_reviewed_model_authority_gate_section(
             ),
             *(
                 []
-                if physical_reviewed_motion_ready
+                if reviewed_mujoco_motion_bundle_consistency.get("blocker") is None
+                else [reviewed_mujoco_motion_bundle_consistency["blocker"]]
+            ),
+            *(
+                []
+                if physical_reviewed_motion_child_ready
                 else [
                     "load_reviewed_model_in_mujoco",
                     "prove_physical_reviewed_model_motion",
@@ -4191,6 +4305,57 @@ def so101_reviewed_model_authority_gate_section(
         ]
     else:
         consistency_actions = []
+    motion_consistency_status = reviewed_mujoco_motion_bundle_consistency.get("status")
+    if motion_consistency_status == "reviewed_mujoco_motion_model_path_missing":
+        motion_consistency_actions = [
+            {
+                "action_id": "rerun_reviewed_mujoco_motion_with_bundle_model_path",
+                "gate": "mujoco_scene_validity",
+                "title": "Rerun reviewed MuJoCo motion with bundle model path",
+                "detail": (
+                    "Regenerate the reviewed-MuJoCo bundle evidence from the reviewed "
+                    "bundle manifest so the motion summary carries the same model path."
+                ),
+            }
+        ]
+    elif motion_consistency_status == "reviewed_mujoco_motion_model_path_mismatch":
+        motion_consistency_actions = [
+            {
+                "action_id": "align_reviewed_mujoco_motion_with_bundle_model_path",
+                "gate": "mujoco_scene_validity",
+                "title": "Align reviewed MuJoCo motion model path",
+                "detail": (
+                    "Rerun or replace the reviewed-MuJoCo motion evidence so its model "
+                    "path matches the reviewed bundle manifest model path."
+                ),
+            }
+        ]
+    elif motion_consistency_status == "reviewed_mujoco_motion_model_digest_missing":
+        motion_consistency_actions = [
+            {
+                "action_id": "record_reviewed_mujoco_motion_model_sha256",
+                "gate": "mujoco_scene_validity",
+                "title": "Record reviewed MuJoCo motion model digest",
+                "detail": (
+                    "Ensure the reviewed-MuJoCo motion summary carries the reviewed "
+                    "model SHA-256 from the bundle manifest before closing authority."
+                ),
+            }
+        ]
+    elif motion_consistency_status == "reviewed_mujoco_motion_model_digest_mismatch":
+        motion_consistency_actions = [
+            {
+                "action_id": "align_reviewed_mujoco_motion_with_bundle_model_digest",
+                "gate": "mujoco_scene_validity",
+                "title": "Align reviewed MuJoCo motion model digest",
+                "detail": (
+                    "Rerun or replace the reviewed-MuJoCo motion evidence so its model "
+                    "digest matches the reviewed bundle manifest declaration."
+                ),
+            }
+        ]
+    else:
+        motion_consistency_actions = []
     motion_actions = (
         [
             {
@@ -4212,7 +4377,8 @@ def so101_reviewed_model_authority_gate_section(
                 ),
             },
         ]
-        if not physical_reviewed_motion_ready
+        if not physical_reviewed_motion_reported
+        or not physical_reviewed_motion_status_ready
         else []
     )
     fixture_boundary_actions = (
@@ -4238,6 +4404,7 @@ def so101_reviewed_model_authority_gate_section(
         bundle_manifest.get("next_required_for_goal"),
         reviewed_mujoco_bundle.get("next_required_for_goal"),
         consistency_actions,
+        motion_consistency_actions,
         fixture_boundary_actions,
         motion_actions,
     )
@@ -4273,9 +4440,19 @@ def so101_reviewed_model_authority_gate_section(
         "source_bundle_consistency_ready": source_bundle_consistency_ready,
         "source_bundle_consistency_status": source_bundle_consistency.get("status"),
         "source_bundle_consistency": source_bundle_consistency,
+        "reviewed_mujoco_motion_bundle_consistency_ready": (
+            reviewed_mujoco_motion_bundle_consistency_ready
+        ),
+        "reviewed_mujoco_motion_bundle_consistency_status": (
+            reviewed_mujoco_motion_bundle_consistency.get("status")
+        ),
+        "reviewed_mujoco_motion_bundle_consistency": (
+            reviewed_mujoco_motion_bundle_consistency
+        ),
         "physical_reviewed_model_motion_checked": physical_reviewed_motion_ready,
         "physical_reviewed_model_motion_reported": physical_reviewed_motion_reported,
         "physical_reviewed_model_motion_status_ready": physical_reviewed_motion_status_ready,
+        "physical_reviewed_model_motion_child_ready": physical_reviewed_motion_child_ready,
         "hardware_free_fixture_motion_checked": fixture_motion_checked,
         "development_fixture_evidence_present": development_fixture_evidence_present,
         "reviewed_mujoco_bundle_status": reviewed_mujoco_bundle_status,
@@ -4302,6 +4479,7 @@ def so101_reviewed_model_authority_gate_section(
             "It is ready only when source authority, physical bundle authority, source-to-bundle model path/digest consistency, and physical-reviewed MuJoCo motion are all true.",
             "Any hardware-free fixture readiness or fixture-motion evidence fails the aggregate gate closed, even if another child summary also reports a physical-ready flag.",
             "Physical-reviewed MuJoCo motion must have a matching child status and motion-authority status, not only a lone boolean flag.",
+            "Physical-reviewed MuJoCo motion must also carry the same reviewed model path and digest as the reviewed bundle manifest.",
             "The source-authority model path/digest and bundle manifest model path/digest must be consistent before authority can close.",
             "Development fixture evidence remains useful automation coverage but does not close reviewed physical SO-101 authority.",
         ],
@@ -4347,6 +4525,25 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
         source_bundle_consistency_next_action_id = (
             "align_source_inventory_with_bundle_manifest_model_path"
         )
+    motion_bundle_consistency = gate.get("reviewed_mujoco_motion_bundle_consistency")
+    motion_bundle_consistency = (
+        motion_bundle_consistency if isinstance(motion_bundle_consistency, dict) else {}
+    )
+    motion_bundle_consistency_status = motion_bundle_consistency.get("status")
+    if motion_bundle_consistency_status == "reviewed_mujoco_motion_model_path_missing":
+        physical_motion_next_action_id = "rerun_reviewed_mujoco_motion_with_bundle_model_path"
+    elif motion_bundle_consistency_status == "reviewed_mujoco_motion_model_path_mismatch":
+        physical_motion_next_action_id = (
+            "align_reviewed_mujoco_motion_with_bundle_model_path"
+        )
+    elif motion_bundle_consistency_status == "reviewed_mujoco_motion_model_digest_missing":
+        physical_motion_next_action_id = "record_reviewed_mujoco_motion_model_sha256"
+    elif motion_bundle_consistency_status == "reviewed_mujoco_motion_model_digest_mismatch":
+        physical_motion_next_action_id = (
+            "align_reviewed_mujoco_motion_with_bundle_model_digest"
+        )
+    else:
+        physical_motion_next_action_id = "prove_physical_reviewed_model_motion"
     physical_bundle_authority_ready = (
         gate.get("physical_so101_model_authority_ready") is True
     )
@@ -4433,10 +4630,11 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
                 "source_bundle_consistency",
             ],
             "evidence_artifact_path": gate.get("reviewed_mujoco_bundle_summary_path"),
-            "next_action_id": "prove_physical_reviewed_model_motion",
+            "next_action_id": physical_motion_next_action_id,
             "operator_action": (
                 "Load the reviewed bundle in MuJoCo, map all SO-101 joints, find the target "
-                "frame, and prove SimRobot joint motion without fallback behavior."
+                "frame, prove SimRobot joint motion without fallback behavior, and keep "
+                "the motion summary tied to the same reviewed model path and digest."
             ),
         },
     ]
@@ -4489,7 +4687,13 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
                 and (
                     (
                         not spec.get("blocked_by_prior_requirements")
-                        and ("mujoco" in blocker or "motion" in blocker)
+                        and (
+                            "mujoco" in blocker
+                            or "motion" in blocker
+                            or "rerun_reviewed_mujoco_motion" in blocker
+                            or "align_reviewed_mujoco_motion" in blocker
+                            or "record_reviewed_mujoco_motion" in blocker
+                        )
                     )
                     or (
                         spec.get("blocked_by_prior_requirements")

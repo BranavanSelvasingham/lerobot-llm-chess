@@ -613,7 +613,17 @@ The gate reports `physical_reviewed_model_motion_reported` separately from
 `physical_reviewed_model_motion_status_ready`; it only reports
 `physical_reviewed_model_motion_checked: true` when the reviewed-MuJoCo child
 status is `reviewed_mujoco_bundle_motion_checked` and
-`motion_authority_status` is `physical_reviewed_model_motion_checked`.
+`motion_authority_status` is `physical_reviewed_model_motion_checked`. It also
+requires the physical-reviewed MuJoCo motion summary to carry the same reviewed
+bundle model path and declared SHA-256 as the bundle manifest. The nested
+`reviewed_mujoco_motion_bundle_consistency` object reports
+`reviewed_mujoco_motion_model_path_missing`,
+`reviewed_mujoco_motion_model_path_mismatch`,
+`reviewed_mujoco_motion_model_digest_missing`,
+`reviewed_mujoco_motion_model_digest_mismatch`, or the ready status
+`reviewed_mujoco_motion_matches_bundle_model_identity`; the aggregate gate stays
+blocked until the reviewed-motion model path and digest match the reviewed
+bundle identity.
 
 The standalone reviewed-authority gate matrix writes
 `so101_reviewed_authority_gate_matrix_summary.json`, `.csv`, and `README.md`.
@@ -625,7 +635,10 @@ state-machine guard only; it is not evidence that a reviewed physical SO-101
 bundle exists. It also includes an inconsistent-motion negative case: even when
 the injected physical motion boolean is true, the top-level authority gate stays
 blocked unless the reviewed-MuJoCo child status and motion-authority status also
-match physical reviewed motion.
+match physical reviewed motion. The matrix also includes physical-motion child
+ready states with mismatched reviewed model path and mismatched reviewed model
+digest; both stay blocked and point operators back to aligning the motion
+evidence with the reviewed bundle identity.
 
 The standalone reviewed-MuJoCo bundle matrix writes
 `so101_reviewed_mujoco_bundle_matrix_summary.json`, `.csv`, and `README.md`.

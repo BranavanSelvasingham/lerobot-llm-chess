@@ -79,9 +79,14 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "selected_authoritative_candidate_covered_by_source_configuration",
         "bundle_model_observed_sha256_missing",
         "bundle_model_observed_sha256_matches_declared",
+        "reviewed_mujoco_motion_bundle_consistency_status",
+        "reviewed_mujoco_motion_bundle_consistency_ready",
+        "reviewed_mujoco_motion_model_path_matches_bundle",
+        "reviewed_mujoco_motion_model_sha256_matches_bundle",
         "physical_reviewed_model_motion_checked",
         "physical_reviewed_model_motion_reported",
         "physical_reviewed_model_motion_status_ready",
+        "physical_reviewed_model_motion_child_ready",
         "reviewed_mujoco_bundle_status",
         "reviewed_mujoco_motion_authority_status",
         "development_fixture_evidence_not_physical_so101_truth",
@@ -359,6 +364,8 @@ def motion_hardware_fixture(summary_path: Path) -> dict[str, Any]:
 def motion_physical_ready(
     summary_path: Path,
     *,
+    model_path: Path | None = None,
+    sha256: str | None = SOURCE_MODEL_SHA256,
     fixture_motion_checked: bool = False,
 ) -> dict[str, Any]:
     return {
@@ -366,6 +373,12 @@ def motion_physical_ready(
         "motion_authority_status": "physical_reviewed_model_motion_checked",
         "physical_reviewed_model_motion_checked": True,
         "hardware_free_fixture_motion_checked": fixture_motion_checked,
+        "model_path": {"path": normalize_path(model_path) if model_path else None},
+        "model_identity": {
+            "declared_sha256": sha256,
+            "observed_sha256": sha256,
+            "matches": bool(sha256),
+        },
         "next_required_for_goal": [],
         "summary_path": str(summary_path),
     }
@@ -482,7 +495,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 source_model,
             ),
             "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
-            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
             "expect": {
                 "ready": False,
                 "consistency_status": "source_authoritative_model_path_missing",
@@ -509,7 +522,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 source_model,
             ),
             "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
-            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
             "expect": {
                 "ready": False,
                 "consistency_status": "source_authoritative_model_selection_unconfigured",
@@ -540,7 +553,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 source_sibling_model,
             ),
             "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
-            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
             "expect": {
                 "ready": False,
                 "consistency_status": "source_authoritative_model_selection_mismatch",
@@ -620,7 +633,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 summary_dir / "bundle_same_root_unselected.json",
                 source_sibling_model,
             ),
-            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
             "expect": {
                 "ready": False,
                 "consistency_status": "source_bundle_model_path_mismatch",
@@ -663,7 +676,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 sha256=None,
             ),
             "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
-            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
             "expect": {
                 "ready": False,
                 "consistency_status": "source_bundle_model_digest_missing",
@@ -688,7 +701,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 declared_sha256=None,
                 observed_sha256=SOURCE_MODEL_SHA256,
             ),
-            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
             "expect": {
                 "ready": False,
                 "consistency_status": "source_bundle_model_digest_missing",
@@ -716,7 +729,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 declared_sha256=SOURCE_MODEL_SHA256,
                 observed_sha256=None,
             ),
-            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
             "expect": {
                 "ready": False,
                 "consistency_status": "bundle_model_observed_digest_missing",
@@ -750,7 +763,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 declared_sha256=SOURCE_MODEL_SHA256,
                 observed_sha256=BUNDLE_MODEL_SHA256,
             ),
-            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
             "expect": {
                 "ready": False,
                 "consistency_status": "bundle_model_observed_digest_mismatch",
@@ -783,7 +796,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 source_model,
                 sha256=BUNDLE_MODEL_SHA256,
             ),
-            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
             "expect": {
                 "ready": False,
                 "consistency_status": "source_bundle_model_digest_mismatch",
@@ -822,6 +835,71 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                     "prove_physical_reviewed_model_motion",
                 ],
                 "action_required_contains": ["physical_reviewed_mujoco_motion_checked"],
+            },
+        },
+        {
+            "case_id": "source_ready_physical_bundle_motion_model_path_mismatch",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready(
+                summary_dir / "motion_model_path_mismatch.json",
+                model_path=bundle_model,
+            ),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_bundle_model_path_and_digest_consistent",
+                "consistency_ready": True,
+                "motion_bundle_consistency_status": (
+                    "reviewed_mujoco_motion_model_path_mismatch"
+                ),
+                "motion_bundle_consistency_ready": False,
+                "development_fixture": True,
+                "motion_child_ready": True,
+                "motion_path_matches_bundle": False,
+                "motion_digest_matches_bundle": True,
+                "blockers_contain": [
+                    "align_reviewed_mujoco_motion_with_bundle_model_path"
+                ],
+                "actions_contain": [
+                    "align_reviewed_mujoco_motion_with_bundle_model_path"
+                ],
+                "action_required_contains": ["physical_reviewed_mujoco_motion_checked"],
+                "blocker_packet_next_actions_contain": [
+                    "align_reviewed_mujoco_motion_with_bundle_model_path"
+                ],
+            },
+        },
+        {
+            "case_id": "source_ready_physical_bundle_motion_model_digest_mismatch",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready(
+                summary_dir / "motion_model_digest_mismatch.json",
+                model_path=source_model,
+                sha256=BUNDLE_MODEL_SHA256,
+            ),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_bundle_model_path_and_digest_consistent",
+                "consistency_ready": True,
+                "motion_bundle_consistency_status": (
+                    "reviewed_mujoco_motion_model_digest_mismatch"
+                ),
+                "motion_bundle_consistency_ready": False,
+                "development_fixture": True,
+                "motion_child_ready": True,
+                "motion_path_matches_bundle": True,
+                "motion_digest_matches_bundle": False,
+                "blockers_contain": [
+                    "align_reviewed_mujoco_motion_with_bundle_model_digest"
+                ],
+                "actions_contain": [
+                    "align_reviewed_mujoco_motion_with_bundle_model_digest"
+                ],
+                "action_required_contains": ["physical_reviewed_mujoco_motion_checked"],
+                "blocker_packet_next_actions_contain": [
+                    "align_reviewed_mujoco_motion_with_bundle_model_digest"
+                ],
             },
         },
         {
@@ -874,7 +952,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 source_model,
                 fixture_ready=True,
             ),
-            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
             "expect": {
                 "ready": False,
                 "consistency_status": "source_bundle_model_path_and_digest_consistent",
@@ -899,6 +977,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
             "motion": motion_physical_ready(
                 summary_dir / "motion_ready_fixture_conflict.json",
+                model_path=source_model,
                 fixture_motion_checked=True,
             ),
             "expect": {
@@ -923,7 +1002,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             "case_id": "all_ready_contract_state",
             "source": source_ready(summary_dir / "source_ready.json", source_model),
             "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
-            "motion": motion_physical_ready(summary_dir / "motion_ready.json"),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
             "expect": {
                 "ready": True,
                 "consistency_status": "source_bundle_model_path_and_digest_consistent",
@@ -1009,6 +1088,13 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             "physical_reviewed_model_motion_status_ready",
             gate.get("physical_reviewed_model_motion_status_ready"),
             expect["motion_status_ready"],
+        )
+    if "motion_child_ready" in expect:
+        add_error(
+            errors,
+            "physical_reviewed_model_motion_child_ready",
+            gate.get("physical_reviewed_model_motion_child_ready"),
+            expect["motion_child_ready"],
         )
     if "development_fixture_present" in expect:
         add_error(
@@ -1169,6 +1255,72 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
                 expect["bundle_observed_sha256_matches_declared"],
             )
 
+    motion_bundle_consistency = gate.get("reviewed_mujoco_motion_bundle_consistency")
+    if not isinstance(motion_bundle_consistency, dict):
+        errors.append("reviewed_mujoco_motion_bundle_consistency: expected dict")
+    else:
+        add_error(
+            errors,
+            "nested_motion_bundle_consistency_status",
+            motion_bundle_consistency.get("status"),
+            gate.get("reviewed_mujoco_motion_bundle_consistency_status"),
+        )
+        add_error(
+            errors,
+            "nested_motion_bundle_consistency_ready",
+            motion_bundle_consistency.get("ready"),
+            gate.get("reviewed_mujoco_motion_bundle_consistency_ready"),
+        )
+        if gate.get("ready") is True:
+            add_error(
+                errors,
+                "motion_path_matches_bundle",
+                motion_bundle_consistency.get(
+                    "reviewed_mujoco_motion_model_path_matches_bundle"
+                ),
+                True,
+            )
+            add_error(
+                errors,
+                "motion_digest_matches_bundle",
+                motion_bundle_consistency.get(
+                    "reviewed_mujoco_motion_model_sha256_matches_bundle"
+                ),
+                True,
+            )
+        if "motion_bundle_consistency_status" in expect:
+            add_error(
+                errors,
+                "reviewed_mujoco_motion_bundle_consistency_status",
+                gate.get("reviewed_mujoco_motion_bundle_consistency_status"),
+                expect["motion_bundle_consistency_status"],
+            )
+        if "motion_bundle_consistency_ready" in expect:
+            add_error(
+                errors,
+                "reviewed_mujoco_motion_bundle_consistency_ready",
+                gate.get("reviewed_mujoco_motion_bundle_consistency_ready"),
+                expect["motion_bundle_consistency_ready"],
+            )
+        if "motion_path_matches_bundle" in expect:
+            add_error(
+                errors,
+                "motion_path_matches_bundle",
+                motion_bundle_consistency.get(
+                    "reviewed_mujoco_motion_model_path_matches_bundle"
+                ),
+                expect["motion_path_matches_bundle"],
+            )
+        if "motion_digest_matches_bundle" in expect:
+            add_error(
+                errors,
+                "motion_digest_matches_bundle",
+                motion_bundle_consistency.get(
+                    "reviewed_mujoco_motion_model_sha256_matches_bundle"
+                ),
+                expect["motion_digest_matches_bundle"],
+            )
+
     if "blockers_exact" in expect:
         add_error(errors, "blockers", gate.get("blockers"), expect["blockers_exact"])
     expect_contains(
@@ -1253,6 +1405,10 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
     blocker_packet = case["blocker_packet"]
     consistency = gate.get("source_bundle_consistency")
     consistency = consistency if isinstance(consistency, dict) else {}
+    motion_consistency = gate.get("reviewed_mujoco_motion_bundle_consistency")
+    motion_consistency = (
+        motion_consistency if isinstance(motion_consistency, dict) else {}
+    )
     return {
         "case_id": case["case_id"],
         "ok": case["ok"],
@@ -1282,6 +1438,18 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "bundle_model_observed_sha256_matches_declared": consistency.get(
             "bundle_model_observed_sha256_matches_declared"
         ),
+        "reviewed_mujoco_motion_bundle_consistency_status": gate.get(
+            "reviewed_mujoco_motion_bundle_consistency_status"
+        ),
+        "reviewed_mujoco_motion_bundle_consistency_ready": gate.get(
+            "reviewed_mujoco_motion_bundle_consistency_ready"
+        ),
+        "reviewed_mujoco_motion_model_path_matches_bundle": motion_consistency.get(
+            "reviewed_mujoco_motion_model_path_matches_bundle"
+        ),
+        "reviewed_mujoco_motion_model_sha256_matches_bundle": motion_consistency.get(
+            "reviewed_mujoco_motion_model_sha256_matches_bundle"
+        ),
         "physical_reviewed_model_motion_checked": gate.get(
             "physical_reviewed_model_motion_checked"
         ),
@@ -1290,6 +1458,9 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "physical_reviewed_model_motion_status_ready": gate.get(
             "physical_reviewed_model_motion_status_ready"
+        ),
+        "physical_reviewed_model_motion_child_ready": gate.get(
+            "physical_reviewed_model_motion_child_ready"
         ),
         "reviewed_mujoco_bundle_status": gate.get("reviewed_mujoco_bundle_status"),
         "reviewed_mujoco_motion_authority_status": gate.get(
