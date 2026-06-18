@@ -13,6 +13,12 @@ The script writes:
 - `so101_chess_env_steps.csv`
 - `README.md`
 
+The summary exposes `gymnasium_task_wiring_status`,
+`mujoco_backend_required`, `mujoco_backend_loaded`,
+`joint_state_fallback_active`, `ready_for_policy_training`, and
+`training_authority_status` so fallback, development-MuJoCo, and failed required
+backend modes are distinguishable in CI.
+
 By default the smoke accepts the existing joint-state fallback and records
 whether Gymnasium and MuJoCo are importable. To require a real MuJoCo backend,
 pass a reviewed model path and require MuJoCo:
@@ -38,6 +44,21 @@ Current limitations are explicit in the summary:
   robot/world scene is added.
 - The scripted pick/place policy is a deterministic joint-space scaffold, not
   calibrated IK or contact-validated manipulation.
+- `ready_for_policy_training` remains `false` until reviewed model authority,
+  reviewed model-backed board-source pick/place, and reviewed rollouts are all
+  available.
+
+For focused contract coverage, run:
+
+```bash
+python scripts/smoke_sim_so101_chess_env_matrix.py --output-dir /private/tmp/lerobot_sim/so101_chess_env_matrix
+```
+
+The matrix writes `so101_chess_env_matrix_summary.json`,
+`so101_chess_env_matrix_cases.csv`, and `README.md`. It proves joint-state
+fallback can remain explicit and non-training, `--require-mujoco` fails closed
+without a model path, and a generated development MJCF can drive the Gymnasium
+task without becoming reviewed SO-101 truth.
 
 This is the bridge between the existing calibration/model-readiness evidence
 and later policy training. It should become a hard MuJoCo gate after the SO-101

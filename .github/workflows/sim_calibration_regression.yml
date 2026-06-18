@@ -90,6 +90,7 @@ env:
   SO101_SOURCE_AUTHORITY_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_source_authority_matrix"
   SO101_REVIEWED_AUTHORITY_GATE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_reviewed_authority_gate_matrix"
   SO101_REVIEWED_MUJOCO_BUNDLE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_reviewed_mujoco_bundle_matrix"
+  SO101_CHESS_ENV_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_chess_env_matrix"
   SO101_TRAINING_READINESS_GATE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_training_readiness_gate_matrix"
   CALIBRATION_REGRESSION_ARTIFACT_NAME: "sim-calibration-regression-${{ github.run_id }}"
   REFERENCE_MEDIA_ROOTS: ""
@@ -350,6 +351,66 @@ jobs:
           for relative_path in (
               "so101_reviewed_mujoco_bundle_matrix_summary.json",
               "so101_reviewed_mujoco_bundle_matrix_cases.csv",
+              "README.md",
+          ):
+              assert (summary_path.parent / relative_path).is_file(), relative_path
+          PY
+
+      - name: Run SO-101 chess env matrix
+        run: |
+          python scripts/smoke_sim_so101_chess_env_matrix.py \
+            --output-dir "${SO101_CHESS_ENV_MATRIX_OUTPUT_DIR}" \
+            --python "$(python -c 'import sys; print(sys.executable)')"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          summary_path = Path(os.environ["SO101_CHESS_ENV_MATRIX_OUTPUT_DIR"]) / "so101_chess_env_matrix_summary.json"
+          summary = json.loads(summary_path.read_text())
+          assert summary["ok"] is True, summary
+          assert summary["status"] == "ok", summary
+          assert summary["model_authority"] == "so101_chess_env_matrix_not_authority", summary
+          assert summary["observed_evidence_is_physical_so101_authority"] is False, summary
+          assert summary["ready_for_policy_training"] is False, summary
+          assert summary["hardware_skipped"] is True, summary
+          assert summary["gui_skipped"] is True, summary
+          assert summary["openai_skipped"] is True, summary
+          assert summary["case_ids"] == [
+              "fallback_without_model_allowed",
+              "gymnasium_required_fallback_allowed",
+              "require_mujoco_without_model_fails",
+              "development_mujoco_required_not_policy_ready",
+          ], summary["case_ids"]
+          assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
+          assert summary["development_scene"]["ok"] is True, summary["development_scene"]
+          assert summary["development_scene"]["model_authority"] == "development_scaffold_not_reviewed", summary["development_scene"]
+          assert summary["development_scene"]["ready_for_model_backed_ik"] is False, summary["development_scene"]
+          by_case = {case["case_id"]: case for case in summary["cases"]}
+          fallback = by_case["fallback_without_model_allowed"]
+          assert fallback["observations"]["env_ok"] is True, fallback
+          assert fallback["observations"]["mujoco_backend_loaded"] is False, fallback
+          assert fallback["observations"]["joint_state_fallback_active"] is True, fallback
+          assert fallback["observations"]["gymnasium_task_wiring_status"] == "joint_state_fallback_env_scripted", fallback
+          require_mujoco = by_case["require_mujoco_without_model_fails"]
+          assert require_mujoco["record"]["return_code"] == 1, require_mujoco
+          assert require_mujoco["observations"]["env_ok"] is False, require_mujoco
+          assert require_mujoco["observations"]["mujoco_backend_required"] is True, require_mujoco
+          assert require_mujoco["observations"]["training_authority_status"] == "requirements_failed_not_policy_ready", require_mujoco
+          dev_mujoco = by_case["development_mujoco_required_not_policy_ready"]
+          assert dev_mujoco["observations"]["env_ok"] is True, dev_mujoco
+          assert dev_mujoco["observations"]["model_authority"] == "development_scaffold_not_reviewed", dev_mujoco
+          assert dev_mujoco["observations"]["mujoco_backend_loaded"] is True, dev_mujoco
+          assert dev_mujoco["observations"]["joint_state_fallback_active"] is False, dev_mujoco
+          assert dev_mujoco["observations"]["ready_for_model_backed_ik"] is False, dev_mujoco
+          assert dev_mujoco["observations"]["ready_for_policy_training"] is False, dev_mujoco
+          assert dev_mujoco["observations"]["training_authority_status"] == "development_mujoco_env_verified_not_policy_ready", dev_mujoco
+          for case in summary["cases"]:
+              blockers = case["observations"]["training_authority_blockers"]
+              assert "reviewed_so101_model_bundle" in blockers, case
+          for relative_path in (
+              "so101_chess_env_matrix_summary.json",
+              "so101_chess_env_matrix_cases.csv",
               "README.md",
           ):
               assert (summary_path.parent / relative_path).is_file(), relative_path
@@ -1218,6 +1279,15 @@ jobs:
           so101_chess_env = summary["so101_chess_env"]
           assert so101_chess_env["ok"] is True, so101_chess_env
           assert so101_chess_env["status"] == "ok", so101_chess_env
+          assert so101_chess_env["model_authority"] == "development_scaffold_not_reviewed", so101_chess_env
+          assert so101_chess_env["ready_for_model_backed_ik"] is False, so101_chess_env
+          assert so101_chess_env["ready_for_policy_training"] is False, so101_chess_env
+          assert so101_chess_env["mujoco_backend_required"] is True, so101_chess_env
+          assert so101_chess_env["mujoco_backend_loaded"] is True, so101_chess_env
+          assert so101_chess_env["joint_state_fallback_active"] is False, so101_chess_env
+          assert so101_chess_env["gymnasium_task_wiring_status"] == "development_mujoco_env_scripted", so101_chess_env
+          assert so101_chess_env["training_authority_status"] == "development_mujoco_env_verified_not_policy_ready", so101_chess_env
+          assert "reviewed_so101_model_bundle" in so101_chess_env["training_authority_blockers"], so101_chess_env
           assert so101_chess_env["sim_status"]["ok"] is True, so101_chess_env
           assert so101_chess_env["scripted_pick_place"]["scripted_pick_place_complete"] is True, so101_chess_env
           for key in ("summary_json", "steps_csv", "readme"):
@@ -2597,5 +2667,6 @@ jobs:
             ${{ env.SO101_SOURCE_AUTHORITY_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_REVIEWED_AUTHORITY_GATE_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_REVIEWED_MUJOCO_BUNDLE_MATRIX_OUTPUT_DIR }}
+            ${{ env.SO101_CHESS_ENV_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_TRAINING_READINESS_GATE_MATRIX_OUTPUT_DIR }}
           if-no-files-found: warn

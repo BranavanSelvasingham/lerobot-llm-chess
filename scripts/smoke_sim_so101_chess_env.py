@@ -151,9 +151,13 @@ def write_readme(path: Path, summary: dict[str, Any], steps_path: Path) -> None:
         f"- Ready for model-backed IK: `{str(summary['ready_for_model_backed_ik']).lower()}`",
         f"- Gymnasium available: `{summary['dependencies']['gymnasium']}`",
         f"- MuJoCo available: `{summary['dependencies']['mujoco']}`",
+        f"- Gymnasium task wiring: `{summary.get('gymnasium_task_wiring_status')}`",
         f"- MuJoCo backend ok: `{summary['sim_status'].get('ok')}`",
+        f"- Joint-state fallback active: `{summary.get('joint_state_fallback_active')}`",
         f"- Contact model: `{summary['contact_model']}`",
         f"- Scripted pick/place complete: `{summary['scripted_pick_place']['scripted_pick_place_complete']}`",
+        f"- Ready for policy training: `{summary.get('ready_for_policy_training')}`",
+        f"- Training authority: `{summary.get('training_authority_status')}`",
         f"- Source square: `{summary['config']['source_square']}`",
         f"- Target square: `{summary['config']['target_square']}`",
         f"- Step rows: `{steps_path}`",
@@ -190,6 +194,19 @@ def write_dependency_failure(args: argparse.Namespace, deps: dict[str, bool], fa
         "dependencies": deps,
         "model_authority": "runtime_dependencies_missing",
         "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "gymnasium_required": bool(args.require_gymnasium),
+        "mujoco_backend_required": bool(args.require_mujoco),
+        "mujoco_backend_loaded": False,
+        "joint_state_fallback_active": False,
+        "gymnasium_task_wiring_status": "runtime_dependencies_missing",
+        "training_authority_status": "requirements_failed_not_policy_ready",
+        "training_authority_blockers": [
+            "runtime_dependencies",
+            "reviewed_so101_model_bundle",
+            "reviewed_mujoco_scene_contact_validation",
+            "reviewed_model_backed_board_source_pick_place",
+        ],
         "contact_model": "unavailable_until_runtime_dependencies_install",
         "config": {
             "source_square": args.source_square,
@@ -276,6 +293,25 @@ def main() -> int:
         if sim_status.get("ok") and config.mujoco_model_path is not None
         else "joint_state_fallback_no_reviewed_model"
     )
+    mujoco_backend_loaded = bool(sim_status.get("ok"))
+    joint_state_fallback_active = sim_status.get("fallback") == "joint_state"
+    if hard_failures:
+        gymnasium_task_wiring_status = "failed_requirements"
+        training_authority_status = "requirements_failed_not_policy_ready"
+    elif mujoco_backend_loaded:
+        gymnasium_task_wiring_status = "development_mujoco_env_scripted"
+        training_authority_status = "development_mujoco_env_verified_not_policy_ready"
+    else:
+        gymnasium_task_wiring_status = "joint_state_fallback_env_scripted"
+        training_authority_status = "joint_state_fallback_env_verified_not_policy_ready"
+    training_authority_blockers = [
+        "reviewed_so101_model_bundle",
+        "reviewed_mujoco_scene_contact_validation",
+        "reviewed_model_backed_board_source_pick_place",
+        "reviewed_model_backed_training_rollouts",
+    ]
+    if not mujoco_backend_loaded:
+        training_authority_blockers.insert(0, "mujoco_backend_loaded")
 
     summary = {
         "schema": "lerobot.sim.so101_chess_env_smoke.v1",
@@ -285,6 +321,14 @@ def main() -> int:
         "dependencies": deps,
         "model_authority": model_authority,
         "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "gymnasium_required": bool(args.require_gymnasium),
+        "mujoco_backend_required": bool(args.require_mujoco),
+        "mujoco_backend_loaded": mujoco_backend_loaded,
+        "joint_state_fallback_active": joint_state_fallback_active,
+        "gymnasium_task_wiring_status": gymnasium_task_wiring_status,
+        "training_authority_status": training_authority_status,
+        "training_authority_blockers": training_authority_blockers,
         "contact_model": scene_state.get("contact_model"),
         "config": {
             "source_square": config.source_square,
