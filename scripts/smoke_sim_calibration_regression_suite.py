@@ -108,6 +108,7 @@ SO101_TRAINING_READINESS_GATE_CHECKLIST_NAME = "so101_training_readiness_gate_ch
 SO101_TRAINING_READINESS_GATE_README_NAME = "README.md"
 SO101_TRAINING_ROLLOUTS_DIR_NAME = "so101_training_rollouts"
 SO101_TRAINING_ROLLOUTS_SUMMARY_NAME = "so101_training_rollouts_summary.json"
+REVIEWED_SO101_MODEL_AUTHORITY = "reviewed_so101_model_bundle_manifest"
 BASELINE_CORNERS = [[32, 338], [594, 340], [540, 20], [86, 12]]
 PERTURBED_CORNERS = [[34, 337], [592, 342], [538, 22], [88, 14]]
 
@@ -4378,19 +4379,19 @@ def so101_training_readiness_gate_section(
     training_rollouts: dict[str, Any],
 ) -> dict[str, Any]:
     reviewed_authority_ready = reviewed_authority_gate.get("ready") is True
+    board_pick_reviewed_model_authority_ready = (
+        board_pick.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
+    )
     reviewed_model_backed_board_pick_place = (
         board_pick.get("board_source_pick_place_verified") is True
         and board_pick.get("ready_for_model_backed_ik") is True
-        and board_pick.get("model_authority") not in {None, "development_scaffold_not_reviewed"}
+        and board_pick_reviewed_model_authority_ready
         and board_pick.get("robot_pose_seeded_for_source_fixture") is not True
         and board_pick.get("manual_piece_pose_used_after_reset") is False
     )
-    rollout_ready = (
+    rollout_policy_training_authority_ready = (
         training_rollouts.get("ready_for_policy_training") is True
-        and training_rollouts.get("model_authority") not in {
-            None,
-            "development_scaffold_not_reviewed",
-        }
+        and training_rollouts.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
     )
     blockers = unique_string_values(
         [
@@ -4406,7 +4407,7 @@ def so101_training_readiness_gate_section(
             ),
             *(
                 []
-                if rollout_ready
+                if rollout_policy_training_authority_ready
                 else (
                     training_rollouts.get("serious_policy_training_blockers")
                     or ["reviewed_model_backed_training_rollouts"]
@@ -4414,7 +4415,11 @@ def so101_training_readiness_gate_section(
             ),
         ]
     )
-    ready = reviewed_authority_ready and reviewed_model_backed_board_pick_place and rollout_ready
+    ready = (
+        reviewed_authority_ready
+        and reviewed_model_backed_board_pick_place
+        and rollout_policy_training_authority_ready
+    )
     return {
         "status": "serious_training_ready" if ready else "serious_training_blocked",
         "ready": ready,
@@ -4423,6 +4428,7 @@ def so101_training_readiness_gate_section(
         "reviewed_model_backed_board_source_pick_place": reviewed_model_backed_board_pick_place,
         "board_pick_status": board_pick.get("status"),
         "board_pick_model_authority": board_pick.get("model_authority"),
+        "board_pick_reviewed_model_authority_ready": board_pick_reviewed_model_authority_ready,
         "board_pick_ready_for_model_backed_ik": board_pick.get("ready_for_model_backed_ik"),
         "board_pick_robot_pose_seeded_for_source_fixture": board_pick.get(
             "robot_pose_seeded_for_source_fixture"
@@ -4437,11 +4443,12 @@ def so101_training_readiness_gate_section(
             "training_authority_status"
         ),
         "rollout_model_authority": training_rollouts.get("model_authority"),
+        "rollout_policy_training_authority_ready": rollout_policy_training_authority_ready,
         "rollout_use": training_rollouts.get("rollout_use"),
         "development_fixture_evidence_not_policy_training_truth": (
             not ready
-            or board_pick.get("model_authority") == "development_scaffold_not_reviewed"
-            or training_rollouts.get("model_authority") == "development_scaffold_not_reviewed"
+            or not board_pick_reviewed_model_authority_ready
+            or not rollout_policy_training_authority_ready
         ),
         "blockers": blockers,
         "blocker_count": len(blockers),
@@ -4507,12 +4514,14 @@ def write_so101_training_readiness_gate_artifacts(
             "requirement_id": "policy_training_rollouts_ready",
             "category": "training_rollouts",
             "status": "ok"
-            if gate.get("rollout_ready_for_policy_training") is True
+            if gate.get("rollout_policy_training_authority_ready") is True
             else "action_required",
-            "observed_value": markdown_bool(gate.get("rollout_ready_for_policy_training")),
-            "expected_value": "true",
+            "observed_value": markdown_bool(
+                gate.get("rollout_policy_training_authority_ready")
+            ),
+            "expected_value": "true with reviewed SO-101 model authority",
             "blockers": "; ".join(gate.get("blockers", [])),
-            "notes": "Development JSONL rollouts are debug/imitation-curriculum evidence only.",
+            "notes": "Development JSONL rollouts or rollouts without reviewed SO-101 model authority are debug/imitation-curriculum evidence only.",
         },
         {
             "requirement_id": "development_fixture_caveat",
@@ -4560,8 +4569,12 @@ def write_so101_training_readiness_gate_artifacts(
                 f"`{markdown_bool(gate.get('reviewed_model_authority_ready'))}`",
                 "- Reviewed model-backed board-source pick/place: "
                 f"`{markdown_bool(gate.get('reviewed_model_backed_board_source_pick_place'))}`",
+                "- Board-pick reviewed model authority ready: "
+                f"`{markdown_bool(gate.get('board_pick_reviewed_model_authority_ready'))}`",
                 "- Rollout ready for policy training: "
                 f"`{markdown_bool(gate.get('rollout_ready_for_policy_training'))}`",
+                "- Rollout policy-training authority ready: "
+                f"`{markdown_bool(gate.get('rollout_policy_training_authority_ready'))}`",
                 "- Development fixture evidence is not policy training truth: "
                 f"`{markdown_bool(gate.get('development_fixture_evidence_not_policy_training_truth'))}`",
                 "",

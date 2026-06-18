@@ -61,6 +61,11 @@ training should wait for a reviewed SO-101 model bundle, calibrated TCP offset,
 base-to-board alignment, and contact-validated grasp/place physics using
 reviewed model-backed IK. The required board-pick summary proves only the
 development-fixture source-board pickup gate; it does not remove those blockers.
+The suite-level training-readiness gate therefore distinguishes the rollout's
+raw `ready_for_policy_training` flag from the computed
+`rollout_policy_training_authority_ready` flag. Both policy-ready rollouts and
+the board-source pick/place prerequisite must carry reviewed SO-101 model
+authority before the serious-training gate can close.
 
 For reset-specific validation before collecting rollouts, run
 [docs/sim_so101_env_resets.md](sim_so101_env_resets.md). That smoke checks

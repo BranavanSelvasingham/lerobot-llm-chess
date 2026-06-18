@@ -2930,6 +2930,9 @@ def collect_so101_training_readiness_gate_artifacts(
         ),
         "board_pick_status": gate.get("board_pick_status"),
         "board_pick_model_authority": gate.get("board_pick_model_authority"),
+        "board_pick_reviewed_model_authority_ready": gate.get(
+            "board_pick_reviewed_model_authority_ready"
+        ),
         "board_pick_ready_for_model_backed_ik": gate.get(
             "board_pick_ready_for_model_backed_ik"
         ),
@@ -2940,6 +2943,9 @@ def collect_so101_training_readiness_gate_artifacts(
             "board_pick_manual_piece_pose_used_after_reset"
         ),
         "rollout_ready_for_policy_training": gate.get("rollout_ready_for_policy_training"),
+        "rollout_policy_training_authority_ready": gate.get(
+            "rollout_policy_training_authority_ready"
+        ),
         "rollout_training_authority_status": gate.get("rollout_training_authority_status"),
         "rollout_model_authority": gate.get("rollout_model_authority"),
         "rollout_use": gate.get("rollout_use"),
