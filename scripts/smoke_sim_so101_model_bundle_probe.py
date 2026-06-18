@@ -383,6 +383,63 @@ def observed_joint_limits_from_contract(contract_result: dict[str, Any]) -> dict
     }
 
 
+def _unique_asset_references(rows: list[Any]) -> list[str]:
+    seen: set[str] = set()
+    references: list[str] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        reference = row.get("normalized_reference") or row.get("raw_reference")
+        if not isinstance(reference, str) or not reference:
+            continue
+        if reference in seen:
+            continue
+        seen.add(reference)
+        references.append(reference)
+    return references
+
+
+def mesh_asset_review_from_contract(contract_result: dict[str, Any]) -> dict[str, Any]:
+    summary = contract_result.get("summary")
+    summary = summary if isinstance(summary, dict) else {}
+    preflight = summary.get("model_asset_preflight")
+    preflight = preflight if isinstance(preflight, dict) else {}
+    missing_assets = preflight.get("missing_assets")
+    missing_assets = missing_assets if isinstance(missing_assets, list) else []
+    unresolved_references = preflight.get("unresolved_references")
+    unresolved_references = unresolved_references if isinstance(unresolved_references, list) else []
+    missing_references = _unique_asset_references(missing_assets)
+    unresolved_reference_values = _unique_asset_references(unresolved_references)
+
+    if missing_references:
+        status = "missing_mesh_assets_detected"
+    elif unresolved_reference_values:
+        status = "unresolved_mesh_references_detected"
+    elif preflight.get("mesh_reference_count"):
+        status = "mesh_references_resolved"
+    else:
+        status = "mesh_references_not_observed"
+
+    return {
+        "status": status,
+        "source": "contract_checker.model_asset_preflight",
+        "asset_roots": preflight.get("asset_roots") or [],
+        "mesh_reference_count": preflight.get("mesh_reference_count"),
+        "present_asset_count": preflight.get("present_asset_count"),
+        "missing_asset_count": preflight.get("missing_asset_count"),
+        "unresolved_reference_count": preflight.get("unresolved_reference_count"),
+        "unique_missing_reference_count": len(missing_references),
+        "missing_references": missing_references,
+        "unique_unresolved_reference_count": len(unresolved_reference_values),
+        "unresolved_references": unresolved_reference_values,
+        "artifacts": preflight.get("artifacts"),
+        "notes": (
+            "Missing mesh references are review evidence for selecting asset roots. "
+            "They do not prove reviewed geometry, collision policy, or model authority."
+        ),
+    }
+
+
 def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, Any]]:
     required = {
         "reviewed_by": args.authority_reviewed_by,
@@ -453,6 +510,7 @@ def build_candidate_manifest(
     provenance_placeholder: dict[str, Any],
     contract_result: dict[str, Any],
     observed_joint_limits: dict[str, Any],
+    mesh_asset_review: dict[str, Any],
 ) -> dict[str, Any]:
     return {
         "schema": CANDIDATE_SCHEMA,
@@ -483,6 +541,7 @@ def build_candidate_manifest(
             "reason": "The probe cannot infer reviewed joint-limit authority from model existence alone.",
         },
         "observed_joint_limits_deg_from_model": observed_joint_limits,
+        "observed_mesh_asset_references_from_model": mesh_asset_review,
         "tcp_offset_placeholder": {
             "status": "TODO_calibrated_target_frame_to_tcp_offset_required",
             "accepted_manifest_fields": [
@@ -510,6 +569,7 @@ def build_candidate_manifest(
             "Extra probe_child_diagnostics fields are for operator review; the bundle manifest checker derives readiness from the declared manifest fields.",
             "Populate joint_limits_deg or an equivalent joint-limit authority field before expecting ready_for_model_backed_ik.",
             "observed_joint_limits_deg_from_model is raw candidate evidence for review only; copy it into joint_limits_deg only after separate authority review.",
+            "observed_mesh_asset_references_from_model is raw candidate evidence for review only; supply reviewed asset roots before expecting mesh readiness.",
         ],
     }
 
@@ -549,6 +609,7 @@ def build_rows(
     contract_result: dict[str, Any],
     manifest_result: dict[str, Any],
     observed_joint_limits: dict[str, Any],
+    mesh_asset_review: dict[str, Any],
 ) -> list[dict[str, Any]]:
     manifest_excerpt = manifest_result["diagnostic_excerpt"]
     missing_inputs = manifest_excerpt.get("missing_inputs") or []
@@ -576,6 +637,22 @@ def build_rows(
             None if not asset_root_config["diagnostics"] else ["--asset-root"],
             asset_root_config["diagnostics"],
             "Repeat --asset-root for separate mesh directories; an empty list is explicit and valid.",
+        ),
+        row(
+            "observed_candidate_mesh_references",
+            "mesh_assets",
+            "ok" if not mesh_asset_review.get("missing_references") else "action_required",
+            "info",
+            mesh_asset_review,
+            {"missing_references": [], "unresolved_references": []},
+            None
+            if not mesh_asset_review.get("missing_references")
+            and not mesh_asset_review.get("unresolved_references")
+            else ["mesh_assets"],
+            mesh_asset_review.get("missing_references")
+            or mesh_asset_review.get("unresolved_references")
+            or [],
+            "Raw mesh references help choose reviewed asset roots; they do not satisfy mesh readiness.",
         ),
         row(
             "authority",
@@ -711,6 +788,9 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         f"- `observed_joint_limits_status`: `{summary.get('observed_joint_limits_status')}`",
         f"- `observed_joint_limits_complete`: `{str(summary.get('observed_joint_limits_complete')).lower()}`",
         f"- `observed_joint_limits_missing_joints`: `{', '.join(summary.get('observed_joint_limits_missing_joints') or []) if summary.get('observed_joint_limits_missing_joints') else 'none'}`",
+        f"- `mesh_asset_review_status`: `{summary.get('mesh_asset_review_status')}`",
+        f"- `mesh_asset_review_unique_missing_reference_count`: `{summary.get('mesh_asset_review_unique_missing_reference_count')}`",
+        f"- `mesh_asset_review_unique_unresolved_reference_count`: `{summary.get('mesh_asset_review_unique_unresolved_reference_count')}`",
         f"- `manifest_status`: `{manifest.get('status')}`",
         f"- `ready_for_model_backed_ik`: `{str(manifest.get('ready_for_model_backed_ik')).lower()}`",
         f"- `manifest_missing_inputs`: `{', '.join(manifest.get('missing_inputs') or []) if manifest.get('missing_inputs') else 'none'}`",
@@ -737,6 +817,7 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
             "## Next Inputs",
             "",
             "- Replace empty `authority` and `provenance` placeholders with reviewed source fields.",
+            "- Supply reviewed mesh asset roots that resolve every `mesh_asset_review_missing_references` entry.",
             "- Replace `tcp_offset_placeholder` with one accepted calibrated TCP/gripper-tip offset field.",
             "- Replace `base_to_board_alignment_placeholder` with a real base-to-board transform/alignment.",
             "- Re-run `scripts/smoke_sim_so101_model_bundle_manifest.py` on the candidate manifest before enabling model-backed IK.",
@@ -765,6 +846,7 @@ def main() -> int:
         str(args.target_frame),
     )
     observed_joint_limits = observed_joint_limits_from_contract(contract_result)
+    mesh_asset_review = mesh_asset_review_from_contract(contract_result)
 
     candidate_manifest_path = output_dir / "so101_model_bundle.candidate.json"
     candidate_manifest = build_candidate_manifest(
@@ -777,6 +859,7 @@ def main() -> int:
         provenance_placeholder=provenance_placeholder,
         contract_result=contract_result,
         observed_joint_limits=observed_joint_limits,
+        mesh_asset_review=mesh_asset_review,
     )
     write_json(candidate_manifest_path, candidate_manifest)
 
@@ -791,6 +874,7 @@ def main() -> int:
         contract_result=contract_result,
         manifest_result=manifest_result,
         observed_joint_limits=observed_joint_limits,
+        mesh_asset_review=mesh_asset_review,
     )
 
     summary_path = output_dir / "so101_model_bundle_probe_summary.json"
@@ -825,6 +909,15 @@ def main() -> int:
         "observed_joint_limits_complete": observed_joint_limits.get("complete"),
         "observed_joint_limits_deg": observed_joint_limits.get("values_deg"),
         "observed_joint_limits_missing_joints": observed_joint_limits.get("missing_joints"),
+        "mesh_asset_review_status": mesh_asset_review.get("status"),
+        "mesh_asset_review_unique_missing_reference_count": mesh_asset_review.get(
+            "unique_missing_reference_count"
+        ),
+        "mesh_asset_review_missing_references": mesh_asset_review.get("missing_references"),
+        "mesh_asset_review_unique_unresolved_reference_count": mesh_asset_review.get(
+            "unique_unresolved_reference_count"
+        ),
+        "mesh_asset_review_unresolved_references": mesh_asset_review.get("unresolved_references"),
         "manifest_status": manifest_excerpt.get("status"),
         "ready_for_model_backed_ik": manifest_excerpt.get("ready_for_model_backed_ik") is True,
         "missing_inputs": manifest_excerpt.get("missing_inputs") or [],
@@ -897,6 +990,13 @@ def main() -> int:
                 "observed_joint_limits_complete": summary["observed_joint_limits_complete"],
                 "observed_joint_limits_missing_joints": summary[
                     "observed_joint_limits_missing_joints"
+                ],
+                "mesh_asset_review_status": summary["mesh_asset_review_status"],
+                "mesh_asset_review_unique_missing_reference_count": summary[
+                    "mesh_asset_review_unique_missing_reference_count"
+                ],
+                "mesh_asset_review_unique_unresolved_reference_count": summary[
+                    "mesh_asset_review_unique_unresolved_reference_count"
                 ],
                 "manifest_status": summary["manifest_status"],
                 "ready_for_model_backed_ik": summary["ready_for_model_backed_ik"],

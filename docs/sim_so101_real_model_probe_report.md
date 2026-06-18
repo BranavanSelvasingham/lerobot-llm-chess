@@ -146,6 +146,9 @@ Result:
 - `ready_for_model_backed_ik`: `false`
 - `observed_joint_limits_status`: `observed_unreviewed_limits_complete`
 - `observed_joint_limits_complete`: `true`
+- `mesh_asset_review_status`: `missing_mesh_assets_detected`
+- `mesh_asset_review_unique_missing_reference_count`: `13`
+- `mesh_asset_review_unique_unresolved_reference_count`: `0`
 - `missing_inputs`: `authority`, `base_to_board_transform`,
   `joint_limits_deg`, `mesh_assets`, `non_blocking_contract_checker_result`,
   `provenance`, `tcp_offset_m`
@@ -211,6 +214,11 @@ Unique missing mesh references:
 - `assets/waveshare_mounting_plate_so101_v2.stl`
 - `assets/wrist_roll_follower_so101_v1.stl`
 - `assets/wrist_roll_pitch_so101_v2.stl`
+
+The probe now carries that de-duplicated list under
+`mesh_asset_review_missing_references` and keeps it separate from manifest
+readiness. These references are review evidence for selecting asset roots; they
+do not prove reviewed geometry, collision policy, or model authority.
 
 Observed unreviewed joint limits from the candidate model structure:
 
