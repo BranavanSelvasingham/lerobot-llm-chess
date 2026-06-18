@@ -2971,6 +2971,9 @@ def collect_so101_training_readiness_gate_artifacts(
         "ready": gate.get("ready"),
         "reviewed_model_authority_ready": gate.get("reviewed_model_authority_ready"),
         "reviewed_model_authority_status": gate.get("reviewed_model_authority_status"),
+        "reviewed_model_physical_motion_checked": gate.get(
+            "reviewed_model_physical_motion_checked"
+        ),
         "reviewed_model_backed_board_source_pick_place": gate.get(
             "reviewed_model_backed_board_source_pick_place"
         ),

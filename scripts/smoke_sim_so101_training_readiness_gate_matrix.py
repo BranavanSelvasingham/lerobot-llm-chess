@@ -65,6 +65,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "gate_status",
         "gate_ready",
         "reviewed_model_authority_ready",
+        "reviewed_model_physical_motion_checked",
         "reviewed_model_backed_board_source_pick_place",
         "board_pick_reviewed_model_authority_ready",
         "rollout_ready_for_policy_training",
@@ -85,10 +86,15 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
             writer.writerow({field: csv_cell(row.get(field)) for field in fieldnames})
 
 
-def reviewed_authority_ready(summary_path: Path) -> dict[str, Any]:
+def reviewed_authority_ready(
+    summary_path: Path,
+    *,
+    physical_motion_checked: bool = True,
+) -> dict[str, Any]:
     return {
         "status": "reviewed_model_authority_ready",
         "ready": True,
+        "physical_reviewed_model_motion_checked": physical_motion_checked,
         "blockers": [],
         "summary_path": str(summary_path),
     }
@@ -219,7 +225,10 @@ def grasp_probe_state(summary_path: Path, *, verified: bool = True) -> dict[str,
 def case_specs(output_dir: Path) -> list[dict[str, Any]]:
     summaries = output_dir / "input_summaries"
     authority_ready = reviewed_authority_ready(summaries / "authority_ready.json")
-    authority_ready["physical_reviewed_model_motion_checked"] = True
+    authority_motion_not_checked = reviewed_authority_ready(
+        summaries / "authority_motion_not_checked.json",
+        physical_motion_checked=False,
+    )
     authority_blocked = reviewed_authority_blocked(summaries / "authority_blocked.json")
     board_dev = board_pick_state(
         summaries / "board_dev.json",
@@ -288,6 +297,28 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                     "reviewed_model_backed_board_source_pick_place",
                 ],
                 "next_priority_gate": "reviewed_model_authority",
+            },
+        },
+        {
+            "case_id": "reviewed_authority_motion_not_checked_rejected",
+            "authority": authority_motion_not_checked,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "reviewed_motion": False,
+                "board_pick": True,
+                "board_authority": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "blockers_contain": ["load_reviewed_model_in_mujoco"],
+                "next_priority_gate": "mujoco_scene_validity",
             },
         },
         {
@@ -545,6 +576,13 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         gate.get("reviewed_model_authority_ready"),
         expect["reviewed_authority"],
     )
+    if "reviewed_motion" in expect:
+        add_error(
+            errors,
+            "reviewed_model_physical_motion_checked",
+            gate.get("reviewed_model_physical_motion_checked"),
+            expect["reviewed_motion"],
+        )
     add_error(
         errors,
         "reviewed_model_backed_board_source_pick_place",
@@ -635,6 +673,9 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "gate_status": gate.get("status"),
         "gate_ready": gate.get("ready"),
         "reviewed_model_authority_ready": gate.get("reviewed_model_authority_ready"),
+        "reviewed_model_physical_motion_checked": gate.get(
+            "reviewed_model_physical_motion_checked"
+        ),
         "reviewed_model_backed_board_source_pick_place": gate.get(
             "reviewed_model_backed_board_source_pick_place"
         ),

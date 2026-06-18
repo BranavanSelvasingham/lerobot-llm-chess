@@ -911,6 +911,7 @@ jobs:
           assert summary["openai_skipped"] is True, summary
           assert summary["case_ids"] == [
               "all_development_evidence_blocked",
+              "reviewed_authority_motion_not_checked_rejected",
               "reviewed_authority_but_board_still_development",
               "reviewed_authority_but_scene_still_development",
               "reviewed_scene_but_gym_still_development",
@@ -923,6 +924,12 @@ jobs:
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
           by_case = {case["case_id"]: case for case in summary["cases"]}
+          motion_missing = by_case["reviewed_authority_motion_not_checked_rejected"]["gate"]
+          assert motion_missing["ready"] is False, motion_missing
+          assert motion_missing["reviewed_model_authority_ready"] is True, motion_missing
+          assert motion_missing["reviewed_model_physical_motion_checked"] is False, motion_missing
+          assert motion_missing["next_priority_gate_id"] == "mujoco_scene_validity", motion_missing
+          assert "load_reviewed_model_in_mujoco" in motion_missing["next_priority_action_ids"], motion_missing
           draft = by_case["board_draft_authority_rejected"]["gate"]
           assert draft["ready"] is False, draft
           assert draft["board_pick_reviewed_model_authority_ready"] is False, draft
@@ -1945,6 +1952,9 @@ jobs:
           assert isinstance(training_readiness_gate["ready"], bool), training_readiness_gate
           assert training_readiness_gate["reviewed_model_authority_ready"] == (
               reviewed_model_authority_gate["ready"] is True
+          ), training_readiness_gate
+          assert training_readiness_gate["reviewed_model_physical_motion_checked"] == (
+              reviewed_model_authority_gate["physical_reviewed_model_motion_checked"] is True
           ), training_readiness_gate
           assert isinstance(training_readiness_gate["board_pick_reviewed_model_authority_ready"], bool), training_readiness_gate
           assert isinstance(training_readiness_gate["rollout_policy_training_authority_ready"], bool), training_readiness_gate

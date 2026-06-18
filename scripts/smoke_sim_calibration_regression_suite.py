@@ -5276,6 +5276,9 @@ def so101_training_readiness_gate_section(
     grasp_probe: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     reviewed_authority_ready = reviewed_authority_gate.get("ready") is True
+    reviewed_model_physical_motion_checked = (
+        reviewed_authority_gate.get("physical_reviewed_model_motion_checked") is True
+    )
     board_pick_reviewed_model_authority_ready = (
         board_pick.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
     )
@@ -5341,6 +5344,7 @@ def so101_training_readiness_gate_section(
         "ready": ready,
         "reviewed_model_authority_ready": reviewed_authority_ready,
         "reviewed_model_authority_status": reviewed_authority_gate.get("status"),
+        "reviewed_model_physical_motion_checked": reviewed_model_physical_motion_checked,
         "reviewed_model_backed_board_source_pick_place": reviewed_model_backed_board_pick_place,
         "board_pick_status": board_pick.get("status"),
         "board_pick_model_authority": board_pick.get("model_authority"),
