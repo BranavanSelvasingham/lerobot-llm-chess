@@ -2,6 +2,9 @@
 
 Date: 2026-06-16
 
+Current checker recheck: 2026-06-18. The candidate remains diagnostic-only and
+not ready for model-backed IK.
+
 This report records a hardware-free owner check of the visible local SO-101
 model candidates around `/Users/branavan/GitHub/lerobot-chess`. It does not copy
 or vendor any URDF, MJCF, or mesh assets into this repository.
@@ -20,7 +23,8 @@ checker reports:
 - `status`: `model_bundle_manifest_needs_follow_up`
 - `ready_for_model_backed_ik`: `false`
 - `missing_inputs`: `authority`, `base_to_board_transform`,
-  `non_blocking_contract_checker_result`, `provenance`, `tcp_offset_m`
+  `joint_limits_deg`, `mesh_assets`, `non_blocking_contract_checker_result`,
+  `provenance`, `tcp_offset_m`
 
 No real model-backed IK readiness is claimed here. Do not trust
 Cartesian/delta/radial model-backed residuals unless
@@ -141,7 +145,8 @@ Result:
 - `manifest_status`: `model_bundle_manifest_needs_follow_up`
 - `ready_for_model_backed_ik`: `false`
 - `missing_inputs`: `authority`, `base_to_board_transform`,
-  `non_blocking_contract_checker_result`, `provenance`, `tcp_offset_m`
+  `joint_limits_deg`, `mesh_assets`, `non_blocking_contract_checker_result`,
+  `provenance`, `tcp_offset_m`
 - `summary_json`:
   `/private/tmp/lerobot_sim/so101_real_model_probe_owner_check/so101_model_bundle_probe_summary.json`
 - `candidate_manifest_json`:
@@ -222,11 +227,16 @@ Result:
 - `asset_roots.status`: `present`
 - `authority.status`: `missing`
 - `provenance.status`: `missing`
+- `joint_limits.status`: `missing`
+- `joint_limits.missing_joints`: `shoulder_pan`, `shoulder_lift`,
+  `elbow_flex`, `wrist_flex`, `wrist_roll`, `gripper`
 - `target_frame.status`: `present`
 - `target_frame.value`: `gripper_frame_link`
 - `tcp_offset.status`: `missing`
 - `base_to_board_alignment.status`: `placeholder_only`
 - `contract_checker.status`: `model_asset_preflight_needs_follow_up`
+- `mesh_assets.status`: `needs_follow_up`
+- `mesh_assets.mesh_reference_count`: `34`
 - `model_asset_preflight.status`: `asset_preflight_needs_follow_up`
 - `model_asset_preflight.missing_asset_count`: `34`
 - `model_asset_preflight.unresolved_reference_count`: `0`
@@ -243,6 +253,9 @@ must supply or review:
 - `authority`: source authority status, reviewer, and review date/id.
 - `provenance`: source URL/commit/export tool/license basis. The detected
   Onshape URL and sibling `LICENSE` are context, not sufficient authority.
+- `joint_limits_deg` or accepted alias: reviewed lower/upper limits for
+  `shoulder_pan`, `shoulder_lift`, `elbow_flex`, `wrist_flex`, `wrist_roll`,
+  and `gripper`.
 - Mesh assets/root: a reviewed root that resolves all 34 URDF mesh references,
   or a reviewed no-mesh model with an explicit rationale.
 - `tcp_offset_m` or accepted alias: calibrated target-frame to TCP/gripper-tip

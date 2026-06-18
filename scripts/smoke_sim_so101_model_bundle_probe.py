@@ -730,10 +730,24 @@ def main() -> int:
         "manifest_check_summary_json": manifest_result["artifacts"]["summary_json"],
         "manifest_checklist_csv": manifest_result["artifacts"]["checklist_csv"],
     }
+    contract_excerpt = contract_result["diagnostic_excerpt"]
+    asset_preflight_excerpt = contract_excerpt.get("model_asset_preflight") or {}
+    manifest_excerpt = manifest_result["diagnostic_excerpt"]
     summary = {
         "schema": SCHEMA,
         "ok": True,
         "status": status_for(model_request, manifest_result),
+        "model_authority": "draft_candidate_not_reviewed",
+        "model_request_status": model_request["status"],
+        "contract_status": contract_excerpt.get("status"),
+        "asset_preflight_status": asset_preflight_excerpt.get("status"),
+        "asset_preflight_mesh_reference_count": asset_preflight_excerpt.get("mesh_reference_count"),
+        "asset_preflight_present_asset_count": asset_preflight_excerpt.get("present_asset_count"),
+        "asset_preflight_missing_asset_count": asset_preflight_excerpt.get("missing_asset_count"),
+        "asset_preflight_unresolved_reference_count": asset_preflight_excerpt.get("unresolved_reference_count"),
+        "manifest_status": manifest_excerpt.get("status"),
+        "ready_for_model_backed_ik": manifest_excerpt.get("ready_for_model_backed_ik") is True,
+        "missing_inputs": manifest_excerpt.get("missing_inputs") or [],
         "hardware_skipped": True,
         "gui_skipped": True,
         "openai_skipped": True,
@@ -780,7 +794,6 @@ def main() -> int:
     write_csv(csv_path, rows)
     write_markdown(readme_path, summary, rows)
 
-    manifest_excerpt = manifest_result["diagnostic_excerpt"]
     print(
         json.dumps(
             {
@@ -790,14 +803,19 @@ def main() -> int:
                 "summary_json": str(summary_path),
                 "checklist_csv": str(csv_path),
                 "readme_md": str(readme_path),
-                "model_request_status": model_request["status"],
-                "contract_status": contract_result["diagnostic_excerpt"].get("status"),
-                "asset_preflight_status": (
-                    contract_result["diagnostic_excerpt"].get("model_asset_preflight") or {}
-                ).get("status"),
-                "manifest_status": manifest_excerpt.get("status"),
-                "ready_for_model_backed_ik": manifest_excerpt.get("ready_for_model_backed_ik"),
-                "missing_inputs": manifest_excerpt.get("missing_inputs", []),
+                "model_authority": summary["model_authority"],
+                "model_request_status": summary["model_request_status"],
+                "contract_status": summary["contract_status"],
+                "asset_preflight_status": summary["asset_preflight_status"],
+                "asset_preflight_missing_asset_count": summary[
+                    "asset_preflight_missing_asset_count"
+                ],
+                "asset_preflight_unresolved_reference_count": summary[
+                    "asset_preflight_unresolved_reference_count"
+                ],
+                "manifest_status": summary["manifest_status"],
+                "ready_for_model_backed_ik": summary["ready_for_model_backed_ik"],
+                "missing_inputs": summary["missing_inputs"],
             },
             sort_keys=True,
         )

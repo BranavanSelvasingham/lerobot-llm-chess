@@ -28,6 +28,13 @@ strings. It never copies or imports model assets. It writes:
 - `so101_model_contract/so101_model_asset_preflight/so101_model_asset_preflight_summary.json`
 - `so101_model_bundle_manifest_check/so101_model_bundle_manifest_summary.json`
 
+The saved probe summary repeats the review-critical fields at top level:
+`model_authority`, `model_request_status`, `contract_status`,
+`asset_preflight_status`, asset-preflight mesh/present/missing/unresolved
+counts, `manifest_status`, `ready_for_model_backed_ik`, and `missing_inputs`.
+These are shortcuts for artifact review only; readiness is still decided by the
+nested manifest checker.
+
 With no `--model-path`, it still exits `0`, emits a candidate manifest template
 with an empty `model_path`, and reports `candidate_model_missing`. With a
 nonexistent model path, it exits `0`, preserves the requested path in the draft,
