@@ -3598,14 +3598,6 @@ def normalized_gate_path(value: Any) -> str | None:
     return str(Path(value).expanduser().resolve(strict=False))
 
 
-def path_is_relative_to(child: str, root: str) -> bool:
-    try:
-        Path(child).relative_to(Path(root))
-    except ValueError:
-        return False
-    return True
-
-
 def so101_source_bundle_consistency_section(
     source_inventory: dict[str, Any],
     bundle_manifest: dict[str, Any],
@@ -3638,15 +3630,15 @@ def so101_source_bundle_consistency_section(
         )
         if path
     ]
+    selected_authoritative_candidate_path = normalized_gate_path(
+        source_inventory.get("selected_authoritative_candidate_path")
+    )
 
-    matched_by = None
-    if bundle_model_path and bundle_model_path in source_authoritative_paths:
-        matched_by = "authoritative_model_path"
-    elif bundle_model_path and any(
-        path_is_relative_to(bundle_model_path, root)
-        for root in source_authoritative_roots
-    ):
-        matched_by = "authoritative_model_root"
+    selected_path_matches_bundle = bool(
+        bundle_model_path
+        and selected_authoritative_candidate_path
+        and bundle_model_path == selected_authoritative_candidate_path
+    )
 
     prerequisites_ready = source_authority_ready and physical_authority_ready
     if not prerequisites_ready:
@@ -3657,7 +3649,7 @@ def so101_source_bundle_consistency_section(
         status = "bundle_model_path_missing"
         ready = False
         blocker = "select_reviewed_so101_model_path"
-    elif matched_by:
+    elif selected_path_matches_bundle:
         status = "source_bundle_model_path_consistent"
         ready = True
         blocker = None
@@ -3665,6 +3657,11 @@ def so101_source_bundle_consistency_section(
         status = "source_bundle_model_path_mismatch"
         ready = False
         blocker = "align_source_inventory_with_bundle_manifest_model_path"
+    matched_by = (
+        "selected_authoritative_candidate_path"
+        if ready and selected_path_matches_bundle
+        else None
+    )
 
     return {
         "ready": ready,
@@ -3674,12 +3671,14 @@ def so101_source_bundle_consistency_section(
         "bundle_model_path": bundle_model_path,
         "source_authoritative_model_paths": source_authoritative_paths,
         "source_authoritative_model_roots": source_authoritative_roots,
+        "selected_authoritative_candidate_path": selected_authoritative_candidate_path,
+        "selected_authoritative_candidate_path_matches_bundle": selected_path_matches_bundle,
         "matched_by": matched_by,
         "blocker": blocker,
         "notes": [
             "This check prevents source authority and bundle authority from closing on different model paths.",
             "It is evaluated only after source authority and physical bundle authority are otherwise ready.",
-            "A bundle model path must match an authoritative source path or be contained by an authoritative source root.",
+            "A bundle model path must match the selected authoritative model candidate path.",
         ],
     }
 

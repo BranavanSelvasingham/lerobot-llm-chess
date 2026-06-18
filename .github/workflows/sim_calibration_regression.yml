@@ -793,6 +793,17 @@ jobs:
           assert source_bundle_consistency.get("ready") == reviewed_model_authority_gate["source_bundle_consistency_ready"], reviewed_model_authority_gate
           assert isinstance(source_bundle_consistency.get("source_authoritative_model_paths"), list), source_bundle_consistency
           assert isinstance(source_bundle_consistency.get("source_authoritative_model_roots"), list), source_bundle_consistency
+          assert source_bundle_consistency.get("selected_authoritative_candidate_path") == source_inventory.get("selected_authoritative_candidate_path"), (
+              source_bundle_consistency,
+              source_inventory,
+          )
+          assert isinstance(source_bundle_consistency.get("selected_authoritative_candidate_path_matches_bundle"), bool), source_bundle_consistency
+          if reviewed_model_authority_gate["source_bundle_consistency_ready"] is True:
+              assert source_bundle_consistency.get("matched_by") == "selected_authoritative_candidate_path", source_bundle_consistency
+              assert source_bundle_consistency.get("bundle_model_path") == source_bundle_consistency.get("selected_authoritative_candidate_path"), source_bundle_consistency
+              assert source_bundle_consistency.get("selected_authoritative_candidate_path_matches_bundle") is True, source_bundle_consistency
+          if reviewed_model_authority_gate["source_bundle_consistency_status"] == "not_checked_prerequisites_not_ready":
+              assert source_bundle_consistency.get("matched_by") is None, source_bundle_consistency
           assert reviewed_model_authority_gate["physical_reviewed_model_motion_checked"] == (
               reviewed_mujoco_bundle["physical_reviewed_model_motion_checked"] is True
           ), reviewed_model_authority_gate
@@ -1470,6 +1481,14 @@ jobs:
               assert isinstance(source_bundle_consistency, dict), metrics
               assert source_bundle_consistency.get("status") == metrics.get("source_bundle_consistency_status"), metrics
               assert source_bundle_consistency.get("ready") == metrics.get("source_bundle_consistency_ready"), metrics
+              assert "selected_authoritative_candidate_path" in source_bundle_consistency, metrics
+              assert isinstance(source_bundle_consistency.get("selected_authoritative_candidate_path_matches_bundle"), bool), metrics
+              if metrics.get("source_bundle_consistency_ready") is True:
+                  assert source_bundle_consistency.get("matched_by") == "selected_authoritative_candidate_path", metrics
+                  assert source_bundle_consistency.get("bundle_model_path") == source_bundle_consistency.get("selected_authoritative_candidate_path"), metrics
+                  assert source_bundle_consistency.get("selected_authoritative_candidate_path_matches_bundle") is True, metrics
+              if metrics.get("source_bundle_consistency_status") == "not_checked_prerequisites_not_ready":
+                  assert source_bundle_consistency.get("matched_by") is None, metrics
               assert metrics.get("physical_reviewed_model_motion_checked") in {True, False, None}, metrics
               assert isinstance(metrics.get("blockers"), list), metrics
               assert metrics.get("blocker_count") == len(metrics.get("blockers")), metrics

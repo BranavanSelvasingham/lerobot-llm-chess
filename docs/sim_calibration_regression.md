@@ -467,12 +467,17 @@ The SO-101 reviewed model authority gate contract also requires
 `source_bundle_consistency_ready`, `source_bundle_consistency_status`, and the
 nested `source_bundle_consistency` object in both the top-level summary and the
 artifact-index metrics. The gate only becomes ready when that status is
-`source_bundle_model_path_consistent`; if source or bundle authority is not
-ready yet, it remains `not_checked_prerequisites_not_ready` rather than
-overclaiming reviewed physical SO-101 authority. The blocker packet separates
-immediate `action_required` items from `blocked_by_prior_requirements` items so
-reviewed MuJoCo motion proof stays downstream of reviewed physical bundle
-authority and source/bundle model-path consistency.
+`source_bundle_model_path_consistent` and the bundle model path matches the
+selected authoritative source candidate path. The nested object records that as
+`selected_authoritative_candidate_path_matches_bundle`; `matched_by` is populated
+only when the prerequisites are ready and the checked path match closes. An
+authoritative root alone is not enough to authorize a different model file in the
+same tree. If source or bundle authority is not ready yet, the consistency check
+remains `not_checked_prerequisites_not_ready` rather than overclaiming reviewed
+physical SO-101 authority. The blocker packet separates immediate
+`action_required` items from `blocked_by_prior_requirements` items so reviewed
+MuJoCo motion proof stays downstream of reviewed physical bundle authority and
+source/bundle model-path consistency.
 
 For the SO-101 model-source inventory contract, CI also requires
 `so101_model_source_inventory_review_packet.json` and `.csv`, with
