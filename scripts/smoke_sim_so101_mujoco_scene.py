@@ -149,6 +149,7 @@ def validate_loaded_model(model_path: Path) -> dict[str, Any]:
     joint_names = mujoco_names(mujoco, model, mujoco.mjtObj.mjOBJ_JOINT, model.njnt)
     geom_names = mujoco_names(mujoco, model, mujoco.mjtObj.mjOBJ_GEOM, model.ngeom)
     body_names = mujoco_names(mujoco, model, mujoco.mjtObj.mjOBJ_BODY, model.nbody)
+    site_names = mujoco_names(mujoco, model, mujoco.mjtObj.mjOBJ_SITE, model.nsite)
     required_joints = set(SO101_JOINTS)
     required_model_joints = required_joints | {"piece_source_freejoint"}
     required_bodies = {"piece_source", "chess_board"}
@@ -157,13 +158,16 @@ def validate_loaded_model(model_path: Path) -> dict[str, Any]:
         "piece_source_collision",
         "gripper_fixed_finger_collision",
         "gripper_moving_finger_collision",
+        "target_square_marker",
     }
+    required_sites = {"gripper_frame_link"}
     square_geoms = [name for name in geom_names if name.startswith("square_")]
     return {
         "ok": (
             required_model_joints.issubset(joint_names)
             and required_bodies.issubset(body_names)
             and required_geoms.issubset(geom_names)
+            and required_sites.issubset(site_names)
             and len(square_geoms) == 64
         ),
         "model_path": str(model_path),
@@ -173,6 +177,8 @@ def validate_loaded_model(model_path: Path) -> dict[str, Any]:
         "missing_joints": sorted(required_model_joints - set(joint_names)),
         "body_names": body_names,
         "missing_bodies": sorted(required_bodies - set(body_names)),
+        "site_names": site_names,
+        "missing_required_sites": sorted(required_sites - set(site_names)),
         "geom_count": len(geom_names),
         "body_count": len(body_names),
         "square_geom_count": len(square_geoms),
@@ -306,7 +312,15 @@ def main() -> int:
         "ok": ok,
         "status": "ok" if ok else "failed",
         "model_authority": SO101_DEV_MJCF_AUTHORITY,
+        "observed_evidence_is_physical_so101_authority": False,
         "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "mujoco_scene_validity_status": "development_scene_validated_not_physical_authority",
+        "source_square": args.source_square,
+        "target_square": args.target_square,
+        "square_geom_count": model_load.get("square_geom_count"),
+        "target_frame_site_present": not bool(model_load.get("missing_required_sites")),
+        "target_marker_present": "target_square_marker" not in set(model_load.get("missing_required_geoms") or []),
         "dependencies": deps,
         "development_manifest": manifest,
         "mujoco_model_load": model_load,

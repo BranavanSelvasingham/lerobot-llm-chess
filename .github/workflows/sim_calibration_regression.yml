@@ -90,6 +90,7 @@ env:
   SO101_SOURCE_AUTHORITY_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_source_authority_matrix"
   SO101_REVIEWED_AUTHORITY_GATE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_reviewed_authority_gate_matrix"
   SO101_REVIEWED_MUJOCO_BUNDLE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_reviewed_mujoco_bundle_matrix"
+  SO101_MUJOCO_SCENE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_mujoco_scene_matrix"
   SO101_CHESS_ENV_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_chess_env_matrix"
   SO101_TRAINING_READINESS_GATE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_training_readiness_gate_matrix"
   CALIBRATION_REGRESSION_ARTIFACT_NAME: "sim-calibration-regression-${{ github.run_id }}"
@@ -351,6 +352,56 @@ jobs:
           for relative_path in (
               "so101_reviewed_mujoco_bundle_matrix_summary.json",
               "so101_reviewed_mujoco_bundle_matrix_cases.csv",
+              "README.md",
+          ):
+              assert (summary_path.parent / relative_path).is_file(), relative_path
+          PY
+
+      - name: Run SO-101 MuJoCo scene matrix
+        run: |
+          python scripts/smoke_sim_so101_mujoco_scene_matrix.py \
+            --output-dir "${SO101_MUJOCO_SCENE_MATRIX_OUTPUT_DIR}" \
+            --python "$(python -c 'import sys; print(sys.executable)')"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          summary_path = Path(os.environ["SO101_MUJOCO_SCENE_MATRIX_OUTPUT_DIR"]) / "so101_mujoco_scene_matrix_summary.json"
+          summary = json.loads(summary_path.read_text())
+          assert summary["ok"] is True, summary
+          assert summary["status"] == "ok", summary
+          assert summary["model_authority"] == "so101_mujoco_scene_matrix_not_authority", summary
+          assert summary["observed_evidence_is_physical_so101_authority"] is False, summary
+          assert summary["ready_for_model_backed_ik"] is False, summary
+          assert summary["ready_for_policy_training"] is False, summary
+          assert summary["hardware_skipped"] is True, summary
+          assert summary["gui_skipped"] is True, summary
+          assert summary["openai_skipped"] is True, summary
+          assert summary["case_ids"] == [
+              "center_file_scene_e4_e5",
+              "corner_diagonal_scene_a1_h8",
+              "back_rank_to_edge_scene_b8_a4",
+              "edge_to_center_scene_h2_d5",
+          ], summary["case_ids"]
+          assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
+          for case in summary["cases"]:
+              obs = case["observations"]
+              assert obs["model_authority"] == "development_scaffold_not_reviewed", case
+              assert obs["square_geom_count"] == 64, case
+              assert obs["target_frame_site_present"] is True, case
+              assert obs["target_marker_present"] is True, case
+              assert obs["model_load_ok"] is True, case
+              assert obs["sim_robot_sync_ok"] is True, case
+              assert obs["env_scripted_pick_place_complete"] is True, case
+              assert obs["ready_for_model_backed_ik"] is False, case
+              assert obs["ready_for_policy_training"] is False, case
+              assert obs["physical_authority"] is False, case
+              assert obs["missing_required_geoms"] == [], case
+              assert obs["missing_required_sites"] == [], case
+          for relative_path in (
+              "so101_mujoco_scene_matrix_summary.json",
+              "so101_mujoco_scene_matrix_cases.csv",
               "README.md",
           ):
               assert (summary_path.parent / relative_path).is_file(), relative_path
@@ -1266,7 +1317,15 @@ jobs:
           assert so101_mujoco_scene["ok"] is True, so101_mujoco_scene
           assert so101_mujoco_scene["status"] == "ok", so101_mujoco_scene
           assert so101_mujoco_scene["model_authority"] == "development_scaffold_not_reviewed", so101_mujoco_scene
+          assert so101_mujoco_scene["observed_evidence_is_physical_so101_authority"] is False, so101_mujoco_scene
           assert so101_mujoco_scene["ready_for_model_backed_ik"] is False, so101_mujoco_scene
+          assert so101_mujoco_scene["ready_for_policy_training"] is False, so101_mujoco_scene
+          assert so101_mujoco_scene["mujoco_scene_validity_status"] == "development_scene_validated_not_physical_authority", so101_mujoco_scene
+          assert so101_mujoco_scene["source_square"] == "e4", so101_mujoco_scene
+          assert so101_mujoco_scene["target_square"] == "e5", so101_mujoco_scene
+          assert so101_mujoco_scene["square_geom_count"] == 64, so101_mujoco_scene
+          assert so101_mujoco_scene["target_frame_site_present"] is True, so101_mujoco_scene
+          assert so101_mujoco_scene["target_marker_present"] is True, so101_mujoco_scene
           assert so101_mujoco_scene["mujoco_model_load"]["ok"] is True, so101_mujoco_scene
           assert so101_mujoco_scene["sim_robot_mujoco_sync"]["ok"] is True, so101_mujoco_scene
           assert so101_mujoco_scene["env_scripted_pick_place"]["scripted_pick_place_complete"] is True, so101_mujoco_scene
@@ -2667,6 +2726,7 @@ jobs:
             ${{ env.SO101_SOURCE_AUTHORITY_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_REVIEWED_AUTHORITY_GATE_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_REVIEWED_MUJOCO_BUNDLE_MATRIX_OUTPUT_DIR }}
+            ${{ env.SO101_MUJOCO_SCENE_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_CHESS_ENV_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_TRAINING_READINESS_GATE_MATRIX_OUTPUT_DIR }}
           if-no-files-found: warn

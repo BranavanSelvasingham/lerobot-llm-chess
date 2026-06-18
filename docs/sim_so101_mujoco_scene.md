@@ -28,11 +28,27 @@ The generated MJCF includes:
 The summary must report:
 
 - `model_authority: "development_scaffold_not_reviewed"`
+- `observed_evidence_is_physical_so101_authority: false`
 - `ready_for_model_backed_ik: false`
+- `ready_for_policy_training: false`
+- `mujoco_scene_validity_status: "development_scene_validated_not_physical_authority"`
+- source and target squares, `square_geom_count: 64`, target-frame site
+  presence, and target marker presence
 - `mujoco_model_load.ok: true`
 - `sim_robot_mujoco_sync.ok: true`
 - `sim_robot_mujoco_sync.after_status.fallback: null`
 - `env_scripted_pick_place.scripted_pick_place_complete: true`
+
+For focused scene-placement coverage, run:
+
+```bash
+python scripts/smoke_sim_so101_mujoco_scene_matrix.py --output-dir /private/tmp/lerobot_sim/so101_mujoco_scene_matrix
+```
+
+The matrix writes `so101_mujoco_scene_matrix_summary.json`,
+`so101_mujoco_scene_matrix_cases.csv`, and `README.md`. It validates generated
+development scenes across center, corner, back-rank, and edge placements while
+keeping every case labeled as non-authoritative development scaffolding.
 
 This scene is intentionally not an authoritative model bundle. It is generated
 from approximate repo-local dimensions and exists to validate MuJoCo loading,

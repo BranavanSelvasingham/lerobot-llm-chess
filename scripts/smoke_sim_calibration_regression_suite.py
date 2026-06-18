@@ -3096,6 +3096,9 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "model_authority": smoke.get("model_authority"),
         "physical_so101_model_authority_ready": smoke.get("physical_so101_model_authority_ready"),
         "hardware_free_regression_fixture_ready": smoke.get("hardware_free_regression_fixture_ready"),
+        "observed_evidence_is_physical_so101_authority": smoke.get(
+            "observed_evidence_is_physical_so101_authority"
+        ),
         "ready_for_model_backed_ik": smoke.get("ready_for_model_backed_ik"),
         "limitations": smoke.get("limitations"),
         "next_required_for_goal": smoke.get("next_required_for_goal"),
@@ -3157,6 +3160,10 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "mujoco_backend_loaded",
         "joint_state_fallback_active",
         "gymnasium_task_wiring_status",
+        "mujoco_scene_validity_status",
+        "square_geom_count",
+        "target_frame_site_present",
+        "target_marker_present",
         "training_authority_status",
         "training_authority_blockers",
         "ready_for_policy_training",
