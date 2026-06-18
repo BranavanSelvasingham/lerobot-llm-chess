@@ -131,6 +131,35 @@ Without authoritative flags, a SO-101-looking file remains
 Without complete review metadata and scope coverage, an authoritative candidate
 remains explicit but reports `source_authority_review_ready: false`.
 
+## Source Authority Matrix Smoke
+
+Use the matrix smoke when changing source-authority logic or workflow checks:
+
+```bash
+python scripts/smoke_sim_so101_source_authority_matrix.py --output-dir /private/tmp/lerobot_sim/so101_source_authority_matrix --python python
+```
+
+The smoke generates synthetic URDF fixtures under the output directory and runs
+the inventory through six non-hardware cases: missing source root, unverified
+candidate, authoritative path without review metadata, authoritative path with
+placeholder review metadata, authoritative path with complete source-review
+metadata, and ambiguous authoritative root. It writes:
+
+- `so101_source_authority_matrix_summary.json`
+- `so101_source_authority_matrix_cases.csv`
+- `README.md`
+
+The complete-source-review fixture must reach
+`source_authority_gate_status: "source_authority_ready"` and
+`source_intake_status: "source_authority_ready_waiting_for_bundle_manifest"`.
+The ambiguous-root fixture must remain
+`source_authority_blocked_ambiguous_authoritative_model` and queue
+`select_single_authoritative_so101_model_source`. Every matrix case keeps
+`source_intake_model_authority: "source_intake_not_authority"`,
+`review_packet_model_authority: "review_packet_not_authority"`, and false
+physical SO-101 authority flags; the smoke proves the inventory state machine,
+not a reviewed robot model.
+
 ## Owner Check Evidence
 
 Default repo-root validation for this PR:

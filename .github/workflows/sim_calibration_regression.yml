@@ -87,6 +87,7 @@ permissions:
 env:
   PYTHON_VERSION: "3.12"
   CALIBRATION_REGRESSION_OUTPUT_DIR: "/tmp/lerobot_sim/calibration_regression_suite"
+  SO101_SOURCE_AUTHORITY_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_source_authority_matrix"
   CALIBRATION_REGRESSION_ARTIFACT_NAME: "sim-calibration-regression-${{ github.run_id }}"
   REFERENCE_MEDIA_ROOTS: ""
   REFERENCE_CAPTURE_MANIFEST: ""
@@ -198,6 +199,51 @@ jobs:
             cmd+=(--so101-source-authority-license-basis "${SO101_SOURCE_AUTHORITY_LICENSE_BASIS}")
           fi
           "${cmd[@]}"
+
+      - name: Run SO-101 source authority matrix
+        run: |
+          python scripts/smoke_sim_so101_source_authority_matrix.py \
+            --output-dir "${SO101_SOURCE_AUTHORITY_MATRIX_OUTPUT_DIR}" \
+            --python "$(python -c 'import sys; print(sys.executable)')"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          summary_path = Path(os.environ["SO101_SOURCE_AUTHORITY_MATRIX_OUTPUT_DIR"]) / "so101_source_authority_matrix_summary.json"
+          summary = json.loads(summary_path.read_text())
+          assert summary["ok"] is True, summary
+          assert summary["status"] == "ok", summary
+          assert summary["hardware_skipped"] is True, summary
+          assert summary["gui_skipped"] is True, summary
+          assert summary["openai_skipped"] is True, summary
+          assert summary["case_ids"] == [
+              "missing_source_root",
+              "candidate_unverified",
+              "authoritative_missing_review_metadata",
+              "authoritative_placeholder_review_metadata",
+              "authoritative_complete_source_review",
+              "authoritative_root_ambiguous",
+          ], summary["case_ids"]
+          assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
+          by_case = {case["case_id"]: case for case in summary["cases"]}
+          assert by_case["authoritative_complete_source_review"]["observations"]["source_authority_gate_status"] == "source_authority_ready", by_case["authoritative_complete_source_review"]
+          assert by_case["authoritative_complete_source_review"]["observations"]["source_intake_status"] == "source_authority_ready_waiting_for_bundle_manifest", by_case["authoritative_complete_source_review"]
+          assert by_case["authoritative_root_ambiguous"]["observations"]["source_authority_gate_status"] == "source_authority_blocked_ambiguous_authoritative_model", by_case["authoritative_root_ambiguous"]
+          assert by_case["authoritative_root_ambiguous"]["observations"]["source_intake_status"] == "single_source_selection_required", by_case["authoritative_root_ambiguous"]
+          for case in summary["cases"]:
+              observations = case["observations"]
+              assert observations["source_intake_model_authority"] == "source_intake_not_authority", case
+              assert observations["review_packet_model_authority"] == "review_packet_not_authority", case
+              assert observations["source_intake_physical_so101_model_authority_ready"] is False, case
+              assert observations["review_packet_physical_so101_model_authority_ready"] is False, case
+          for relative_path in (
+              "so101_source_authority_matrix_summary.json",
+              "so101_source_authority_matrix_cases.csv",
+              "README.md",
+          ):
+              assert (summary_path.parent / relative_path).is_file(), relative_path
+          PY
 
       - name: Check regression summary
         run: |
@@ -2377,5 +2423,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.CALIBRATION_REGRESSION_ARTIFACT_NAME }}
-          path: ${{ env.CALIBRATION_REGRESSION_OUTPUT_DIR }}
+          path: |
+            ${{ env.CALIBRATION_REGRESSION_OUTPUT_DIR }}
+            ${{ env.SO101_SOURCE_AUTHORITY_MATRIX_OUTPUT_DIR }}
           if-no-files-found: warn
