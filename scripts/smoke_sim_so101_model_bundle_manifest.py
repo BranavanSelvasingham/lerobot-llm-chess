@@ -15,11 +15,24 @@ DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "so101_model_bundle_
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_CHECKER_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_contract.py"
 EXPECTED_TARGET_FRAME = "gripper_frame_link"
+EXPECTED_SO101_JOINTS = (
+    "shoulder_pan",
+    "shoulder_lift",
+    "elbow_flex",
+    "wrist_flex",
+    "wrist_roll",
+    "gripper",
+)
 TCP_OFFSET_FIELDS = (
     "tcp_offset_m",
     "gripper_tip_offset_m",
     "target_frame_to_tcp_m",
     "tool_center_point_offset_m",
+)
+JOINT_LIMIT_FIELDS = (
+    "joint_limits_deg",
+    "joint_limits",
+    "joint_limit_authority",
 )
 ALIGNMENT_FIELDS = (
     "base_to_board_transform",
@@ -49,6 +62,14 @@ REQUIRED_INPUTS = (
     {
         "input": "provenance",
         "requirement": "Model provenance fields such as source URL/commit/export tool/license basis.",
+    },
+    {
+        "input": "joint_limits_deg",
+        "requirement": "Reviewed joint-limit authority covering every SO-101 joint.",
+    },
+    {
+        "input": "mesh_assets",
+        "requirement": "At least one model mesh reference visible to asset preflight and resolved with no missing assets.",
     },
     {
         "input": "target_frame",
@@ -405,6 +426,100 @@ def inspect_provenance(manifest: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
+def parse_joint_limit_pair(value: Any) -> tuple[bool, Any, list[str]]:
+    if isinstance(value, dict):
+        lower_key = "lower" if "lower" in value else "min" if "min" in value else None
+        upper_key = "upper" if "upper" in value else "max" if "max" in value else None
+        if lower_key is None or upper_key is None:
+            return False, value, ["joint_limit_missing_lower_or_upper"]
+        try:
+            lower = float(value[lower_key])
+            upper = float(value[upper_key])
+        except (TypeError, ValueError) as exc:
+            return False, value, [f"joint_limit_non_numeric:{type(exc).__name__}"]
+        if lower >= upper:
+            return False, {"lower": lower, "upper": upper}, ["joint_limit_lower_not_below_upper"]
+        return True, {"lower": lower, "upper": upper}, []
+
+    if isinstance(value, list) and len(value) == 2:
+        try:
+            lower = float(value[0])
+            upper = float(value[1])
+        except (TypeError, ValueError) as exc:
+            return False, value, [f"joint_limit_non_numeric:{type(exc).__name__}"]
+        if lower >= upper:
+            return False, [lower, upper], ["joint_limit_lower_not_below_upper"]
+        return True, [lower, upper], []
+
+    return False, value, ["joint_limit_expected_lower_upper_or_len2_list"]
+
+
+def inspect_joint_limits(manifest: dict[str, Any] | None) -> dict[str, Any]:
+    if not manifest:
+        return {
+            "status": "missing",
+            "field": None,
+            "value": None,
+            "expected_joints": list(EXPECTED_SO101_JOINTS),
+            "missing_joints": list(EXPECTED_SO101_JOINTS),
+            "invalid_joints": [],
+            "diagnostics": ["joint_limits_missing"],
+        }
+
+    field_name, value = find_first_field(manifest, JOINT_LIMIT_FIELDS)
+    if field_name is None:
+        return {
+            "status": "missing",
+            "field": None,
+            "value": None,
+            "expected_joints": list(EXPECTED_SO101_JOINTS),
+            "missing_joints": list(EXPECTED_SO101_JOINTS),
+            "invalid_joints": [],
+            "diagnostics": ["joint_limits_missing"],
+        }
+    if not isinstance(value, dict):
+        return {
+            "status": "invalid",
+            "field": field_name,
+            "value": value,
+            "expected_joints": list(EXPECTED_SO101_JOINTS),
+            "missing_joints": list(EXPECTED_SO101_JOINTS),
+            "invalid_joints": [],
+            "diagnostics": ["joint_limits_not_object"],
+        }
+
+    normalized: dict[str, Any] = {}
+    invalid_joints: list[dict[str, Any]] = []
+    for joint in EXPECTED_SO101_JOINTS:
+        if joint not in value:
+            continue
+        valid, normalized_value, diagnostics = parse_joint_limit_pair(value[joint])
+        if valid:
+            normalized[joint] = normalized_value
+        else:
+            invalid_joints.append(
+                {"joint": joint, "value": normalized_value, "diagnostics": diagnostics}
+            )
+    missing_joints = [joint for joint in EXPECTED_SO101_JOINTS if joint not in normalized]
+    diagnostics = []
+    if missing_joints:
+        diagnostics.extend(f"joint_limit_missing:{joint}" for joint in missing_joints)
+    for invalid in invalid_joints:
+        diagnostics.extend(
+            f"joint_limit_invalid:{invalid['joint']}:{diagnostic}"
+            for diagnostic in invalid["diagnostics"]
+        )
+    return {
+        "status": "present" if not diagnostics else "invalid",
+        "field": field_name,
+        "value": normalized,
+        "expected_joints": list(EXPECTED_SO101_JOINTS),
+        "missing_joints": missing_joints,
+        "invalid_joints": invalid_joints,
+        "diagnostics": diagnostics,
+    }
+
+
 def inspect_target_frame(manifest: dict[str, Any] | None) -> dict[str, Any]:
     raw = manifest.get("target_frame") if manifest else None
     if raw is None:
@@ -609,6 +724,14 @@ def contract_non_blocking(contract: dict[str, Any]) -> tuple[bool, list[str]]:
     contract_status = contract.get("status")
     if contract_status == "model_contract_checked":
         pass
+    elif contract_status == "model_suffix_supported_not_directly_usable":
+        structure = (contract.get("child_diagnostics") or {}).get("model_structure_inspection") or {}
+        missing_joints = structure.get("expected_joint_names_missing")
+        target_frame_present = structure.get("target_frame_present")
+        if missing_joints:
+            diagnostics.append(f"model_structure_missing_joints:{missing_joints}")
+        if target_frame_present is not True:
+            diagnostics.append(f"model_structure_target_frame_present:{target_frame_present}")
     elif (
         contract_status == "model_contract_needs_follow_up"
         and contract.get("robot_kinematics_status") == "urdf_requires_placo"
@@ -627,6 +750,9 @@ def contract_non_blocking(contract: dict[str, Any]) -> tuple[bool, list[str]]:
     asset_preflight = contract.get("model_asset_preflight") or {}
     if asset_preflight.get("status") not in {"asset_preflight_checked", "asset_preflight_limited_diagnostics"}:
         diagnostics.append(f"asset_preflight_status:{asset_preflight.get('status')}")
+    mesh_reference_count = asset_preflight.get("mesh_reference_count")
+    if not isinstance(mesh_reference_count, int) or mesh_reference_count <= 0:
+        diagnostics.append(f"mesh_reference_count:{mesh_reference_count}")
     if asset_preflight.get("missing_asset_count") not in {0, None}:
         diagnostics.append(f"missing_asset_count:{asset_preflight.get('missing_asset_count')}")
     if asset_preflight.get("unresolved_reference_count") not in {0, None}:
@@ -635,12 +761,43 @@ def contract_non_blocking(contract: dict[str, Any]) -> tuple[bool, list[str]]:
     return not diagnostics, diagnostics
 
 
+def inspect_mesh_assets(contract: dict[str, Any]) -> dict[str, Any]:
+    asset_preflight = contract.get("model_asset_preflight") or {}
+    mesh_reference_count = asset_preflight.get("mesh_reference_count")
+    present_asset_count = asset_preflight.get("present_asset_count")
+    missing_asset_count = asset_preflight.get("missing_asset_count")
+    unresolved_reference_count = asset_preflight.get("unresolved_reference_count")
+    diagnostics: list[str] = []
+    if not isinstance(mesh_reference_count, int) or mesh_reference_count <= 0:
+        diagnostics.append("mesh_reference_count_missing_or_zero")
+    if missing_asset_count not in {0, None}:
+        diagnostics.append(f"missing_asset_count:{missing_asset_count}")
+    if unresolved_reference_count not in {0, None}:
+        diagnostics.append(f"unresolved_reference_count:{unresolved_reference_count}")
+    if diagnostics:
+        status = "missing" if not isinstance(mesh_reference_count, int) or mesh_reference_count <= 0 else "needs_follow_up"
+    else:
+        status = "present"
+    return {
+        "status": status,
+        "mesh_reference_count": mesh_reference_count,
+        "present_asset_count": present_asset_count,
+        "missing_asset_count": missing_asset_count,
+        "unresolved_reference_count": unresolved_reference_count,
+        "asset_preflight_status": asset_preflight.get("status"),
+        "artifacts": asset_preflight.get("artifacts"),
+        "diagnostics": diagnostics,
+    }
+
+
 def build_field_checks(
     manifest_request: dict[str, Any],
     model_path: dict[str, Any],
     asset_roots: dict[str, Any],
     authority: dict[str, Any],
     provenance: dict[str, Any],
+    joint_limits: dict[str, Any],
+    mesh_assets: dict[str, Any],
     target_frame: dict[str, Any],
     tcp_offset: dict[str, Any],
     alignment: dict[str, Any],
@@ -681,6 +838,18 @@ def build_field_checks(
             "diagnostics": provenance.get("diagnostics", []),
         },
         {
+            "requirement_id": "joint_limits_deg",
+            "ok": joint_limits["status"] == "present",
+            "missing_inputs": None if joint_limits["status"] == "present" else ["joint_limits_deg"],
+            "diagnostics": joint_limits.get("diagnostics", []),
+        },
+        {
+            "requirement_id": "mesh_assets",
+            "ok": mesh_assets["status"] == "present",
+            "missing_inputs": None if mesh_assets["status"] == "present" else ["mesh_assets"],
+            "diagnostics": mesh_assets.get("diagnostics", []),
+        },
+        {
             "requirement_id": "target_frame",
             "ok": target_frame["status"] in {"present", "defaulted"},
             "missing_inputs": None if target_frame["status"] in {"present", "defaulted"} else ["target_frame"],
@@ -715,6 +884,8 @@ def build_checklist_rows(
     asset_roots: dict[str, Any],
     authority: dict[str, Any],
     provenance: dict[str, Any],
+    joint_limits: dict[str, Any],
+    mesh_assets: dict[str, Any],
     target_frame: dict[str, Any],
     tcp_offset: dict[str, Any],
     alignment: dict[str, Any],
@@ -783,6 +954,30 @@ def build_checklist_rows(
             None if provenance["status"] == "present" else ["provenance"],
             provenance.get("diagnostics", []),
             "Record source URL/commit/export/license context before trusting the bundle.",
+        ),
+        row(
+            "joint_limits_deg",
+            "joint_contract",
+            "ok" if joint_limits["status"] == "present" else "action_required",
+            "warning",
+            f"manifest.{'|'.join(JOINT_LIMIT_FIELDS)}",
+            joint_limits,
+            {"required_joints": list(EXPECTED_SO101_JOINTS), "unit": "degrees"},
+            None if joint_limits["status"] == "present" else ["joint_limits_deg"],
+            joint_limits.get("diagnostics", []),
+            "The reviewed bundle must declare limit authority for every SO-101 joint before model-backed IK is trusted.",
+        ),
+        row(
+            "mesh_assets",
+            "mesh_assets",
+            "ok" if mesh_assets["status"] == "present" else "action_required",
+            "warning",
+            "contract_checker.model_asset_preflight",
+            mesh_assets,
+            {"mesh_reference_count": "> 0", "missing_asset_count": 0, "unresolved_reference_count": 0},
+            None if mesh_assets["status"] == "present" else ["mesh_assets"],
+            mesh_assets.get("diagnostics", []),
+            "Readiness requires actual model mesh references, not only an asset root declaration.",
         ),
         row(
             "target_frame",
@@ -870,6 +1065,9 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         f"- `manifest_path`: `{summary['manifest_request']['path']}`",
         f"- `model_path`: `{summary['model_path']['path']}`",
         f"- `asset_roots`: `{'; '.join(summary['asset_roots']['asset_roots']) if summary['asset_roots']['asset_roots'] else 'none'}`",
+        f"- `joint_limits_status`: `{summary['joint_limits']['status']}`",
+        f"- `mesh_assets_status`: `{summary['mesh_assets']['status']}`",
+        f"- `mesh_reference_count`: `{summary['mesh_assets']['mesh_reference_count']}`",
         f"- `target_frame`: `{summary['target_frame']['value']}`",
         f"- `tcp_offset_field`: `{summary['tcp_offset']['field']}`",
         f"- `alignment_status`: `{summary['base_to_board_alignment']['status']}`",
@@ -927,12 +1125,16 @@ def build_summary(
     tcp_offset = inspect_tcp_offset(manifest)
     alignment = inspect_alignment(manifest)
     contract = run_contract_checker(python_path, output_dir, model_path, asset_roots, target_frame)
+    joint_limits = inspect_joint_limits(manifest)
+    mesh_assets = inspect_mesh_assets(contract)
     field_checks = build_field_checks(
         manifest_request,
         model_path,
         asset_roots,
         authority,
         provenance,
+        joint_limits,
+        mesh_assets,
         target_frame,
         tcp_offset,
         alignment,
@@ -961,6 +1163,8 @@ def build_summary(
         "asset_roots": asset_roots,
         "authority": authority,
         "provenance": provenance,
+        "joint_limits": joint_limits,
+        "mesh_assets": mesh_assets,
         "target_frame": target_frame,
         "tcp_offset": tcp_offset,
         "base_to_board_alignment": alignment,
@@ -981,6 +1185,8 @@ def build_summary(
         asset_roots,
         authority,
         provenance,
+        joint_limits,
+        mesh_assets,
         target_frame,
         tcp_offset,
         alignment,
@@ -1022,6 +1228,9 @@ def main() -> int:
                 "manifest_path": summary["manifest_request"]["path"],
                 "model_path": summary["model_path"]["path"],
                 "asset_roots": summary["asset_roots"]["asset_roots"],
+                "joint_limits_status": summary["joint_limits"]["status"],
+                "mesh_assets_status": summary["mesh_assets"]["status"],
+                "mesh_reference_count": summary["mesh_assets"]["mesh_reference_count"],
                 "contract_status": summary["contract_checker"].get("status"),
                 "asset_preflight_status": summary["contract_checker"].get("model_asset_preflight", {}).get("status"),
                 "summary_json": str(summary_path),

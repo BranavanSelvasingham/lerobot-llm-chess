@@ -418,6 +418,19 @@ def build_candidate_manifest(
         "provenance": provenance,
         "provenance_placeholder": provenance_placeholder,
         "target_frame": target_frame,
+        "joint_limits_placeholder": {
+            "status": "TODO_reviewed_joint_limits_required",
+            "accepted_manifest_fields": ["joint_limits_deg", "joint_limits", "joint_limit_authority"],
+            "required_joints": [
+                "shoulder_pan",
+                "shoulder_lift",
+                "elbow_flex",
+                "wrist_flex",
+                "wrist_roll",
+                "gripper",
+            ],
+            "reason": "The probe cannot infer reviewed joint-limit authority from model existence alone.",
+        },
         "tcp_offset_placeholder": {
             "status": "TODO_calibrated_target_frame_to_tcp_offset_required",
             "accepted_manifest_fields": [
@@ -440,9 +453,10 @@ def build_candidate_manifest(
             "contract_checker": contract_result["diagnostic_excerpt"],
         },
         "notes": [
-            "This candidate manifest is a review draft. It should stay diagnostic-only until authority, provenance, TCP, and base-to-board fields are replaced with reviewed values.",
+            "This candidate manifest is a review draft. It should stay diagnostic-only until authority, provenance, joint limits, TCP, and base-to-board fields are replaced with reviewed values.",
             "The probe does not copy, ingest, or modify model/mesh assets.",
             "Extra probe_child_diagnostics fields are for operator review; the bundle manifest checker derives readiness from the declared manifest fields.",
+            "Populate joint_limits_deg or an equivalent joint-limit authority field before expecting ready_for_model_backed_ik.",
         ],
     }
 
@@ -541,6 +555,17 @@ def build_rows(
             ["tcp_offset_m"],
             ["tcp_offset_placeholder_declared_without_calibrated_vector"],
             "The probe intentionally does not invent TCP/gripper-tip offsets.",
+        ),
+        row(
+            "joint_limits_deg",
+            "joint_contract",
+            "action_required",
+            "warning",
+            {"joint_limits_placeholder": True},
+            {"required_joints": ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"]},
+            ["joint_limits_deg"],
+            ["joint_limits_placeholder_declared_without_reviewed_limits"],
+            "The probe intentionally does not invent reviewed joint-limit authority.",
         ),
         row(
             "base_to_board_transform",

@@ -3,9 +3,9 @@
 Use this hardware-free checker when a reviewed SO-101 model bundle should drive
 future model-backed IK calibration. It verifies that one JSON manifest declares
 the kinematic model path, mesh asset roots, source authority/provenance, target
-frame, TCP/gripper-tip offset, and base-to-board alignment inputs before the
-simulator treats Cartesian, delta, or radial reachability residuals as
-trustworthy.
+frame, reviewed joint-limit authority, TCP/gripper-tip offset, mesh evidence,
+and base-to-board alignment inputs before the simulator treats Cartesian,
+delta, or radial reachability residuals as trustworthy.
 
 ## Probe/Generator Flow
 
@@ -39,10 +39,11 @@ diagnostics match the rest of the simulator gate.
 By default the generated candidate manifest leaves `authority` and
 `provenance` as empty objects and stores TODO details in
 `authority_placeholder` and `provenance_placeholder`. It also writes
-`tcp_offset_placeholder` and `base_to_board_alignment_placeholder` instead of
-inventing calibrated TCP or board-alignment values. That means the generated
-manifest remains diagnostic-only until an operator replaces those placeholders
-with reviewed fields and this checker reports `ready_for_model_backed_ik: true`.
+`joint_limits_placeholder`, `tcp_offset_placeholder`, and
+`base_to_board_alignment_placeholder` instead of inventing reviewed limits,
+calibrated TCP, or board-alignment values. That means the generated manifest
+remains diagnostic-only until an operator replaces those placeholders with
+reviewed fields and this checker reports `ready_for_model_backed_ik: true`.
 
 To re-check a generated draft directly:
 
@@ -121,6 +122,14 @@ resolved from the manifest directory.
     "license": "reviewed-license-or-notice"
   },
   "target_frame": "gripper_frame_link",
+  "joint_limits_deg": {
+    "shoulder_pan": [-110.0, 110.0],
+    "shoulder_lift": [-110.0, 110.0],
+    "elbow_flex": [-120.0, 120.0],
+    "wrist_flex": [-120.0, 120.0],
+    "wrist_roll": [-180.0, 180.0],
+    "gripper": [0.0, 100.0]
+  },
   "tcp_offset_m": {
     "x": 0.0,
     "y": 0.0,
@@ -146,10 +155,18 @@ Accepted TCP aliases are `tcp_offset_m`, `gripper_tip_offset_m`,
 `target_frame` defaults to `gripper_frame_link`.
 
 `asset_roots` must be present. An explicit empty list is valid when the model
-directory alone resolves mesh paths, but nonexistent roots are reported as
-follow-up diagnostics. Explicit placeholders such as
+directory alone resolves mesh paths, but readiness still requires at least one
+literal mesh reference visible to asset preflight and resolved with no missing
+or unresolved assets. Nonexistent roots are reported as follow-up diagnostics.
+Explicit placeholders such as
 `base_to_board_alignment_placeholder` or `alignment_placeholders` are recorded,
 but they do not make the bundle ready for model-backed IK.
+
+`joint_limits_deg`, `joint_limits`, or `joint_limit_authority` must be present
+as an object covering every expected SO-101 joint: `shoulder_pan`,
+`shoulder_lift`, `elbow_flex`, `wrist_flex`, `wrist_roll`, and `gripper`.
+Each entry may be a two-item `[lower, upper]` list or an object with
+`lower`/`upper` or `min`/`max` numeric values.
 
 ## Readiness Rule
 
@@ -160,6 +177,9 @@ true:
 - `model_path` exists
 - `asset_roots` is present and all supplied roots are directories
 - non-empty `authority` and `provenance` objects are present
+- reviewed joint-limit authority covers every SO-101 joint
+- at least one mesh reference is visible to the asset preflight and all mesh
+  references resolve
 - the target frame is present or defaulted
 - a valid x/y/z TCP offset in meters is present
 - a real `base_to_board_transform` or `base_to_board_alignment` is populated

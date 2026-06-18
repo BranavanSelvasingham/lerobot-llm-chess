@@ -55,6 +55,22 @@ IK_REACHABILITY_SUMMARY_NAME = "ik_reachability_drill_summary.json"
 SO101_MODEL_SOURCE_INVENTORY_SUMMARY_NAME = "so101_model_source_inventory_summary.json"
 SO101_MODEL_BUNDLE_MANIFEST_SUMMARY_NAME = "so101_model_bundle_manifest_summary.json"
 SO101_MODEL_CONTRACT_SUMMARY_NAME = "so101_model_contract_summary.json"
+SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME = "so101_reviewed_mujoco_bundle"
+SO101_REVIEWED_MUJOCO_BUNDLE_SUMMARY_NAME = "so101_reviewed_mujoco_bundle_summary.json"
+SO101_MUJOCO_SCENE_DIR_NAME = "so101_mujoco_scene"
+SO101_MUJOCO_SCENE_SUMMARY_NAME = "so101_mujoco_scene_summary.json"
+SO101_CHESS_ENV_DIR_NAME = "so101_chess_env"
+SO101_CHESS_ENV_SUMMARY_NAME = "so101_chess_env_summary.json"
+SO101_ENV_RESETS_DIR_NAME = "so101_env_resets"
+SO101_ENV_RESETS_SUMMARY_NAME = "so101_env_resets_summary.json"
+SO101_MUJOCO_CONTACT_PROBE_DIR_NAME = "so101_mujoco_contact_probe"
+SO101_MUJOCO_CONTACT_PROBE_SUMMARY_NAME = "so101_mujoco_contact_probe_summary.json"
+SO101_MUJOCO_GRASP_PROBE_DIR_NAME = "so101_mujoco_grasp_probe"
+SO101_MUJOCO_GRASP_PROBE_SUMMARY_NAME = "so101_mujoco_grasp_probe_summary.json"
+SO101_MUJOCO_BOARD_PICK_PROBE_DIR_NAME = "so101_mujoco_board_pick_probe"
+SO101_MUJOCO_BOARD_PICK_PROBE_SUMMARY_NAME = "so101_mujoco_board_pick_probe_summary.json"
+SO101_TRAINING_ROLLOUTS_DIR_NAME = "so101_training_rollouts"
+SO101_TRAINING_ROLLOUTS_SUMMARY_NAME = "so101_training_rollouts_summary.json"
 BASELINE_CORNERS = [[32, 338], [594, 340], [540, 20], [86, 12]]
 PERTURBED_CORNERS = [[34, 337], [592, 342], [538, 22], [88, 14]]
 
@@ -1006,12 +1022,40 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
     so101_bundle_tcp = so101_bundle_tcp if isinstance(so101_bundle_tcp, dict) else {}
     so101_bundle_alignment = so101_bundle.get("base_to_board_alignment")
     so101_bundle_alignment = so101_bundle_alignment if isinstance(so101_bundle_alignment, dict) else {}
+    so101_reviewed_mujoco_bundle = summary.get("so101_reviewed_mujoco_bundle")
+    so101_reviewed_mujoco_bundle = (
+        so101_reviewed_mujoco_bundle if isinstance(so101_reviewed_mujoco_bundle, dict) else {}
+    )
     so101_contract = summary.get("so101_model_contract")
     so101_contract = so101_contract if isinstance(so101_contract, dict) else {}
     so101_contract_config = summary.get("so101_model_contract_config")
     so101_contract_config = so101_contract_config if isinstance(so101_contract_config, dict) else {}
     so101_asset_preflight = so101_contract.get("model_asset_preflight")
     so101_asset_preflight = so101_asset_preflight if isinstance(so101_asset_preflight, dict) else {}
+    so101_mujoco_scene = summary.get("so101_mujoco_scene")
+    so101_mujoco_scene = so101_mujoco_scene if isinstance(so101_mujoco_scene, dict) else {}
+    so101_chess_env = summary.get("so101_chess_env")
+    so101_chess_env = so101_chess_env if isinstance(so101_chess_env, dict) else {}
+    so101_env_resets = summary.get("so101_env_resets")
+    so101_env_resets = so101_env_resets if isinstance(so101_env_resets, dict) else {}
+    so101_mujoco_contact_probe = summary.get("so101_mujoco_contact_probe")
+    so101_mujoco_contact_probe = (
+        so101_mujoco_contact_probe if isinstance(so101_mujoco_contact_probe, dict) else {}
+    )
+    so101_mujoco_grasp_probe = summary.get("so101_mujoco_grasp_probe")
+    so101_mujoco_grasp_probe = (
+        so101_mujoco_grasp_probe if isinstance(so101_mujoco_grasp_probe, dict) else {}
+    )
+    so101_mujoco_board_pick_probe = summary.get("so101_mujoco_board_pick_probe")
+    so101_mujoco_board_pick_probe = (
+        so101_mujoco_board_pick_probe
+        if isinstance(so101_mujoco_board_pick_probe, dict)
+        else {}
+    )
+    so101_training_rollouts = summary.get("so101_training_rollouts")
+    so101_training_rollouts = (
+        so101_training_rollouts if isinstance(so101_training_rollouts, dict) else {}
+    )
     readme_path = output_dir / ARTIFACT_ENTRYPOINT_NAME
     lines = [
         "# Simulator Calibration Regression Artifacts",
@@ -1081,6 +1125,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `so101_model_bundle_manifest/so101_model_bundle_manifest_summary.json`",
         "- `so101_model_bundle_manifest/so101_model_bundle_manifest_checklist.csv`",
         "- `so101_model_bundle_manifest/README.md`",
+        f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/{SO101_REVIEWED_MUJOCO_BUNDLE_SUMMARY_NAME}`",
+        f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/so101_reviewed_mujoco_bundle_checklist.csv`",
+        f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/README.md`",
         "- `so101_model_source_inventory/so101_model_source_inventory_summary.json`",
         "- `so101_model_source_inventory/so101_model_source_candidates.csv`",
         "- `so101_model_source_inventory/README.md`",
@@ -1093,6 +1140,13 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `ik_reachability_drill/ik_reachability_drill_summary.json`",
         "- `ik_reachability_drill/ik_reachability_drill_rows.csv`",
         "- `ik_reachability_drill/ik_reachability_drill_heatmap.png`",
+        f"- `{SO101_MUJOCO_SCENE_DIR_NAME}/{SO101_MUJOCO_SCENE_SUMMARY_NAME}`",
+        f"- `{SO101_CHESS_ENV_DIR_NAME}/{SO101_CHESS_ENV_SUMMARY_NAME}`",
+        f"- `{SO101_ENV_RESETS_DIR_NAME}/{SO101_ENV_RESETS_SUMMARY_NAME}`",
+        f"- `{SO101_MUJOCO_CONTACT_PROBE_DIR_NAME}/{SO101_MUJOCO_CONTACT_PROBE_SUMMARY_NAME}`",
+        f"- `{SO101_MUJOCO_GRASP_PROBE_DIR_NAME}/{SO101_MUJOCO_GRASP_PROBE_SUMMARY_NAME}`",
+        f"- `{SO101_MUJOCO_BOARD_PICK_PROBE_DIR_NAME}/{SO101_MUJOCO_BOARD_PICK_PROBE_SUMMARY_NAME}`",
+        f"- `{SO101_TRAINING_ROLLOUTS_DIR_NAME}/{SO101_TRAINING_ROLLOUTS_SUMMARY_NAME}`",
         "- `gripper_camera_pov_review/gripper_camera_pov_review_summary.json`",
         "- `pick_place_scenario_matrix/scenario_matrix_summary.json`",
         "- `app_entrypoint/smoke_sim_app_entrypoints_summary.json`",
@@ -1360,6 +1414,13 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             f"effective asset-root source `{so101_bundle_forwarding.get('ik_model_asset_root_source')}`."
         ),
         (
+            "- SO-101 reviewed MuJoCo bundle gate: "
+            f"status `{so101_reviewed_mujoco_bundle.get('status')}`; "
+            f"ready_for_model_backed_ik `{markdown_bool(so101_reviewed_mujoco_bundle.get('ready_for_model_backed_ik'))}`; "
+            f"reviewed_model_motion_checked `{markdown_bool(so101_reviewed_mujoco_bundle.get('reviewed_model_motion_checked'))}`; "
+            "a ready reviewed bundle must load in MuJoCo and map/move every SO-101 joint before training evidence is trusted."
+        ),
+        (
             "- SO-101 model contract evidence records model availability, direct "
             "RobotKinematics usability, joint/frame/TCP contract inputs, and the missing "
             "alignment inputs that still gate trustworthy model-backed IK residuals."
@@ -1382,6 +1443,35 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             "- IK reachability evidence records deterministic Cartesian/delta/radial command "
             "feasibility with summary JSON, rows CSV, and a heatmap PNG; missing repo-local "
             "SO-101 models remain an explicit non-failing fallback diagnostic."
+        ),
+        (
+            "- SO-101 MuJoCo scene evidence: "
+            f"status `{so101_mujoco_scene.get('status')}`; model authority "
+            f"`{so101_mujoco_scene.get('model_authority')}`; ready_for_model_backed_ik "
+            f"`{markdown_bool(so101_mujoco_scene.get('ready_for_model_backed_ik'))}`; "
+            "this proves development-scaffold MuJoCo plumbing, not physical IK truth."
+        ),
+        (
+            "- SO-101 Gymnasium env evidence: "
+            f"status `{so101_chess_env.get('status')}`; MuJoCo backend "
+            f"`{(so101_chess_env.get('sim_status') or {}).get('ok') if isinstance(so101_chess_env.get('sim_status'), dict) else None}`; "
+            f"scripted pick/place `{(so101_chess_env.get('scripted_pick_place') or {}).get('scripted_pick_place_complete') if isinstance(so101_chess_env.get('scripted_pick_place'), dict) else None}`."
+        ),
+        (
+            "- SO-101 reset/contact/rollout evidence: resets "
+            f"`{markdown_bool(so101_env_resets.get('all_resets_ok'))}`, board contact "
+            f"`{markdown_bool(so101_mujoco_contact_probe.get('all_board_contacts_observed'))}`, "
+            f"gripper contact `{markdown_bool(so101_mujoco_grasp_probe.get('gripper_contact_observed'))}`, "
+            f"lift/place physics `{markdown_bool(so101_mujoco_grasp_probe.get('lift_place_physics_verified'))}`, "
+            f"board-source pick/place `{markdown_bool(so101_mujoco_board_pick_probe.get('board_source_pick_place_verified'))}`, "
+            f"board-source final target XY error `{so101_mujoco_board_pick_probe.get('final_target_xy_error_m')}`, "
+            f"scripted rollout episodes `{so101_training_rollouts.get('episode_count')}` and transitions "
+            f"`{so101_training_rollouts.get('transition_count')}`."
+        ),
+        (
+            "- SO-101 MuJoCo next required items stay open: reviewed model bundle, mesh roots, "
+            "joint/frame/TCP authority, base-to-board alignment, and replacement of the seeded "
+            "development board-source pickup with reviewed model-backed IK before serious policy training."
         ),
         (
             "- App-entrypoint metadata evidence runs `smoke_sim_app_entrypoints.py --sim` "
@@ -2530,6 +2620,92 @@ def ik_reachability_section(ik: dict[str, Any] | None, summary_path: Path) -> di
     }
 
 
+def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
+    smoke = smoke if isinstance(smoke, dict) else {}
+    artifacts = smoke.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    dependencies = smoke.get("dependencies")
+    dependencies = dependencies if isinstance(dependencies, dict) else {}
+    section: dict[str, Any] = {
+        "summary_path": artifacts.get("summary_json") or str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(smoke.get("ok", False)),
+        "status": smoke.get("status"),
+        "artifacts": {
+            "summary_json": artifacts.get("summary_json") or str(summary_path),
+            **{key: value for key, value in artifacts.items() if key != "summary_json"},
+        },
+        "dependencies": dependencies,
+        "model_authority": smoke.get("model_authority"),
+        "ready_for_model_backed_ik": smoke.get("ready_for_model_backed_ik"),
+        "limitations": smoke.get("limitations"),
+        "next_required_for_goal": smoke.get("next_required_for_goal"),
+    }
+    for key in (
+        "mujoco_model_load",
+        "sim_robot_mujoco_sync",
+        "env_scripted_pick_place",
+        "sim_status",
+        "scripted_pick_place",
+        "reset_count",
+        "all_resets_ok",
+        "all_mujoco_fallback_free",
+        "all_piece_resets_ok",
+        "all_board_contacts_observed",
+        "probe_count",
+        "gripper_contact_observed",
+        "two_finger_contact_observed",
+        "settled_gripper_contact_observed",
+        "source_square",
+        "source_pick_started_at_source",
+        "source_pick_xy_tolerance_m",
+        "close_two_finger_contact_observed",
+        "lift_verified",
+        "lift_without_manual_piece_pose_m",
+        "lift_z_threshold_m",
+        "board_contact_cleared_during_lift",
+        "transfer_verified",
+        "transfer_xy_m",
+        "transfer_xy_threshold_m",
+        "transfer_target_xy_error_m",
+        "transfer_source_to_target_progress_m",
+        "place_without_manual_piece_pose_verified",
+        "lift_place_physics_verified",
+        "board_source_pick_place_verified",
+        "release_contact_cleared",
+        "release_contact_cleared_after_retreat",
+        "final_board_contact_observed",
+        "final_target_xy_error_m",
+        "target_xy_tolerance_m",
+        "final_place_z_error_m",
+        "source_to_target_progress_m",
+        "target_square",
+        "piece_reset_to_source_before_run",
+        "manual_piece_pose_used_for_fixture",
+        "manual_piece_pose_used_after_fixture",
+        "manual_piece_pose_used_after_reset",
+        "robot_pose_seeded_for_source_fixture",
+        "robot_motion_mode",
+        "episode_count",
+        "transition_count",
+        "all_scripted_pick_place_complete",
+        "all_mujoco_piece_release_synced",
+        "manifest_status",
+        "manifest_request",
+        "model_path",
+        "asset_roots",
+        "target_frame",
+        "tcp_offset",
+        "base_to_board_alignment",
+        "reviewed_model_motion_checked",
+        "require_ready_reviewed_model",
+        "missing_inputs",
+    ):
+        if key in smoke:
+            section[key] = smoke.get(key)
+    return section
+
+
 def so101_model_contract_section(contract: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
     contract = contract if isinstance(contract, dict) else {}
     model_request = contract.get("model_request")
@@ -2692,6 +2868,10 @@ def so101_model_bundle_manifest_section(
     authority = authority if isinstance(authority, dict) else {}
     provenance = bundle.get("provenance")
     provenance = provenance if isinstance(provenance, dict) else {}
+    joint_limits = bundle.get("joint_limits")
+    joint_limits = joint_limits if isinstance(joint_limits, dict) else {}
+    mesh_assets = bundle.get("mesh_assets")
+    mesh_assets = mesh_assets if isinstance(mesh_assets, dict) else {}
     field_checks = bundle.get("field_checks")
     field_checks = field_checks if isinstance(field_checks, list) else []
     return {
@@ -2725,6 +2905,23 @@ def so101_model_bundle_manifest_section(
         },
         "authority_status": authority.get("status"),
         "provenance_status": provenance.get("status"),
+        "joint_limits": {
+            "status": joint_limits.get("status"),
+            "field": joint_limits.get("field"),
+            "expected_joints": joint_limits.get("expected_joints"),
+            "missing_joints": joint_limits.get("missing_joints"),
+            "invalid_joints": joint_limits.get("invalid_joints"),
+            "diagnostics": joint_limits.get("diagnostics"),
+        },
+        "mesh_assets": {
+            "status": mesh_assets.get("status"),
+            "mesh_reference_count": mesh_assets.get("mesh_reference_count"),
+            "present_asset_count": mesh_assets.get("present_asset_count"),
+            "missing_asset_count": mesh_assets.get("missing_asset_count"),
+            "unresolved_reference_count": mesh_assets.get("unresolved_reference_count"),
+            "asset_preflight_status": mesh_assets.get("asset_preflight_status"),
+            "diagnostics": mesh_assets.get("diagnostics"),
+        },
         "target_frame": {
             "status": target_frame.get("status"),
             "value": target_frame.get("value"),
@@ -3284,6 +3481,25 @@ def main() -> int:
         args=args,
         bundle=so101_model_bundle_manifest,
     )
+    so101_reviewed_mujoco_bundle_dir = output_dir / SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME
+    so101_reviewed_mujoco_bundle_summary_path = (
+        so101_reviewed_mujoco_bundle_dir / SO101_REVIEWED_MUJOCO_BUNDLE_SUMMARY_NAME
+    )
+    so101_reviewed_mujoco_bundle_record, so101_reviewed_mujoco_bundle = run_child(
+        name="so101_reviewed_mujoco_bundle",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_so101_reviewed_mujoco_bundle.py"),
+            "--output-dir",
+            str(so101_reviewed_mujoco_bundle_dir),
+            "--manifest-summary-path",
+            str(so101_model_bundle_manifest_summary_path),
+            "--python",
+            python,
+        ],
+        output_dir=so101_reviewed_mujoco_bundle_dir,
+        expected_json_path=so101_reviewed_mujoco_bundle_summary_path,
+    )
     effective_ik_model_path = path_from_string(so101_bundle_forwarding.get("effective_ik_model_path"))
     effective_ik_model_asset_roots = paths_from_strings(
         so101_bundle_forwarding.get("effective_ik_model_asset_roots")
@@ -3368,6 +3584,139 @@ def main() -> int:
         expected_json_path=ik_reachability_summary_path,
     )
 
+    so101_mujoco_scene_dir = output_dir / SO101_MUJOCO_SCENE_DIR_NAME
+    so101_mujoco_scene_summary_path = so101_mujoco_scene_dir / SO101_MUJOCO_SCENE_SUMMARY_NAME
+    so101_mujoco_scene_record, so101_mujoco_scene = run_child(
+        name="so101_mujoco_scene",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_so101_mujoco_scene.py"),
+            "--output-dir",
+            str(so101_mujoco_scene_dir),
+            "--source-square",
+            str(args.source_square),
+            "--target-square",
+            str(args.target_square),
+        ],
+        output_dir=so101_mujoco_scene_dir,
+        expected_json_path=so101_mujoco_scene_summary_path,
+    )
+
+    so101_chess_env_dir = output_dir / SO101_CHESS_ENV_DIR_NAME
+    so101_chess_env_summary_path = so101_chess_env_dir / SO101_CHESS_ENV_SUMMARY_NAME
+    so101_mujoco_scene_artifacts = (
+        so101_mujoco_scene.get("artifacts") if isinstance(so101_mujoco_scene, dict) else {}
+    )
+    so101_mujoco_scene_artifacts = (
+        so101_mujoco_scene_artifacts if isinstance(so101_mujoco_scene_artifacts, dict) else {}
+    )
+    so101_development_model_path = so101_mujoco_scene_artifacts.get("model_xml")
+    if isinstance(so101_development_model_path, str) and Path(so101_development_model_path).is_file():
+        so101_chess_env_record, so101_chess_env = run_child(
+            name="so101_chess_env",
+            command=[
+                python,
+                str(REPO_ROOT / "scripts" / "smoke_sim_so101_chess_env.py"),
+                "--output-dir",
+                str(so101_chess_env_dir),
+                "--require-gymnasium",
+                "--require-mujoco",
+                "--mujoco-model-path",
+                so101_development_model_path,
+            ],
+            output_dir=so101_chess_env_dir,
+            expected_json_path=so101_chess_env_summary_path,
+        )
+    else:
+        so101_chess_env_record = skipped_child(
+            "so101_chess_env",
+            "development MuJoCo scene model was not available",
+            so101_chess_env_summary_path,
+        )
+        so101_chess_env = None
+
+    so101_env_resets_dir = output_dir / SO101_ENV_RESETS_DIR_NAME
+    so101_env_resets_summary_path = so101_env_resets_dir / SO101_ENV_RESETS_SUMMARY_NAME
+    so101_env_resets_record, so101_env_resets = run_child(
+        name="so101_env_resets",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_so101_env_resets.py"),
+            "--output-dir",
+            str(so101_env_resets_dir),
+        ],
+        output_dir=so101_env_resets_dir,
+        expected_json_path=so101_env_resets_summary_path,
+    )
+
+    so101_mujoco_contact_probe_dir = output_dir / SO101_MUJOCO_CONTACT_PROBE_DIR_NAME
+    so101_mujoco_contact_probe_summary_path = (
+        so101_mujoco_contact_probe_dir / SO101_MUJOCO_CONTACT_PROBE_SUMMARY_NAME
+    )
+    so101_mujoco_contact_probe_record, so101_mujoco_contact_probe = run_child(
+        name="so101_mujoco_contact_probe",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_so101_mujoco_contact_probe.py"),
+            "--output-dir",
+            str(so101_mujoco_contact_probe_dir),
+        ],
+        output_dir=so101_mujoco_contact_probe_dir,
+        expected_json_path=so101_mujoco_contact_probe_summary_path,
+    )
+
+    so101_mujoco_grasp_probe_dir = output_dir / SO101_MUJOCO_GRASP_PROBE_DIR_NAME
+    so101_mujoco_grasp_probe_summary_path = (
+        so101_mujoco_grasp_probe_dir / SO101_MUJOCO_GRASP_PROBE_SUMMARY_NAME
+    )
+    so101_mujoco_grasp_probe_record, so101_mujoco_grasp_probe = run_child(
+        name="so101_mujoco_grasp_probe",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_so101_mujoco_grasp_probe.py"),
+            "--output-dir",
+            str(so101_mujoco_grasp_probe_dir),
+        ],
+        output_dir=so101_mujoco_grasp_probe_dir,
+        expected_json_path=so101_mujoco_grasp_probe_summary_path,
+    )
+
+    so101_mujoco_board_pick_probe_dir = output_dir / SO101_MUJOCO_BOARD_PICK_PROBE_DIR_NAME
+    so101_mujoco_board_pick_probe_summary_path = (
+        so101_mujoco_board_pick_probe_dir / SO101_MUJOCO_BOARD_PICK_PROBE_SUMMARY_NAME
+    )
+    so101_mujoco_board_pick_probe_record, so101_mujoco_board_pick_probe = run_child(
+        name="so101_mujoco_board_pick_probe",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_so101_mujoco_board_pick_probe.py"),
+            "--output-dir",
+            str(so101_mujoco_board_pick_probe_dir),
+            "--source-square",
+            str(args.source_square),
+            "--target-square",
+            str(args.target_square),
+        ],
+        output_dir=so101_mujoco_board_pick_probe_dir,
+        expected_json_path=so101_mujoco_board_pick_probe_summary_path,
+    )
+
+    so101_training_rollouts_dir = output_dir / SO101_TRAINING_ROLLOUTS_DIR_NAME
+    so101_training_rollouts_summary_path = (
+        so101_training_rollouts_dir / SO101_TRAINING_ROLLOUTS_SUMMARY_NAME
+    )
+    so101_training_rollouts_record, so101_training_rollouts = run_child(
+        name="so101_training_rollouts",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_so101_training_rollouts.py"),
+            "--output-dir",
+            str(so101_training_rollouts_dir),
+        ],
+        output_dir=so101_training_rollouts_dir,
+        expected_json_path=so101_training_rollouts_summary_path,
+    )
+
     pov_dir = output_dir / "gripper_camera_pov_review"
     pov_summary_path = pov_dir / "gripper_camera_pov_review_summary.json"
     pov_record, pov = run_child(
@@ -3446,9 +3795,17 @@ def main() -> int:
         "perception_regression_fixture": fixture_record,
         "sim_camera_pose_fixture": pose_fixture_record,
         "so101_model_bundle_manifest": so101_model_bundle_manifest_record,
+        "so101_reviewed_mujoco_bundle": so101_reviewed_mujoco_bundle_record,
         "so101_model_source_inventory": so101_model_source_inventory_record,
         "so101_model_contract": so101_model_contract_record,
         "ik_reachability_drill": ik_reachability_record,
+        "so101_mujoco_scene": so101_mujoco_scene_record,
+        "so101_chess_env": so101_chess_env_record,
+        "so101_env_resets": so101_env_resets_record,
+        "so101_mujoco_contact_probe": so101_mujoco_contact_probe_record,
+        "so101_mujoco_grasp_probe": so101_mujoco_grasp_probe_record,
+        "so101_mujoco_board_pick_probe": so101_mujoco_board_pick_probe_record,
+        "so101_training_rollouts": so101_training_rollouts_record,
         "gripper_camera_pov_review": pov_record,
         "pick_place_scenario_matrix": matrix_record,
     }
@@ -3563,6 +3920,10 @@ def main() -> int:
             so101_bundle_config,
             so101_bundle_forwarding,
         ),
+        "so101_reviewed_mujoco_bundle": so101_mujoco_smoke_section(
+            so101_reviewed_mujoco_bundle,
+            so101_reviewed_mujoco_bundle_summary_path,
+        ),
         "so101_model_contract": so101_model_contract_section(
             so101_model_contract,
             so101_model_contract_summary_path,
@@ -3570,6 +3931,34 @@ def main() -> int:
         "ik_reachability_drill": ik_reachability_section(
             ik_reachability,
             ik_reachability_summary_path,
+        ),
+        "so101_mujoco_scene": so101_mujoco_smoke_section(
+            so101_mujoco_scene,
+            so101_mujoco_scene_summary_path,
+        ),
+        "so101_chess_env": so101_mujoco_smoke_section(
+            so101_chess_env,
+            so101_chess_env_summary_path,
+        ),
+        "so101_env_resets": so101_mujoco_smoke_section(
+            so101_env_resets,
+            so101_env_resets_summary_path,
+        ),
+        "so101_mujoco_contact_probe": so101_mujoco_smoke_section(
+            so101_mujoco_contact_probe,
+            so101_mujoco_contact_probe_summary_path,
+        ),
+        "so101_mujoco_grasp_probe": so101_mujoco_smoke_section(
+            so101_mujoco_grasp_probe,
+            so101_mujoco_grasp_probe_summary_path,
+        ),
+        "so101_mujoco_board_pick_probe": so101_mujoco_smoke_section(
+            so101_mujoco_board_pick_probe,
+            so101_mujoco_board_pick_probe_summary_path,
+        ),
+        "so101_training_rollouts": so101_mujoco_smoke_section(
+            so101_training_rollouts,
+            so101_training_rollouts_summary_path,
         ),
         "gripper_camera_pov_review": gripper_camera_pov_section(pov, pov_summary_path),
         "pick_place_scenario_matrix": matrix_summary_section(matrix, matrix_summary_path),
@@ -3619,6 +4008,7 @@ def main() -> int:
             "This suite intentionally calls existing smoke scripts as subprocesses instead of duplicating their internals.",
             "It does not mutate simulator rendering, camera profiles, perception algorithms, robot execution, dependencies, or canonical calibration constants.",
             "SimCamera intrinsics/extrinsics are simulator reference metadata for downstream tool compatibility, not physical calibration truth.",
+            "MuJoCo SO-101 chess evidence is prioritized as a development-plumbing gate until a reviewed model bundle, TCP/gripper offset, and base-to-board alignment make model-backed training evidence trustworthy.",
         ],
     }
     write_json(summary_path, summary)

@@ -29,14 +29,22 @@ CATEGORY_ORDER = {
     "sim_camera_pose_fixture": 14,
     "so101_model_source_inventory": 15,
     "so101_model_bundle_manifest": 16,
-    "so101_model_contract": 17,
-    "so101_model_asset_preflight": 18,
-    "ik_reachability": 19,
-    "gripper_camera_pov": 20,
-    "app_entrypoint": 21,
-    "pick_place_scenario": 22,
-    "negative_check": 23,
-    "logs": 24,
+    "so101_reviewed_mujoco_bundle": 17,
+    "so101_model_contract": 18,
+    "so101_model_asset_preflight": 19,
+    "ik_reachability": 20,
+    "so101_mujoco_scene": 21,
+    "so101_chess_env": 22,
+    "so101_env_resets": 23,
+    "so101_mujoco_contact_probe": 24,
+    "so101_mujoco_grasp_probe": 25,
+    "so101_mujoco_board_pick_probe": 26,
+    "so101_training_rollouts": 27,
+    "gripper_camera_pov": 28,
+    "app_entrypoint": 29,
+    "pick_place_scenario": 30,
+    "negative_check": 31,
+    "logs": 32,
 }
 CATEGORY_LABELS = {
     "reference_media_inventory": "Reference Media Inventory",
@@ -56,9 +64,17 @@ CATEGORY_LABELS = {
     "sim_camera_pose_fixture": "SimCamera Pose Fixture",
     "so101_model_source_inventory": "SO-101 Model Source Inventory",
     "so101_model_bundle_manifest": "SO-101 Model Bundle Manifest",
+    "so101_reviewed_mujoco_bundle": "SO-101 Reviewed MuJoCo Bundle",
     "so101_model_contract": "SO-101 Model Contract",
     "so101_model_asset_preflight": "SO-101 Model Asset Preflight",
     "ik_reachability": "IK Reachability Drill",
+    "so101_mujoco_scene": "SO-101 MuJoCo Scene",
+    "so101_chess_env": "SO-101 Chess Gymnasium Env",
+    "so101_env_resets": "SO-101 Env Resets",
+    "so101_mujoco_contact_probe": "SO-101 MuJoCo Contact Probe",
+    "so101_mujoco_grasp_probe": "SO-101 MuJoCo Grasp Probe",
+    "so101_mujoco_board_pick_probe": "SO-101 MuJoCo Board Pick Probe",
+    "so101_training_rollouts": "SO-101 Training Rollouts",
     "gripper_camera_pov": "Gripper-Camera POV Review",
     "app_entrypoint": "App Entrypoint Metadata",
     "pick_place_scenario": "Pick/Place Release Frames",
@@ -1242,6 +1258,9 @@ def so101_model_bundle_manifest_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("ready_for_model_backed_ik", ""),
         metrics.get("model_path", ""),
         compact_list(metrics.get("asset_roots")),
+        metrics.get("joint_limits_status", ""),
+        metrics.get("mesh_assets_status", ""),
+        metrics.get("mesh_assets_mesh_reference_count", ""),
         metrics.get("target_frame", ""),
         metrics.get("tcp_offset_field", ""),
         metrics.get("base_to_board_alignment_status", ""),
@@ -1249,6 +1268,36 @@ def so101_model_bundle_manifest_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("asset_preflight_status", ""),
         metrics.get("diagnostic_only", ""),
         metrics.get("diagnostic_only_reason", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def so101_mujoco_smoke_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("model_authority", ""),
+        metrics.get("ready_for_model_backed_ik", ""),
+        metrics.get("reviewed_model_motion_checked", ""),
+        metrics.get("gymnasium_available", ""),
+        metrics.get("mujoco_available", ""),
+        metrics.get("all_resets_ok", ""),
+        metrics.get("all_board_contacts_observed", ""),
+        metrics.get("gripper_contact_observed", ""),
+        metrics.get("lift_place_physics_verified", ""),
+        metrics.get("source_pick_started_at_source", ""),
+        metrics.get("board_source_pick_place_verified", ""),
+        metrics.get("robot_pose_seeded_for_source_fixture", ""),
+        metrics.get("final_board_contact_observed", ""),
+        metrics.get("final_target_xy_error_m", ""),
+        metrics.get("episode_count", ""),
+        metrics.get("transition_count", ""),
+        compact_list(metrics.get("next_required_for_goal")),
         "ok" if artifact.get("exists") is True else "missing",
     ]
 
@@ -2629,8 +2678,8 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
     lines.extend(["", "### SO-101 Model Bundle Manifest"])
     lines.append(
         "This hardware-free child records one reviewed SO-101 model bundle manifest, "
-        "including model path, asset roots, target frame, TCP/gripper-tip offset, "
-        "base-to-board alignment, child contract diagnostics, and nested asset-preflight "
+        "including model path, asset roots, joint-limit authority, mesh evidence, target frame, "
+        "TCP/gripper-tip offset, base-to-board alignment, child contract diagnostics, and nested asset-preflight "
         "diagnostics. Manifest fields remain diagnostic-only unless "
         "`ready_for_model_backed_ik` is true; explicit suite CLI model inputs take precedence."
     )
@@ -2645,6 +2694,9 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Ready",
                 "Model Path",
                 "Asset Roots",
+                "Joint Limits",
+                "Mesh Assets",
+                "Mesh Refs",
                 "Target Frame",
                 "TCP Field",
                 "Alignment",
@@ -2744,6 +2796,58 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         )
         if ik_reachability
         else ["_No IK reachability artifacts indexed._"]
+    )
+
+    so101_mujoco_rows = []
+    for category in (
+        "so101_reviewed_mujoco_bundle",
+        "so101_mujoco_scene",
+        "so101_chess_env",
+        "so101_env_resets",
+        "so101_mujoco_contact_probe",
+        "so101_mujoco_grasp_probe",
+        "so101_mujoco_board_pick_probe",
+        "so101_training_rollouts",
+    ):
+        so101_mujoco_rows.extend(grouped.get(category, []))
+    lines.extend(["", "### SO-101 MuJoCo Development Gates"])
+    lines.append(
+        "These hardware-free children prioritize the MuJoCo/Gymnasium training path: "
+        "reviewed bundle handoff into MuJoCo, development scene load, env reset/step, "
+        "freejoint/contact checks, gripper-contact lift/place verification, board-source pick/place probing, and scripted rollout collection. The development scene "
+        "still uses a generated scaffold; serious training remains blocked until the "
+        "reviewed bundle gate reports MuJoCo motion checked and seeded board-source pickup is replaced with reviewed model-backed IK."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Authority",
+                "Ready",
+                "Reviewed Motion",
+                "Gymnasium",
+                "MuJoCo",
+                "Resets",
+                "Board Contact",
+                "Gripper Contact",
+                "Lift/Place Physics",
+                "Source Pick",
+                "Board Pick/Place",
+                "Seeded Pose",
+                "Final Board",
+                "Target XY Error",
+                "Episodes",
+                "Transitions",
+                "Next Required",
+                "Artifact Status",
+            ],
+            [so101_mujoco_smoke_row(row) for row in so101_mujoco_rows],
+        )
+        if so101_mujoco_rows
+        else ["_No SO-101 MuJoCo development gate artifacts indexed._"]
     )
 
     pov = [
@@ -2850,6 +2954,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "- The SO-101 model bundle manifest checker is hardware-free evidence for one reviewed bundle; it forwards model path and asset roots only when `ready_for_model_backed_ik` is true and explicit IK CLI inputs do not take precedence.",
             "- The SO-101 model contract checker is a hardware-free preflight for model availability, direct RobotKinematics usability, and joint/frame/TCP alignment inputs.",
             "- The IK reachability drill is a hardware-free feasibility gate; `model_unavailable_fallback_complete` remains a deliberate non-failing status until a repo-local SO-101 model is wired in.",
+            "- The SO-101 MuJoCo development gates exercise the Gymnasium/MuJoCo path with a generated scaffold; gripper-contact fixture lift/place and seeded board-source pick/place evidence are separate from reviewed physical model truth, and reviewed model authority, TCP/gripper offset, base-to-board alignment, and reviewed model-backed IK remain required before serious policy training.",
             "- The SimCamera profile sweep is deterministic synthetic review evidence; its full-frame image deltas are coarse prompts, not physical calibration truth.",
             "- The SimCamera tuning before/after section compares the documented 72px baseline against the current canonical profile and keeps missing real depth and pick/place video gaps open.",
             "- The reference capture manifest section records local input readiness for real depth-reference and pick/place-video captures; readiness is not physical calibration truth.",

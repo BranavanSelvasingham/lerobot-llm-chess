@@ -1,0 +1,386 @@
+#!/usr/bin/env python3
+
+from __future__ import annotations
+
+import argparse
+import csv
+import importlib.util
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SRC_DIR = REPO_ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+
+DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "so101_training_rollouts"
+SUMMARY_NAME = "so101_training_rollouts_summary.json"
+TRANSITIONS_NAME = "so101_training_rollouts.jsonl"
+EPISODES_NAME = "so101_training_rollout_episodes.csv"
+MODEL_NAME = "so101_chess_development.xml"
+MANIFEST_NAME = "so101_chess_development_manifest.json"
+README_NAME = "README.md"
+SCHEMA = "lerobot.sim.so101_training_rollouts.v1"
+DEFAULT_TASKS: tuple[tuple[str, str], ...] = (
+    ("e4", "e5"),
+    ("a4", "a5"),
+    ("b8", "c8"),
+    ("e2", "e3"),
+    ("d4", "f4"),
+)
+SO101_JOINTS: tuple[str, ...] = (
+    "shoulder_pan",
+    "shoulder_lift",
+    "elbow_flex",
+    "wrist_flex",
+    "wrist_roll",
+    "gripper",
+)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Collect deterministic scripted expert rollouts for focused SO-101 chess "
+            "pick/place tasks in the development MuJoCo scene."
+        )
+    )
+    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument("--max-steps", type=int, default=96)
+    parser.add_argument(
+        "--task",
+        action="append",
+        default=[],
+        help="Task pair as SOURCE:TARGET, for example e4:e5. Repeatable. Defaults to a small board-zone curriculum.",
+    )
+    return parser.parse_args()
+
+
+def module_available(name: str) -> bool:
+    return importlib.util.find_spec(name) is not None
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2) + "\n")
+
+
+def append_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as f:
+        for row in rows:
+            f.write(json.dumps(row, sort_keys=True) + "\n")
+
+
+def write_episode_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "episode",
+        "source_square",
+        "target_square",
+        "steps",
+        "terminated",
+        "truncated",
+        "total_reward",
+        "final_phase_index",
+        "final_piece_square",
+        "final_holding_piece",
+        "mujoco_active",
+        "fallback",
+        "mujoco_piece_release_synced",
+        "mujoco_piece_release_error_m",
+    ]
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field, "") for field in fieldnames})
+
+
+def parse_tasks(values: list[str]) -> tuple[tuple[str, str], ...]:
+    if not values:
+        return DEFAULT_TASKS
+    tasks: list[tuple[str, str]] = []
+    for value in values:
+        if ":" not in value:
+            raise ValueError(f"Task must be SOURCE:TARGET, got {value!r}.")
+        source, target = value.split(":", 1)
+        tasks.append((source.strip().lower(), target.strip().lower()))
+    return tuple(tasks)
+
+
+def observation_payload(obs: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "joint_positions_deg": [float(value) for value in obs["joint_positions_deg"].tolist()],
+        "source_square_xyz_m": [float(value) for value in obs["source_square_xyz_m"].tolist()],
+        "target_square_xyz_m": [float(value) for value in obs["target_square_xyz_m"].tolist()],
+        "piece_square_index": int(obs["piece_square_index"][0]),
+        "holding_piece": float(obs["holding_piece"][0]),
+        "phase_index": int(obs["phase_index"][0]),
+        "mujoco_active": float(obs["mujoco_active"][0]),
+    }
+
+
+def joint_positions_from_obs(obs: dict[str, Any]) -> dict[str, float]:
+    joints = obs["joint_positions_deg"]
+    return {joint: float(joints[index]) for index, joint in enumerate(SO101_JOINTS)}
+
+
+def piece_release_error_m(env: Any, scene_state: dict[str, Any], target_square: str) -> float:
+    from lerobot.sim.chess_env import square_center_m
+
+    mujoco_piece = scene_state["piece"].get("mujoco_freejoint") or {}
+    actual_piece_xyz = mujoco_piece.get("position_xyz_m") if isinstance(mujoco_piece, dict) else None
+    if not isinstance(actual_piece_xyz, list) or len(actual_piece_xyz) < 3 or not mujoco_piece.get("ok"):
+        return float("inf")
+    target_center = square_center_m(target_square, env.config.board_params)
+    expected_piece_xyz = (
+        float(env.config.board_origin_m[0] + target_center[0]),
+        float(env.config.board_origin_m[1] + target_center[1]),
+        float(env.config.board_origin_m[2] + target_center[2] + env.config.piece_height_m / 2.0),
+    )
+    return sum((float(actual_piece_xyz[index]) - expected_piece_xyz[index]) ** 2 for index in range(3)) ** 0.5
+
+
+def collect_episode(
+    *,
+    episode_index: int,
+    source_square: str,
+    target_square: str,
+    model_path: Path,
+    max_steps: int,
+    action_toward_targets: Any,
+    env_cls: Any,
+    env_config_cls: Any,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    env = env_cls(
+        env_config_cls(
+            source_square=source_square,
+            target_square=target_square,
+            max_steps=max_steps,
+            use_mujoco=True,
+            mujoco_model_path=model_path,
+        )
+    )
+    transitions: list[dict[str, Any]] = []
+    try:
+        obs, info = env.reset()
+        total_reward = 0.0
+        terminated = False
+        truncated = False
+        for step_index in range(max_steps):
+            phase_index = int(obs["phase_index"][0])
+            waypoint = env.waypoints[min(phase_index, len(env.waypoints) - 1)]
+            action = action_toward_targets(
+                joint_positions_from_obs(obs),
+                waypoint.targets_deg,
+                action_scale_deg=env.config.action_scale_deg,
+            )
+            prev_obs = observation_payload(obs)
+            obs, reward, terminated, truncated, info = env.step(action)
+            total_reward += float(reward)
+            transitions.append(
+                {
+                    "schema": SCHEMA + ".transition",
+                    "episode": episode_index,
+                    "step": step_index + 1,
+                    "task": {
+                        "source_square": source_square,
+                        "target_square": target_square,
+                    },
+                    "expert": {
+                        "policy": "scripted_joint_waypoint_tracker",
+                        "waypoint": waypoint.name,
+                        "waypoint_index": phase_index,
+                        "waypoint_targets_deg": dict(waypoint.targets_deg),
+                    },
+                    "observation": prev_obs,
+                    "action": [float(value) for value in action.tolist()],
+                    "reward": float(reward),
+                    "terminated": bool(terminated),
+                    "truncated": bool(truncated),
+                    "next_observation": observation_payload(obs),
+                    "info": {
+                        "sim_status": info["sim_status"],
+                        "scene_state": info["scene_state"],
+                    },
+                }
+            )
+            if terminated or truncated:
+                break
+        final_scene = info["scene_state"]
+        sim_status = info["sim_status"]
+        release_error = piece_release_error_m(env, final_scene, target_square)
+        release_synced = release_error < 1e-6
+        episode = {
+            "episode": episode_index,
+            "source_square": source_square,
+            "target_square": target_square,
+            "steps": len(transitions),
+            "terminated": bool(terminated),
+            "truncated": bool(truncated),
+            "total_reward": float(total_reward),
+            "final_phase_index": int(obs["phase_index"][0]),
+            "final_piece_square": final_scene["piece"]["square"],
+            "final_holding_piece": bool(final_scene["piece"]["held_by_gripper"]),
+            "mujoco_active": bool(sim_status.get("ok")),
+            "fallback": sim_status.get("fallback"),
+            "mujoco_piece_release_synced": release_synced,
+            "mujoco_piece_release_error_m": release_error,
+            "scripted_pick_place_complete": bool(
+                terminated
+                and final_scene["piece"]["square"] == target_square
+                and not final_scene["piece"]["held_by_gripper"]
+                and sim_status.get("fallback") is None
+                and release_synced
+            ),
+        }
+        return episode, transitions
+    finally:
+        env.close()
+
+
+def write_readme(path: Path, summary: dict[str, Any]) -> None:
+    lines = [
+        "# SO-101 Training Rollouts",
+        "",
+        "This artifact records deterministic scripted expert rollouts for focused chess pick/place tasks.",
+        "",
+        f"- Status: `{summary['status']}`",
+        f"- Episodes: `{summary['episode_count']}`",
+        f"- Transition count: `{summary['transition_count']}`",
+        f"- All episodes complete: `{summary['all_scripted_pick_place_complete']}`",
+        f"- MuJoCo fallback-free: `{summary['all_mujoco_fallback_free']}`",
+        f"- MuJoCo piece release synced: `{summary['all_mujoco_piece_release_synced']}`",
+        f"- Rollouts JSONL: `{summary['artifacts']['transitions_jsonl']}`",
+        "",
+        "The rollouts use the development MJCF scaffold and are not physical SO-101 training truth.",
+    ]
+    path.write_text("\n".join(lines) + "\n")
+
+
+def main() -> int:
+    args = parse_args()
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    deps = {
+        "numpy": module_available("numpy"),
+        "draccus": module_available("draccus"),
+        "gymnasium": module_available("gymnasium"),
+        "mujoco": module_available("mujoco"),
+    }
+    model_path = args.output_dir / MODEL_NAME
+    manifest_path = args.output_dir / MANIFEST_NAME
+    summary_path = args.output_dir / SUMMARY_NAME
+    transitions_path = args.output_dir / TRANSITIONS_NAME
+    episodes_path = args.output_dir / EPISODES_NAME
+    readme_path = args.output_dir / README_NAME
+    missing = [name for name, available in deps.items() if not available]
+    if missing:
+        summary = {
+            "schema": SCHEMA,
+            "ok": False,
+            "status": "missing_runtime_dependencies",
+            "missing_dependencies": missing,
+            "dependencies": deps,
+            "episode_count": 0,
+            "transition_count": 0,
+            "all_scripted_pick_place_complete": False,
+            "all_mujoco_fallback_free": False,
+            "all_mujoco_piece_release_synced": False,
+            "artifacts": {
+                "summary_json": str(summary_path),
+                "transitions_jsonl": str(transitions_path),
+                "episodes_csv": str(episodes_path),
+                "model_xml": str(model_path),
+                "manifest_json": str(manifest_path),
+                "readme": str(readme_path),
+            },
+        }
+        write_json(summary_path, summary)
+        append_jsonl(transitions_path, [])
+        write_episode_csv(episodes_path, [])
+        write_readme(readme_path, summary)
+        print(json.dumps({"ok": False, "status": summary["status"], "summary_json": str(summary_path)}, indent=2))
+        return 1
+
+    from lerobot.sim import SO101ChessEnv, SO101ChessEnvConfig, action_toward_targets
+    from lerobot.sim.mujoco_scene import (
+        SO101_DEV_MJCF_AUTHORITY,
+        SO101DevelopmentMJCFConfig,
+        write_so101_development_mjcf,
+    )
+
+    tasks = parse_tasks(args.task)
+    first_source, first_target = tasks[0]
+    manifest = write_so101_development_mjcf(
+        model_path,
+        SO101DevelopmentMJCFConfig(piece_square=first_source, target_square=first_target),
+        manifest_path=manifest_path,
+    )
+    episode_rows: list[dict[str, Any]] = []
+    transitions: list[dict[str, Any]] = []
+    for index, (source, target) in enumerate(tasks, start=1):
+        episode, episode_transitions = collect_episode(
+            episode_index=index,
+            source_square=source,
+            target_square=target,
+            model_path=model_path,
+            max_steps=args.max_steps,
+            action_toward_targets=action_toward_targets,
+            env_cls=SO101ChessEnv,
+            env_config_cls=SO101ChessEnvConfig,
+        )
+        episode_rows.append(episode)
+        transitions.extend(episode_transitions)
+
+    all_complete = all(row["scripted_pick_place_complete"] for row in episode_rows)
+    all_fallback_free = all(row["mujoco_active"] and row["fallback"] is None for row in episode_rows)
+    all_release_synced = all(row["mujoco_piece_release_synced"] for row in episode_rows)
+    ok = bool(episode_rows) and bool(transitions) and all_complete and all_fallback_free and all_release_synced
+    summary = {
+        "schema": SCHEMA,
+        "ok": ok,
+        "status": "ok" if ok else "failed",
+        "dependencies": deps,
+        "model_authority": SO101_DEV_MJCF_AUTHORITY,
+        "ready_for_model_backed_ik": False,
+        "development_manifest": manifest,
+        "tasks": [{"source_square": source, "target_square": target} for source, target in tasks],
+        "episode_count": len(episode_rows),
+        "transition_count": len(transitions),
+        "all_scripted_pick_place_complete": all_complete,
+        "all_mujoco_fallback_free": all_fallback_free,
+        "all_mujoco_piece_release_synced": all_release_synced,
+        "episodes": episode_rows,
+        "artifacts": {
+            "summary_json": str(summary_path),
+            "transitions_jsonl": str(transitions_path),
+            "episodes_csv": str(episodes_path),
+            "model_xml": str(model_path),
+            "manifest_json": str(manifest_path),
+            "readme": str(readme_path),
+        },
+        "limitations": [
+            "Rollouts use a generated development MJCF scaffold, not a reviewed SO-101 model bundle.",
+            "The expert policy tracks deterministic joint-space waypoints, not calibrated IK or learned contact behavior.",
+            "The piece transfer in the environment remains symbolic until reviewed MuJoCo contact manipulation is implemented.",
+        ],
+        "next_required_for_goal": [
+            "Replace the development MJCF scaffold with reviewed model bundle evidence.",
+            "Add contact-validated grasp/lift/place physics after TCP and base-to-board alignment are reviewed.",
+            "Use these JSONL transitions as a narrow imitation-learning/debug curriculum, not final policy training truth.",
+        ],
+    }
+    write_json(summary_path, summary)
+    append_jsonl(transitions_path, transitions)
+    write_episode_csv(episodes_path, episode_rows)
+    write_readme(readme_path, summary)
+    print(json.dumps({"ok": ok, "status": summary["status"], "summary_json": str(summary_path)}, indent=2))
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

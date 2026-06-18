@@ -8,10 +8,17 @@ import json
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SRC_DIR = REPO_ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from lerobot.sim.mujoco_scene import SO101DevelopmentMJCFConfig, build_so101_development_mjcf
+
 DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "so101_bundle_ready_forwarding"
 SCHEMA = "lerobot.sim.so101_bundle_ready_forwarding.v1"
 SUITE_PATH = REPO_ROOT / "scripts" / "smoke_sim_calibration_regression_suite.py"
@@ -47,8 +54,11 @@ def normalize_path(path: Path) -> Path:
 
 def executable_arg(path: Path) -> str:
     raw = str(path)
-    if path.is_absolute() or "/" in raw:
-        return str(normalize_path(path))
+    expanded = path.expanduser()
+    if expanded.is_absolute():
+        return str(expanded)
+    if "/" in raw:
+        return str((REPO_ROOT / expanded).absolute())
     return raw
 
 
@@ -63,6 +73,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "ok",
         "suite_status",
         "bundle_ready",
+        "reviewed_mujoco_status",
+        "reviewed_model_motion_checked",
         "forwarding_diagnostic_only",
         "diagnostic_only_reason",
         "ik_model_path_source",
@@ -100,15 +112,18 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         "",
         "## Cases",
         "",
-        "| Case | Status | Forwarding | Artifact index missing | Summary |",
-        "| --- | --- | --- | --- | --- |",
+        "| Case | Status | Reviewed MuJoCo | Forwarding | Artifact index missing | Summary |",
+        "| --- | --- | --- | --- | --- | --- |",
     ]
     for case in summary["cases"]:
         forwarding = case["observations"]["bundle_forwarding"]
+        reviewed_mujoco = case["observations"]["reviewed_mujoco_bundle"]
         lines.append(
-            "| `{case_id}` | `{status}` | source `{source}`, diagnostic `{diagnostic}` | `{missing}` | `{summary_path}` |".format(
+            "| `{case_id}` | `{status}` | `{reviewed_status}`, motion `{motion}` | source `{source}`, diagnostic `{diagnostic}` | `{missing}` | `{summary_path}` |".format(
                 case_id=case["case_id"],
                 status=case["status"],
+                reviewed_status=reviewed_mujoco.get("status"),
+                motion=reviewed_mujoco.get("reviewed_model_motion_checked"),
                 source=forwarding.get("ik_model_path_source"),
                 diagnostic=forwarding.get("diagnostic_only"),
                 missing=case["observations"].get("artifact_index_missing_count"),
@@ -118,17 +133,36 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
     path.write_text("\n".join(lines) + "\n")
 
 
-def stl_text() -> str:
-    return """solid synthetic_so101
-  facet normal 0 0 1
-    outer loop
-      vertex 0 0 0
-      vertex 0.01 0 0
-      vertex 0 0.01 0
-    endloop
-  endfacet
-endsolid synthetic_so101
+def obj_text() -> str:
+    return """v 0 0 0
+v 0.01 0 0
+v 0 0.01 0
+v 0 0 0.01
+f 1 2 3
+f 1 3 4
+f 1 4 2
+f 2 4 3
 """
+
+
+def mjcf_with_mesh_reference() -> str:
+    root = ET.fromstring(
+        build_so101_development_mjcf(
+            SO101DevelopmentMJCFConfig(model_name="synthetic_so101_reviewed_mujoco_fixture")
+        )
+    )
+    asset = root.find("asset")
+    if asset is None:
+        asset = ET.SubElement(root, "asset")
+    ET.SubElement(
+        asset,
+        "mesh",
+        {
+            "name": "synthetic_gripper_shell",
+            "file": "meshes/synthetic_gripper_shell.obj",
+        },
+    )
+    return ET.tostring(root, encoding="unicode")
 
 
 def synthetic_urdf(*, include_mesh: bool) -> str:
@@ -137,7 +171,7 @@ def synthetic_urdf(*, include_mesh: bool) -> str:
         visual = """
     <visual>
       <geometry>
-        <mesh filename="meshes/synthetic_gripper_shell.stl"/>
+        <mesh filename="meshes/synthetic_gripper_shell.obj"/>
       </geometry>
     </visual>"""
     return f"""<?xml version="1.0"?>
@@ -184,12 +218,12 @@ def synthetic_urdf(*, include_mesh: bool) -> str:
 """
 
 
-def manifest_payload(*, ready: bool) -> dict[str, Any]:
+def manifest_payload(*, ready: bool, model_filename: str = "synthetic_so101.urdf") -> dict[str, Any]:
     payload: dict[str, Any] = {
-        "model_path": "model/synthetic_so101.urdf",
+        "model_path": f"model/{model_filename}",
         "asset_roots": ["assets"],
         "authority": {
-            "source_authority_status": "synthetic_smoke_reviewed",
+            "source_authority_status": "synthetic_fixture_reviewed_for_automation_only",
             "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
             "reviewed_at": "2026-06-16",
             "scope": "hardware-free forwarding regression only",
@@ -201,6 +235,14 @@ def manifest_payload(*, ready: bool) -> dict[str, Any]:
             "license": "test-only",
         },
         "target_frame": EXPECTED_TARGET_FRAME,
+        "joint_limits_deg": {
+            "shoulder_pan": [-110.0, 110.0],
+            "shoulder_lift": [-110.0, 110.0],
+            "elbow_flex": [-120.0, 120.0],
+            "wrist_flex": [-120.0, 120.0],
+            "wrist_roll": [-180.0, 180.0],
+            "gripper": [0.0, 100.0],
+        },
         "tcp_offset_m": {"x": 0.0, "y": 0.0, "z": 0.075},
     }
     if ready:
@@ -227,8 +269,11 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         (root / "model" / "meshes").mkdir(parents=True, exist_ok=True)
         (root / "assets" / "meshes").mkdir(parents=True, exist_ok=True)
         (root / "model" / "synthetic_so101.urdf").write_text(synthetic_urdf(include_mesh=True))
-        (root / "model" / "meshes" / "synthetic_gripper_shell.stl").write_text(stl_text())
-        (root / "assets" / "meshes" / "synthetic_gripper_shell.stl").write_text(stl_text())
+        (root / "model" / "meshes" / "synthetic_gripper_shell.obj").write_text(obj_text())
+        (root / "assets" / "meshes" / "synthetic_gripper_shell.obj").write_text(obj_text())
+
+    ready_model_path = bundle_dir / "model" / "synthetic_so101_mujoco.xml"
+    ready_model_path.write_text(mjcf_with_mesh_reference())
 
     explicit_dir.mkdir(parents=True, exist_ok=True)
     explicit_model_path = explicit_dir / "explicit_cli_so101.urdf"
@@ -236,13 +281,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
 
     ready_manifest_path = bundle_dir / "so101_model_bundle.ready.json"
     placeholder_manifest_path = placeholder_dir / "so101_model_bundle.placeholder.json"
-    write_json(ready_manifest_path, manifest_payload(ready=True))
+    write_json(ready_manifest_path, manifest_payload(ready=True, model_filename=ready_model_path.name))
     write_json(placeholder_manifest_path, manifest_payload(ready=False))
 
     return {
         "ready_manifest_path": ready_manifest_path,
         "placeholder_manifest_path": placeholder_manifest_path,
-        "ready_model_path": bundle_dir / "model" / "synthetic_so101.urdf",
+        "ready_model_path": ready_model_path,
         "ready_asset_root": bundle_dir / "assets",
         "explicit_model_path": explicit_model_path,
     }
@@ -344,6 +389,7 @@ def summarize_case(
     contract = get_nested(suite_summary, ("so101_model_contract",), {})
     contract_preflight = get_nested(suite_summary, ("so101_model_contract", "model_asset_preflight"), {})
     bundle_preflight = get_nested(suite_summary, ("so101_model_bundle_manifest", "model_asset_preflight"), {})
+    reviewed_mujoco = get_nested(suite_summary, ("so101_reviewed_mujoco_bundle",), {})
     artifact_index_missing_count = get_nested(suite_summary, ("artifact_index", "missing_artifact_count"))
     contract_command = get_nested(suite_summary, ("child_commands", "so101_model_contract", "command"), [])
     ik_command = get_nested(suite_summary, ("child_commands", "ik_reachability_drill", "command"), [])
@@ -359,6 +405,17 @@ def summarize_case(
 
     if expectation == "ready_manifest_forwarded":
         assert_true(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
+        assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        if not isinstance(get_nested(bundle, ("mesh_assets", "mesh_reference_count")), int) or get_nested(bundle, ("mesh_assets", "mesh_reference_count")) <= 0:
+            errors.append(f"{case_id}.mesh_reference_count: expected > 0, got {get_nested(bundle, ('mesh_assets', 'mesh_reference_count'))!r}")
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_motion_checked",
+        )
+        assert_true(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
         assert_false(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
         assert_true(errors, f"{case_id}.used_for_downstream_contract", forwarding.get("used_for_downstream_contract"))
         assert_equal(errors, f"{case_id}.ik_model_path_source", forwarding.get("ik_model_path_source"), "so101_model_bundle_manifest")
@@ -377,8 +434,19 @@ def summarize_case(
         assert_equal(errors, f"{case_id}.contract_preflight_missing", contract_preflight.get("missing_asset_count"), 0)
         assert_equal(errors, f"{case_id}.contract_preflight_unresolved", contract_preflight.get("unresolved_reference_count"), 0)
         assert_equal(errors, f"{case_id}.bundle_preflight_missing", bundle_preflight.get("missing_asset_count"), 0)
+        if not isinstance(bundle_preflight.get("mesh_reference_count"), int) or bundle_preflight.get("mesh_reference_count") <= 0:
+            errors.append(f"{case_id}.bundle_preflight_mesh_reference_count: expected > 0, got {bundle_preflight.get('mesh_reference_count')!r}")
     elif expectation == "explicit_cli_precedence":
         assert_true(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
+        assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_motion_checked",
+        )
+        assert_true(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
         assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
         assert_equal(errors, f"{case_id}.diagnostic_reason", forwarding.get("diagnostic_only_reason"), "explicit_ik_model_path_supplied")
         assert_false(errors, f"{case_id}.used_for_downstream_contract", forwarding.get("used_for_downstream_contract"))
@@ -394,6 +462,13 @@ def summarize_case(
         assert_equal(errors, f"{case_id}.contract_preflight_unresolved", contract_preflight.get("unresolved_reference_count"), 0)
     elif expectation == "placeholder_not_forwarded":
         assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_not_ready",
+        )
+        assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
         assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
         assert_equal(
             errors,
@@ -412,6 +487,7 @@ def summarize_case(
             get_nested(bundle, ("base_to_board_alignment", "status")),
             "placeholder_only",
         )
+        assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
     else:
         errors.append(f"{case_id}.unknown_expectation:{expectation}")
 
@@ -431,6 +507,9 @@ def summarize_case(
             "contract_model_request": contract.get("model_request"),
             "contract_asset_preflight": contract_preflight,
             "bundle_asset_preflight": bundle_preflight,
+            "bundle_joint_limits": bundle.get("joint_limits"),
+            "bundle_mesh_assets": bundle.get("mesh_assets"),
+            "reviewed_mujoco_bundle": reviewed_mujoco,
             "artifact_index_missing_count": artifact_index_missing_count,
         },
     }
@@ -446,6 +525,10 @@ def flatten_case_rows(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "ok": case["ok"],
                 "suite_status": case["observations"]["suite_status"],
                 "bundle_ready": case["observations"]["bundle_ready"],
+                "reviewed_mujoco_status": case["observations"]["reviewed_mujoco_bundle"].get("status"),
+                "reviewed_model_motion_checked": case["observations"]["reviewed_mujoco_bundle"].get(
+                    "reviewed_model_motion_checked"
+                ),
                 "forwarding_diagnostic_only": forwarding.get("diagnostic_only"),
                 "diagnostic_only_reason": forwarding.get("diagnostic_only_reason"),
                 "ik_model_path_source": forwarding.get("ik_model_path_source"),

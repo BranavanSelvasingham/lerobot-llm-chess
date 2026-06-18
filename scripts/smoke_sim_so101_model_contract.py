@@ -408,6 +408,13 @@ def inspect_xml_model(model_request: dict[str, Any], target_frame: str, expected
             if tag_name(node) == "link" and node.attrib.get("name")
         }
     )
+    mjcf_frames = sorted(
+        {
+            node.attrib["name"]
+            for node in root.iter()
+            if tag_name(node) in {"body", "site", "geom"} and node.attrib.get("name")
+        }
+    )
     joints: list[dict[str, Any]] = []
     for node in root.iter():
         if tag_name(node) != "joint" or not node.attrib.get("name"):
@@ -422,17 +429,20 @@ def inspect_xml_model(model_request: dict[str, Any], target_frame: str, expected
     joint_names = [joint["name"] for joint in joints]
     present_expected = [joint for joint in expected_joints if joint in joint_names]
     missing_expected = [joint for joint in expected_joints if joint not in joint_names]
-    target_frame_present = target_frame in links or target_frame in joint_names
+    target_frame_present = target_frame in links or target_frame in joint_names or target_frame in mjcf_frames
 
     status = "xml_inspected"
     if path.suffix.lower() == ".urdf" and not missing_expected and target_frame_present:
         status = "urdf_contract_visible"
+    elif tag_name(root) == "mujoco" and not missing_expected and target_frame_present:
+        status = "mjcf_contract_visible"
 
     return {
         "status": status,
         "path": str(path),
         "root_tag": tag_name(root),
         "link_names": links,
+        "mjcf_frame_names": mjcf_frames,
         "joint_names": joint_names,
         "joints": joints,
         "expected_joint_names_present": present_expected,

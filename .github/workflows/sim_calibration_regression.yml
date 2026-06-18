@@ -25,10 +25,18 @@ on:
       - "docs/sim_calibration_regression.md"
       - "docs/sim_reference_capture_manifest.md"
       - "docs/sim_reference_media_inventory.md"
+      - "docs/sim_so101_chess_env.md"
+      - "docs/sim_so101_env_resets.md"
       - "docs/sim_so101_model_asset_preflight.md"
       - "docs/sim_so101_model_bundle_manifest.md"
       - "docs/sim_so101_model_contract.md"
       - "docs/sim_so101_model_source_inventory.md"
+      - "docs/sim_so101_reviewed_mujoco_bundle.md"
+      - "docs/sim_so101_mujoco_board_pick_probe.md"
+      - "docs/sim_so101_mujoco_contact_probe.md"
+      - "docs/sim_so101_mujoco_grasp_probe.md"
+      - "docs/sim_so101_mujoco_scene.md"
+      - "docs/sim_so101_training_rollouts.md"
       - "llm-tools/**"
       - "README.md"
       - "scripts/render_sim_*.py"
@@ -49,10 +57,18 @@ on:
       - "docs/sim_calibration_regression.md"
       - "docs/sim_reference_capture_manifest.md"
       - "docs/sim_reference_media_inventory.md"
+      - "docs/sim_so101_chess_env.md"
+      - "docs/sim_so101_env_resets.md"
       - "docs/sim_so101_model_asset_preflight.md"
       - "docs/sim_so101_model_bundle_manifest.md"
       - "docs/sim_so101_model_contract.md"
       - "docs/sim_so101_model_source_inventory.md"
+      - "docs/sim_so101_reviewed_mujoco_bundle.md"
+      - "docs/sim_so101_mujoco_board_pick_probe.md"
+      - "docs/sim_so101_mujoco_contact_probe.md"
+      - "docs/sim_so101_mujoco_grasp_probe.md"
+      - "docs/sim_so101_mujoco_scene.md"
+      - "docs/sim_so101_training_rollouts.md"
       - "llm-tools/**"
       - "README.md"
       - "scripts/render_sim_*.py"
@@ -109,7 +125,9 @@ jobs:
           python -m pip install \
             deepdiff \
             draccus \
+            gymnasium \
             huggingface-hub \
+            mujoco \
             numpy \
             opencv-python-headless \
             pyserial \
@@ -409,6 +427,12 @@ jobs:
           }, bundle_manifest
           assert bundle_manifest["ready_for_model_backed_ik"] in {True, False}, bundle_manifest
           bundle_request = bundle_manifest["manifest_request"]
+          if bundle_manifest["ready_for_model_backed_ik"] is True:
+              assert bundle_manifest["joint_limits"]["status"] == "present", bundle_manifest
+              assert bundle_manifest["mesh_assets"]["status"] == "present", bundle_manifest
+              assert bundle_manifest["mesh_assets"]["mesh_reference_count"] > 0, bundle_manifest
+              assert bundle_manifest["mesh_assets"]["missing_asset_count"] in {0, None}, bundle_manifest
+              assert bundle_manifest["mesh_assets"]["unresolved_reference_count"] in {0, None}, bundle_manifest
           if os.environ["SO101_MODEL_BUNDLE_MANIFEST"].strip():
               assert bundle_request["path"], bundle_request
           else:
@@ -420,6 +444,25 @@ jobs:
               assert isinstance(bundle_artifacts.get(key), str) and Path(bundle_artifacts[key]).is_file(), (
                   key,
                   bundle_artifacts,
+              )
+          reviewed_mujoco_bundle = summary["so101_reviewed_mujoco_bundle"]
+          assert reviewed_mujoco_bundle["ok"] is True, reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["status"] in {
+              "reviewed_mujoco_bundle_not_ready",
+              "reviewed_mujoco_bundle_motion_checked",
+          }, reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["ready_for_model_backed_ik"] in {True, False}, reviewed_mujoco_bundle
+          if bundle_manifest["ready_for_model_backed_ik"] is True:
+              assert reviewed_mujoco_bundle["reviewed_model_motion_checked"] is True, reviewed_mujoco_bundle
+              assert reviewed_mujoco_bundle["status"] == "reviewed_mujoco_bundle_motion_checked", reviewed_mujoco_bundle
+          else:
+              assert reviewed_mujoco_bundle["reviewed_model_motion_checked"] is False, reviewed_mujoco_bundle
+              assert reviewed_mujoco_bundle["status"] == "reviewed_mujoco_bundle_not_ready", reviewed_mujoco_bundle
+          reviewed_mujoco_artifacts = reviewed_mujoco_bundle["artifacts"]
+          for key in ("summary_json", "checklist_csv", "readme"):
+              assert isinstance(reviewed_mujoco_artifacts.get(key), str) and Path(reviewed_mujoco_artifacts[key]).is_file(), (
+                  key,
+                  reviewed_mujoco_artifacts,
               )
           source_inventory = summary["so101_model_source_inventory"]
           assert source_inventory["ok"] is True, source_inventory
@@ -511,6 +554,99 @@ jobs:
               "missing_model",
               "model_unavailable",
           }, model_diagnostic
+          so101_mujoco_scene = summary["so101_mujoco_scene"]
+          assert so101_mujoco_scene["ok"] is True, so101_mujoco_scene
+          assert so101_mujoco_scene["status"] == "ok", so101_mujoco_scene
+          assert so101_mujoco_scene["model_authority"] == "development_scaffold_not_reviewed", so101_mujoco_scene
+          assert so101_mujoco_scene["ready_for_model_backed_ik"] is False, so101_mujoco_scene
+          assert so101_mujoco_scene["mujoco_model_load"]["ok"] is True, so101_mujoco_scene
+          assert so101_mujoco_scene["sim_robot_mujoco_sync"]["ok"] is True, so101_mujoco_scene
+          assert so101_mujoco_scene["env_scripted_pick_place"]["scripted_pick_place_complete"] is True, so101_mujoco_scene
+          for key in ("summary_json", "model_xml", "manifest_json", "steps_csv", "readme"):
+              assert isinstance(so101_mujoco_scene["artifacts"].get(key), str) and Path(so101_mujoco_scene["artifacts"][key]).is_file(), (
+                  key,
+                  so101_mujoco_scene["artifacts"],
+              )
+
+          so101_chess_env = summary["so101_chess_env"]
+          assert so101_chess_env["ok"] is True, so101_chess_env
+          assert so101_chess_env["status"] == "ok", so101_chess_env
+          assert so101_chess_env["sim_status"]["ok"] is True, so101_chess_env
+          assert so101_chess_env["scripted_pick_place"]["scripted_pick_place_complete"] is True, so101_chess_env
+          for key in ("summary_json", "steps_csv", "readme"):
+              assert isinstance(so101_chess_env["artifacts"].get(key), str) and Path(so101_chess_env["artifacts"][key]).is_file(), (
+                  key,
+                  so101_chess_env["artifacts"],
+              )
+
+          so101_env_resets = summary["so101_env_resets"]
+          assert so101_env_resets["ok"] is True, so101_env_resets
+          assert so101_env_resets["status"] == "ok", so101_env_resets
+          assert so101_env_resets["all_resets_ok"] is True, so101_env_resets
+          assert so101_env_resets["all_mujoco_fallback_free"] is True, so101_env_resets
+          assert isinstance(so101_env_resets["reset_count"], int) and so101_env_resets["reset_count"] > 0, so101_env_resets
+
+          so101_mujoco_contact_probe = summary["so101_mujoco_contact_probe"]
+          assert so101_mujoco_contact_probe["ok"] is True, so101_mujoco_contact_probe
+          assert so101_mujoco_contact_probe["status"] == "ok", so101_mujoco_contact_probe
+          assert so101_mujoco_contact_probe["all_piece_resets_ok"] is True, so101_mujoco_contact_probe
+          assert so101_mujoco_contact_probe["all_board_contacts_observed"] is True, so101_mujoco_contact_probe
+          assert isinstance(so101_mujoco_contact_probe["probe_count"], int) and so101_mujoco_contact_probe["probe_count"] > 0, so101_mujoco_contact_probe
+
+          so101_mujoco_grasp_probe = summary["so101_mujoco_grasp_probe"]
+          assert so101_mujoco_grasp_probe["ok"] is True, so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["status"] == "contact_grasp_lift_place_physics_verified", so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["gripper_contact_observed"] is True, so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["two_finger_contact_observed"] is True, so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["manual_piece_pose_used_after_fixture"] is False, so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["lift_place_physics_verified"] is True, so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["lift_verified"] is True, so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["transfer_verified"] is True, so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["place_without_manual_piece_pose_verified"] is True, so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["release_contact_cleared"] is True, so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["final_board_contact_observed"] is True, so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["final_target_xy_error_m"] <= so101_mujoco_grasp_probe["target_xy_tolerance_m"], so101_mujoco_grasp_probe
+          assert isinstance(so101_mujoco_grasp_probe["probe_count"], int) and so101_mujoco_grasp_probe["probe_count"] > 0, so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["next_required_for_goal"], so101_mujoco_grasp_probe
+          for key in ("summary_json", "rows_csv", "model_xml", "manifest_json", "readme"):
+              assert isinstance(so101_mujoco_grasp_probe["artifacts"].get(key), str) and Path(so101_mujoco_grasp_probe["artifacts"][key]).is_file(), (
+                  key,
+                  so101_mujoco_grasp_probe["artifacts"],
+              )
+
+          so101_mujoco_board_pick_probe = summary["so101_mujoco_board_pick_probe"]
+          assert so101_mujoco_board_pick_probe["ok"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["status"] == "development_board_source_pick_place_verified", so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["model_authority"] == "development_scaffold_not_reviewed", so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["ready_for_model_backed_ik"] is False, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["source_pick_started_at_source"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["close_two_finger_contact_observed"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["lift_verified"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["board_contact_cleared_during_lift"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["transfer_verified"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["place_without_manual_piece_pose_verified"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["board_source_pick_place_verified"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["release_contact_cleared_after_retreat"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["final_board_contact_observed"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["final_target_xy_error_m"] <= so101_mujoco_board_pick_probe["target_xy_tolerance_m"], so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["manual_piece_pose_used_after_reset"] is False, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["robot_pose_seeded_for_source_fixture"] is True, so101_mujoco_board_pick_probe
+          assert isinstance(so101_mujoco_board_pick_probe["probe_count"], int) and so101_mujoco_board_pick_probe["probe_count"] > 0, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["next_required_for_goal"], so101_mujoco_board_pick_probe
+          for key in ("summary_json", "rows_csv", "model_xml", "manifest_json", "readme"):
+              assert isinstance(so101_mujoco_board_pick_probe["artifacts"].get(key), str) and Path(so101_mujoco_board_pick_probe["artifacts"][key]).is_file(), (
+                  key,
+                  so101_mujoco_board_pick_probe["artifacts"],
+              )
+
+          so101_training_rollouts = summary["so101_training_rollouts"]
+          assert so101_training_rollouts["ok"] is True, so101_training_rollouts
+          assert so101_training_rollouts["status"] == "ok", so101_training_rollouts
+          assert so101_training_rollouts["all_scripted_pick_place_complete"] is True, so101_training_rollouts
+          assert so101_training_rollouts["all_mujoco_fallback_free"] is True, so101_training_rollouts
+          assert so101_training_rollouts["all_mujoco_piece_release_synced"] is True, so101_training_rollouts
+          assert isinstance(so101_training_rollouts["episode_count"], int) and so101_training_rollouts["episode_count"] > 0, so101_training_rollouts
+          assert isinstance(so101_training_rollouts["transition_count"], int) and so101_training_rollouts["transition_count"] > 0, so101_training_rollouts
           matrix = summary["pick_place_scenario_matrix"]
           assert matrix["ok"] is True, matrix
           assert matrix["aggregate_status"]["ok"] is True, matrix["aggregate_status"]
@@ -594,8 +730,16 @@ jobs:
               "sim_camera_pose_fixture",
               "so101_model_source_inventory",
               "so101_model_bundle_manifest",
+              "so101_reviewed_mujoco_bundle",
               "so101_model_contract",
               "ik_reachability",
+              "so101_mujoco_scene",
+              "so101_chess_env",
+              "so101_env_resets",
+              "so101_mujoco_contact_probe",
+              "so101_mujoco_grasp_probe",
+              "so101_mujoco_board_pick_probe",
+              "so101_training_rollouts",
               "pick_place_scenario",
               "negative_check",
               "logs",
@@ -831,6 +975,14 @@ jobs:
               }
               for row in artifacts_by_category["so101_model_bundle_manifest"]
           ), artifacts_by_category["so101_model_bundle_manifest"]
+          for row in artifacts_by_category["so101_model_bundle_manifest"]:
+              metrics = row.get("metrics", {})
+              if metrics.get("ready_for_model_backed_ik") is True:
+                  assert metrics.get("joint_limits_status") == "present", metrics
+                  assert metrics.get("mesh_assets_status") == "present", metrics
+                  assert metrics.get("mesh_assets_mesh_reference_count") > 0, metrics
+                  assert metrics.get("mesh_assets_missing_asset_count") in {0, None}, metrics
+                  assert metrics.get("mesh_assets_unresolved_reference_count") in {0, None}, metrics
           assert any(
               row.get("kind") == "csv" and row.get("exists") is True
               for row in artifacts_by_category["so101_model_bundle_manifest"]
@@ -839,6 +991,23 @@ jobs:
               row.get("label") == "so101_model_bundle_manifest:readme" and row.get("exists") is True
               for row in artifacts_by_category["so101_model_bundle_manifest"]
           ), artifacts_by_category["so101_model_bundle_manifest"]
+          assert any(
+              row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("status") in {
+                  "reviewed_mujoco_bundle_not_ready",
+                  "reviewed_mujoco_bundle_motion_checked",
+              }
+              for row in artifacts_by_category["so101_reviewed_mujoco_bundle"]
+          ), artifacts_by_category["so101_reviewed_mujoco_bundle"]
+          assert any(
+              row.get("kind") == "csv" and row.get("exists") is True
+              for row in artifacts_by_category["so101_reviewed_mujoco_bundle"]
+          ), artifacts_by_category["so101_reviewed_mujoco_bundle"]
+          assert any(
+              row.get("label") == "so101_reviewed_mujoco_bundle:readme" and row.get("exists") is True
+              for row in artifacts_by_category["so101_reviewed_mujoco_bundle"]
+          ), artifacts_by_category["so101_reviewed_mujoco_bundle"]
           assert any(
               row.get("kind") == "json"
               and row.get("exists") is True
@@ -878,6 +1047,60 @@ jobs:
               row.get("kind") == "image" and row.get("exists") is True
               for row in artifacts_by_category["ik_reachability"]
           ), artifacts_by_category["ik_reachability"]
+          for category in (
+              "so101_mujoco_scene",
+              "so101_chess_env",
+              "so101_env_resets",
+              "so101_mujoco_contact_probe",
+              "so101_mujoco_board_pick_probe",
+              "so101_training_rollouts",
+          ):
+              assert any(
+                  row.get("kind") == "json"
+                  and row.get("exists") is True
+                  and row.get("metrics", {}).get("status") == "ok"
+                  for row in artifacts_by_category[category]
+              ), (category, artifacts_by_category[category])
+          assert any(
+              row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("status") == "contact_grasp_lift_place_physics_verified"
+              and row.get("metrics", {}).get("gripper_contact_observed") is True
+              and row.get("metrics", {}).get("lift_place_physics_verified") is True
+              and row.get("metrics", {}).get("final_board_contact_observed") is True
+              and row.get("metrics", {}).get("final_target_xy_error_m") <= row.get("metrics", {}).get("target_xy_tolerance_m")
+              for row in artifacts_by_category["so101_mujoco_grasp_probe"]
+          ), artifacts_by_category["so101_mujoco_grasp_probe"]
+          assert any(
+              row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("status") == "development_board_source_pick_place_verified"
+              and row.get("metrics", {}).get("board_source_pick_place_verified") is True
+              and row.get("metrics", {}).get("source_pick_started_at_source") is True
+              and row.get("metrics", {}).get("close_two_finger_contact_observed") is True
+              and row.get("metrics", {}).get("board_contact_cleared_during_lift") is True
+              and row.get("metrics", {}).get("manual_piece_pose_used_after_reset") is False
+              and row.get("metrics", {}).get("robot_pose_seeded_for_source_fixture") is True
+              and row.get("metrics", {}).get("final_target_xy_error_m") <= row.get("metrics", {}).get("target_xy_tolerance_m")
+              for row in artifacts_by_category["so101_mujoco_board_pick_probe"]
+          ), artifacts_by_category["so101_mujoco_board_pick_probe"]
+          assert any(
+              row.get("label") == "so101_mujoco_scene:model_xml"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("model_authority") == "development_scaffold_not_reviewed"
+              and row.get("metrics", {}).get("ready_for_model_backed_ik") is False
+              for row in artifacts_by_category["so101_mujoco_scene"]
+          ), artifacts_by_category["so101_mujoco_scene"]
+          for category in ("so101_mujoco_scene", "so101_chess_env", "so101_env_resets", "so101_mujoco_contact_probe", "so101_mujoco_grasp_probe", "so101_mujoco_board_pick_probe"):
+              assert any(
+                  row.get("kind") == "csv" and row.get("exists") is True
+                  for row in artifacts_by_category[category]
+              ), (category, artifacts_by_category[category])
+          assert any(
+              row.get("label") == "so101_training_rollouts:transitions_jsonl"
+              and row.get("exists") is True
+              for row in artifacts_by_category["so101_training_rollouts"]
+          ), artifacts_by_category["so101_training_rollouts"]
           indexed_release_scenarios = {
               row.get("scenario_id")
               for row in artifacts_by_category["pick_place_scenario"]
@@ -917,6 +1140,7 @@ jobs:
           assert "## Reference Capture Manifest" in report_text, report_text
           assert "### SO-101 Model Source Inventory" in report_text, report_text
           assert "### SO-101 Model Bundle Manifest" in report_text, report_text
+          assert "### SO-101 MuJoCo Development Gates" in report_text, report_text
           entrypoint_text = entrypoint_path.read_text()
           assert "Open `artifact_index_report.md` first." in entrypoint_text, entrypoint_text
           assert "`calibration_regression_summary.json`" in entrypoint_text, entrypoint_text
@@ -943,8 +1167,18 @@ jobs:
           assert "Reference capture manifest diagnostics:" in entrypoint_text, entrypoint_text
           assert "`so101_model_bundle_manifest/so101_model_bundle_manifest_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_model_bundle_manifest/so101_model_bundle_manifest_checklist.csv`" in entrypoint_text, entrypoint_text
+          assert "`so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_summary.json`" in entrypoint_text, entrypoint_text
+          assert "`so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_checklist.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_inventory_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_candidates.csv`" in entrypoint_text, entrypoint_text
+          assert "`so101_mujoco_scene/so101_mujoco_scene_summary.json`" in entrypoint_text, entrypoint_text
+          assert "`so101_chess_env/so101_chess_env_summary.json`" in entrypoint_text, entrypoint_text
+          assert "`so101_env_resets/so101_env_resets_summary.json`" in entrypoint_text, entrypoint_text
+          assert "`so101_mujoco_contact_probe/so101_mujoco_contact_probe_summary.json`" in entrypoint_text, entrypoint_text
+          assert "`so101_mujoco_grasp_probe/so101_mujoco_grasp_probe_summary.json`" in entrypoint_text, entrypoint_text
+          assert "`so101_mujoco_board_pick_probe/so101_mujoco_board_pick_probe_summary.json`" in entrypoint_text, entrypoint_text
+          assert "`so101_training_rollouts/so101_training_rollouts_summary.json`" in entrypoint_text, entrypoint_text
+          assert "SO-101 MuJoCo next required items stay open" in entrypoint_text, entrypoint_text
           assert "`hardware_skipped: true`" in entrypoint_text, entrypoint_text
           assert "`gui_skipped: true`" in entrypoint_text, entrypoint_text
           assert "Reference media inventory:" in entrypoint_text, entrypoint_text
@@ -1066,6 +1300,15 @@ jobs:
                           "forwarding": bundle_manifest["forwarding"],
                           "artifacts": bundle_artifacts,
                       },
+                      "so101_reviewed_mujoco_bundle": {
+                          "summary_path": reviewed_mujoco_bundle["summary_path"],
+                          "status": reviewed_mujoco_bundle["status"],
+                          "ready_for_model_backed_ik": reviewed_mujoco_bundle["ready_for_model_backed_ik"],
+                          "reviewed_model_motion_checked": reviewed_mujoco_bundle["reviewed_model_motion_checked"],
+                          "manifest_status": reviewed_mujoco_bundle["manifest_status"],
+                          "missing_inputs": reviewed_mujoco_bundle["missing_inputs"],
+                          "artifacts": reviewed_mujoco_artifacts,
+                      },
                       "so101_model_contract": {
                           "summary_path": so101_contract["summary_path"],
                           "status": so101_contract["status"],
@@ -1122,9 +1365,17 @@ jobs:
               "fixture/fixture_summary.json",
               "sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json",
               "so101_model_bundle_manifest/so101_model_bundle_manifest_summary.json",
+              "so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_summary.json",
               "so101_model_source_inventory/so101_model_source_inventory_summary.json",
               "so101_model_contract/so101_model_contract_summary.json",
               "ik_reachability_drill/ik_reachability_drill_summary.json",
+              "so101_mujoco_scene/so101_mujoco_scene_summary.json",
+              "so101_chess_env/so101_chess_env_summary.json",
+              "so101_env_resets/so101_env_resets_summary.json",
+              "so101_mujoco_contact_probe/so101_mujoco_contact_probe_summary.json",
+              "so101_mujoco_grasp_probe/so101_mujoco_grasp_probe_summary.json",
+              "so101_mujoco_board_pick_probe/so101_mujoco_board_pick_probe_summary.json",
+              "so101_training_rollouts/so101_training_rollouts_summary.json",
               "pick_place_scenario_matrix/scenario_matrix_summary.json",
               "negative_empty_inventory/comparison_set_summary.json",
           ]
@@ -1233,6 +1484,12 @@ jobs:
               f"- `asset_roots`: `{summary['so101_model_bundle_manifest']['asset_roots']['asset_roots']}`",
               f"- `diagnostic_only`: `{summary['so101_model_bundle_manifest']['forwarding']['diagnostic_only']}`",
               f"- `diagnostic_only_reason`: `{summary['so101_model_bundle_manifest']['forwarding']['diagnostic_only_reason']}`",
+              "",
+              "SO-101 reviewed MuJoCo bundle gate:",
+              f"- `status`: `{summary['so101_reviewed_mujoco_bundle']['status']}`",
+              f"- `ready_for_model_backed_ik`: `{summary['so101_reviewed_mujoco_bundle']['ready_for_model_backed_ik']}`",
+              f"- `reviewed_model_motion_checked`: `{summary['so101_reviewed_mujoco_bundle']['reviewed_model_motion_checked']}`",
+              f"- `missing_inputs`: `{summary['so101_reviewed_mujoco_bundle']['missing_inputs']}`",
               "",
               "SO-101 model contract:",
               f"- `ik_model_path`: `{summary['so101_model_contract_config']['ik_model_path']}`",

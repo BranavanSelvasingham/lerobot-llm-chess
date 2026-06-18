@@ -28,14 +28,22 @@ CATEGORY_ORDER = {
     "sim_camera_pose_fixture": 14,
     "so101_model_source_inventory": 15,
     "so101_model_bundle_manifest": 16,
-    "so101_model_contract": 17,
-    "so101_model_asset_preflight": 18,
-    "ik_reachability": 19,
-    "gripper_camera_pov": 20,
-    "app_entrypoint": 21,
-    "pick_place_scenario": 22,
-    "negative_check": 23,
-    "logs": 24,
+    "so101_reviewed_mujoco_bundle": 17,
+    "so101_model_contract": 18,
+    "so101_model_asset_preflight": 19,
+    "ik_reachability": 20,
+    "so101_mujoco_scene": 21,
+    "so101_chess_env": 22,
+    "so101_env_resets": 23,
+    "so101_mujoco_contact_probe": 24,
+    "so101_mujoco_grasp_probe": 25,
+    "so101_mujoco_board_pick_probe": 26,
+    "so101_training_rollouts": 27,
+    "gripper_camera_pov": 28,
+    "app_entrypoint": 29,
+    "pick_place_scenario": 30,
+    "negative_check": 31,
+    "logs": 32,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -2160,6 +2168,89 @@ def collect_ik_reachability_artifacts(
     }
 
 
+def collect_so101_mujoco_smoke_artifacts(
+    *,
+    suite: dict[str, Any],
+    suite_key: str,
+    category: str,
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    smoke = suite.get(suite_key)
+    smoke = smoke if isinstance(smoke, dict) else {}
+    artifact_paths = smoke.get("artifacts")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    dependencies = smoke.get("dependencies")
+    dependencies = dependencies if isinstance(dependencies, dict) else {}
+    metrics = {
+        "status": smoke.get("status"),
+        "ok": smoke.get("ok"),
+        "model_authority": smoke.get("model_authority"),
+        "ready_for_model_backed_ik": smoke.get("ready_for_model_backed_ik"),
+        "reviewed_model_motion_checked": smoke.get("reviewed_model_motion_checked"),
+        "manifest_status": smoke.get("manifest_status"),
+        "missing_inputs": smoke.get("missing_inputs"),
+        "gymnasium_available": dependencies.get("gymnasium"),
+        "mujoco_available": dependencies.get("mujoco"),
+        "reset_count": smoke.get("reset_count"),
+        "all_resets_ok": smoke.get("all_resets_ok"),
+        "all_mujoco_fallback_free": smoke.get("all_mujoco_fallback_free"),
+        "all_piece_resets_ok": smoke.get("all_piece_resets_ok"),
+        "all_board_contacts_observed": smoke.get("all_board_contacts_observed"),
+        "probe_count": smoke.get("probe_count"),
+        "gripper_contact_observed": smoke.get("gripper_contact_observed"),
+        "two_finger_contact_observed": smoke.get("two_finger_contact_observed"),
+        "settled_gripper_contact_observed": smoke.get("settled_gripper_contact_observed"),
+        "source_square": smoke.get("source_square"),
+        "source_pick_started_at_source": smoke.get("source_pick_started_at_source"),
+        "close_two_finger_contact_observed": smoke.get("close_two_finger_contact_observed"),
+        "lift_verified": smoke.get("lift_verified"),
+        "lift_without_manual_piece_pose_m": smoke.get("lift_without_manual_piece_pose_m"),
+        "board_contact_cleared_during_lift": smoke.get("board_contact_cleared_during_lift"),
+        "transfer_verified": smoke.get("transfer_verified"),
+        "transfer_xy_m": smoke.get("transfer_xy_m"),
+        "transfer_target_xy_error_m": smoke.get("transfer_target_xy_error_m"),
+        "transfer_source_to_target_progress_m": smoke.get("transfer_source_to_target_progress_m"),
+        "lift_place_physics_verified": smoke.get("lift_place_physics_verified"),
+        "board_source_pick_place_verified": smoke.get("board_source_pick_place_verified"),
+        "release_contact_cleared": smoke.get("release_contact_cleared"),
+        "release_contact_cleared_after_retreat": smoke.get("release_contact_cleared_after_retreat"),
+        "final_board_contact_observed": smoke.get("final_board_contact_observed"),
+        "final_target_xy_error_m": smoke.get("final_target_xy_error_m"),
+        "target_xy_tolerance_m": smoke.get("target_xy_tolerance_m"),
+        "target_square": smoke.get("target_square"),
+        "manual_piece_pose_used_after_fixture": smoke.get("manual_piece_pose_used_after_fixture"),
+        "manual_piece_pose_used_after_reset": smoke.get("manual_piece_pose_used_after_reset"),
+        "robot_pose_seeded_for_source_fixture": smoke.get("robot_pose_seeded_for_source_fixture"),
+        "source_to_target_progress_m": smoke.get("source_to_target_progress_m"),
+        "episode_count": smoke.get("episode_count"),
+        "transition_count": smoke.get("transition_count"),
+        "all_scripted_pick_place_complete": smoke.get("all_scripted_pick_place_complete"),
+        "all_mujoco_piece_release_synced": smoke.get("all_mujoco_piece_release_synced"),
+        "next_required_for_goal": smoke.get("next_required_for_goal"),
+    }
+    for key, value in sorted(artifact_paths.items()):
+        add_path(
+            artifacts,
+            category=category,
+            label=f"{category}:{key}",
+            value=value,
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"{suite_key}.artifacts.{key}",
+            metrics=metrics,
+        )
+    return {
+        **metrics,
+        "summary_path": artifact_paths.get("summary_json") or smoke.get("summary_path"),
+        "artifact_paths": artifact_paths,
+        "limitations": smoke.get("limitations"),
+    }
+
+
 def collect_so101_model_contract_artifacts(
     *,
     suite: dict[str, Any],
@@ -2244,6 +2335,10 @@ def collect_so101_model_bundle_manifest_artifacts(
     tcp_offset = tcp_offset if isinstance(tcp_offset, dict) else {}
     alignment = bundle.get("base_to_board_alignment")
     alignment = alignment if isinstance(alignment, dict) else {}
+    joint_limits = bundle.get("joint_limits")
+    joint_limits = joint_limits if isinstance(joint_limits, dict) else {}
+    mesh_assets = bundle.get("mesh_assets")
+    mesh_assets = mesh_assets if isinstance(mesh_assets, dict) else {}
     forwarding = bundle.get("forwarding")
     forwarding = forwarding if isinstance(forwarding, dict) else {}
     contract = bundle.get("contract_checker")
@@ -2264,6 +2359,13 @@ def collect_so101_model_bundle_manifest_artifacts(
         "model_path": model_path.get("path"),
         "asset_root_status": asset_roots.get("status"),
         "asset_roots": asset_roots.get("asset_roots"),
+        "joint_limits_status": joint_limits.get("status"),
+        "joint_limits_missing_joints": joint_limits.get("missing_joints"),
+        "joint_limits_invalid_joints": joint_limits.get("invalid_joints"),
+        "mesh_assets_status": mesh_assets.get("status"),
+        "mesh_assets_mesh_reference_count": mesh_assets.get("mesh_reference_count"),
+        "mesh_assets_missing_asset_count": mesh_assets.get("missing_asset_count"),
+        "mesh_assets_unresolved_reference_count": mesh_assets.get("unresolved_reference_count"),
         "target_frame": target_frame.get("value"),
         "target_frame_status": target_frame.get("status"),
         "tcp_offset_status": tcp_offset.get("status"),
@@ -2347,6 +2449,8 @@ def collect_so101_model_bundle_manifest_artifacts(
         "ready_for_model_backed_ik": bundle.get("ready_for_model_backed_ik"),
         "model_path": model_path,
         "asset_roots": asset_roots,
+        "joint_limits": joint_limits,
+        "mesh_assets": mesh_assets,
         "target_frame": target_frame,
         "tcp_offset": tcp_offset,
         "base_to_board_alignment": alignment,
@@ -3015,6 +3119,15 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    so101_reviewed_mujoco_bundle = collect_so101_mujoco_smoke_artifacts(
+        suite=suite,
+        suite_key="so101_reviewed_mujoco_bundle",
+        category="so101_reviewed_mujoco_bundle",
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
     so101_model_contract = collect_so101_model_contract_artifacts(
         suite=suite,
         artifacts=artifacts,
@@ -3031,6 +3144,69 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
     )
     ik_reachability = collect_ik_reachability_artifacts(
         suite=suite,
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
+    so101_mujoco_scene = collect_so101_mujoco_smoke_artifacts(
+        suite=suite,
+        suite_key="so101_mujoco_scene",
+        category="so101_mujoco_scene",
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
+    so101_chess_env = collect_so101_mujoco_smoke_artifacts(
+        suite=suite,
+        suite_key="so101_chess_env",
+        category="so101_chess_env",
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
+    so101_env_resets = collect_so101_mujoco_smoke_artifacts(
+        suite=suite,
+        suite_key="so101_env_resets",
+        category="so101_env_resets",
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
+    so101_mujoco_contact_probe = collect_so101_mujoco_smoke_artifacts(
+        suite=suite,
+        suite_key="so101_mujoco_contact_probe",
+        category="so101_mujoco_contact_probe",
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
+    so101_mujoco_grasp_probe = collect_so101_mujoco_smoke_artifacts(
+        suite=suite,
+        suite_key="so101_mujoco_grasp_probe",
+        category="so101_mujoco_grasp_probe",
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
+    so101_mujoco_board_pick_probe = collect_so101_mujoco_smoke_artifacts(
+        suite=suite,
+        suite_key="so101_mujoco_board_pick_probe",
+        category="so101_mujoco_board_pick_probe",
+        artifacts=artifacts,
+        suite_summary_path=suite_summary_path,
+        output_dir=output_dir,
+        repo_root=repo_root,
+    )
+    so101_training_rollouts = collect_so101_mujoco_smoke_artifacts(
+        suite=suite,
+        suite_key="so101_training_rollouts",
+        category="so101_training_rollouts",
         artifacts=artifacts,
         suite_summary_path=suite_summary_path,
         output_dir=output_dir,
@@ -3126,9 +3302,17 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "sim_camera_pose_fixture_metadata_contract": sim_camera_pose_metadata_contract,
         "so101_model_source_inventory": so101_model_source_inventory,
         "so101_model_bundle_manifest": so101_model_bundle_manifest,
+        "so101_reviewed_mujoco_bundle": so101_reviewed_mujoco_bundle,
         "so101_model_contract": so101_model_contract,
         "so101_model_asset_preflight": so101_model_asset_preflight,
         "ik_reachability": ik_reachability,
+        "so101_mujoco_scene": so101_mujoco_scene,
+        "so101_chess_env": so101_chess_env,
+        "so101_env_resets": so101_env_resets,
+        "so101_mujoco_contact_probe": so101_mujoco_contact_probe,
+        "so101_mujoco_grasp_probe": so101_mujoco_grasp_probe,
+        "so101_mujoco_board_pick_probe": so101_mujoco_board_pick_probe,
+        "so101_training_rollouts": so101_training_rollouts,
         "gripper_camera_pov": gripper_camera_pov,
         "app_entrypoint_metadata_contract": app_entrypoint_metadata_contract,
         "pick_place_release_frame_count": sum(
