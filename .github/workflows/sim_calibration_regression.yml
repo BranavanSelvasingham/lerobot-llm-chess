@@ -291,6 +291,7 @@ jobs:
               "source_ready_physical_bundle_path_mismatch",
               "source_ready_physical_bundle_same_root_unselected_model",
               "source_ready_physical_bundle_path_match_motion_missing",
+              "source_ready_physical_bundle_digest_missing",
               "source_ready_physical_bundle_digest_mismatch",
               "source_ready_physical_bundle_motion_status_inconsistent",
               "source_ready_hardware_free_bundle_fixture",
@@ -309,12 +310,22 @@ jobs:
           assert same_root["physical_reviewed_model_motion_checked"] is True, same_root
           assert same_root["development_fixture_evidence_not_physical_so101_truth"] is True, same_root
           assert "align_source_inventory_with_bundle_manifest_model_path" in same_root["next_required_action_ids"], same_root
-          digest_mismatch = by_case["source_ready_physical_bundle_digest_mismatch"]["gate"]
+          digest_missing_case = by_case["source_ready_physical_bundle_digest_missing"]
+          digest_missing = digest_missing_case["gate"]
+          assert digest_missing["ready"] is False, digest_missing
+          assert digest_missing["source_bundle_consistency_status"] == "source_bundle_model_digest_missing", digest_missing
+          assert digest_missing["source_bundle_consistency"]["selected_authoritative_candidate_path_matches_bundle"] is True, digest_missing
+          assert digest_missing["source_bundle_consistency"]["selected_authoritative_candidate_sha256_matches_bundle"] is False, digest_missing
+          assert "record_reviewed_so101_model_file_sha256" in digest_missing["next_required_action_ids"], digest_missing
+          assert "record_reviewed_so101_model_file_sha256" in digest_missing_case["blocker_packet"]["next_action_ids"], digest_missing_case
+          digest_mismatch_case = by_case["source_ready_physical_bundle_digest_mismatch"]
+          digest_mismatch = digest_mismatch_case["gate"]
           assert digest_mismatch["ready"] is False, digest_mismatch
           assert digest_mismatch["source_bundle_consistency_status"] == "source_bundle_model_digest_mismatch", digest_mismatch
           assert digest_mismatch["source_bundle_consistency"]["selected_authoritative_candidate_path_matches_bundle"] is True, digest_mismatch
           assert digest_mismatch["source_bundle_consistency"]["selected_authoritative_candidate_sha256_matches_bundle"] is False, digest_mismatch
           assert "align_source_inventory_with_bundle_manifest_model_digest" in digest_mismatch["next_required_action_ids"], digest_mismatch
+          assert "align_source_inventory_with_bundle_manifest_model_digest" in digest_mismatch_case["blocker_packet"]["next_action_ids"], digest_mismatch_case
           inconsistent_motion = by_case["source_ready_physical_bundle_motion_status_inconsistent"]["gate"]
           assert inconsistent_motion["ready"] is False, inconsistent_motion
           assert inconsistent_motion["source_bundle_consistency_status"] == "source_bundle_model_path_consistent", inconsistent_motion
