@@ -15,6 +15,13 @@ It writes:
 - `so101_reviewed_mujoco_bundle_checklist.csv`
 - `README.md`
 
+The summary carries the manifest checker's `model_authority`,
+`physical_so101_model_authority_ready`,
+`hardware_free_regression_fixture_ready`, and
+`synthetic_fixture_authority_fields` fields. A hardware-free synthetic fixture
+may exercise the positive MuJoCo motion path, but it stays labeled as
+`hardware_free_regression_fixture_not_physical_so101_authority`.
+
 With no manifest, or with a manifest whose bundle checker does not report
 `ready_for_model_backed_ik: true` after checking reviewed joint limits, mesh
 evidence, target-frame authority, TCP offset, and base-to-board alignment, the
@@ -50,8 +57,9 @@ The positive path is covered without hardware by the focused forwarding smoke:
 
 That smoke creates a fixture-only ready MJCF model bundle, verifies the
 integrated suite forwards it, and requires this gate to report
-`reviewed_mujoco_bundle_motion_checked`. The fixture is automation coverage,
-not physical SO-101 model authority.
+`reviewed_mujoco_bundle_motion_checked`. The fixture is automation coverage and
+must also report `physical_so101_model_authority_ready: false`; it is not
+physical SO-101 model authority.
 
 Passing this gate is still not full physical readiness. It proves reviewed-model
 handoff into MuJoCo and SimRobot joint motion. Contact-validated gripper

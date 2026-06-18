@@ -566,6 +566,22 @@ def summarize_case(
 
     if expectation == "ready_manifest_forwarded":
         assert_true(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.bundle_model_authority",
+            bundle.get("model_authority"),
+            "hardware_free_regression_fixture_not_physical_so101_authority",
+        )
+        assert_false(
+            errors,
+            f"{case_id}.bundle_physical_so101_model_authority_ready",
+            bundle.get("physical_so101_model_authority_ready"),
+        )
+        assert_true(
+            errors,
+            f"{case_id}.bundle_hardware_free_regression_fixture_ready",
+            bundle.get("hardware_free_regression_fixture_ready"),
+        )
         assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
         assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
         assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
@@ -578,6 +594,22 @@ def summarize_case(
             f"{case_id}.reviewed_mujoco_status",
             reviewed_mujoco.get("status"),
             "reviewed_mujoco_bundle_motion_checked",
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_model_authority",
+            reviewed_mujoco.get("model_authority"),
+            "hardware_free_regression_fixture_not_physical_so101_authority",
+        )
+        assert_false(
+            errors,
+            f"{case_id}.reviewed_mujoco_physical_so101_model_authority_ready",
+            reviewed_mujoco.get("physical_so101_model_authority_ready"),
+        )
+        assert_true(
+            errors,
+            f"{case_id}.reviewed_mujoco_hardware_free_regression_fixture_ready",
+            reviewed_mujoco.get("hardware_free_regression_fixture_ready"),
         )
         assert_true(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
         assert_false(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
@@ -602,6 +634,22 @@ def summarize_case(
             errors.append(f"{case_id}.bundle_preflight_mesh_reference_count: expected > 0, got {bundle_preflight.get('mesh_reference_count')!r}")
     elif expectation == "explicit_cli_precedence":
         assert_true(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.bundle_model_authority",
+            bundle.get("model_authority"),
+            "hardware_free_regression_fixture_not_physical_so101_authority",
+        )
+        assert_false(
+            errors,
+            f"{case_id}.bundle_physical_so101_model_authority_ready",
+            bundle.get("physical_so101_model_authority_ready"),
+        )
+        assert_true(
+            errors,
+            f"{case_id}.bundle_hardware_free_regression_fixture_ready",
+            bundle.get("hardware_free_regression_fixture_ready"),
+        )
         assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
         assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
         assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
@@ -612,6 +660,22 @@ def summarize_case(
             f"{case_id}.reviewed_mujoco_status",
             reviewed_mujoco.get("status"),
             "reviewed_mujoco_bundle_motion_checked",
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_model_authority",
+            reviewed_mujoco.get("model_authority"),
+            "hardware_free_regression_fixture_not_physical_so101_authority",
+        )
+        assert_false(
+            errors,
+            f"{case_id}.reviewed_mujoco_physical_so101_model_authority_ready",
+            reviewed_mujoco.get("physical_so101_model_authority_ready"),
+        )
+        assert_true(
+            errors,
+            f"{case_id}.reviewed_mujoco_hardware_free_regression_fixture_ready",
+            reviewed_mujoco.get("hardware_free_regression_fixture_ready"),
         )
         assert_true(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
         assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
@@ -833,6 +897,14 @@ def summarize_case(
             "suite_status": suite_summary.get("status"),
             "bundle_status": bundle.get("status"),
             "bundle_ready": bundle.get("ready_for_model_backed_ik"),
+            "bundle_model_authority": bundle.get("model_authority"),
+            "bundle_physical_so101_model_authority_ready": bundle.get(
+                "physical_so101_model_authority_ready"
+            ),
+            "bundle_hardware_free_regression_fixture_ready": bundle.get(
+                "hardware_free_regression_fixture_ready"
+            ),
+            "bundle_synthetic_fixture_authority_fields": bundle.get("synthetic_fixture_authority_fields"),
             "bundle_forwarding": forwarding,
             "bundle_authority_status": bundle.get("authority_status"),
             "bundle_provenance_status": bundle.get("provenance_status"),

@@ -441,7 +441,14 @@ def build_not_ready_summary(
         "target_frame": manifest_value(manifest_summary, "target_frame"),
         "tcp_offset": manifest_value(manifest_summary, "tcp_offset"),
         "base_to_board_alignment": manifest_value(manifest_summary, "base_to_board_alignment"),
-        "model_authority": "reviewed_bundle_required",
+        "model_authority": manifest_summary.get("model_authority") or "reviewed_bundle_required",
+        "physical_so101_model_authority_ready": bool(
+            manifest_summary.get("physical_so101_model_authority_ready")
+        ),
+        "hardware_free_regression_fixture_ready": bool(
+            manifest_summary.get("hardware_free_regression_fixture_ready")
+        ),
+        "synthetic_fixture_authority_fields": manifest_summary.get("synthetic_fixture_authority_fields") or [],
         "ready_for_model_backed_ik": ready,
         "reviewed_model_motion_checked": False,
         "require_ready_reviewed_model": bool(args.require_ready_reviewed_model),
@@ -542,7 +549,14 @@ def build_ready_summary(
         "target_frame": target_frame,
         "tcp_offset": manifest_value(manifest_summary, "tcp_offset"),
         "base_to_board_alignment": manifest_value(manifest_summary, "base_to_board_alignment"),
-        "model_authority": "reviewed_model_bundle_manifest",
+        "model_authority": manifest_summary.get("model_authority") or "reviewed_so101_model_bundle_manifest",
+        "physical_so101_model_authority_ready": bool(
+            manifest_summary.get("physical_so101_model_authority_ready")
+        ),
+        "hardware_free_regression_fixture_ready": bool(
+            manifest_summary.get("hardware_free_regression_fixture_ready")
+        ),
+        "synthetic_fixture_authority_fields": manifest_summary.get("synthetic_fixture_authority_fields") or [],
         "ready_for_model_backed_ik": True,
         "reviewed_model_motion_checked": motion_ok,
         "require_ready_reviewed_model": bool(args.require_ready_reviewed_model),
@@ -627,6 +641,9 @@ def write_readme(path: Path, summary: dict[str, Any], rows: list[dict[str, Any]]
         f"- `status`: `{summary['status']}`",
         f"- `ok`: `{str(summary['ok']).lower()}`",
         f"- `manifest_status`: `{summary.get('manifest_status')}`",
+        f"- `model_authority`: `{summary.get('model_authority')}`",
+        f"- `physical_so101_model_authority_ready`: `{str(summary.get('physical_so101_model_authority_ready')).lower()}`",
+        f"- `hardware_free_regression_fixture_ready`: `{str(summary.get('hardware_free_regression_fixture_ready')).lower()}`",
         f"- `ready_for_model_backed_ik`: `{str(summary.get('ready_for_model_backed_ik')).lower()}`",
         f"- `reviewed_model_motion_checked`: `{str(summary.get('reviewed_model_motion_checked')).lower()}`",
         f"- `model_path`: `{summary.get('model_path', {}).get('path') if isinstance(summary.get('model_path'), dict) else None}`",
@@ -697,6 +714,9 @@ def main() -> int:
             {
                 "ok": summary["ok"],
                 "status": summary["status"],
+                "model_authority": summary["model_authority"],
+                "physical_so101_model_authority_ready": summary["physical_so101_model_authority_ready"],
+                "hardware_free_regression_fixture_ready": summary["hardware_free_regression_fixture_ready"],
                 "ready_for_model_backed_ik": summary["ready_for_model_backed_ik"],
                 "reviewed_model_motion_checked": summary["reviewed_model_motion_checked"],
                 "summary_json": str(summary_path),

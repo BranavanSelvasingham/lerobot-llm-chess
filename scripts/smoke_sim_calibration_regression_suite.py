@@ -1400,6 +1400,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             "- SO-101 model bundle manifest status: "
             f"`{so101_bundle.get('status')}`; ready_for_model_backed_ik "
             f"`{markdown_bool(so101_bundle.get('ready_for_model_backed_ik'))}`; "
+            f"model_authority `{so101_bundle.get('model_authority')}`; "
+            f"physical authority `{markdown_bool(so101_bundle.get('physical_so101_model_authority_ready'))}`; "
+            f"fixture ready `{markdown_bool(so101_bundle.get('hardware_free_regression_fixture_ready'))}`; "
             f"model `{so101_bundle_model_path.get('path') or 'none'}`; roots "
             f"`{markdown_list_value(so101_bundle_asset_roots.get('asset_roots'))}`; "
             f"target frame `{so101_bundle.get('target_frame', {}).get('value') if isinstance(so101_bundle.get('target_frame'), dict) else None}`; "
@@ -1416,6 +1419,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         (
             "- SO-101 reviewed MuJoCo bundle gate: "
             f"status `{so101_reviewed_mujoco_bundle.get('status')}`; "
+            f"model_authority `{so101_reviewed_mujoco_bundle.get('model_authority')}`; "
+            f"physical authority `{markdown_bool(so101_reviewed_mujoco_bundle.get('physical_so101_model_authority_ready'))}`; "
+            f"fixture ready `{markdown_bool(so101_reviewed_mujoco_bundle.get('hardware_free_regression_fixture_ready'))}`; "
             f"ready_for_model_backed_ik `{markdown_bool(so101_reviewed_mujoco_bundle.get('ready_for_model_backed_ik'))}`; "
             f"reviewed_model_motion_checked `{markdown_bool(so101_reviewed_mujoco_bundle.get('reviewed_model_motion_checked'))}`; "
             "a ready reviewed bundle must load in MuJoCo and map/move every SO-101 joint before training evidence is trusted."
@@ -2639,6 +2645,8 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         },
         "dependencies": dependencies,
         "model_authority": smoke.get("model_authority"),
+        "physical_so101_model_authority_ready": smoke.get("physical_so101_model_authority_ready"),
+        "hardware_free_regression_fixture_ready": smoke.get("hardware_free_regression_fixture_ready"),
         "ready_for_model_backed_ik": smoke.get("ready_for_model_backed_ik"),
         "limitations": smoke.get("limitations"),
         "next_required_for_goal": smoke.get("next_required_for_goal"),
@@ -2891,6 +2899,10 @@ def so101_model_bundle_manifest_section(
         "config": config,
         "forwarding": forwarding,
         "ready_for_model_backed_ik": bundle.get("ready_for_model_backed_ik"),
+        "model_authority": bundle.get("model_authority"),
+        "physical_so101_model_authority_ready": bundle.get("physical_so101_model_authority_ready"),
+        "hardware_free_regression_fixture_ready": bundle.get("hardware_free_regression_fixture_ready"),
+        "synthetic_fixture_authority_fields": bundle.get("synthetic_fixture_authority_fields"),
         "manifest_request": {
             "status": manifest_request.get("status"),
             "path": manifest_request.get("path"),

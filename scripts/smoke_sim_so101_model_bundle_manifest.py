@@ -1537,6 +1537,34 @@ def build_field_checks(
     ]
 
 
+def synthetic_fixture_authority_flags(
+    authority: dict[str, Any],
+    joint_limits: dict[str, Any],
+    mesh_assets: dict[str, Any],
+    target_frame: dict[str, Any],
+    tcp_offset: dict[str, Any],
+    alignment: dict[str, Any],
+) -> dict[str, bool]:
+    return {
+        "authority": bool(authority.get("synthetic_fixture_only")),
+        "joint_limits": bool((joint_limits.get("review") or {}).get("synthetic_fixture_only")),
+        "mesh_assets": bool((mesh_assets.get("review") or {}).get("synthetic_fixture_only")),
+        "target_frame": bool((target_frame.get("review") or {}).get("synthetic_fixture_only")),
+        "tcp_offset": bool((tcp_offset.get("review") or {}).get("synthetic_fixture_only")),
+        "base_to_board_alignment": bool((alignment.get("review") or {}).get("synthetic_fixture_only")),
+    }
+
+
+def model_authority_class(ready: bool, synthetic_flags: dict[str, bool]) -> str:
+    if any(synthetic_flags.values()):
+        if ready:
+            return "hardware_free_regression_fixture_not_physical_so101_authority"
+        return "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+    if ready:
+        return "reviewed_so101_model_bundle_manifest"
+    return "reviewed_bundle_required"
+
+
 def build_checklist_rows(
     manifest_request: dict[str, Any],
     model_path: dict[str, Any],
@@ -1735,6 +1763,10 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         "",
         f"- `status`: `{summary['status']}`",
         f"- `ready_for_model_backed_ik`: `{str(summary['ready_for_model_backed_ik']).lower()}`",
+        f"- `model_authority`: `{summary['model_authority']}`",
+        f"- `physical_so101_model_authority_ready`: `{str(summary['physical_so101_model_authority_ready']).lower()}`",
+        f"- `hardware_free_regression_fixture_ready`: `{str(summary['hardware_free_regression_fixture_ready']).lower()}`",
+        f"- `synthetic_fixture_authority_fields`: `{'; '.join(summary['synthetic_fixture_authority_fields']) if summary['synthetic_fixture_authority_fields'] else 'none'}`",
         f"- `manifest_path`: `{summary['manifest_request']['path']}`",
         f"- `model_path`: `{summary['model_path']['path']}`",
         f"- `asset_roots`: `{'; '.join(summary['asset_roots']['asset_roots']) if summary['asset_roots']['asset_roots'] else 'none'}`",
@@ -1821,11 +1853,25 @@ def build_summary(
         for missing_input in (check["missing_inputs"] or [])
     ]
     ready = not missing_inputs
+    synthetic_flags = synthetic_fixture_authority_flags(
+        authority,
+        joint_limits,
+        mesh_assets,
+        target_frame,
+        tcp_offset,
+        alignment,
+    )
+    synthetic_fields = [field for field, enabled in synthetic_flags.items() if enabled]
+    physical_authority_ready = ready and not synthetic_fields
     summary = {
         "schema": SCHEMA,
         "ok": True,
         "status": status_for(manifest_request, ready),
         "ready_for_model_backed_ik": ready,
+        "model_authority": model_authority_class(ready, synthetic_flags),
+        "physical_so101_model_authority_ready": physical_authority_ready,
+        "hardware_free_regression_fixture_ready": ready and bool(synthetic_fields),
+        "synthetic_fixture_authority_fields": synthetic_fields,
         "hardware_skipped": True,
         "gui_skipped": True,
         "openai_skipped": True,
@@ -1898,6 +1944,9 @@ def main() -> int:
                 "ok": True,
                 "status": summary["status"],
                 "ready_for_model_backed_ik": summary["ready_for_model_backed_ik"],
+                "model_authority": summary["model_authority"],
+                "physical_so101_model_authority_ready": summary["physical_so101_model_authority_ready"],
+                "hardware_free_regression_fixture_ready": summary["hardware_free_regression_fixture_ready"],
                 "missing_inputs": summary["missing_inputs"],
                 "manifest_path": summary["manifest_request"]["path"],
                 "model_path": summary["model_path"]["path"],

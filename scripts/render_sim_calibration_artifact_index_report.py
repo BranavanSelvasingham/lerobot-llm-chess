@@ -1256,6 +1256,10 @@ def so101_model_bundle_manifest_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("status", ""),
         metrics.get("manifest_request_status", ""),
         metrics.get("ready_for_model_backed_ik", ""),
+        metrics.get("model_authority", ""),
+        metrics.get("physical_so101_model_authority_ready", ""),
+        metrics.get("hardware_free_regression_fixture_ready", ""),
+        compact_list(metrics.get("synthetic_fixture_authority_fields")),
         metrics.get("model_path", ""),
         compact_list(metrics.get("asset_roots")),
         metrics.get("joint_limits_status", ""),
@@ -1282,6 +1286,8 @@ def so101_mujoco_smoke_row(artifact: dict[str, Any]) -> list[Any]:
         markdown_link(path, link_path(artifact)) if path else "",
         metrics.get("status", ""),
         metrics.get("model_authority", ""),
+        metrics.get("physical_so101_model_authority_ready", ""),
+        metrics.get("hardware_free_regression_fixture_ready", ""),
         metrics.get("ready_for_model_backed_ik", ""),
         metrics.get("reviewed_model_motion_checked", ""),
         metrics.get("gymnasium_available", ""),
@@ -2681,7 +2687,8 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         "including model path, asset roots, joint-limit authority, mesh evidence, target frame, "
         "TCP/gripper-tip offset, base-to-board alignment, child contract diagnostics, and nested asset-preflight "
         "diagnostics. Manifest fields remain diagnostic-only unless "
-        "`ready_for_model_backed_ik` is true; explicit suite CLI model inputs take precedence."
+        "`ready_for_model_backed_ik` is true; fixture-only readiness stays labeled separately "
+        "from physical SO-101 model authority and explicit suite CLI model inputs take precedence."
     )
     lines.extend(
         linked_table(
@@ -2692,6 +2699,10 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Status",
                 "Request",
                 "Ready",
+                "Authority",
+                "Physical Authority",
+                "Fixture Ready",
+                "Synthetic Fields",
                 "Model Path",
                 "Asset Roots",
                 "Joint Limits",
@@ -2826,6 +2837,8 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Path",
                 "Status",
                 "Authority",
+                "Physical Authority",
+                "Fixture Ready",
                 "Ready",
                 "Reviewed Motion",
                 "Gymnasium",

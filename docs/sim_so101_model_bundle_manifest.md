@@ -108,6 +108,15 @@ fields. A nonexistent manifest path reports
 `status: "model_bundle_manifest_unavailable"`. Invalid JSON reports
 `status: "model_bundle_manifest_parse_error"`.
 
+Every summary also reports `model_authority`,
+`physical_so101_model_authority_ready`,
+`hardware_free_regression_fixture_ready`, and
+`synthetic_fixture_authority_fields`. A manifest can be ready for automation
+with only synthetic hardware-free fixture authority, but that readiness is
+classified as
+`hardware_free_regression_fixture_not_physical_so101_authority` and does not
+close the reviewed physical SO-101 model-authority gate.
+
 ## Integrated Suite Mode
 
 The hardware-free simulator calibration regression suite runs this checker on
@@ -237,9 +246,11 @@ Accepted authority review statuses are `reviewed`, `operator_reviewed`,
 `reviewed_so101_model_bundle`. The checker also accepts
 `synthetic_fixture_reviewed_for_automation_only` only when the manifest scope
 is explicitly hardware-free; that path exists for regression fixtures and is
-not physical SO-101 source authority. Authority must also include at least one
-review evidence field: `reviewed_by`, `reviewed_at`, `review_id`, or
-`review_url`.
+not physical SO-101 source authority. When any required authority field uses
+that fixture-only status, `physical_so101_model_authority_ready` remains
+`false` even if `ready_for_model_backed_ik` is `true`. Authority must also
+include at least one review evidence field: `reviewed_by`, `reviewed_at`,
+`review_id`, or `review_url`.
 
 Provenance must include at least one source field (`source_url`, `source_uri`,
 `cad_url`, `repository_url`, `source_path`, or `source_reference`), one export
