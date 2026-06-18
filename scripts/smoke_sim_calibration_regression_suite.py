@@ -3240,6 +3240,17 @@ def so101_model_source_inventory_section(
         "likely_candidate_count": inventory.get("likely_candidate_count"),
         "direct_contract_candidate_count": inventory.get("direct_contract_candidate_count"),
         "authoritative_candidate_count": inventory.get("authoritative_candidate_count"),
+        "authoritative_source_selection_status": inventory.get(
+            "authoritative_source_selection_status"
+        ),
+        "authoritative_candidate_ids": inventory.get("authoritative_candidate_ids") or [],
+        "authoritative_candidate_paths": inventory.get("authoritative_candidate_paths") or [],
+        "selected_authoritative_candidate_id": inventory.get(
+            "selected_authoritative_candidate_id"
+        ),
+        "selected_authoritative_candidate_path": inventory.get(
+            "selected_authoritative_candidate_path"
+        ),
         "source_authority_review_status": inventory.get("source_authority_review_status"),
         "source_authority_review_ready": inventory.get("source_authority_review_ready"),
         "source_authority_review": inventory.get("source_authority_review"),

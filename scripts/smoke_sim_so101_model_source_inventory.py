@@ -122,6 +122,14 @@ SOURCE_INVENTORY_ACTIONS = {
             "--authority-review-id, or --authority-review-url."
         ),
     },
+    "select_single_authoritative_so101_model_source": {
+        "gate": "reviewed_model_authority",
+        "title": "Select exactly one authoritative SO-101 model source",
+        "detail": (
+            "Rerun with --authoritative-path for the reviewed model file, or narrow "
+            "--authoritative-root so it contains only the selected SO-101 model source."
+        ),
+    },
     "run_so101_model_bundle_probe": {
         "gate": "reviewed_model_authority",
         "title": "Generate a reviewed-bundle manifest draft",
@@ -149,12 +157,15 @@ def source_inventory_next_required(
         action_ids.append("scan_or_supply_so101_model_source_root")
     if authoritative_candidate_count <= 0:
         action_ids.append("review_and_declare_authoritative_so101_model_source")
+    elif authoritative_candidate_count > 1:
+        action_ids.append("select_single_authoritative_so101_model_source")
     elif not source_authority_review_ready:
         action_ids.append("record_source_authority_review_metadata")
-    if recommended_contract_check:
-        action_ids.append("run_so101_model_bundle_probe")
-    elif direct_contract_candidate_count > 0 or likely_candidate_count > 0:
-        action_ids.append("run_so101_model_bundle_probe")
+    if authoritative_candidate_count <= 1:
+        if recommended_contract_check:
+            action_ids.append("run_so101_model_bundle_probe")
+        elif direct_contract_candidate_count > 0 or likely_candidate_count > 0:
+            action_ids.append("run_so101_model_bundle_probe")
     action_ids.append("supply_reviewed_so101_model_bundle_manifest")
 
     seen: set[str] = set()
@@ -185,6 +196,8 @@ def source_authority_gate_status(
 ) -> str:
     if authoritative_candidate_count <= 0:
         return "source_authority_blocked_missing_authoritative_model"
+    if authoritative_candidate_count > 1:
+        return "source_authority_blocked_ambiguous_authoritative_model"
     if not source_authority_review_ready:
         return "source_authority_blocked_review_metadata"
     return "source_authority_ready"
@@ -201,6 +214,8 @@ def source_authority_blockers(
         blockers.append("scan_or_supply_so101_model_source_root")
     if authoritative_candidate_count <= 0:
         blockers.append("review_and_declare_authoritative_so101_model_source")
+    elif authoritative_candidate_count > 1:
+        blockers.append("select_single_authoritative_so101_model_source")
     elif not source_authority_review_ready:
         blockers.append("record_source_authority_review_metadata")
     return blockers
@@ -216,9 +231,19 @@ def source_inventory_review_packet_status(
         return "review_packet_waiting_for_model_source_root"
     if authoritative_candidate_count <= 0:
         return "review_packet_source_candidates_need_authority_review"
+    if authoritative_candidate_count > 1:
+        return "review_packet_multiple_authoritative_candidates_need_selection"
     if not source_authority_review_ready:
         return "review_packet_source_authority_review_metadata_needed"
     return "review_packet_source_authority_ready"
+
+
+def authoritative_source_selection_status(authoritative_candidate_count: int) -> str:
+    if authoritative_candidate_count <= 0:
+        return "missing_authoritative_model"
+    if authoritative_candidate_count > 1:
+        return "multiple_authoritative_candidates"
+    return "single_authoritative_candidate"
 
 
 def candidate_review_packet_status(candidate: dict[str, Any]) -> str:
@@ -926,6 +951,9 @@ def candidate_sort_key(candidate: dict[str, Any]) -> tuple[Any, ...]:
 def build_source_inventory_review_packet(summary: dict[str, Any]) -> dict[str, Any]:
     next_required_for_goal = summary.get("next_required_for_goal") or []
     candidates = summary.get("candidates") or []
+    authoritative_candidates = [
+        candidate for candidate in candidates if candidate.get("authoritative")
+    ]
     packet_status = source_inventory_review_packet_status(
         candidate_count=int(summary.get("candidate_count") or 0),
         authoritative_candidate_count=int(summary.get("authoritative_candidate_count") or 0),
@@ -954,6 +982,34 @@ def build_source_inventory_review_packet(summary: dict[str, Any]) -> dict[str, A
                 "candidate_count": summary.get("candidate_count"),
             },
             operator_action="Run the inventory with a local SO-101 model-source root or supply an authoritative model path/root.",
+        )
+
+    if len(authoritative_candidates) > 1:
+        append_item(
+            item_id="source_inventory:multiple_authoritative_candidates",
+            item_type="authoritative_source_selection",
+            status="multiple_authoritative_candidates_need_selection",
+            gate="reviewed_model_authority",
+            required_input="single_authoritative_model_asset",
+            candidate_id=None,
+            candidate_path=None,
+            candidate_relevance=None,
+            source_authority_status=summary.get("source_authority_gate_status"),
+            source_authority_review_status=summary.get("source_authority_review_status"),
+            next_action_id="select_single_authoritative_so101_model_source",
+            evidence={
+                "authoritative_candidate_count": len(authoritative_candidates),
+                "authoritative_candidate_ids": [
+                    candidate.get("candidate_id") for candidate in authoritative_candidates
+                ],
+                "authoritative_candidate_paths": [
+                    candidate.get("path") for candidate in authoritative_candidates
+                ],
+            },
+            operator_action=(
+                "Select exactly one reviewed SO-101 model source before generating or "
+                "supplying the reviewed model bundle manifest."
+            ),
         )
 
     for requirement in missing_source_requirements():
@@ -1088,6 +1144,7 @@ def build_source_inventory_review_packet(summary: dict[str, Any]) -> dict[str, A
             "needs_reviewed_bundle_manifest",
             "candidate_needs_source_authority_review",
             "authoritative_candidate_needs_review_metadata",
+            "multiple_authoritative_candidates_need_selection",
             "pending",
         }
     ]
@@ -1105,6 +1162,17 @@ def build_source_inventory_review_packet(summary: dict[str, Any]) -> dict[str, A
         "likely_candidate_count": summary.get("likely_candidate_count"),
         "direct_contract_candidate_count": summary.get("direct_contract_candidate_count"),
         "authoritative_candidate_count": summary.get("authoritative_candidate_count"),
+        "authoritative_source_selection_status": summary.get(
+            "authoritative_source_selection_status"
+        ),
+        "authoritative_candidate_ids": summary.get("authoritative_candidate_ids") or [],
+        "authoritative_candidate_paths": summary.get("authoritative_candidate_paths") or [],
+        "selected_authoritative_candidate_id": summary.get(
+            "selected_authoritative_candidate_id"
+        ),
+        "selected_authoritative_candidate_path": summary.get(
+            "selected_authoritative_candidate_path"
+        ),
         "review_candidate_item_count": len(review_candidates[:20]),
         "item_count": len(items),
         "item_ids": [item["item_id"] for item in items],
@@ -1132,6 +1200,13 @@ def build_summary(
     source_authority_review_input: dict[str, Any],
 ) -> dict[str, Any]:
     authoritative_candidates = [candidate for candidate in candidates if candidate["authoritative"]]
+    authoritative_candidate_paths = [candidate["path"] for candidate in authoritative_candidates]
+    authoritative_candidate_ids = [
+        candidate["candidate_id"] for candidate in authoritative_candidates
+    ]
+    selected_authoritative_candidate = (
+        authoritative_candidates[0] if len(authoritative_candidates) == 1 else None
+    )
     direct_candidates = [
         candidate
         for candidate in candidates
@@ -1141,7 +1216,15 @@ def build_summary(
         candidate for candidate in candidates if candidate["likely_so101_relevance"] in {"high", "medium"}
     ]
     best_candidate = sorted(candidates, key=candidate_sort_key)[0] if candidates else None
-    status = "authoritative_model_found" if authoritative_candidates else "missing_authoritative_model"
+    if not authoritative_candidates:
+        status = "missing_authoritative_model"
+    elif len(authoritative_candidates) > 1:
+        status = "ambiguous_authoritative_model"
+    else:
+        status = "authoritative_model_found"
+    selection_status = authoritative_source_selection_status(
+        len(authoritative_candidates)
+    )
     authority_review = source_authority_review_summary(
         authoritative_candidate_count=len(authoritative_candidates),
         review_input=source_authority_review_input,
@@ -1156,6 +1239,20 @@ def build_summary(
                 "likely_candidate_count": len(likely_candidates),
                 "direct_contract_candidate_count": len(direct_candidates),
                 "missing_source_requirements": missing_source_requirements(),
+            }
+        )
+    elif len(authoritative_candidates) > 1:
+        diagnostics.append(
+            {
+                "diagnostic": "ambiguous_authoritative_model",
+                "severity": "action_required",
+                "authoritative_candidate_count": len(authoritative_candidates),
+                "authoritative_candidate_ids": authoritative_candidate_ids,
+                "authoritative_candidate_paths": authoritative_candidate_paths,
+                "reason": (
+                    "Multiple model files matched the authoritative path/root. Select one "
+                    "reviewed model path before the source-authority gate can close."
+                ),
             }
         )
     elif not authority_review["ready"]:
@@ -1173,19 +1270,26 @@ def build_summary(
         )
 
     recommended_contract_check = None
-    if best_candidate and best_candidate["direct_robot_kinematics_compatible"]:
+    contract_candidate = (
+        selected_authoritative_candidate
+        if selected_authoritative_candidate is not None
+        else best_candidate
+        if not authoritative_candidates
+        else None
+    )
+    if contract_candidate and contract_candidate["direct_robot_kinematics_compatible"]:
         recommended_contract_check = {
             "command": [
                 sys.executable,
                 "scripts/smoke_sim_so101_model_contract.py",
                 "--model-path",
-                best_candidate["path"],
+                contract_candidate["path"],
                 "--output-dir",
                 str(DEFAULT_OUTPUT_DIR.parent / "so101_model_contract_inventory_candidate"),
             ],
-            "candidate_id": best_candidate["candidate_id"],
-            "candidate_path": best_candidate["path"],
-            "authoritative": best_candidate["authoritative"],
+            "candidate_id": contract_candidate["candidate_id"],
+            "candidate_path": contract_candidate["path"],
+            "authoritative": contract_candidate["authoritative"],
         }
 
     next_required_for_goal = source_inventory_next_required(
@@ -1221,6 +1325,19 @@ def build_summary(
         "likely_candidate_count": len(likely_candidates),
         "direct_contract_candidate_count": len(direct_candidates),
         "authoritative_candidate_count": len(authoritative_candidates),
+        "authoritative_source_selection_status": selection_status,
+        "authoritative_candidate_ids": authoritative_candidate_ids,
+        "authoritative_candidate_paths": authoritative_candidate_paths,
+        "selected_authoritative_candidate_id": (
+            selected_authoritative_candidate["candidate_id"]
+            if selected_authoritative_candidate
+            else None
+        ),
+        "selected_authoritative_candidate_path": (
+            selected_authoritative_candidate["path"]
+            if selected_authoritative_candidate
+            else None
+        ),
         "source_authority_review_status": authority_review["status"],
         "source_authority_review_ready": authority_review["ready"],
         "source_authority_review": authority_review,
@@ -1320,6 +1437,9 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `likely_candidate_count`: `{summary['likely_candidate_count']}`",
         f"- `direct_contract_candidate_count`: `{summary['direct_contract_candidate_count']}`",
         f"- `authoritative_candidate_count`: `{summary['authoritative_candidate_count']}`",
+        f"- `authoritative_source_selection_status`: `{summary['authoritative_source_selection_status']}`",
+        f"- `selected_authoritative_candidate_id`: `{summary.get('selected_authoritative_candidate_id') or 'none'}`",
+        f"- `selected_authoritative_candidate_path`: `{summary.get('selected_authoritative_candidate_path') or 'none'}`",
         f"- `source_authority_review_status`: `{summary['source_authority_review_status']}`",
         f"- `source_authority_review_ready`: `{str(summary['source_authority_review_ready']).lower()}`",
         f"- `source_authority_review_scope_ready`: `{str(summary['source_authority_review_scope_ready']).lower()}`",

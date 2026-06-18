@@ -53,9 +53,15 @@ inventory can report an authoritative candidate, but it also reports
 `record_source_authority_review_metadata`. The summary keeps
 `source_authority_gate_status` as one of
 `source_authority_blocked_missing_authoritative_model`,
+`source_authority_blocked_ambiguous_authoritative_model`,
 `source_authority_blocked_review_metadata`, or `source_authority_ready`, and
-keeps `source_authority_blockers` empty only when an authoritative candidate and
-non-placeholder source-authority review metadata are both present.
+keeps `source_authority_blockers` empty only when exactly one authoritative
+candidate and non-placeholder source-authority review metadata are both present.
+If an authoritative root matches multiple model files, the inventory reports
+`status: "ambiguous_authoritative_model"`,
+`authoritative_source_selection_status: "multiple_authoritative_candidates"`,
+and queues `select_single_authoritative_so101_model_source` rather than
+implicitly choosing one.
 
 Review evidence must be non-placeholder metadata. Values such as `TODO`, `TBD`,
 `unknown`, `placeholder`, or `review required` are preserved in the summary as
@@ -185,6 +191,7 @@ That means the URDF path is directly compatible with the current `RobotKinematic
 Before model-backed residuals are trusted, capture these inputs:
 
 - `authoritative_model_asset`: repo-local or explicitly declared SO-101 URDF/MJCF/Xacro source with stable provenance, license, and source authority.
+- `single_authoritative_model_asset`: exactly one reviewed model file selected with `--authoritative-path`, or an authoritative root narrowed so it resolves to a single reviewed model file.
 - `model_generation_provenance`: CAD/export source URL or commit, export tool/version, and any local edits.
 - `license_and_redistribution_basis`: clear license file or SPDX/header evidence permitting use in this repo.
 - `joint_and_frame_alignment`: confirmation that model joints match `shoulder_pan` through `wrist_roll` and target frame `gripper_frame_link` matches simulator expectations.

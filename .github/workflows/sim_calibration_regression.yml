@@ -590,12 +590,27 @@ jobs:
           assert source_inventory["ok"] is True, source_inventory
           assert source_inventory["status"] in {
               "missing_authoritative_model",
+              "ambiguous_authoritative_model",
               "authoritative_model_found",
           }, source_inventory
           assert isinstance(source_inventory["candidate_count"], int), source_inventory
           assert isinstance(source_inventory["likely_candidate_count"], int), source_inventory
           assert isinstance(source_inventory["direct_contract_candidate_count"], int), source_inventory
           assert isinstance(source_inventory["authoritative_candidate_count"], int), source_inventory
+          assert source_inventory["authoritative_source_selection_status"] in {
+              "missing_authoritative_model",
+              "multiple_authoritative_candidates",
+              "single_authoritative_candidate",
+          }, source_inventory
+          assert isinstance(source_inventory["authoritative_candidate_ids"], list), source_inventory
+          assert isinstance(source_inventory["authoritative_candidate_paths"], list), source_inventory
+          assert len(source_inventory["authoritative_candidate_ids"]) == source_inventory["authoritative_candidate_count"], source_inventory
+          assert len(source_inventory["authoritative_candidate_paths"]) == source_inventory["authoritative_candidate_count"], source_inventory
+          assert (
+              source_inventory["selected_authoritative_candidate_path"] is None
+              if source_inventory["authoritative_candidate_count"] != 1
+              else isinstance(source_inventory["selected_authoritative_candidate_path"], str)
+          ), source_inventory
           assert source_inventory["source_authority_review_status"] in {
               "not_applicable_no_authoritative_candidate",
               "review_metadata_missing",
@@ -605,6 +620,7 @@ jobs:
           assert isinstance(source_inventory["source_authority_review"], dict), source_inventory
           assert source_inventory["source_authority_gate_status"] in {
               "source_authority_blocked_missing_authoritative_model",
+              "source_authority_blocked_ambiguous_authoritative_model",
               "source_authority_blocked_review_metadata",
               "source_authority_ready",
           }, source_inventory
@@ -629,6 +645,7 @@ jobs:
           assert source_inventory["review_packet_status"] in {
               "review_packet_waiting_for_model_source_root",
               "review_packet_source_candidates_need_authority_review",
+              "review_packet_multiple_authoritative_candidates_need_selection",
               "review_packet_source_authority_review_metadata_needed",
               "review_packet_source_authority_ready",
           }, source_inventory
@@ -672,15 +689,29 @@ jobs:
               assert "review_and_declare_authoritative_so101_model_source" in source_inventory["source_authority_blockers"], source_inventory
               assert source_inventory["diagnostics"], source_inventory
               assert "review_and_declare_authoritative_so101_model_source" in source_inventory["next_required_action_ids"], source_inventory
-          if source_inventory["authoritative_candidate_count"] > 0 and source_inventory["source_authority_review_ready"] is False:
+          if source_inventory["status"] == "ambiguous_authoritative_model":
+              assert source_inventory["authoritative_candidate_count"] > 1, source_inventory
+              assert source_inventory["authoritative_source_selection_status"] == "multiple_authoritative_candidates", source_inventory
+              assert source_inventory["selected_authoritative_candidate_path"] is None, source_inventory
+              assert source_inventory["source_authority_gate_status"] == "source_authority_blocked_ambiguous_authoritative_model", source_inventory
+              assert source_inventory["review_packet_status"] == "review_packet_multiple_authoritative_candidates_need_selection", source_inventory
+              assert "select_single_authoritative_so101_model_source" in source_inventory["source_authority_blockers"], source_inventory
+              assert "select_single_authoritative_so101_model_source" in source_inventory["next_required_action_ids"], source_inventory
+              assert any(
+                  diagnostic.get("diagnostic") == "ambiguous_authoritative_model"
+                  for diagnostic in source_inventory["diagnostics"]
+              ), source_inventory
+          if source_inventory["authoritative_candidate_count"] == 1 and source_inventory["source_authority_review_ready"] is False:
               assert source_inventory["source_authority_gate_status"] == "source_authority_blocked_review_metadata", source_inventory
               assert source_inventory["review_packet_status"] == "review_packet_source_authority_review_metadata_needed", source_inventory
               assert "record_source_authority_review_metadata" in source_inventory["source_authority_blockers"], source_inventory
               assert "record_source_authority_review_metadata" in source_inventory["next_required_action_ids"], source_inventory
-          if source_inventory["authoritative_candidate_count"] > 0 and source_inventory["source_authority_review_ready"] is True:
+          if source_inventory["authoritative_candidate_count"] == 1 and source_inventory["source_authority_review_ready"] is True:
               assert source_inventory["source_authority_gate_status"] == "source_authority_ready", source_inventory
               assert source_inventory["review_packet_status"] == "review_packet_source_authority_ready", source_inventory
               assert source_inventory["source_authority_blockers"] == [], source_inventory
+              assert source_inventory["authoritative_source_selection_status"] == "single_authoritative_candidate", source_inventory
+              assert source_inventory["selected_authoritative_candidate_path"] in source_inventory["authoritative_candidate_paths"], source_inventory
               assert source_inventory["source_authority_review_scope_ready"] is True, source_inventory
               assert source_inventory["source_authority_missing_review_scope_ids"] == [], source_inventory
           source_inventory_artifacts = source_inventory["artifacts"]
@@ -1341,10 +1372,21 @@ jobs:
                   "review_metadata_missing",
                   "review_metadata_supplied",
               }, metrics
+              assert metrics.get("authoritative_source_selection_status") in {
+                  "missing_authoritative_model",
+                  "multiple_authoritative_candidates",
+                  "single_authoritative_candidate",
+                  None,
+              }, metrics
+              assert isinstance(metrics.get("authoritative_candidate_ids"), list), metrics
+              assert isinstance(metrics.get("authoritative_candidate_paths"), list), metrics
+              assert len(metrics.get("authoritative_candidate_ids")) == metrics.get("authoritative_candidate_count"), metrics
+              assert len(metrics.get("authoritative_candidate_paths")) == metrics.get("authoritative_candidate_count"), metrics
               assert isinstance(metrics.get("source_authority_review_ready"), bool), metrics
               assert isinstance(metrics.get("source_authority_review"), dict), metrics
               assert metrics.get("source_authority_gate_status") in {
                   "source_authority_blocked_missing_authoritative_model",
+                  "source_authority_blocked_ambiguous_authoritative_model",
                   "source_authority_blocked_review_metadata",
                   "source_authority_ready",
               }, metrics
@@ -1370,6 +1412,7 @@ jobs:
               assert metrics.get("review_packet_status") in {
                   "review_packet_waiting_for_model_source_root",
                   "review_packet_source_candidates_need_authority_review",
+                  "review_packet_multiple_authoritative_candidates_need_selection",
                   "review_packet_source_authority_review_metadata_needed",
                   "review_packet_source_authority_ready",
               }, metrics
