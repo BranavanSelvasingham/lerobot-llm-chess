@@ -3435,6 +3435,14 @@ def so101_model_source_inventory_section(
         "source_intake_development_fixture_evidence_not_physical_so101_truth": inventory.get(
             "source_intake_development_fixture_evidence_not_physical_so101_truth"
         ),
+        "source_intake_checklist_json_path": inventory.get(
+            "source_intake_checklist_json_path"
+        )
+        or artifacts.get("source_intake_checklist_json"),
+        "source_intake_checklist_csv_path": inventory.get(
+            "source_intake_checklist_csv_path"
+        )
+        or artifacts.get("source_intake_checklist_csv"),
         "source_intake_checklist": inventory.get("source_intake_checklist"),
         "diagnostics": diagnostics,
         "artifacts": {

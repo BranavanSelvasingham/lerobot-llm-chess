@@ -1641,6 +1641,12 @@ def build_summary(
             "source_intake_development_fixture_evidence_not_physical_so101_truth": source_intake_checklist[
                 "development_fixture_evidence_not_physical_so101_truth"
             ],
+            "source_intake_checklist_json_path": artifacts.get(
+                "source_intake_checklist_json"
+            ),
+            "source_intake_checklist_csv_path": artifacts.get(
+                "source_intake_checklist_csv"
+            ),
             "source_intake_checklist": source_intake_checklist,
         }
     )

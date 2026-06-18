@@ -1244,6 +1244,10 @@ jobs:
           assert source_inventory["source_intake_observed_evidence_is_authority"] is False, source_inventory
           assert source_inventory["source_intake_physical_so101_model_authority_ready"] is False, source_inventory
           assert source_inventory["source_intake_development_fixture_evidence_not_physical_so101_truth"] is True, source_inventory
+          assert source_inventory["source_intake_checklist_json_path"] == source_inventory["artifacts"]["source_intake_checklist_json"], source_inventory
+          assert source_inventory["source_intake_checklist_csv_path"] == source_inventory["artifacts"]["source_intake_checklist_csv"], source_inventory
+          assert Path(source_inventory["source_intake_checklist_json_path"]).is_file(), source_inventory
+          assert Path(source_inventory["source_intake_checklist_csv_path"]).is_file(), source_inventory
           source_intake_checklist = source_inventory["source_intake_checklist"]
           assert isinstance(source_intake_checklist, dict), source_inventory
           assert source_intake_checklist["model_authority"] == "source_intake_not_authority", source_intake_checklist
@@ -2147,6 +2151,10 @@ jobs:
               assert metrics.get("source_intake_observed_evidence_is_authority") is False, metrics
               assert metrics.get("source_intake_physical_so101_model_authority_ready") is False, metrics
               assert metrics.get("source_intake_development_fixture_evidence_not_physical_so101_truth") is True, metrics
+              assert isinstance(metrics.get("source_intake_checklist_json_path"), str), metrics
+              assert isinstance(metrics.get("source_intake_checklist_csv_path"), str), metrics
+              assert Path(metrics.get("source_intake_checklist_json_path")).is_file(), metrics
+              assert Path(metrics.get("source_intake_checklist_csv_path")).is_file(), metrics
           assert any(
               row.get("kind") == "json"
               and row.get("exists") is True

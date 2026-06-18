@@ -2695,6 +2695,14 @@ def collect_so101_model_source_inventory_artifacts(
         "source_intake_development_fixture_evidence_not_physical_so101_truth": inventory.get(
             "source_intake_development_fixture_evidence_not_physical_so101_truth"
         ),
+        "source_intake_checklist_json_path": inventory.get(
+            "source_intake_checklist_json_path"
+        )
+        or artifact_paths.get("source_intake_checklist_json"),
+        "source_intake_checklist_csv_path": inventory.get(
+            "source_intake_checklist_csv_path"
+        )
+        or artifact_paths.get("source_intake_checklist_csv"),
     }
     for key, label_suffix in (
         ("summary_json", "summary"),
@@ -2792,6 +2800,8 @@ def collect_so101_model_source_inventory_artifacts(
         "source_intake_development_fixture_evidence_not_physical_so101_truth": metrics[
             "source_intake_development_fixture_evidence_not_physical_so101_truth"
         ],
+        "source_intake_checklist_json_path": metrics["source_intake_checklist_json_path"],
+        "source_intake_checklist_csv_path": metrics["source_intake_checklist_csv_path"],
         "diagnostics": inventory.get("diagnostics"),
     }
 
