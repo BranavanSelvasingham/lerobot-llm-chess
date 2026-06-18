@@ -576,6 +576,21 @@ def review_evidence_summary(
     }
 
 
+def review_evidence_report_fields(review_evidence: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "review_evidence_present": review_evidence["present"],
+        "review_evidence_valid_fields": review_evidence["valid_fields"],
+        "review_evidence_placeholder_fields": review_evidence["placeholder_fields"],
+        "review_evidence_required_groups": review_evidence["required_groups"],
+        "review_evidence_satisfied_required_groups": review_evidence[
+            "satisfied_required_groups"
+        ],
+        "review_evidence_missing_required_groups": review_evidence[
+            "missing_required_groups"
+        ],
+    }
+
+
 def first_non_empty_field(value: dict[str, Any], field_names: tuple[str, ...]) -> tuple[str | None, Any]:
     for field_name in field_names:
         field_value = value.get(field_name)
@@ -829,12 +844,7 @@ def inspect_authority(manifest: dict[str, Any] | None) -> dict[str, Any]:
         "value": value,
         "review_status_field": status_field,
         "review_status": status_value or None,
-        "review_evidence_present": review_evidence["present"],
-        "review_evidence_valid_fields": review_evidence["valid_fields"],
-        "review_evidence_placeholder_fields": review_evidence["placeholder_fields"],
-        "review_evidence_missing_required_groups": review_evidence[
-            "missing_required_groups"
-        ],
+        **review_evidence_report_fields(review_evidence),
         "synthetic_fixture_only": is_synthetic_fixture,
         "diagnostics": diagnostics,
         "accepted_review_statuses": sorted(REVIEWED_AUTHORITY_STATUSES),
@@ -954,12 +964,13 @@ def inspect_joint_limit_review(
             break
 
     if not isinstance(review_source, dict):
+        review_evidence = review_evidence_summary({})
         return {
             "status": "missing",
             "field": None,
             "value": None,
             "review_status": None,
-            "review_evidence_present": False,
+            **review_evidence_report_fields(review_evidence),
             "synthetic_fixture_only": False,
             "accepted_review_statuses": sorted(REVIEWED_JOINT_LIMIT_STATUSES),
             "diagnostics": ["joint_limit_authority_review_missing"],
@@ -998,12 +1009,7 @@ def inspect_joint_limit_review(
         "value": review_source,
         "review_status_field": status_field,
         "review_status": status_value or None,
-        "review_evidence_present": review_evidence["present"],
-        "review_evidence_valid_fields": review_evidence["valid_fields"],
-        "review_evidence_placeholder_fields": review_evidence["placeholder_fields"],
-        "review_evidence_missing_required_groups": review_evidence[
-            "missing_required_groups"
-        ],
+        **review_evidence_report_fields(review_evidence),
         "synthetic_fixture_only": is_synthetic_fixture,
         "accepted_review_statuses": sorted(REVIEWED_JOINT_LIMIT_STATUSES),
         "diagnostics": diagnostics,
@@ -1152,12 +1158,13 @@ def inspect_review_metadata(
             break
 
     if not isinstance(review_source, dict):
+        review_evidence = review_evidence_summary({})
         return {
             "status": "missing",
             "field": None,
             "value": None,
             "review_status": None,
-            "review_evidence_present": False,
+            **review_evidence_report_fields(review_evidence),
             "synthetic_fixture_only": False,
             "accepted_review_statuses": sorted(accepted_statuses),
             "diagnostics": [f"{diagnostic_prefix}_review_missing"],
@@ -1193,12 +1200,7 @@ def inspect_review_metadata(
         "value": review_source,
         "review_status_field": status_field,
         "review_status": status_value or None,
-        "review_evidence_present": review_evidence["present"],
-        "review_evidence_valid_fields": review_evidence["valid_fields"],
-        "review_evidence_placeholder_fields": review_evidence["placeholder_fields"],
-        "review_evidence_missing_required_groups": review_evidence[
-            "missing_required_groups"
-        ],
+        **review_evidence_report_fields(review_evidence),
         "synthetic_fixture_only": is_synthetic_fixture,
         "accepted_review_statuses": sorted(accepted_statuses),
         "diagnostics": diagnostics,
@@ -1582,12 +1584,13 @@ def inspect_mesh_asset_review(manifest: dict[str, Any] | None) -> dict[str, Any]
             break
 
     if not isinstance(review_source, dict):
+        review_evidence = review_evidence_summary({})
         return {
             "status": "missing",
             "field": None,
             "value": None,
             "review_status": None,
-            "review_evidence_present": False,
+            **review_evidence_report_fields(review_evidence),
             "synthetic_fixture_only": False,
             "accepted_review_statuses": sorted(REVIEWED_MESH_ASSET_STATUSES),
             "diagnostics": ["mesh_asset_authority_review_missing"],
@@ -1626,12 +1629,7 @@ def inspect_mesh_asset_review(manifest: dict[str, Any] | None) -> dict[str, Any]
         "value": review_source,
         "review_status_field": status_field,
         "review_status": status_value or None,
-        "review_evidence_present": review_evidence["present"],
-        "review_evidence_valid_fields": review_evidence["valid_fields"],
-        "review_evidence_placeholder_fields": review_evidence["placeholder_fields"],
-        "review_evidence_missing_required_groups": review_evidence[
-            "missing_required_groups"
-        ],
+        **review_evidence_report_fields(review_evidence),
         "synthetic_fixture_only": is_synthetic_fixture,
         "accepted_review_statuses": sorted(REVIEWED_MESH_ASSET_STATUSES),
         "diagnostics": diagnostics,

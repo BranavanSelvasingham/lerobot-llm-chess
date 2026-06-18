@@ -652,6 +652,16 @@ def get_nested(payload: dict[str, Any], path: tuple[str, ...], default: Any = No
     return default if value is None else value
 
 
+def load_json_object(path_value: Any) -> dict[str, Any]:
+    if not isinstance(path_value, str) or not path_value:
+        return {}
+    try:
+        payload = json.loads(Path(path_value).read_text())
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
 def command_contains(command: Any, value: Path) -> bool:
     if not isinstance(command, list):
         return False
@@ -672,6 +682,69 @@ def assert_true(errors: list[str], label: str, value: Any) -> None:
 def assert_false(errors: list[str], label: str, value: Any) -> None:
     if value is not False:
         errors.append(f"{label}: expected false, got {value!r}")
+
+
+def assert_contains_all(
+    errors: list[str],
+    label: str,
+    actual: Any,
+    expected_values: list[str],
+) -> None:
+    if not isinstance(actual, list):
+        errors.append(f"{label}: expected list containing {expected_values!r}, got {actual!r}")
+        return
+    missing = [value for value in expected_values if value not in actual]
+    if missing:
+        errors.append(f"{label}: missing {missing!r} from {actual!r}")
+
+
+def review_group_names(review: Any, key: str) -> list[str]:
+    if not isinstance(review, dict):
+        return []
+    values = review.get(key)
+    if key == "review_evidence_required_groups" and isinstance(values, list):
+        return [
+            str(item.get("group"))
+            for item in values
+            if isinstance(item, dict) and item.get("group")
+        ]
+    return values if isinstance(values, list) else []
+
+
+def assert_traceable_review_evidence(
+    errors: list[str],
+    label: str,
+    review: Any,
+    *,
+    expected_missing_groups: list[str],
+) -> None:
+    if not isinstance(review, dict):
+        errors.append(f"{label}: expected review dict, got {review!r}")
+        return
+    assert_contains_all(
+        errors,
+        f"{label}.review_evidence_required_groups",
+        review_group_names(review, "review_evidence_required_groups"),
+        ["review_actor", "review_trace"],
+    )
+    assert_contains_all(
+        errors,
+        f"{label}.review_evidence_valid_fields",
+        review.get("review_evidence_valid_fields"),
+        ["reviewed_by"],
+    )
+    assert_contains_all(
+        errors,
+        f"{label}.review_evidence_satisfied_required_groups",
+        review_group_names(review, "review_evidence_satisfied_required_groups"),
+        ["review_actor"],
+    )
+    assert_contains_all(
+        errors,
+        f"{label}.review_evidence_missing_required_groups",
+        review_group_names(review, "review_evidence_missing_required_groups"),
+        expected_missing_groups,
+    )
 
 
 def assert_not_ready_motion_authority(
@@ -1034,6 +1107,27 @@ def summarize_case(
         ):
             if not any("review_evidence_missing_required_group:review_trace" in str(item) for item in (diagnostics or [])):
                 errors.append(f"{case_id}.{label}_review_trace_diagnostic_missing:{diagnostics!r}")
+        manifest_summary = load_json_object(
+            get_nested(bundle, ("artifact_paths", "summary_json"))
+            or get_nested(bundle, ("artifacts", "summary_json"))
+        )
+        for label, review in (
+            ("authority", get_nested(manifest_summary, ("authority",), {})),
+            ("joint_limits", get_nested(manifest_summary, ("joint_limits", "review"), {})),
+            ("mesh_assets", get_nested(manifest_summary, ("mesh_assets", "review"), {})),
+            ("target_frame", get_nested(manifest_summary, ("target_frame", "review"), {})),
+            ("tcp_offset", get_nested(manifest_summary, ("tcp_offset", "review"), {})),
+            (
+                "alignment",
+                get_nested(manifest_summary, ("base_to_board_alignment", "review"), {}),
+            ),
+        ):
+            assert_traceable_review_evidence(
+                errors,
+                f"{case_id}.{label}",
+                review,
+                expected_missing_groups=["review_trace"],
+            )
     elif expectation == "weak_review_not_forwarded":
         assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
         assert_equal(

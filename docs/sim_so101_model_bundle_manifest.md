@@ -163,6 +163,11 @@ Placeholder strings such as `TODO`, `TBD`, `unknown`, `placeholder`, or
 `review required` are reported as `review_evidence_placeholder` diagnostics and
 do not satisfy authority readiness, even when the review status itself is an
 accepted value.
+Each authority section reports `review_evidence_required_groups`,
+`review_evidence_satisfied_required_groups`, and
+`review_evidence_missing_required_groups` in the JSON summary. The
+machine-readable group names are `review_actor` for `reviewed_by` and
+`review_trace` for `reviewed_at`, `review_id`, or `review_url`.
 
 ## Integrated Suite Mode
 
@@ -298,8 +303,11 @@ that fixture-only status, `physical_so101_model_authority_ready` remains
 `false` even if `ready_for_model_backed_ik` is `true`; the summary keeps
 `physical_authority_gate_status` set to
 `hardware_free_fixture_ready_not_physical_authority` and blocker entries for
-the synthetic fixture fields. Authority must also include at least one review
-evidence field: `reviewed_by`, `reviewed_at`, `review_id`, or `review_url`.
+the synthetic fixture fields. Every reviewed authority section must include
+reviewer identity plus traceable review evidence: `reviewed_by` and at least
+one of `reviewed_at`, `review_id`, or `review_url`. Thin review metadata that
+supplies only a reviewer identity is reported as missing `review_trace` and
+does not satisfy readiness.
 
 When the integrated calibration regression suite evaluates the reviewed model
 authority gate, this manifest is checked against the SO-101 model-source
@@ -328,16 +336,17 @@ the joint-limit field itself. Accepted review statuses are `reviewed`,
 `operator_reviewed`, `joint_limits_reviewed`, `source_reviewed`, and
 `model_bundle_reviewed`, plus
 `synthetic_fixture_reviewed_for_automation_only` only for explicitly
-hardware-free regression fixtures. Review evidence must include at least one of
-`reviewed_by`, `reviewed_at`, `review_id`, or `review_url`.
+hardware-free regression fixtures. Review evidence must include `reviewed_by`
+plus at least one trace field: `reviewed_at`, `review_id`, or `review_url`.
 
 Mesh/asset-root authority must be declared in `mesh_asset_authority`,
 `mesh_assets_review`, `mesh_asset_review`, or `mesh_assets_metadata`. Accepted
 mesh review statuses are `reviewed`, `operator_reviewed`,
 `mesh_assets_reviewed`, `source_reviewed`, and `model_bundle_reviewed`, plus
 `synthetic_fixture_reviewed_for_automation_only` only for explicitly
-hardware-free regression fixtures. Review evidence must include at least one of
-`reviewed_by`, `reviewed_at`, `review_id`, or `review_url`. Resolved mesh files
+hardware-free regression fixtures. Review evidence must include `reviewed_by`
+plus at least one trace field: `reviewed_at`, `review_id`, or `review_url`.
+Resolved mesh files
 without this review metadata remain diagnostic evidence, not reviewed physical
 SO-101 mesh truth.
 
@@ -348,8 +357,8 @@ the manifest `target_frame` must match the current simulator-contract value
 Accepted target-frame review statuses are `reviewed`, `operator_reviewed`,
 `target_frame_reviewed`, `tcp_frame_reviewed`, and `model_bundle_reviewed`,
 plus `synthetic_fixture_reviewed_for_automation_only` only for explicitly
-hardware-free regression fixtures. Review evidence must include at least one of
-`reviewed_by`, `reviewed_at`, `review_id`, or `review_url`. A frame name
+hardware-free regression fixtures. Review evidence must include `reviewed_by`
+plus at least one trace field: `reviewed_at`, `review_id`, or `review_url`. A frame name
 without this metadata remains diagnostic evidence, not reviewed physical
 SO-101 TCP-frame truth.
 
@@ -359,8 +368,9 @@ Accepted TCP review statuses are `reviewed`, `operator_reviewed`,
 `tcp_offset_reviewed`, `tcp_calibration_reviewed`, and
 `model_bundle_reviewed`, plus
 `synthetic_fixture_reviewed_for_automation_only` only for explicitly
-hardware-free regression fixtures. Review evidence must include at least one of
-`reviewed_by`, `reviewed_at`, `review_id`, or `review_url`. Numeric TCP offsets
+hardware-free regression fixtures. Review evidence must include `reviewed_by`
+plus at least one trace field: `reviewed_at`, `review_id`, or `review_url`.
+Numeric TCP offsets
 without this metadata remain diagnostic evidence, not reviewed physical SO-101
 TCP truth.
 
@@ -371,8 +381,9 @@ Base-to-board alignment authority must be declared in
 `operator_reviewed`, `base_to_board_reviewed`, `alignment_reviewed`,
 `calibration_reviewed`, and `model_bundle_reviewed`, plus
 `synthetic_fixture_reviewed_for_automation_only` only for explicitly
-hardware-free regression fixtures. Review evidence must include at least one of
-`reviewed_by`, `reviewed_at`, `review_id`, or `review_url`. The transform value
+hardware-free regression fixtures. Review evidence must include `reviewed_by`
+plus at least one trace field: `reviewed_at`, `review_id`, or `review_url`.
+The transform value
 must include x/y/z translation and roll/pitch/yaw rotation fields; a non-empty
 object without that shape or without review metadata does not make the bundle
 ready.
@@ -385,14 +396,15 @@ true:
 - the manifest is loaded as a JSON object
 - `model_path` exists
 - `asset_roots` is present and all supplied roots are directories
-- `authority` declares an accepted reviewed status plus review evidence
+- `authority` declares an accepted reviewed status plus traceable review
+  evidence (`reviewed_by` plus `reviewed_at`, `review_id`, or `review_url`)
 - `provenance` declares source reference, export tool, and license basis fields
 - numeric joint limits cover every SO-101 joint and include accepted
   joint-limit review authority
 - at least one mesh reference is visible to the asset preflight and all mesh
   references resolve
-- mesh/asset-root authority includes an accepted review status plus review
-  evidence
+- mesh/asset-root authority includes an accepted review status plus traceable
+  review evidence
 - the target frame is explicitly declared and includes accepted target-frame
   review authority
 - a valid x/y/z TCP offset in meters is present and includes accepted TCP
