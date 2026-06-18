@@ -2189,6 +2189,7 @@ def collect_so101_mujoco_smoke_artifacts(
         "ok": smoke.get("ok"),
         "model_authority": smoke.get("model_authority"),
         "ready_for_model_backed_ik": smoke.get("ready_for_model_backed_ik"),
+        "contact_model": smoke.get("contact_model"),
         "reviewed_model_motion_checked": smoke.get("reviewed_model_motion_checked"),
         "manifest_status": smoke.get("manifest_status"),
         "missing_inputs": smoke.get("missing_inputs"),

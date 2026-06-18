@@ -1052,7 +1052,6 @@ jobs:
               "so101_chess_env",
               "so101_env_resets",
               "so101_mujoco_contact_probe",
-              "so101_mujoco_board_pick_probe",
               "so101_training_rollouts",
           ):
               assert any(

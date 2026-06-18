@@ -2646,6 +2646,7 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "sim_robot_mujoco_sync",
         "env_scripted_pick_place",
         "sim_status",
+        "contact_model",
         "scripted_pick_place",
         "reset_count",
         "all_resets_ok",

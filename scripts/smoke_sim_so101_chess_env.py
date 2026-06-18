@@ -147,9 +147,12 @@ def write_readme(path: Path, summary: dict[str, Any], steps_path: Path) -> None:
         "This hardware-free smoke exercises the training-facing SO-101 chess environment.",
         "",
         f"- Status: `{summary['status']}`",
+        f"- Model authority: `{summary['model_authority']}`",
+        f"- Ready for model-backed IK: `{str(summary['ready_for_model_backed_ik']).lower()}`",
         f"- Gymnasium available: `{summary['dependencies']['gymnasium']}`",
         f"- MuJoCo available: `{summary['dependencies']['mujoco']}`",
         f"- MuJoCo backend ok: `{summary['sim_status'].get('ok')}`",
+        f"- Contact model: `{summary['contact_model']}`",
         f"- Scripted pick/place complete: `{summary['scripted_pick_place']['scripted_pick_place_complete']}`",
         f"- Source square: `{summary['config']['source_square']}`",
         f"- Target square: `{summary['config']['target_square']}`",
@@ -185,6 +188,9 @@ def write_dependency_failure(args: argparse.Namespace, deps: dict[str, bool], fa
         "status": "missing_runtime_dependencies",
         "hard_failures": failures,
         "dependencies": deps,
+        "model_authority": "runtime_dependencies_missing",
+        "ready_for_model_backed_ik": False,
+        "contact_model": "unavailable_until_runtime_dependencies_install",
         "config": {
             "source_square": args.source_square,
             "target_square": args.target_square,
@@ -263,6 +269,13 @@ def main() -> int:
     summary_path = args.output_dir / SUMMARY_NAME
     readme_path = args.output_dir / README_NAME
     write_steps(steps_path, rows)
+    sim_status = scripted_result["final_info"]["sim_status"]
+    scene_state = scripted_result["final_info"]["scene_state"]
+    model_authority = (
+        "development_scaffold_not_reviewed"
+        if sim_status.get("ok") and config.mujoco_model_path is not None
+        else "joint_state_fallback_no_reviewed_model"
+    )
 
     summary = {
         "schema": "lerobot.sim.so101_chess_env_smoke.v1",
@@ -270,6 +283,9 @@ def main() -> int:
         "status": status,
         "hard_failures": hard_failures,
         "dependencies": deps,
+        "model_authority": model_authority,
+        "ready_for_model_backed_ik": False,
+        "contact_model": scene_state.get("contact_model"),
         "config": {
             "source_square": config.source_square,
             "target_square": config.target_square,
@@ -277,8 +293,8 @@ def main() -> int:
             "mujoco_model_path": str(config.mujoco_model_path) if config.mujoco_model_path else None,
             "include_camera": config.include_camera,
         },
-        "sim_status": scripted_result["final_info"]["sim_status"],
-        "scene_state": scripted_result["final_info"]["scene_state"],
+        "sim_status": sim_status,
+        "scene_state": scene_state,
         "scripted_pick_place": scripted_result,
         "artifacts": {
             "summary_json": str(summary_path),
