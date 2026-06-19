@@ -199,8 +199,12 @@ physical SO-101 authority.
 The checker also writes `so101_model_bundle_manifest_review_requirements.json`
 and `.csv`. These files are a machine-readable review map for the manifest
 authority gate: required review sections, manifest fields, accepted review
-statuses, review scopes, evidence groups, placeholder rejection policy, and the
-handoff to child model contract and asset-preflight checks. They always report
+statuses, review scopes, evidence groups, placeholder rejection policy, URL
+field policy, and the handoff to child model contract and asset-preflight
+checks. The URL policy is repeated on the provenance requirement: fields such
+as `source_url`, `repository_url`, `cad_url`, and `license_url` must be
+HTTP(S), while local paths, commit IDs, tickets, or other non-URL handles
+belong in `source_path` or `source_reference`. They always report
 `model_authority: "review_requirements_not_authority"` and are operator intake
 guidance only; they do not make a manifest reviewed physical SO-101 truth.
 

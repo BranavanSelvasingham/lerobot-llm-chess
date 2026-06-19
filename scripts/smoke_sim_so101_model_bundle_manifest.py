@@ -2622,6 +2622,7 @@ def review_requirement_item(
     required_review_scope_ids: list[str] | None = None,
     required_inputs: list[str] | None = None,
     synthetic_fixture_status: str | None = None,
+    url_field_policy: dict[str, Any] | None = None,
     notes: str,
 ) -> dict[str, Any]:
     required_groups = [
@@ -2652,12 +2653,31 @@ def review_requirement_item(
             "non-empty missing_inputs, next_required_for_goal, next_required_action_ids, "
             "pending_action_ids, blockers, or open findings are also rejected."
         ),
+        "url_field_policy": url_field_policy or {},
         "synthetic_fixture_status": synthetic_fixture_status,
         "notes": notes,
     }
 
 
+def provenance_url_field_policy() -> dict[str, Any]:
+    return {
+        "http_url_fields": sorted(PROVENANCE_URL_FIELDS),
+        "required_schemes": ["http", "https"],
+        "non_url_source_handle_fields": ["source_path", "source_reference"],
+        "invalid_url_diagnostics": [
+            "provenance_source_reference_invalid:<field>",
+            "provenance_export_tool_invalid:<field>",
+            "provenance_license_basis_invalid:<field>",
+        ],
+        "notes": [
+            "Fields whose names explicitly end in _url must contain HTTP(S) URLs.",
+            "Use source_path or source_reference for local paths, tickets, commit IDs, or other non-URL handles.",
+        ],
+    }
+
+
 def build_review_requirements(summary: dict[str, Any]) -> dict[str, Any]:
+    url_field_policy = provenance_url_field_policy()
     requirements = [
         review_requirement_item(
             priority=1,
@@ -2704,6 +2724,7 @@ def build_review_requirements(summary: dict[str, Any]) -> dict[str, Any]:
                 "Provenance is not a reviewed-status block, but source, export, "
                 "and license fields must be real non-placeholder records."
             ),
+            url_field_policy=url_field_policy,
         ),
         review_requirement_item(
             priority=4,
@@ -2836,6 +2857,7 @@ def build_review_requirements(summary: dict[str, Any]) -> dict[str, Any]:
             "placeholder_values": sorted(PLACEHOLDER_REVIEW_EVIDENCE_VALUES),
             "placeholder_prefixes": list(PLACEHOLDER_REVIEW_EVIDENCE_PREFIXES),
         },
+        "url_field_policy": url_field_policy,
         "requirements": requirements,
         "rerun_command": bundle_intake_command_template("review_requirements"),
         "caveats": [

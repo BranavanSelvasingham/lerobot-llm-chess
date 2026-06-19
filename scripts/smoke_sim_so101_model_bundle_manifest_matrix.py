@@ -107,6 +107,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "next_required_action_ids",
         "review_packet_status",
         "review_requirements_status",
+        "review_requirements_url_fields",
         "bundle_intake_status",
         "bundle_intake_action_ids",
         "synthetic_fixture_authority_fields",
@@ -152,6 +153,66 @@ def field_check_status(summary: dict[str, Any], requirement_id: str) -> str | No
         if isinstance(check, dict) and check.get("requirement_id") == requirement_id:
             return "ok" if check.get("ok") is True else "action_required"
     return None
+
+
+def review_requirement_by_id(
+    review_requirements: dict[str, Any],
+    requirement_id: str,
+) -> dict[str, Any]:
+    for requirement in review_requirements.get("requirements") or []:
+        if (
+            isinstance(requirement, dict)
+            and requirement.get("requirement_id") == requirement_id
+        ):
+            return requirement
+    return {}
+
+
+def assert_review_requirements_url_policy(
+    errors: list[str],
+    case_id: str,
+    review_requirements: dict[str, Any],
+) -> list[str]:
+    expected_url_fields = ["cad_url", "license_url", "repository_url", "source_url"]
+    url_policy = review_requirements.get("url_field_policy")
+    url_policy = url_policy if isinstance(url_policy, dict) else {}
+    add_error(
+        errors,
+        f"{case_id}.review_requirements.url_field_policy.http_url_fields",
+        url_policy.get("http_url_fields"),
+        expected_url_fields,
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_requirements.url_field_policy.required_schemes",
+        url_policy.get("required_schemes"),
+        ["http", "https"],
+    )
+    expect_contains(
+        errors,
+        f"{case_id}.review_requirements.url_field_policy.non_url_source_handle_fields",
+        url_policy.get("non_url_source_handle_fields"),
+        ["source_path", "source_reference"],
+    )
+
+    provenance_requirement = review_requirement_by_id(review_requirements, "provenance")
+    provenance_url_policy = provenance_requirement.get("url_field_policy")
+    provenance_url_policy = (
+        provenance_url_policy if isinstance(provenance_url_policy, dict) else {}
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_requirements.provenance.url_field_policy.http_url_fields",
+        provenance_url_policy.get("http_url_fields"),
+        expected_url_fields,
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_requirements.provenance.url_field_policy.required_schemes",
+        provenance_url_policy.get("required_schemes"),
+        ["http", "https"],
+    )
+    return expected_url_fields
 
 
 def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
@@ -540,6 +601,11 @@ def summarize_case(
     bundle_intake = bundle_intake if isinstance(bundle_intake, dict) else {}
     review_requirements = summary.get("review_requirements")
     review_requirements = review_requirements if isinstance(review_requirements, dict) else {}
+    review_requirements_url_fields = assert_review_requirements_url_policy(
+        errors,
+        case_id,
+        review_requirements,
+    )
 
     add_error(errors, f"{case_id}.return_code", record.get("return_code"), 0)
     add_error(errors, f"{case_id}.ok", summary.get("ok"), True)
@@ -738,6 +804,7 @@ def summarize_case(
             "next_required_action_ids": next_required_action_ids,
             "review_packet_status": summary.get("review_packet_status"),
             "review_requirements_status": review_requirements.get("status"),
+            "review_requirements_url_fields": review_requirements_url_fields,
             "bundle_intake_status": bundle_intake.get("status"),
             "bundle_intake_action_ids": bundle_intake.get("action_ids"),
             "synthetic_fixture_authority_fields": summary.get(
@@ -813,6 +880,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "next_required_action_ids": obs.get("next_required_action_ids"),
         "review_packet_status": obs.get("review_packet_status"),
         "review_requirements_status": obs.get("review_requirements_status"),
+        "review_requirements_url_fields": obs.get("review_requirements_url_fields"),
         "bundle_intake_status": obs.get("bundle_intake_status"),
         "bundle_intake_action_ids": obs.get("bundle_intake_action_ids"),
         "synthetic_fixture_authority_fields": obs.get(
