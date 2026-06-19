@@ -662,7 +662,9 @@ It reports `model_authority: "reviewed_mujoco_bundle_matrix_not_authority"` and
 `observed_evidence_is_physical_so101_authority: false`. It covers the default
 missing-manifest diagnostic, the fail-closed `--require-ready-reviewed-model`
 path, a not-ready placeholder manifest, placeholder review metadata on otherwise
-complete fields, non-standard JSON constants that must parse-fail, malformed
+complete fields, generic-review-scope and per-field weak-authority fixtures,
+manifest/model target-frame mismatches that must block motion authority,
+non-standard JSON constants that must parse-fail, malformed
 and non-finite TCP/alignment manifest payloads, non-finite joint limits, a
 ready manifest whose declared body-joint bounds intentionally mismatch the
 loaded MuJoCo `jnt_range`, and a ready synthetic fixture manifest whose MuJoCo/SimRobot motion

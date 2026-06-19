@@ -105,7 +105,10 @@ authority.
 The reviewed MuJoCo bundle matrix also includes generic-review-scope and
 per-field weak-authority fixtures. Those cases must stay
 `reviewed_mujoco_bundle_not_ready`, report the missing review inputs, and avoid
-MuJoCo motion. It also includes a ready-manifest negative fixture whose MuJoCo
+MuJoCo motion. The matrix also covers a manifest target-frame mismatch and a
+model file that lacks the manifest target-frame site; both must stay diagnostic
+only before motion authority is attempted. It also includes a ready-manifest
+negative fixture whose MuJoCo
 `gripper` joint has an effectively immobile qpos range. That case must keep
 `ready_for_model_backed_ik: true` from the manifest checker, but the motion gate
 must fail with `simrobot_mujoco_joint_motion` because the gripper's before/after
