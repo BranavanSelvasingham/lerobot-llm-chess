@@ -335,6 +335,71 @@ def add_error(errors: list[str], label: str, actual: Any, expected: Any) -> None
         errors.append(f"{label}: expected {expected!r}, got {actual!r}")
 
 
+def development_scene_contract_errors(scene_summary: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    add_error(
+        errors,
+        "development_scene.model_authority",
+        scene_summary.get("model_authority"),
+        "development_scaffold_not_reviewed",
+    )
+    add_error(
+        errors,
+        "development_scene.observed_evidence_is_physical_so101_authority",
+        scene_summary.get("observed_evidence_is_physical_so101_authority"),
+        False,
+    )
+    add_error(
+        errors,
+        "development_scene.ready_for_model_backed_ik",
+        scene_summary.get("ready_for_model_backed_ik"),
+        False,
+    )
+    add_error(
+        errors,
+        "development_scene.ready_for_policy_training",
+        scene_summary.get("ready_for_policy_training"),
+        False,
+    )
+    add_error(
+        errors,
+        "development_scene.mujoco_scene_validity_status",
+        scene_summary.get("mujoco_scene_validity_status"),
+        "development_scene_validated_not_physical_authority",
+    )
+    add_error(
+        errors,
+        "development_scene.reviewed_mujoco_handoff_requested",
+        scene_summary.get("reviewed_mujoco_handoff_requested"),
+        False,
+    )
+    add_error(
+        errors,
+        "development_scene.reviewed_mujoco_handoff_required",
+        scene_summary.get("reviewed_mujoco_handoff_required"),
+        False,
+    )
+    add_error(
+        errors,
+        "development_scene.reviewed_mujoco_handoff_ready",
+        scene_summary.get("reviewed_mujoco_handoff_ready"),
+        False,
+    )
+    add_error(
+        errors,
+        "development_scene.reviewed_mujoco_handoff_contract_ok",
+        scene_summary.get("reviewed_mujoco_handoff_contract_ok"),
+        False,
+    )
+    add_error(
+        errors,
+        "development_scene.scene_uses_reviewed_mujoco_handoff",
+        scene_summary.get("scene_uses_reviewed_mujoco_handoff"),
+        False,
+    )
+    return errors
+
+
 def summarize_case(
     *,
     case_id: str,
@@ -555,7 +620,12 @@ def main() -> int:
         run_case(output_dir=output_dir, python_path=args.python, spec=spec)
         for spec in case_specs(development_model_path, invalid_model_path)
     ]
-    scene_ok = bool(scene_summary.get("ok")) and development_model_path is not None
+    scene_contract_errors = development_scene_contract_errors(scene_summary)
+    scene_ok = (
+        bool(scene_summary.get("ok"))
+        and development_model_path is not None
+        and not scene_contract_errors
+    )
     ok = scene_ok and all(case["ok"] for case in cases)
     summary_path = output_dir / "so101_chess_env_matrix_summary.json"
     csv_path = output_dir / "so101_chess_env_matrix_cases.csv"
@@ -579,6 +649,31 @@ def main() -> int:
             "model_path": development_model_path,
             "model_authority": scene_summary.get("model_authority"),
             "ready_for_model_backed_ik": scene_summary.get("ready_for_model_backed_ik"),
+            "ready_for_policy_training": scene_summary.get(
+                "ready_for_policy_training"
+            ),
+            "observed_evidence_is_physical_so101_authority": scene_summary.get(
+                "observed_evidence_is_physical_so101_authority"
+            ),
+            "mujoco_scene_validity_status": scene_summary.get(
+                "mujoco_scene_validity_status"
+            ),
+            "reviewed_mujoco_handoff_requested": scene_summary.get(
+                "reviewed_mujoco_handoff_requested"
+            ),
+            "reviewed_mujoco_handoff_required": scene_summary.get(
+                "reviewed_mujoco_handoff_required"
+            ),
+            "reviewed_mujoco_handoff_ready": scene_summary.get(
+                "reviewed_mujoco_handoff_ready"
+            ),
+            "reviewed_mujoco_handoff_contract_ok": scene_summary.get(
+                "reviewed_mujoco_handoff_contract_ok"
+            ),
+            "scene_uses_reviewed_mujoco_handoff": scene_summary.get(
+                "scene_uses_reviewed_mujoco_handoff"
+            ),
+            "contract_errors": scene_contract_errors,
         },
         "case_count": len(cases),
         "case_ids": [case["case_id"] for case in cases],

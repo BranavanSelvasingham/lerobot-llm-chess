@@ -794,7 +794,10 @@ Gymnasium-required fallback allowed, fail-closed `--require-mujoco` with no mode
 path or an invalid model path, and generated development-MuJoCo env wiring that remains
 `development_scaffold_not_reviewed`. Invalid Gymnasium task configuration and
 too-short scripted episode budgets must fail closed without becoming fallback
-success evidence.
+success evidence. The matrix also records `development_scene.contract_errors`
+and requires the generated scene fixture to have no reviewed MuJoCo handoff
+requested, no reviewed handoff consumed, false physical SO-101 authority, and
+false policy/model-backed readiness before the env cases can pass.
 
 The standalone board-pick probe matrix writes
 `so101_mujoco_board_pick_probe_matrix_summary.json`, `.csv`, and `README.md`.

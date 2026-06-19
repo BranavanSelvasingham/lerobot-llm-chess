@@ -62,7 +62,10 @@ fallback can remain explicit and non-training, `--require-mujoco` fails closed
 without a model path or with an invalid model path, invalid max-step
 configuration writes fail-closed artifacts, too-short scripted episodes fail
 instead of reporting a green env smoke, and a generated development MJCF can
-drive the Gymnasium task without becoming reviewed SO-101 truth.
+drive the Gymnasium task without becoming reviewed SO-101 truth. The matrix also
+checks the development scene fixture contract: no reviewed MuJoCo handoff is
+requested or consumed, physical SO-101 authority stays false, and policy/model
+readiness stays false.
 
 This is the bridge between the existing calibration/model-readiness evidence
 and later policy training. It should become a hard MuJoCo gate after the SO-101

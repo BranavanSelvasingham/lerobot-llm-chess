@@ -1543,6 +1543,15 @@ jobs:
           assert summary["development_scene"]["ok"] is True, summary["development_scene"]
           assert summary["development_scene"]["model_authority"] == "development_scaffold_not_reviewed", summary["development_scene"]
           assert summary["development_scene"]["ready_for_model_backed_ik"] is False, summary["development_scene"]
+          assert summary["development_scene"]["ready_for_policy_training"] is False, summary["development_scene"]
+          assert summary["development_scene"]["observed_evidence_is_physical_so101_authority"] is False, summary["development_scene"]
+          assert summary["development_scene"]["mujoco_scene_validity_status"] == "development_scene_validated_not_physical_authority", summary["development_scene"]
+          assert summary["development_scene"]["reviewed_mujoco_handoff_requested"] is False, summary["development_scene"]
+          assert summary["development_scene"]["reviewed_mujoco_handoff_required"] is False, summary["development_scene"]
+          assert summary["development_scene"]["reviewed_mujoco_handoff_ready"] is False, summary["development_scene"]
+          assert summary["development_scene"]["reviewed_mujoco_handoff_contract_ok"] is False, summary["development_scene"]
+          assert summary["development_scene"]["scene_uses_reviewed_mujoco_handoff"] is False, summary["development_scene"]
+          assert summary["development_scene"]["contract_errors"] == [], summary["development_scene"]
           by_case = {case["case_id"]: case for case in summary["cases"]}
           fallback = by_case["fallback_without_model_allowed"]
           assert fallback["observations"]["env_ok"] is True, fallback
