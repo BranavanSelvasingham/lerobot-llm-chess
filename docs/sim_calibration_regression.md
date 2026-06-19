@@ -588,7 +588,8 @@ incomplete final board contact or target-tolerance evidence, and too-short
 rollout budgets fail closed without becoming policy-training authority. The
 same matrix requires malformed rollout tasks, invalid chess squares, identical
 source/target task squares, and non-positive step budgets to fail closed without
-generating model XML or manifests. It also runs the focused
+generating model XML or manifests; invalid source-square and invalid
+target-square rollout requests are checked separately. It also runs the focused
 `so101_training_readiness_gate_matrix` contract smoke to prove development,
 draft, fixture-seeded, manually reset-pose-corrected, raw-rollout-ready, and
 all-ready injected states do not cross the serious-training boundary without

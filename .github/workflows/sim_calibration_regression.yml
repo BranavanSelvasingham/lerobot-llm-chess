@@ -1703,7 +1703,8 @@ jobs:
               "forged_authority_board_pick_prerequisite_fails_closed",
               "short_budget_records_incomplete_rollout",
               "invalid_task_syntax_fails_closed",
-              "invalid_task_square_fails_closed",
+              "invalid_source_square_task_fails_closed",
+              "invalid_target_square_task_fails_closed",
               "same_source_target_task_fails_closed",
               "nonpositive_step_budget_fails_closed",
           ], summary["case_ids"]
@@ -1718,13 +1719,15 @@ jobs:
               "forged_authority_board_pick_prerequisite_fails_closed",
               "short_budget_records_incomplete_rollout",
               "invalid_task_syntax_fails_closed",
-              "invalid_task_square_fails_closed",
+              "invalid_source_square_task_fails_closed",
+              "invalid_target_square_task_fails_closed",
               "same_source_target_task_fails_closed",
               "nonpositive_step_budget_fails_closed",
           ], summary["expected_failure_case_ids"]
           assert summary["invalid_task_case_ids"] == [
               "invalid_task_syntax_fails_closed",
-              "invalid_task_square_fails_closed",
+              "invalid_source_square_task_fails_closed",
+              "invalid_target_square_task_fails_closed",
               "same_source_target_task_fails_closed",
               "nonpositive_step_budget_fails_closed",
           ], summary["invalid_task_case_ids"]
@@ -1771,10 +1774,14 @@ jobs:
           assert invalid_syntax["record"]["return_code"] == 1, invalid_syntax
           assert invalid_syntax["observations"]["status"] == "invalid_task_configuration", invalid_syntax
           assert "Task must be SOURCE:TARGET" in invalid_syntax["observations"]["configuration_error"]["message"], invalid_syntax
-          invalid_square = by_case["invalid_task_square_fails_closed"]
-          assert invalid_square["record"]["return_code"] == 1, invalid_square
-          assert invalid_square["observations"]["status"] == "invalid_task_configuration", invalid_square
-          assert "Invalid chess square" in invalid_square["observations"]["configuration_error"]["message"], invalid_square
+          invalid_source_square = by_case["invalid_source_square_task_fails_closed"]
+          assert invalid_source_square["record"]["return_code"] == 1, invalid_source_square
+          assert invalid_source_square["observations"]["status"] == "invalid_task_configuration", invalid_source_square
+          assert "Invalid chess square" in invalid_source_square["observations"]["configuration_error"]["message"], invalid_source_square
+          invalid_target_square = by_case["invalid_target_square_task_fails_closed"]
+          assert invalid_target_square["record"]["return_code"] == 1, invalid_target_square
+          assert invalid_target_square["observations"]["status"] == "invalid_task_configuration", invalid_target_square
+          assert "Invalid chess square" in invalid_target_square["observations"]["configuration_error"]["message"], invalid_target_square
           same_task = by_case["same_source_target_task_fails_closed"]
           assert same_task["record"]["return_code"] == 1, same_task
           assert same_task["observations"]["status"] == "invalid_task_configuration", same_task
@@ -1785,7 +1792,8 @@ jobs:
           assert "max_steps must be positive" in nonpositive["observations"]["configuration_error"]["message"], nonpositive
           for case_id in (
               "invalid_task_syntax_fails_closed",
-              "invalid_task_square_fails_closed",
+              "invalid_source_square_task_fails_closed",
+              "invalid_target_square_task_fails_closed",
               "same_source_target_task_fails_closed",
               "nonpositive_step_budget_fails_closed",
           ):

@@ -35,6 +35,7 @@ short-budget incomplete rollout, and invalid rollout task requests. Invalid task
 `SOURCE:TARGET` pairs, invalid chess squares, identical source/target squares,
 or non-positive step budgets, must write summary, JSONL, CSV, and README
 artifacts while leaving model XML and manifest files ungenerated. The matrix
+checks invalid source-square and invalid target-square requests separately. It
 must keep `observed_evidence_is_policy_training_authority: false` and
 `ready_for_policy_training: false`; a development board-pick prerequisite that
 claims physical or policy-training authority must fail closed before rollout
