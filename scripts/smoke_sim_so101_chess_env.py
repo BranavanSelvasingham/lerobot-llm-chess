@@ -233,6 +233,68 @@ def write_dependency_failure(args: argparse.Namespace, deps: dict[str, bool], fa
     return 1
 
 
+def write_invalid_configuration_failure(
+    args: argparse.Namespace,
+    deps: dict[str, bool],
+    message: str,
+) -> int:
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    steps_path = args.output_dir / STEPS_NAME
+    summary_path = args.output_dir / SUMMARY_NAME
+    readme_path = args.output_dir / README_NAME
+    write_steps(steps_path, [])
+    summary = {
+        "schema": "lerobot.sim.so101_chess_env_smoke.v1",
+        "ok": False,
+        "status": "invalid_task_configuration",
+        "hard_failures": ["invalid_task_configuration"],
+        "configuration_error": {
+            "type": "ValueError",
+            "message": message,
+        },
+        "dependencies": deps,
+        "model_authority": "invalid_task_configuration_not_authority",
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "gymnasium_required": bool(args.require_gymnasium),
+        "mujoco_backend_required": bool(args.require_mujoco),
+        "mujoco_backend_loaded": False,
+        "joint_state_fallback_active": False,
+        "gymnasium_task_wiring_status": "invalid_task_configuration",
+        "training_authority_status": "requirements_failed_not_policy_ready",
+        "training_authority_blockers": [
+            "invalid_task_configuration",
+            "reviewed_so101_model_bundle",
+            "reviewed_mujoco_scene_contact_validation",
+            "reviewed_model_backed_board_source_pick_place",
+        ],
+        "contact_model": "unavailable_invalid_task_configuration",
+        "config": {
+            "source_square": args.source_square,
+            "target_square": args.target_square,
+            "max_steps": args.max_steps,
+            "mujoco_model_path": str(args.mujoco_model_path) if args.mujoco_model_path else None,
+            "include_camera": args.include_camera,
+        },
+        "sim_status": {"ok": False, "reason": message},
+        "scene_state": {},
+        "scripted_pick_place": {"scripted_pick_place_complete": False, "steps": 0},
+        "artifacts": {
+            "summary_json": str(summary_path),
+            "steps_csv": str(steps_path),
+            "readme": str(readme_path),
+        },
+        "limitations": [
+            "Invalid task configuration is recorded as a fail-closed Gymnasium gate artifact.",
+            "No environment reset, MuJoCo backend, or scripted movement is attempted.",
+        ],
+    }
+    write_json(summary_path, summary)
+    write_readme(readme_path, summary, steps_path)
+    print(json.dumps({"ok": False, "status": summary["status"], "summary_json": str(summary_path)}, indent=2))
+    return 1
+
+
 def main() -> int:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -261,13 +323,17 @@ def main() -> int:
     if args.require_mujoco and not deps["mujoco"]:
         hard_failures.append("mujoco_required_but_unavailable")
 
-    config = SO101ChessEnvConfig(
-        source_square=args.source_square,
-        target_square=args.target_square,
-        max_steps=args.max_steps,
-        mujoco_model_path=args.mujoco_model_path,
-        include_camera=args.include_camera,
-    )
+    try:
+        config = SO101ChessEnvConfig(
+            source_square=args.source_square,
+            target_square=args.target_square,
+            max_steps=args.max_steps,
+            mujoco_model_path=args.mujoco_model_path,
+            include_camera=args.include_camera,
+        )
+    except ValueError as exc:
+        return write_invalid_configuration_failure(args, deps, str(exc))
+
     env = SO101ChessEnv(config)
     try:
         scripted_result, rows = run_scripted_pick_place(
@@ -278,6 +344,8 @@ def main() -> int:
         sim_status = scripted_result["final_info"]["sim_status"]
         if args.require_mujoco and not sim_status.get("ok"):
             hard_failures.append("mujoco_backend_required_but_not_loaded")
+        if not scripted_result.get("scripted_pick_place_complete"):
+            hard_failures.append("scripted_pick_place_incomplete")
     finally:
         env.close()
 

@@ -80,6 +80,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "env_ok",
         "status",
         "model_authority",
+        "max_steps",
         "gymnasium_required",
         "mujoco_backend_required",
         "mujoco_backend_loaded",
@@ -87,6 +88,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "sim_status_ok",
         "sim_fallback",
         "sim_status_reason",
+        "configuration_error",
         "gymnasium_task_wiring_status",
         "training_authority_status",
         "ready_for_model_backed_ik",
@@ -251,6 +253,54 @@ def case_specs(development_model_path: str | None, invalid_model_path: str) -> l
             },
         },
         {
+            "case_id": "invalid_max_steps_rejected",
+            "args": ["--max-steps", "0"],
+            "expect": {
+                "return_code": 1,
+                "env_ok": False,
+                "status": "invalid_task_configuration",
+                "model_authority": "invalid_task_configuration_not_authority",
+                "max_steps": 0,
+                "gymnasium_required": False,
+                "mujoco_backend_required": False,
+                "mujoco_backend_loaded": False,
+                "joint_state_fallback_active": False,
+                "sim_status_ok": False,
+                "sim_fallback": None,
+                "sim_status_reason_contains": "max_steps must be positive",
+                "configuration_error_contains": "max_steps must be positive",
+                "gymnasium_task_wiring_status": "invalid_task_configuration",
+                "training_authority_status": "requirements_failed_not_policy_ready",
+                "ready_for_model_backed_ik": False,
+                "ready_for_policy_training": False,
+                "scripted_pick_place_complete": False,
+                "hard_failures_contain": ["invalid_task_configuration"],
+            },
+        },
+        {
+            "case_id": "short_budget_scripted_pick_place_incomplete_fails",
+            "args": ["--max-steps", "1"],
+            "expect": {
+                "return_code": 1,
+                "env_ok": False,
+                "status": "failed_requirements",
+                "model_authority": "joint_state_fallback_no_reviewed_model",
+                "max_steps": 1,
+                "gymnasium_required": False,
+                "mujoco_backend_required": False,
+                "mujoco_backend_loaded": False,
+                "joint_state_fallback_active": True,
+                "sim_status_ok": False,
+                "sim_fallback": "joint_state",
+                "gymnasium_task_wiring_status": "failed_requirements",
+                "training_authority_status": "requirements_failed_not_policy_ready",
+                "ready_for_model_backed_ik": False,
+                "ready_for_policy_training": False,
+                "scripted_pick_place_complete": False,
+                "hard_failures_contain": ["scripted_pick_place_incomplete"],
+            },
+        },
+        {
             "case_id": "development_mujoco_required_not_policy_ready",
             "args": [
                 "--require-gymnasium",
@@ -263,6 +313,7 @@ def case_specs(development_model_path: str | None, invalid_model_path: str) -> l
                 "env_ok": True,
                 "status": "ok",
                 "model_authority": "development_scaffold_not_reviewed",
+                "max_steps": 96,
                 "gymnasium_required": True,
                 "mujoco_backend_required": True,
                 "mujoco_backend_loaded": True,
@@ -293,6 +344,12 @@ def summarize_case(
 ) -> dict[str, Any]:
     errors: list[str] = []
     sim_status = summary.get("sim_status") if isinstance(summary.get("sim_status"), dict) else {}
+    config = summary.get("config") if isinstance(summary.get("config"), dict) else {}
+    configuration_error = (
+        summary.get("configuration_error")
+        if isinstance(summary.get("configuration_error"), dict)
+        else {}
+    )
     scripted = (
         summary.get("scripted_pick_place")
         if isinstance(summary.get("scripted_pick_place"), dict)
@@ -302,6 +359,7 @@ def summarize_case(
         "env_ok": summary.get("ok"),
         "status": summary.get("status"),
         "model_authority": summary.get("model_authority"),
+        "max_steps": config.get("max_steps"),
         "gymnasium_required": summary.get("gymnasium_required"),
         "mujoco_backend_required": summary.get("mujoco_backend_required"),
         "mujoco_backend_loaded": summary.get("mujoco_backend_loaded"),
@@ -309,6 +367,7 @@ def summarize_case(
         "sim_status_ok": sim_status.get("ok"),
         "sim_fallback": sim_status.get("fallback"),
         "sim_status_reason": sim_status.get("reason"),
+        "configuration_error": configuration_error,
         "gymnasium_task_wiring_status": summary.get("gymnasium_task_wiring_status"),
         "training_authority_status": summary.get("training_authority_status"),
         "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
@@ -320,13 +379,27 @@ def summarize_case(
     }
     add_error(errors, f"{case_id}.return_code", record.get("return_code"), expect["return_code"])
     for key, expected in expect.items():
-        if key in {"return_code", "hard_failures_contain", "sim_status_reason_contains"}:
+        if key in {
+            "return_code",
+            "hard_failures_contain",
+            "sim_status_reason_contains",
+            "configuration_error_contains",
+        }:
             continue
         add_error(errors, f"{case_id}.{key}", observations.get(key), expected)
     reason_contains = expect.get("sim_status_reason_contains")
     if isinstance(reason_contains, str) and reason_contains not in str(observations.get("sim_status_reason")):
         errors.append(
             f"{case_id}.sim_status_reason: expected {reason_contains!r} in {observations.get('sim_status_reason')!r}"
+        )
+    configuration_error_contains = expect.get("configuration_error_contains")
+    configuration_error_message = observations["configuration_error"].get("message")
+    if (
+        isinstance(configuration_error_contains, str)
+        and configuration_error_contains not in str(configuration_error_message)
+    ):
+        errors.append(
+            f"{case_id}.configuration_error: expected {configuration_error_contains!r} in {configuration_error_message!r}"
         )
     for required_failure in expect.get("hard_failures_contain", []):
         hard_failures = observations.get("hard_failures")
@@ -398,6 +471,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "env_ok": observations.get("env_ok"),
         "status": observations.get("status"),
         "model_authority": observations.get("model_authority"),
+        "max_steps": observations.get("max_steps"),
         "gymnasium_required": observations.get("gymnasium_required"),
         "mujoco_backend_required": observations.get("mujoco_backend_required"),
         "mujoco_backend_loaded": observations.get("mujoco_backend_loaded"),
@@ -405,6 +479,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "sim_status_ok": observations.get("sim_status_ok"),
         "sim_fallback": observations.get("sim_fallback"),
         "sim_status_reason": observations.get("sim_status_reason"),
+        "configuration_error": observations.get("configuration_error"),
         "gymnasium_task_wiring_status": observations.get("gymnasium_task_wiring_status"),
         "training_authority_status": observations.get("training_authority_status"),
         "ready_for_model_backed_ik": observations.get("ready_for_model_backed_ik"),

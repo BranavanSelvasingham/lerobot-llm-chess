@@ -945,6 +945,8 @@ jobs:
               "gymnasium_required_fallback_allowed",
               "require_mujoco_without_model_fails",
               "require_mujoco_invalid_model_path_fails",
+              "invalid_max_steps_rejected",
+              "short_budget_scripted_pick_place_incomplete_fails",
               "development_mujoco_required_not_policy_ready",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -970,6 +972,22 @@ jobs:
           assert invalid_model_path["observations"]["joint_state_fallback_active"] is True, invalid_model_path
           assert "MuJoCo model path does not exist" in invalid_model_path["observations"]["sim_status_reason"], invalid_model_path
           assert invalid_model_path["observations"]["training_authority_status"] == "requirements_failed_not_policy_ready", invalid_model_path
+          invalid_steps = by_case["invalid_max_steps_rejected"]
+          assert invalid_steps["record"]["return_code"] == 1, invalid_steps
+          assert invalid_steps["observations"]["env_ok"] is False, invalid_steps
+          assert invalid_steps["observations"]["status"] == "invalid_task_configuration", invalid_steps
+          assert invalid_steps["observations"]["max_steps"] == 0, invalid_steps
+          assert "max_steps must be positive" in invalid_steps["observations"]["configuration_error"]["message"], invalid_steps
+          assert "invalid_task_configuration" in invalid_steps["observations"]["hard_failures"], invalid_steps
+          assert invalid_steps["observations"]["scripted_pick_place_complete"] is False, invalid_steps
+          short_budget = by_case["short_budget_scripted_pick_place_incomplete_fails"]
+          assert short_budget["record"]["return_code"] == 1, short_budget
+          assert short_budget["observations"]["env_ok"] is False, short_budget
+          assert short_budget["observations"]["status"] == "failed_requirements", short_budget
+          assert short_budget["observations"]["max_steps"] == 1, short_budget
+          assert "scripted_pick_place_incomplete" in short_budget["observations"]["hard_failures"], short_budget
+          assert short_budget["observations"]["scripted_pick_place_complete"] is False, short_budget
+          assert short_budget["observations"]["training_authority_status"] == "requirements_failed_not_policy_ready", short_budget
           dev_mujoco = by_case["development_mujoco_required_not_policy_ready"]
           assert dev_mujoco["observations"]["env_ok"] is True, dev_mujoco
           assert dev_mujoco["observations"]["model_authority"] == "development_scaffold_not_reviewed", dev_mujoco
