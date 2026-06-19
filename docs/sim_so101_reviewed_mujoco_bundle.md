@@ -109,7 +109,10 @@ MuJoCo motion. The matrix also covers a manifest target-frame mismatch and a
 model file that lacks the manifest target-frame site; both must stay diagnostic
 only before motion authority is attempted. It covers invalid joint-limit payloads
 such as non-finite values and lower bounds that are not below upper bounds, and
-those must stay not-ready before motion authority is attempted. It also includes a ready-manifest
+those must stay not-ready before motion authority is attempted. It also covers
+a ready-looking manifest whose model still references a mesh that cannot be
+resolved from the model directory or declared asset roots; that case must report
+`mesh_assets` as the blocker and avoid motion. It also includes a ready-manifest
 negative fixture whose MuJoCo
 `gripper` joint has an effectively immobile qpos range. That case must keep
 `ready_for_model_backed_ik: true` from the manifest checker, but the motion gate
