@@ -229,6 +229,7 @@ jobs:
           assert summary["case_ids"] == [
               "missing_source_root",
               "candidate_unverified",
+              "candidate_prefer_top_level_model",
               "authoritative_missing_review_metadata",
               "authoritative_placeholder_review_metadata",
               "authoritative_angle_bracket_placeholder_review_metadata",
@@ -242,6 +243,16 @@ jobs:
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
           by_case = {case["case_id"]: case for case in summary["cases"]}
+          preferred_candidate = by_case["candidate_prefer_top_level_model"]
+          preferred_candidate_path = preferred_candidate["observations"]["source_intake_recommended_candidate_path"]
+          preferred_candidate_root = preferred_candidate["observations"]["source_intake_recommended_candidate_source_root"]
+          assert preferred_candidate["observations"]["source_intake_status"] == "source_authority_review_required", preferred_candidate
+          assert preferred_candidate_path.endswith("/so101_synthetic_source.urdf"), preferred_candidate
+          assert "/archive/" not in preferred_candidate_path, preferred_candidate
+          assert ".nomesh." not in preferred_candidate_path, preferred_candidate
+          assert preferred_candidate_root.endswith("/preferred_source_root"), preferred_candidate
+          assert preferred_candidate["observations"]["source_intake_recommended_candidate_authoritative"] is False, preferred_candidate
+          assert "run_so101_model_bundle_probe" in preferred_candidate["observations"]["next_required_action_ids"], preferred_candidate
           thin_review = by_case["authoritative_thin_review_metadata"]
           assert thin_review["observations"]["source_authority_gate_status"] == "source_authority_blocked_review_metadata", thin_review
           assert thin_review["observations"]["source_authority_review_status"] == "review_metadata_missing", thin_review
