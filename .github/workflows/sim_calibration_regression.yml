@@ -324,6 +324,7 @@ jobs:
           assert summary["case_ids"] == [
               "missing_manifest_nonfailing",
               "ready_synthetic_fixture_manifest_not_physical_authority",
+              "missing_model_file_not_ready",
               "placeholder_alignment_manifest_not_ready",
               "placeholder_review_metadata_not_ready",
               "thin_review_metadata_not_ready",
@@ -356,6 +357,28 @@ jobs:
           assert ready_fixture["hardware_free_regression_fixture_ready"] is True, ready_fixture
           assert ready_fixture["physical_authority_gate_status"] == "hardware_free_fixture_ready_not_physical_authority", ready_fixture
           assert ready_fixture["next_required_action_ids"] == [], ready_fixture
+          missing_model_file = by_case["missing_model_file_not_ready"]["observations"]
+          assert missing_model_file["status"] == "model_bundle_manifest_needs_follow_up", missing_model_file
+          assert missing_model_file["ready_for_model_backed_ik"] is False, missing_model_file
+          assert missing_model_file["physical_so101_model_authority_ready"] is False, missing_model_file
+          assert missing_model_file["hardware_free_regression_fixture_ready"] is False, missing_model_file
+          assert missing_model_file["model_path_status"] == "unavailable", missing_model_file
+          assert missing_model_file["model_identity_status"] == "invalid", missing_model_file
+          assert missing_model_file["mesh_assets_status"] == "missing", missing_model_file
+          for missing_input in (
+              "model_path",
+              "model_sha256",
+              "mesh_assets",
+              "non_blocking_contract_checker_result",
+          ):
+              assert missing_input in missing_model_file["missing_inputs"], missing_model_file
+          for action_id in (
+              "select_reviewed_so101_model_path",
+              "record_reviewed_so101_model_file_sha256",
+              "resolve_so101_mesh_assets",
+              "clear_model_contract_and_asset_preflight",
+          ):
+              assert action_id in missing_model_file["next_required_action_ids"], missing_model_file
           reviewed_fixture = by_case["reviewed_status_with_fixture_provenance_not_physical_authority"]["observations"]
           assert reviewed_fixture["ready_for_model_backed_ik"] is True, reviewed_fixture
           assert reviewed_fixture["physical_so101_model_authority_ready"] is False, reviewed_fixture
