@@ -23,6 +23,14 @@ DEFAULT_OUTPUT_DIR = (
 )
 SCHEMA = "lerobot.sim.so101_reviewed_mujoco_bundle_matrix.v1"
 REVIEWED_MUJOCO_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_reviewed_mujoco_bundle.py"
+EXPECTED_MOTION_CHECK_JOINTS = (
+    "elbow_flex",
+    "gripper",
+    "shoulder_lift",
+    "shoulder_pan",
+    "wrist_flex",
+    "wrist_roll",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -151,6 +159,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "physical_so101_model_authority_ready",
         "hardware_free_regression_fixture_ready",
         "reviewed_model_motion_checked",
+        "all_so101_joints_motion_checked",
+        "motion_check_joint_names",
         "motion_authority_status",
         "physical_reviewed_model_motion_checked",
         "hardware_free_fixture_motion_checked",
@@ -442,6 +452,8 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "physical_so101_model_authority_ready": False,
                 "hardware_free_regression_fixture_ready": True,
                 "reviewed_model_motion_checked": True,
+                "all_so101_joints_motion_checked": True,
+                "motion_check_joint_names": list(EXPECTED_MOTION_CHECK_JOINTS),
                 "motion_authority_status": (
                     "hardware_free_fixture_motion_checked_not_physical_so101_authority"
                 ),
@@ -639,6 +651,22 @@ def summarize_case(
             errors.append(f"{case_id}.mujoco_model_load: expected ok true")
         if not isinstance(sim_sync, dict) or sim_sync.get("ok") is not True:
             errors.append(f"{case_id}.sim_robot_mujoco_sync: expected ok true")
+    sim_sync = summary.get("sim_robot_mujoco_sync")
+    sim_sync = sim_sync if isinstance(sim_sync, dict) else {}
+    if "all_so101_joints_motion_checked" in expect:
+        add_error(
+            errors,
+            f"{case_id}.all_so101_joints_motion_checked",
+            sim_sync.get("all_so101_joints_motion_checked"),
+            expect["all_so101_joints_motion_checked"],
+        )
+    if "motion_check_joint_names" in expect:
+        add_error(
+            errors,
+            f"{case_id}.motion_check_joint_names",
+            sim_sync.get("motion_check_joint_names"),
+            expect["motion_check_joint_names"],
+        )
 
     return {
         "case_id": case_id,
@@ -668,6 +696,10 @@ def summarize_case(
                 "hardware_free_regression_fixture_ready"
             ),
             "reviewed_model_motion_checked": summary.get("reviewed_model_motion_checked"),
+            "all_so101_joints_motion_checked": sim_sync.get(
+                "all_so101_joints_motion_checked"
+            ),
+            "motion_check_joint_names": sim_sync.get("motion_check_joint_names"),
             "motion_authority_status": summary.get("motion_authority_status"),
             "physical_reviewed_model_motion_checked": summary.get(
                 "physical_reviewed_model_motion_checked"
@@ -720,6 +752,10 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
             "hardware_free_regression_fixture_ready"
         ),
         "reviewed_model_motion_checked": observations.get("reviewed_model_motion_checked"),
+        "all_so101_joints_motion_checked": observations.get(
+            "all_so101_joints_motion_checked"
+        ),
+        "motion_check_joint_names": observations.get("motion_check_joint_names"),
         "motion_authority_status": observations.get("motion_authority_status"),
         "physical_reviewed_model_motion_checked": observations.get(
             "physical_reviewed_model_motion_checked"

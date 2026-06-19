@@ -64,13 +64,17 @@ When the manifest is ready, this gate must:
 - compare the manifest body-joint limits against MuJoCo `jnt_range` values
 - instantiate `SimRobot` with the reviewed model path
 - verify the MuJoCo backend has no joint-state fallback
-- send a deterministic joint action and confirm mapped qpos motion
+- send a deterministic joint action and confirm mapped qpos motion for all six
+  SO-101 joints, including gripper qpos range mapping from the 0-100 command
 
 The joint-limit comparison converts manifest body-joint limits from degrees to
 MuJoCo radians and covers `shoulder_pan`, `shoulder_lift`, `elbow_flex`,
 `wrist_flex`, and `wrist_roll`. The gripper is reported as skipped in
 `joint_limit_model_consistency` because the manifest uses percent-style command
-limits while MuJoCo gripper joints may be slide openings in meters. If any body
+limits while MuJoCo gripper joints may be slide openings in meters. The SimRobot
+motion proof still checks the gripper separately by translating the commanded
+percentage through the loaded MuJoCo `gripper` joint range and requiring an
+actual before/after qpos delta. If any body
 joint's declared bounds differ from the loaded model, the gate reports
 `status: "reviewed_mujoco_bundle_motion_failed"` with
 `joint_limit_model_consistency` in `missing_inputs`; this prevents a

@@ -41,7 +41,11 @@ BODY_JOINT_TARGETS_DEG: dict[str, float] = {
     "wrist_flex": -20.0,
     "wrist_roll": 22.0,
 }
+GRIPPER_INITIAL_PERCENT = 95.0
+GRIPPER_TARGET_PERCENT = 78.0
 JOINT_LIMIT_RANGE_TOLERANCE_RAD = 1e-6
+QPOS_TARGET_TOLERANCE = 1e-6
+QPOS_MOTION_DELTA_MIN = 1e-9
 MOTION_AUTHORITY_STATUSES = {
     "not_checked_manifest_not_ready",
     "physical_reviewed_model_motion_checked",
@@ -431,7 +435,7 @@ def validate_simrobot_motion(model_path: Path) -> dict[str, Any]:
             cameras={},
             use_mujoco=True,
             mujoco_model_path=model_path,
-            initial_positions={"gripper": 95.0},
+            initial_positions={"gripper": GRIPPER_INITIAL_PERCENT},
         )
     )
     try:
@@ -452,9 +456,11 @@ def validate_simrobot_motion(model_path: Path) -> dict[str, Any]:
                 joint: float(backend.data.qpos[qpos_addr])
                 for joint, qpos_addr in backend.joint_qpos_addr.items()
             }
+            if backend.gripper_qpos_addr is not None:
+                before_qpos["gripper"] = float(backend.data.qpos[backend.gripper_qpos_addr])
         action = {
             **{f"{joint}.pos": target for joint, target in BODY_JOINT_TARGETS_DEG.items()},
-            "gripper.pos": 78.0,
+            "gripper.pos": GRIPPER_TARGET_PERCENT,
         }
         sent_action = robot.send_action(action)
         after_status = robot.sim_status()
@@ -475,22 +481,87 @@ def validate_simrobot_motion(model_path: Path) -> dict[str, Any]:
                     continue
                 observed_rad = float(backend.data.qpos[qpos_addr])
                 expected_rad = float(target_deg) * 3.141592653589793 / 180.0
+                delta_rad = abs(observed_rad - float(before_qpos.get(joint, observed_rad)))
                 motion_checks.append(
                     {
                         "joint": joint,
-                        "ok": abs(observed_rad - expected_rad) <= 1e-6,
+                        "joint_type": "body_revolute",
+                        "ok": (
+                            abs(observed_rad - expected_rad) <= QPOS_TARGET_TOLERANCE
+                            and delta_rad > QPOS_MOTION_DELTA_MIN
+                        ),
+                        "target_ok": abs(observed_rad - expected_rad) <= QPOS_TARGET_TOLERANCE,
+                        "moved": delta_rad > QPOS_MOTION_DELTA_MIN,
                         "before_qpos": before_qpos.get(joint),
                         "after_qpos": observed_rad,
                         "expected_qpos": expected_rad,
+                        "delta_qpos": delta_rad,
+                        "target_tolerance": QPOS_TARGET_TOLERANCE,
+                        "motion_delta_min": QPOS_MOTION_DELTA_MIN,
                         "target_deg": target_deg,
                     }
                 )
+            if backend.gripper_qpos_addr is None:
+                motion_checks.append(
+                    {
+                        "joint": "gripper",
+                        "joint_type": "gripper_slide_or_opening",
+                        "ok": False,
+                        "reason": "gripper_qpos_addr_missing",
+                        "target_percent": GRIPPER_TARGET_PERCENT,
+                    }
+                )
+            elif backend.gripper_qpos_range is None:
+                motion_checks.append(
+                    {
+                        "joint": "gripper",
+                        "joint_type": "gripper_slide_or_opening",
+                        "ok": False,
+                        "reason": "gripper_qpos_range_missing",
+                        "target_percent": GRIPPER_TARGET_PERCENT,
+                    }
+                )
+            else:
+                lo, hi = backend.gripper_qpos_range
+                range_width = abs(float(hi) - float(lo))
+                target_opening = GRIPPER_TARGET_PERCENT / 100.0
+                expected_qpos = float(lo) + target_opening * (float(hi) - float(lo))
+                observed_qpos = float(backend.data.qpos[backend.gripper_qpos_addr])
+                before_gripper = float(before_qpos.get("gripper", observed_qpos))
+                delta_qpos = abs(observed_qpos - before_gripper)
+                target_ok = abs(observed_qpos - expected_qpos) <= QPOS_TARGET_TOLERANCE
+                moved = delta_qpos > QPOS_MOTION_DELTA_MIN
+                range_ok = range_width > QPOS_MOTION_DELTA_MIN
+                motion_checks.append(
+                    {
+                        "joint": "gripper",
+                        "joint_type": "gripper_slide_or_opening",
+                        "ok": bool(target_ok and moved and range_ok),
+                        "target_ok": target_ok,
+                        "moved": moved,
+                        "range_ok": range_ok,
+                        "before_qpos": before_gripper,
+                        "after_qpos": observed_qpos,
+                        "expected_qpos": expected_qpos,
+                        "delta_qpos": delta_qpos,
+                        "qpos_range": [float(lo), float(hi)],
+                        "qpos_range_width": range_width,
+                        "target_tolerance": QPOS_TARGET_TOLERANCE,
+                        "motion_delta_min": QPOS_MOTION_DELTA_MIN,
+                        "initial_percent": GRIPPER_INITIAL_PERCENT,
+                        "target_percent": GRIPPER_TARGET_PERCENT,
+                    }
+                )
         mapped = set(after_status.get("mapped_joints") or [])
+        motion_check_joint_names = sorted(
+            str(check.get("joint")) for check in motion_checks if check.get("joint")
+        )
         ok = (
             bool(initial_status.get("ok"))
             and bool(after_status.get("ok"))
             and after_status.get("fallback") is None
             and set(SO101_JOINTS).issubset(mapped)
+            and set(SO101_JOINTS).issubset(set(motion_check_joint_names))
             and all(check.get("ok") for check in motion_checks)
         )
         return {
@@ -500,6 +571,11 @@ def validate_simrobot_motion(model_path: Path) -> dict[str, Any]:
             "after_status": after_status,
             "sent_action": sent_action,
             "motion_checks": motion_checks,
+            "motion_check_joint_names": motion_check_joint_names,
+            "motion_check_count": len(motion_checks),
+            "all_so101_joints_motion_checked": set(SO101_JOINTS).issubset(
+                set(motion_check_joint_names)
+            ),
             "mapped_joints": sorted(mapped),
             "missing_mapped_joints": sorted(set(SO101_JOINTS) - mapped),
         }
@@ -846,7 +922,7 @@ def build_ready_summary(
             bool(simrobot_motion.get("ok")),
             "SimRobot.send_action",
             simrobot_motion,
-            {"fallback": None, "all_body_joint_qpos_match_targets": True},
+            {"fallback": None, "all_so101_joint_qpos_match_targets_and_move": True},
             missing_inputs=None if simrobot_motion.get("ok") else ["simrobot_mujoco_joint_motion"],
             diagnostics=simrobot_motion.get("diagnostics"),
         ),
