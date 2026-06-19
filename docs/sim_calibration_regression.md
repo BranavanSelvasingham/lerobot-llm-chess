@@ -814,7 +814,12 @@ before reviewed model-backed IK is available. The matrix also exports and
 asserts the detailed contact path:
 source-start, two-finger contact, board-contact clearance during lift, transfer,
 placement without manual piece-pose edits, release-contact clearance, final
-board contact, and final target XY tolerance.
+board contact, and final target XY tolerance. It also reports
+`phase_evidence_contract_ok` and `phase_evidence_contract_error_count`, and
+each case records `phase_evidence_contract_ok` plus
+`phase_evidence_contract_errors`, so artifact review can see whether the
+phase rows, failed-phase IDs, all-required flag, and top-level pick/place
+booleans agree.
 
 The standalone training-rollouts matrix writes
 `so101_training_rollouts_matrix_summary.json`, `.csv`, and `README.md`. It

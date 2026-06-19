@@ -39,7 +39,11 @@ It also checks the machine-readable phase contract:
 `pick_place_failed_phase_ids`, `pick_place_phase_count`, and
 `pick_place_all_required_phases_verified`. The required phases are
 `source_reset`, `two_finger_grasp`, `lift_clearance`,
-`transfer_toward_target`, and `release_place`.
+`transfer_toward_target`, and `release_place`. The matrix reports
+`phase_evidence_contract_ok` and `phase_evidence_contract_error_count`, and
+each case records `phase_evidence_contract_errors`; these checks require the
+phase row `ok` values, failed-phase IDs, aggregate all-required flag, and
+top-level pick/place booleans to agree.
 
 The smoke resets the free piece onto source square `e4`, seeds the development
 robot at a source-pick pose, closes on the board piece, lifts it off the board,

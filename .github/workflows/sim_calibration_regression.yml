@@ -1627,6 +1627,8 @@ jobs:
           assert summary["hardware_skipped"] is True, summary
           assert summary["gui_skipped"] is True, summary
           assert summary["openai_skipped"] is True, summary
+          assert summary["phase_evidence_contract_ok"] is True, summary
+          assert summary["phase_evidence_contract_error_count"] == 0, summary
           assert summary["case_ids"] == [
               "seeded_fixture_e4_e5_pick_place_verified",
               "alternate_target_e4_d5_records_place_gap",
@@ -1651,6 +1653,9 @@ jobs:
               "same_source_target_rejected",
           ], summary["invalid_task_case_ids"]
           by_case = {case["case_id"]: case for case in summary["cases"]}
+          for case in summary["cases"]:
+              assert case["observations"]["phase_evidence_contract_ok"] is True, case
+              assert case["observations"]["phase_evidence_contract_errors"] == [], case
           verified = by_case["seeded_fixture_e4_e5_pick_place_verified"]
           assert verified["observations"]["status"] == "development_board_source_pick_place_verified", verified
           assert verified["observations"]["board_source_pick_place_verified"] is True, verified

@@ -24,6 +24,13 @@ EXPECTED_PHASE_IDS = [
     "transfer_toward_target",
     "release_place",
 ]
+PHASE_OBSERVATION_KEYS = {
+    "source_reset": "source_pick_started_at_source",
+    "two_finger_grasp": "close_two_finger_contact_observed",
+    "lift_clearance": "lift_verified",
+    "transfer_toward_target": "transfer_verified",
+    "release_place": "place_without_manual_piece_pose_verified",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -106,6 +113,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "pick_place_failed_phase_ids",
         "pick_place_phase_count",
         "pick_place_all_required_phases_verified",
+        "phase_evidence_contract_ok",
+        "phase_evidence_contract_errors",
         "ready_for_model_backed_ik",
         "ready_for_policy_training",
         "physical_authority",
@@ -272,6 +281,99 @@ def add_contains_errors(
         errors.append(f"{label}: missing {missing!r} from {actual!r}")
 
 
+def phase_evidence_contract_errors(
+    *,
+    case_id: str,
+    observations: dict[str, Any],
+    expect_ok: bool,
+) -> list[str]:
+    errors: list[str] = []
+    phase_evidence = observations["pick_place_phase_evidence"]
+    phase_ids = observations["pick_place_phase_ids"]
+    failed_phase_ids = observations["pick_place_failed_phase_ids"]
+    phase_count = observations["pick_place_phase_count"]
+
+    if not expect_ok:
+        if phase_evidence != []:
+            errors.append(f"{case_id}.phase_contract.evidence: expected empty list")
+        if phase_ids != []:
+            errors.append(f"{case_id}.phase_contract.phase_ids: expected empty list")
+        if failed_phase_ids != []:
+            errors.append(f"{case_id}.phase_contract.failed_phase_ids: expected empty list")
+        if phase_count != 0:
+            errors.append(f"{case_id}.phase_contract.phase_count: expected 0")
+        if observations["pick_place_all_required_phases_verified"] is not False:
+            errors.append(
+                f"{case_id}.phase_contract.all_required: expected False for invalid task"
+            )
+        return errors
+
+    if not isinstance(phase_evidence, list):
+        return [f"{case_id}.phase_contract.evidence: expected list"]
+    if not isinstance(phase_ids, list):
+        errors.append(f"{case_id}.phase_contract.phase_ids: expected list")
+    if not isinstance(failed_phase_ids, list):
+        errors.append(f"{case_id}.phase_contract.failed_phase_ids: expected list")
+    if len(phase_evidence) != len(EXPECTED_PHASE_IDS):
+        errors.append(
+            f"{case_id}.phase_contract.evidence_count: expected {len(EXPECTED_PHASE_IDS)}, got {len(phase_evidence)}"
+        )
+
+    row_phase_ids: list[str] = []
+    row_failed_phase_ids: list[str] = []
+    row_all_ok = True
+    for index, expected_phase_id in enumerate(EXPECTED_PHASE_IDS):
+        if index >= len(phase_evidence):
+            break
+        row = phase_evidence[index]
+        if not isinstance(row, dict):
+            errors.append(f"{case_id}.phase_contract.{expected_phase_id}: expected dict")
+            row_all_ok = False
+            continue
+        phase_id = row.get("phase_id")
+        row_phase_ids.append(str(phase_id))
+        if phase_id != expected_phase_id:
+            errors.append(
+                f"{case_id}.phase_contract.phase_id[{index}]: expected {expected_phase_id!r}, got {phase_id!r}"
+            )
+        ok = row.get("ok")
+        if not isinstance(ok, bool):
+            errors.append(f"{case_id}.phase_contract.{expected_phase_id}.ok: expected bool")
+            row_all_ok = False
+            continue
+        if not ok:
+            row_all_ok = False
+            row_failed_phase_ids.append(expected_phase_id)
+        observation_key = PHASE_OBSERVATION_KEYS[expected_phase_id]
+        expected_ok = observations[observation_key]
+        if ok != expected_ok:
+            errors.append(
+                f"{case_id}.phase_contract.{expected_phase_id}.ok: expected to match {observation_key}={expected_ok!r}, got {ok!r}"
+            )
+
+    if phase_ids != row_phase_ids:
+        errors.append(
+            f"{case_id}.phase_contract.phase_ids: expected row ids {row_phase_ids!r}, got {phase_ids!r}"
+        )
+    if failed_phase_ids != row_failed_phase_ids:
+        errors.append(
+            f"{case_id}.phase_contract.failed_phase_ids: expected {row_failed_phase_ids!r}, got {failed_phase_ids!r}"
+        )
+    if phase_count != len(phase_evidence):
+        errors.append(
+            f"{case_id}.phase_contract.phase_count: expected {len(phase_evidence)}, got {phase_count!r}"
+        )
+    if observations["pick_place_all_required_phases_verified"] != row_all_ok:
+        errors.append(
+            f"{case_id}.phase_contract.all_required: expected {row_all_ok!r}, got {observations['pick_place_all_required_phases_verified']!r}"
+        )
+    if observations["board_source_pick_place_verified"] != row_all_ok:
+        errors.append(
+            f"{case_id}.phase_contract.board_pick_place: expected {row_all_ok!r}, got {observations['board_source_pick_place_verified']!r}"
+        )
+    return errors
+
+
 def summarize_case(
     *,
     spec: dict[str, Any],
@@ -336,10 +438,18 @@ def summarize_case(
         "model_xml_exists": isinstance(model_xml_path, str) and Path(model_xml_path).is_file(),
         "manifest_json_exists": isinstance(manifest_path, str) and Path(manifest_path).is_file(),
     }
+    phase_contract_errors = phase_evidence_contract_errors(
+        case_id=case_id,
+        observations=observations,
+        expect_ok=expect_ok,
+    )
+    observations["phase_evidence_contract_errors"] = phase_contract_errors
+    observations["phase_evidence_contract_ok"] = not phase_contract_errors
 
     add_error(errors, f"{case_id}.return_code", record.get("return_code"), expected_return_code)
     add_error(errors, f"{case_id}.ok", observations["ok"], expect_ok)
     add_error(errors, f"{case_id}.status", observations["status"], spec["expected_status"])
+    errors.extend(phase_contract_errors)
     add_error(
         errors,
         f"{case_id}.model_authority",
@@ -641,6 +751,8 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "pick_place_all_required_phases_verified": observations.get(
             "pick_place_all_required_phases_verified"
         ),
+        "phase_evidence_contract_ok": observations.get("phase_evidence_contract_ok"),
+        "phase_evidence_contract_errors": observations.get("phase_evidence_contract_errors"),
         "ready_for_model_backed_ik": observations.get("ready_for_model_backed_ik"),
         "ready_for_policy_training": observations.get("ready_for_policy_training"),
         "physical_authority": observations.get("physical_authority"),
@@ -725,6 +837,10 @@ def main() -> int:
         if case["observations"].get("board_source_pick_place_verified") is False
         and case["observations"].get("status") != "invalid_task_configuration"
     ]
+    phase_contract_error_count = sum(
+        len(case["observations"].get("phase_evidence_contract_errors") or [])
+        for case in cases
+    )
     summary_path = output_dir / "so101_mujoco_board_pick_probe_matrix_summary.json"
     csv_path = output_dir / "so101_mujoco_board_pick_probe_matrix_cases.csv"
     readme_path = output_dir / "README.md"
@@ -745,6 +861,8 @@ def main() -> int:
         "verified_pick_place_case_count": len(verified_cases),
         "expected_gap_case_count": len(expected_gap_cases),
         "invalid_task_case_count": len(invalid_task_cases),
+        "phase_evidence_contract_ok": phase_contract_error_count == 0,
+        "phase_evidence_contract_error_count": phase_contract_error_count,
         "case_ids": [case["case_id"] for case in cases],
         "failed_case_ids": [case["case_id"] for case in cases if not case["ok"]],
         "verified_pick_place_case_ids": [case["case_id"] for case in verified_cases],
