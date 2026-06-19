@@ -1166,6 +1166,10 @@ jobs:
               "failed_board_pick_prerequisite_fails_closed",
               "incomplete_final_board_pick_prerequisite_fails_closed",
               "short_budget_records_incomplete_rollout",
+              "invalid_task_syntax_fails_closed",
+              "invalid_task_square_fails_closed",
+              "same_source_target_task_fails_closed",
+              "nonpositive_step_budget_fails_closed",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
           assert summary["passed_rollout_case_ids"] == [
@@ -1176,7 +1180,17 @@ jobs:
               "failed_board_pick_prerequisite_fails_closed",
               "incomplete_final_board_pick_prerequisite_fails_closed",
               "short_budget_records_incomplete_rollout",
+              "invalid_task_syntax_fails_closed",
+              "invalid_task_square_fails_closed",
+              "same_source_target_task_fails_closed",
+              "nonpositive_step_budget_fails_closed",
           ], summary["expected_failure_case_ids"]
+          assert summary["invalid_task_case_ids"] == [
+              "invalid_task_syntax_fails_closed",
+              "invalid_task_square_fails_closed",
+              "same_source_target_task_fails_closed",
+              "nonpositive_step_budget_fails_closed",
+          ], summary["invalid_task_case_ids"]
           by_case = {case["case_id"]: case for case in summary["cases"]}
           valid = by_case["valid_development_default_curriculum_debug_rollouts"]
           assert valid["observations"]["status"] == "ok", valid
@@ -1208,14 +1222,56 @@ jobs:
           assert short["observations"]["development_prerequisites_satisfied"] is True, short
           assert short["observations"]["all_scripted_pick_place_complete"] is False, short
           assert short["observations"]["all_mujoco_piece_release_synced"] is False, short
+          invalid_syntax = by_case["invalid_task_syntax_fails_closed"]
+          assert invalid_syntax["record"]["return_code"] == 1, invalid_syntax
+          assert invalid_syntax["observations"]["status"] == "invalid_task_configuration", invalid_syntax
+          assert "Task must be SOURCE:TARGET" in invalid_syntax["observations"]["configuration_error"]["message"], invalid_syntax
+          invalid_square = by_case["invalid_task_square_fails_closed"]
+          assert invalid_square["record"]["return_code"] == 1, invalid_square
+          assert invalid_square["observations"]["status"] == "invalid_task_configuration", invalid_square
+          assert "Invalid chess square" in invalid_square["observations"]["configuration_error"]["message"], invalid_square
+          same_task = by_case["same_source_target_task_fails_closed"]
+          assert same_task["record"]["return_code"] == 1, same_task
+          assert same_task["observations"]["status"] == "invalid_task_configuration", same_task
+          assert "source_square and target_square must differ" in same_task["observations"]["configuration_error"]["message"], same_task
+          nonpositive = by_case["nonpositive_step_budget_fails_closed"]
+          assert nonpositive["record"]["return_code"] == 1, nonpositive
+          assert nonpositive["observations"]["status"] == "invalid_task_configuration", nonpositive
+          assert "max_steps must be positive" in nonpositive["observations"]["configuration_error"]["message"], nonpositive
+          for case_id in (
+              "invalid_task_syntax_fails_closed",
+              "invalid_task_square_fails_closed",
+              "same_source_target_task_fails_closed",
+              "nonpositive_step_budget_fails_closed",
+          ):
+              obs = by_case[case_id]["observations"]
+              assert obs["model_authority"] == "invalid_task_configuration_not_authority", by_case[case_id]
+              assert obs["episode_count"] == 0, by_case[case_id]
+              assert obs["transition_count"] == 0, by_case[case_id]
+              assert obs["development_prerequisites_satisfied"] is False, by_case[case_id]
+              assert obs["board_pick_prerequisite_status"] == "not_checked_invalid_task_configuration", by_case[case_id]
+              assert obs["rollout_use"] == "not_collected_invalid_task_configuration", by_case[case_id]
+              assert obs["model_xml_exists"] is False, by_case[case_id]
+              assert obs["manifest_json_exists"] is False, by_case[case_id]
           for case in summary["cases"]:
               obs = case["observations"]
               assert obs["observed_evidence_is_physical_so101_authority"] is False, case
               assert obs["observed_evidence_is_policy_training_authority"] is False, case
               assert obs["ready_for_model_backed_ik"] is False, case
               assert obs["ready_for_policy_training"] is False, case
-              assert obs["rollout_use"] == "debug_imitation_curriculum_only", case
               assert "reviewed_model_backed_board_source_pick_place" in obs["serious_policy_training_blockers"], case
+          for case_id in (
+              "valid_development_default_curriculum_debug_rollouts",
+              "missing_board_pick_prerequisite_fails_closed",
+              "failed_board_pick_prerequisite_fails_closed",
+              "incomplete_final_board_pick_prerequisite_fails_closed",
+              "short_budget_records_incomplete_rollout",
+          ):
+              obs = by_case[case_id]["observations"]
+              assert obs["rollout_use"] == "debug_imitation_curriculum_only", by_case[case_id]
+              assert obs["model_authority"] == "development_scaffold_not_reviewed", by_case[case_id]
+              assert obs["model_xml_exists"] is True, by_case[case_id]
+              assert obs["manifest_json_exists"] is True, by_case[case_id]
           for relative_path in (
               "so101_training_rollouts_matrix_summary.json",
               "so101_training_rollouts_matrix_cases.csv",

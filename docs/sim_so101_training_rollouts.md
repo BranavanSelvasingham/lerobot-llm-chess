@@ -29,8 +29,12 @@ python scripts/smoke_sim_so101_training_rollouts_matrix.py --output-dir /private
 The matrix writes `so101_training_rollouts_matrix_summary.json`,
 `so101_training_rollouts_matrix_cases.csv`, and `README.md`. It verifies the
 default development rollout curriculum, missing and failed board-pick
-prerequisite fail-closed behavior, and a short-budget incomplete rollout. The
-matrix must keep `observed_evidence_is_policy_training_authority: false` and
+prerequisite fail-closed behavior, a short-budget incomplete rollout, and
+invalid rollout task requests. Invalid task cases, such as malformed
+`SOURCE:TARGET` pairs, invalid chess squares, identical source/target squares,
+or non-positive step budgets, must write summary, JSONL, CSV, and README
+artifacts while leaving model XML and manifest files ungenerated. The matrix
+must keep `observed_evidence_is_policy_training_authority: false` and
 `ready_for_policy_training: false`.
 
 Each JSONL transition contains:

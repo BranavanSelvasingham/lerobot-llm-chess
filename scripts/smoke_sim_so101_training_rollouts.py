@@ -32,6 +32,7 @@ DEFAULT_TASKS: tuple[tuple[str, str], ...] = (
     ("e2", "e3"),
     ("d4", "f4"),
 )
+INVALID_TASK_MODEL_AUTHORITY = "invalid_task_configuration_not_authority"
 SO101_JOINTS: tuple[str, ...] = (
     "shoulder_pan",
     "shoulder_lift",
@@ -118,6 +119,12 @@ def write_episode_csv(path: Path, rows: list[dict[str, Any]]) -> None:
             writer.writerow({field: row.get(field, "") for field in fieldnames})
 
 
+def validate_square(square: str) -> None:
+    value = square.strip().lower()
+    if len(value) != 2 or not ("a" <= value[0] <= "h") or not ("1" <= value[1] <= "8"):
+        raise ValueError(f"Invalid chess square: {square!r}")
+
+
 def parse_tasks(values: list[str]) -> tuple[tuple[str, str], ...]:
     if not values:
         return DEFAULT_TASKS
@@ -126,8 +133,24 @@ def parse_tasks(values: list[str]) -> tuple[tuple[str, str], ...]:
         if ":" not in value:
             raise ValueError(f"Task must be SOURCE:TARGET, got {value!r}.")
         source, target = value.split(":", 1)
-        tasks.append((source.strip().lower(), target.strip().lower()))
+        source_square = source.strip().lower()
+        target_square = target.strip().lower()
+        validate_square(source_square)
+        validate_square(target_square)
+        if source_square == target_square:
+            raise ValueError("source_square and target_square must differ.")
+        tasks.append((source_square, target_square))
     return tuple(tasks)
+
+
+def task_configuration_error(args: argparse.Namespace) -> str | None:
+    if args.max_steps <= 0:
+        return "max_steps must be positive."
+    try:
+        parse_tasks(args.task)
+    except ValueError as exc:
+        return str(exc)
+    return None
 
 
 def load_json_object(path: Path) -> dict[str, Any]:
@@ -359,6 +382,76 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
     path.write_text("\n".join(lines) + "\n")
 
 
+def invalid_task_summary(
+    *,
+    args: argparse.Namespace,
+    deps: dict[str, bool],
+    summary_path: Path,
+    transitions_path: Path,
+    episodes_path: Path,
+    model_path: Path,
+    manifest_path: Path,
+    readme_path: Path,
+    message: str,
+) -> dict[str, Any]:
+    return {
+        "schema": SCHEMA,
+        "ok": False,
+        "status": "invalid_task_configuration",
+        "dependencies": deps,
+        "configuration_error": {
+            "type": "ValueError",
+            "message": message,
+        },
+        "requested_tasks": list(args.task),
+        "max_steps": args.max_steps,
+        "episode_count": 0,
+        "transition_count": 0,
+        "all_scripted_pick_place_complete": False,
+        "all_mujoco_fallback_free": False,
+        "all_mujoco_piece_release_synced": False,
+        "development_prerequisites_satisfied": False,
+        "model_authority": INVALID_TASK_MODEL_AUTHORITY,
+        "observed_evidence_is_physical_so101_authority": False,
+        "observed_evidence_is_policy_training_authority": False,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "training_authority_status": "invalid_task_configuration",
+        "board_pick_prerequisite": {
+            "schema": BOARD_PICK_PREREQUISITE_SCHEMA,
+            "path": str(args.development_board_pick_summary_json),
+            "ok": False,
+            "status": "not_checked_invalid_task_configuration",
+        },
+        "rollout_use": "not_collected_invalid_task_configuration",
+        "serious_policy_training_blockers": [
+            "valid_rollout_task_configuration",
+            "reviewed_so101_model_bundle",
+            "reviewed_tcp_and_base_to_board_alignment",
+            "reviewed_model_backed_board_source_pick_place",
+        ],
+        "tasks": [],
+        "episodes": [],
+        "artifacts": {
+            "summary_json": str(summary_path),
+            "transitions_jsonl": str(transitions_path),
+            "episodes_csv": str(episodes_path),
+            "model_xml": str(model_path),
+            "manifest_json": str(manifest_path),
+            "readme": str(readme_path),
+        },
+        "limitations": [
+            "Invalid rollout task configuration is recorded as a fail-closed artifact.",
+            "No MuJoCo model generation, Gymnasium rollout, or transition collection is attempted.",
+            "This failure is hardware-free and does not claim physical SO-101 or policy-training evidence.",
+        ],
+        "next_required_for_goal": [
+            "Provide valid SOURCE:TARGET chess task pairs with distinct source and target squares.",
+            "Use a positive rollout step budget.",
+        ],
+    }
+
+
 def main() -> int:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -375,6 +468,25 @@ def main() -> int:
     episodes_path = args.output_dir / EPISODES_NAME
     readme_path = args.output_dir / README_NAME
     missing = [name for name, available in deps.items() if not available]
+    configuration_error = task_configuration_error(args)
+    if configuration_error is not None:
+        summary = invalid_task_summary(
+            args=args,
+            deps=deps,
+            summary_path=summary_path,
+            transitions_path=transitions_path,
+            episodes_path=episodes_path,
+            model_path=model_path,
+            manifest_path=manifest_path,
+            readme_path=readme_path,
+            message=configuration_error,
+        )
+        write_json(summary_path, summary)
+        append_jsonl(transitions_path, [])
+        write_episode_csv(episodes_path, [])
+        write_readme(readme_path, summary)
+        print(json.dumps({"ok": False, "status": summary["status"], "summary_json": str(summary_path)}, indent=2))
+        return 1
     if missing:
         summary = {
             "schema": SCHEMA,

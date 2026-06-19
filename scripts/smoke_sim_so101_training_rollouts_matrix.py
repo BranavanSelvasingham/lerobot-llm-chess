@@ -76,8 +76,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "case_id",
         "ok",
         "return_code",
+        "expected_return_code",
         "status",
         "expected_status",
+        "model_authority",
         "rollout_ok",
         "episode_count",
         "transition_count",
@@ -90,6 +92,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "ready_for_policy_training",
         "policy_authority",
         "rollout_use",
+        "configuration_error",
+        "model_xml_exists",
+        "manifest_json_exists",
         "summary_path",
         "errors",
     )
@@ -235,6 +240,10 @@ def case_specs(
             "expected_release_synced": True,
             "expected_episode_count": 5,
             "expect_transition_count_positive": True,
+            "expected_model_authority": "development_scaffold_not_reviewed",
+            "expected_rollout_use": "debug_imitation_curriculum_only",
+            "expected_all_fallback_free": True,
+            "expected_model_artifacts": True,
         },
         {
             "case_id": "missing_board_pick_prerequisite_fails_closed",
@@ -250,6 +259,10 @@ def case_specs(
             "expected_release_synced": True,
             "expected_episode_count": 1,
             "expect_transition_count_positive": True,
+            "expected_model_authority": "development_scaffold_not_reviewed",
+            "expected_rollout_use": "debug_imitation_curriculum_only",
+            "expected_all_fallback_free": True,
+            "expected_model_artifacts": True,
         },
         {
             "case_id": "failed_board_pick_prerequisite_fails_closed",
@@ -265,6 +278,10 @@ def case_specs(
             "expected_release_synced": True,
             "expected_episode_count": 1,
             "expect_transition_count_positive": True,
+            "expected_model_authority": "development_scaffold_not_reviewed",
+            "expected_rollout_use": "debug_imitation_curriculum_only",
+            "expected_all_fallback_free": True,
+            "expected_model_artifacts": True,
         },
         {
             "case_id": "incomplete_final_board_pick_prerequisite_fails_closed",
@@ -284,6 +301,10 @@ def case_specs(
             "expected_release_synced": True,
             "expected_episode_count": 1,
             "expect_transition_count_positive": True,
+            "expected_model_authority": "development_scaffold_not_reviewed",
+            "expected_rollout_use": "debug_imitation_curriculum_only",
+            "expected_all_fallback_free": True,
+            "expected_model_artifacts": True,
         },
         {
             "case_id": "short_budget_records_incomplete_rollout",
@@ -299,6 +320,90 @@ def case_specs(
             "expected_release_synced": False,
             "expected_episode_count": 1,
             "expect_transition_count_positive": True,
+            "expected_model_authority": "development_scaffold_not_reviewed",
+            "expected_rollout_use": "debug_imitation_curriculum_only",
+            "expected_all_fallback_free": True,
+            "expected_model_artifacts": True,
+        },
+        {
+            "case_id": "invalid_task_syntax_fails_closed",
+            "prerequisite_path": valid_prerequisite,
+            "tasks": ["e4-e5"],
+            "max_steps": 96,
+            "expected_return_code": 1,
+            "expected_status": "invalid_task_configuration",
+            "expected_rollout_ok": False,
+            "expected_development_prerequisites_satisfied": False,
+            "expected_board_pick_prerequisite_status": "not_checked_invalid_task_configuration",
+            "expected_all_complete": False,
+            "expected_release_synced": False,
+            "expected_episode_count": 0,
+            "expect_transition_count_positive": False,
+            "expected_model_authority": "invalid_task_configuration_not_authority",
+            "expected_rollout_use": "not_collected_invalid_task_configuration",
+            "expected_all_fallback_free": False,
+            "expected_model_artifacts": False,
+            "expected_configuration_error_contains": "Task must be SOURCE:TARGET",
+        },
+        {
+            "case_id": "invalid_task_square_fails_closed",
+            "prerequisite_path": valid_prerequisite,
+            "tasks": ["z9:e5"],
+            "max_steps": 96,
+            "expected_return_code": 1,
+            "expected_status": "invalid_task_configuration",
+            "expected_rollout_ok": False,
+            "expected_development_prerequisites_satisfied": False,
+            "expected_board_pick_prerequisite_status": "not_checked_invalid_task_configuration",
+            "expected_all_complete": False,
+            "expected_release_synced": False,
+            "expected_episode_count": 0,
+            "expect_transition_count_positive": False,
+            "expected_model_authority": "invalid_task_configuration_not_authority",
+            "expected_rollout_use": "not_collected_invalid_task_configuration",
+            "expected_all_fallback_free": False,
+            "expected_model_artifacts": False,
+            "expected_configuration_error_contains": "Invalid chess square",
+        },
+        {
+            "case_id": "same_source_target_task_fails_closed",
+            "prerequisite_path": valid_prerequisite,
+            "tasks": ["e4:e4"],
+            "max_steps": 96,
+            "expected_return_code": 1,
+            "expected_status": "invalid_task_configuration",
+            "expected_rollout_ok": False,
+            "expected_development_prerequisites_satisfied": False,
+            "expected_board_pick_prerequisite_status": "not_checked_invalid_task_configuration",
+            "expected_all_complete": False,
+            "expected_release_synced": False,
+            "expected_episode_count": 0,
+            "expect_transition_count_positive": False,
+            "expected_model_authority": "invalid_task_configuration_not_authority",
+            "expected_rollout_use": "not_collected_invalid_task_configuration",
+            "expected_all_fallback_free": False,
+            "expected_model_artifacts": False,
+            "expected_configuration_error_contains": "source_square and target_square must differ",
+        },
+        {
+            "case_id": "nonpositive_step_budget_fails_closed",
+            "prerequisite_path": valid_prerequisite,
+            "tasks": ["e4:e5"],
+            "max_steps": 0,
+            "expected_return_code": 1,
+            "expected_status": "invalid_task_configuration",
+            "expected_rollout_ok": False,
+            "expected_development_prerequisites_satisfied": False,
+            "expected_board_pick_prerequisite_status": "not_checked_invalid_task_configuration",
+            "expected_all_complete": False,
+            "expected_release_synced": False,
+            "expected_episode_count": 0,
+            "expect_transition_count_positive": False,
+            "expected_model_authority": "invalid_task_configuration_not_authority",
+            "expected_rollout_use": "not_collected_invalid_task_configuration",
+            "expected_all_fallback_free": False,
+            "expected_model_artifacts": False,
+            "expected_configuration_error_contains": "max_steps must be positive",
         },
     ]
 
@@ -317,6 +422,8 @@ def summarize_case(
     blockers = blockers if isinstance(blockers, list) else []
     artifacts = summary.get("artifacts")
     artifacts = artifacts if isinstance(artifacts, dict) else {}
+    model_xml_path = artifacts.get("model_xml")
+    manifest_path = artifacts.get("manifest_json")
     observations = {
         "return_code": record.get("return_code"),
         "ok": summary.get("ok"),
@@ -342,19 +449,21 @@ def summarize_case(
         "board_pick_prerequisite_ok": board_pick.get("ok"),
         "board_pick_failed_checks": board_pick.get("failed_checks"),
         "serious_policy_training_blockers": blockers,
+        "configuration_error": summary.get("configuration_error"),
         "artifacts": artifacts,
+        "model_xml_exists": isinstance(model_xml_path, str) and Path(model_xml_path).is_file(),
+        "manifest_json_exists": isinstance(manifest_path, str) and Path(manifest_path).is_file(),
     }
 
     add_error(errors, f"{case_id}.return_code", observations["return_code"], spec["expected_return_code"])
     add_error(errors, f"{case_id}.ok", observations["ok"], spec["expected_rollout_ok"])
     add_error(errors, f"{case_id}.status", observations["status"], spec["expected_status"])
-    if observations["model_authority"] is not None:
-        add_error(
-            errors,
-            f"{case_id}.model_authority",
-            observations["model_authority"],
-            "development_scaffold_not_reviewed",
-        )
+    add_error(
+        errors,
+        f"{case_id}.model_authority",
+        observations["model_authority"],
+        spec["expected_model_authority"],
+    )
     add_error(
         errors,
         f"{case_id}.physical_authority",
@@ -407,7 +516,7 @@ def summarize_case(
         errors,
         f"{case_id}.all_mujoco_fallback_free",
         observations["all_mujoco_fallback_free"],
-        True,
+        spec["expected_all_fallback_free"],
     )
     add_error(
         errors,
@@ -420,18 +529,37 @@ def summarize_case(
         isinstance(observations["transition_count"], int) and observations["transition_count"] > 0
     ):
         errors.append(f"{case_id}.transition_count: expected positive int")
+    if not spec["expect_transition_count_positive"]:
+        add_error(errors, f"{case_id}.transition_count", observations["transition_count"], 0)
     add_error(
         errors,
         f"{case_id}.rollout_use",
         observations["rollout_use"],
-        "debug_imitation_curriculum_only",
+        spec["expected_rollout_use"],
     )
+    if "expected_configuration_error_contains" in spec:
+        configuration_error = observations["configuration_error"]
+        if not isinstance(configuration_error, dict):
+            errors.append(f"{case_id}.configuration_error: expected dict, got {configuration_error!r}")
+        else:
+            message = configuration_error.get("message")
+            expected = str(spec["expected_configuration_error_contains"])
+            if expected not in str(message):
+                errors.append(f"{case_id}.configuration_error.message: expected {expected!r} in {message!r}")
     if "reviewed_model_backed_board_source_pick_place" not in blockers:
         errors.append(f"{case_id}.serious_policy_training_blockers: missing reviewed_model_backed_board_source_pick_place")
-    for key in ("summary_json", "transitions_jsonl", "episodes_csv", "model_xml", "manifest_json", "readme"):
+    for key in ("summary_json", "transitions_jsonl", "episodes_csv", "readme"):
         artifact_path = artifacts.get(key)
         if not isinstance(artifact_path, str) or not Path(artifact_path).is_file():
             errors.append(f"{case_id}.artifacts.{key}: expected existing path")
+    for key in ("model_xml", "manifest_json"):
+        artifact_path = artifacts.get(key)
+        if not isinstance(artifact_path, str):
+            errors.append(f"{case_id}.artifacts.{key}: expected path string")
+        elif spec["expected_model_artifacts"] and not Path(artifact_path).is_file():
+            errors.append(f"{case_id}.artifacts.{key}: expected existing path")
+        elif not spec["expected_model_artifacts"] and Path(artifact_path).is_file():
+            errors.append(f"{case_id}.artifacts.{key}: expected no generated file")
 
     return {
         "case_id": case_id,
@@ -484,8 +612,10 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "case_id": case["case_id"],
         "ok": case["ok"],
         "return_code": observations.get("return_code"),
+        "expected_return_code": case["expected"]["return_code"],
         "status": observations.get("status"),
         "expected_status": case["expected"]["status"],
+        "model_authority": observations.get("model_authority"),
         "rollout_ok": observations.get("ok"),
         "episode_count": observations.get("episode_count"),
         "transition_count": observations.get("transition_count"),
@@ -498,6 +628,9 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "ready_for_policy_training": observations.get("ready_for_policy_training"),
         "policy_authority": observations.get("observed_evidence_is_policy_training_authority"),
         "rollout_use": observations.get("rollout_use"),
+        "configuration_error": observations.get("configuration_error"),
+        "model_xml_exists": observations.get("model_xml_exists"),
+        "manifest_json_exists": observations.get("manifest_json_exists"),
         "summary_path": case["summary_path"],
         "errors": case["errors"],
     }
@@ -511,6 +644,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `case_count`: `{summary['case_count']}`",
         f"- `passed_rollout_case_count`: `{summary['passed_rollout_case_count']}`",
         f"- `expected_failure_case_count`: `{summary['expected_failure_case_count']}`",
+        f"- `invalid_task_case_count`: `{summary['invalid_task_case_count']}`",
         f"- `failed_cases`: `{', '.join(summary['failed_case_ids']) if summary['failed_case_ids'] else 'none'}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `cases_csv`: `{summary['artifacts']['cases_csv']}`",
@@ -543,6 +677,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "",
             "- Passing rollout cases use generated `development_scaffold_not_reviewed` MJCF.",
             "- Missing, failed, or incomplete-final board-pick prerequisites must keep rollout status non-OK.",
+            "- Invalid rollout task configurations must write summary/CSV/README artifacts without generating model XML or manifests.",
             "- Short-budget rollouts must record incomplete episodes instead of becoming policy-ready.",
             "- `ready_for_policy_training` and policy authority flags must remain false.",
         ]
@@ -583,6 +718,9 @@ def main() -> int:
     expected_failure_cases = [
         case for case in cases if case["observations"].get("ok") is False
     ]
+    invalid_task_cases = [
+        case for case in cases if case["observations"].get("status") == "invalid_task_configuration"
+    ]
     summary_path = output_dir / "so101_training_rollouts_matrix_summary.json"
     csv_path = output_dir / "so101_training_rollouts_matrix_cases.csv"
     readme_path = output_dir / "README.md"
@@ -609,10 +747,12 @@ def main() -> int:
         "case_count": len(cases),
         "passed_rollout_case_count": len(passed_rollout_cases),
         "expected_failure_case_count": len(expected_failure_cases),
+        "invalid_task_case_count": len(invalid_task_cases),
         "case_ids": [case["case_id"] for case in cases],
         "failed_case_ids": [case["case_id"] for case in cases if not case["ok"]],
         "passed_rollout_case_ids": [case["case_id"] for case in passed_rollout_cases],
         "expected_failure_case_ids": [case["case_id"] for case in expected_failure_cases],
+        "invalid_task_case_ids": [case["case_id"] for case in invalid_task_cases],
         "cases": cases,
         "artifacts": {
             "summary_json": str(summary_path),
@@ -622,6 +762,7 @@ def main() -> int:
         "limitations": [
             "Development rollout cases use symbolic task transfer and generated MJCF.",
             "The board-pick prerequisite is still seeded development fixture evidence.",
+            "Invalid task cases fail closed before model generation or rollout collection.",
             "This matrix is not reviewed SO-101 policy-training authority.",
         ],
     }

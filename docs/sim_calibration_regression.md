@@ -565,7 +565,10 @@ It also runs the focused
 `so101_training_rollouts_matrix` smoke to prove valid development prerequisites
 allow debug imitation rollouts while missing/failed board-pick prerequisites,
 incomplete final board contact or target-tolerance evidence, and too-short
-rollout budgets fail closed without becoming policy-training authority. It also runs the focused
+rollout budgets fail closed without becoming policy-training authority. The
+same matrix requires malformed rollout tasks, invalid chess squares, identical
+source/target task squares, and non-positive step budgets to fail closed without
+generating model XML or manifests. It also runs the focused
 `so101_training_readiness_gate_matrix` contract smoke to prove development,
 draft, fixture-seeded, manually reset-pose-corrected, raw-rollout-ready, and
 all-ready injected states do not cross the serious-training boundary without
@@ -727,9 +730,11 @@ reports `model_authority: "so101_training_rollouts_matrix_not_authority"`,
 `ready_for_model_backed_ik: false`, and `ready_for_policy_training: false`.
 It covers the default development rollout curriculum, missing and failed
 board-pick prerequisites, an otherwise broad-true board-pick prerequisite that
-is missing final board contact and target-tolerance evidence, and a short-budget
-incomplete rollout. Only the valid development-prerequisite case may pass as
-debug curriculum evidence; the other cases must fail closed without becoming
+is missing final board contact and target-tolerance evidence, a short-budget
+incomplete rollout, and invalid rollout task requests. Invalid rollout tasks
+must write summary/JSONL/CSV/README artifacts without generating model XML or
+manifests. Only the valid development-prerequisite case may pass as debug
+curriculum evidence; the other cases must fail closed without becoming
 policy-training authority.
 
 The standalone training-readiness gate matrix writes
