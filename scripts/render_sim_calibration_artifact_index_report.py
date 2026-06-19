@@ -187,6 +187,19 @@ def compact_list(value: Any) -> str:
     return "<br>".join(markdown_code(item) for item in value)
 
 
+def compact_mapping(value: Any) -> str:
+    if not isinstance(value, dict) or not value:
+        return ""
+    parts = []
+    for key, mapped in sorted(value.items(), key=lambda item: str(item[0])):
+        if isinstance(mapped, list):
+            rendered = "[" + ", ".join(str(item) for item in mapped) + "]"
+        else:
+            rendered = str(mapped)
+        parts.append(markdown_code(f"{key}={rendered}"))
+    return "<br>".join(parts)
+
+
 def source_root_summary(metrics: dict[str, Any]) -> str:
     parts = []
     roots = compact_list(metrics.get("configured_model_source_roots"))
@@ -1303,6 +1316,13 @@ def so101_reviewed_model_authority_gate_row(artifact: dict[str, Any]) -> list[An
         metrics.get("blocker_packet_action_required_count", ""),
         compact_list(metrics.get("blocker_packet_blocked_by_prior_requirements_item_ids")),
         compact_list(metrics.get("blocker_packet_next_action_ids")),
+        compact_mapping(metrics.get("checklist_status_by_requirement_id")),
+        compact_mapping(metrics.get("checklist_next_action_ids_by_requirement_id")),
+        compact_mapping(
+            metrics.get(
+                "checklist_blocked_by_prior_requirement_ids_by_requirement_id"
+            )
+        ),
         "ok" if artifact.get("exists") is True else "missing",
     ]
 
@@ -2884,6 +2904,9 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Action Required",
                 "Blocked Prior",
                 "Packet Next Actions",
+                "Checklist Statuses",
+                "Checklist Next Actions",
+                "Checklist Prior Blockers",
                 "Artifact Status",
             ],
             [

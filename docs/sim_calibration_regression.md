@@ -654,10 +654,13 @@ The nested
 `reviewed_mujoco_motion_model_digest_mismatch`, or the ready status
 `reviewed_mujoco_motion_matches_bundle_model_identity`; the aggregate gate stays
 blocked until the reviewed-motion model path, declared digest, and observed
-model-file digest match the reviewed bundle identity. The generated artifact index and HTML/Markdown report surface
-both `physical_reviewed_model_motion_child_ready` and
-`reviewed_mujoco_motion_bundle_consistency_status` so reviewers can distinguish
-child MuJoCo motion from aggregate reviewed SO-101 authority.
+model-file digest match the reviewed bundle identity. The generated artifact
+index and HTML/Markdown report surface
+`physical_reviewed_model_motion_child_ready`,
+`reviewed_mujoco_motion_bundle_consistency_status`, and the reviewed-authority
+checklist status/next-action/prior-blocker maps so reviewers can distinguish
+child MuJoCo motion from aggregate reviewed SO-101 authority and verify priority
+semantics without opening the gate JSON by hand.
 
 The standalone reviewed-authority gate matrix writes
 `so101_reviewed_authority_gate_matrix_summary.json`, `.csv`, and `README.md`.
