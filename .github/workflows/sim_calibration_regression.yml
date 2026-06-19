@@ -1027,6 +1027,8 @@ jobs:
               "board_seeded_reviewed_authority_rejected",
               "board_manual_reset_pose_reviewed_authority_rejected",
               "board_missing_release_detail_reviewed_authority_rejected",
+              "board_missing_final_contact_reviewed_authority_rejected",
+              "board_target_tolerance_reviewed_authority_rejected",
               "rollout_raw_ready_development_authority_rejected",
               "rollout_reviewed_authority_not_ready",
               "all_ready_reviewed_contract_state",
@@ -1072,6 +1074,18 @@ jobs:
           assert missing_release["board_pick_release_contact_cleared_after_retreat"] is False, missing_release
           assert missing_release["reviewed_model_backed_board_source_pick_place"] is False, missing_release
           assert missing_release["ready"] is False, missing_release
+          missing_final_contact = by_case["board_missing_final_contact_reviewed_authority_rejected"]["gate"]
+          assert missing_final_contact["board_pick_reviewed_model_authority_ready"] is True, missing_final_contact
+          assert missing_final_contact["board_pick_detailed_evidence_ready"] is False, missing_final_contact
+          assert missing_final_contact["board_pick_final_board_contact_observed"] is False, missing_final_contact
+          assert missing_final_contact["reviewed_model_backed_board_source_pick_place"] is False, missing_final_contact
+          assert missing_final_contact["ready"] is False, missing_final_contact
+          target_outside_tolerance = by_case["board_target_tolerance_reviewed_authority_rejected"]["gate"]
+          assert target_outside_tolerance["board_pick_reviewed_model_authority_ready"] is True, target_outside_tolerance
+          assert target_outside_tolerance["board_pick_detailed_evidence_ready"] is False, target_outside_tolerance
+          assert target_outside_tolerance["board_pick_final_target_xy_error_m"] > target_outside_tolerance["board_pick_target_xy_tolerance_m"], target_outside_tolerance
+          assert target_outside_tolerance["reviewed_model_backed_board_source_pick_place"] is False, target_outside_tolerance
+          assert target_outside_tolerance["ready"] is False, target_outside_tolerance
           ready = by_case["all_ready_reviewed_contract_state"]["gate"]
           assert ready["ready"] is True, ready
           assert ready["board_pick_detailed_evidence_ready"] is True, ready

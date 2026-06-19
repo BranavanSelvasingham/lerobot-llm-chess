@@ -264,6 +264,24 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         ),
         "release_contact_cleared_after_retreat": False,
     }
+    board_reviewed_missing_final_contact = {
+        **board_pick_state(
+            summaries / "board_reviewed_missing_final_contact.json",
+            model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+            ready_for_model_backed_ik=True,
+            seeded_source_pose=False,
+        ),
+        "final_board_contact_observed": False,
+    }
+    board_reviewed_target_outside_tolerance = {
+        **board_pick_state(
+            summaries / "board_reviewed_target_outside_tolerance.json",
+            model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+            ready_for_model_backed_ik=True,
+            seeded_source_pose=False,
+        ),
+        "final_target_xy_error_m": 0.05,
+    }
     rollout_dev_blocked = rollout_state(
         summaries / "rollout_dev_blocked.json",
         ready_for_policy_training=False,
@@ -501,6 +519,50 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             "contact": contact_ready,
             "grasp": grasp_ready,
             "board": board_reviewed_missing_release,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": False,
+                "board_authority": True,
+                "board_detail": False,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "blockers_contain": ["reviewed_model_backed_board_source_pick_place"],
+                "next_priority_gate": "scripted_contact_grasp_pick_place",
+            },
+        },
+        {
+            "case_id": "board_missing_final_contact_reviewed_authority_rejected",
+            "authority": authority_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed_missing_final_contact,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": False,
+                "board_authority": True,
+                "board_detail": False,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "blockers_contain": ["reviewed_model_backed_board_source_pick_place"],
+                "next_priority_gate": "scripted_contact_grasp_pick_place",
+            },
+        },
+        {
+            "case_id": "board_target_tolerance_reviewed_authority_rejected",
+            "authority": authority_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed_target_outside_tolerance,
             "rollouts": rollout_reviewed_ready,
             "expect": {
                 "ready": False,
