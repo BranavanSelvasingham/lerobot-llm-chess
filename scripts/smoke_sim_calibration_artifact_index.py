@@ -3037,6 +3037,7 @@ def collect_so101_training_readiness_gate_artifacts(
     for key, label_suffix in (
         ("summary_json", "summary"),
         ("checklist_csv", "checklist"),
+        ("priority_gate_queue_csv", "priority_gate_queue"),
         ("readme_md", "readme"),
     ):
         add_path(
@@ -3054,6 +3055,7 @@ def collect_so101_training_readiness_gate_artifacts(
         **metrics,
         "summary_path": artifact_paths.get("summary_json") or gate.get("summary_path"),
         "checklist_csv_path": artifact_paths.get("checklist_csv"),
+        "priority_gate_queue_csv_path": artifact_paths.get("priority_gate_queue_csv"),
         "readme_md_path": artifact_paths.get("readme_md"),
         "artifact_paths": artifact_paths,
     }

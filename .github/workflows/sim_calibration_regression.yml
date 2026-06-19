@@ -1296,6 +1296,7 @@ jobs:
           python scripts/smoke_sim_so101_training_readiness_gate_matrix.py \
             --output-dir "${SO101_TRAINING_READINESS_GATE_MATRIX_OUTPUT_DIR}"
           python - <<'PY'
+          import csv
           import json
           import os
           from pathlib import Path
@@ -1332,6 +1333,20 @@ jobs:
               "all_ready_reviewed_contract_state",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
+          for case in summary["cases"]:
+              artifact_paths = case.get("artifacts", {})
+              queue_csv = artifact_paths.get("priority_gate_queue_csv")
+              assert queue_csv and Path(queue_csv).is_file(), case
+              with Path(queue_csv).open(newline="") as handle:
+                  queue_rows = list(csv.DictReader(handle))
+              assert len(queue_rows) == 5, (case["case_id"], queue_rows)
+              assert [row.get("gate_id") for row in queue_rows] == [
+                  "reviewed_model_authority",
+                  "mujoco_scene_validity",
+                  "gymnasium_task_wiring",
+                  "scripted_contact_grasp_pick_place",
+                  "focused_training_rollouts",
+              ], (case["case_id"], queue_rows)
           by_case = {case["case_id"]: case for case in summary["cases"]}
           motion_missing = by_case["reviewed_authority_motion_not_checked_rejected"]["gate"]
           assert motion_missing["ready"] is False, motion_missing
@@ -3323,6 +3338,12 @@ jobs:
                   assert metrics.get("next_priority_gate_id") in metrics.get("priority_gate_order"), metrics
                   assert metrics.get("next_priority_action_ids"), metrics
                   assert metrics.get("development_fixture_evidence_not_policy_training_truth") is True, metrics
+          assert any(
+              row.get("label") == "so101_training_readiness_gate:priority_gate_queue"
+              and row.get("kind") == "csv"
+              and row.get("exists") is True
+              for row in artifacts_by_category["so101_training_readiness_gate"]
+          ), artifacts_by_category["so101_training_readiness_gate"]
           assert any(
               row.get("label") == "so101_mujoco_scene:model_xml"
               and row.get("exists") is True

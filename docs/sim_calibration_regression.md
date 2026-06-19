@@ -363,8 +363,9 @@ summary is supplied as a rollout prerequisite. The training-readiness gate
 aggregates reviewed model authority, reviewed model-backed board-source
 pick/place, and rollout authority into one explicit serious-training blocker.
 It also emits `priority_gate_queue`, `priority_gate_order`,
-`next_priority_gate_id`, and `next_priority_action_ids` so the missing work
-stays ordered as reviewed model authority, MuJoCo scene validity, Gymnasium task
+`next_priority_gate_id`, `next_priority_action_ids`, and
+`so101_training_readiness_gate_priority_queue.csv` so the missing work stays
+ordered as reviewed model authority, MuJoCo scene validity, Gymnasium task
 wiring, scripted contact/grasp/pick/place evidence, and only then focused
 training rollouts. A later gate can carry hardware-free automation evidence
 while remaining `blocked_by_prior_requirements` or `development_evidence_only`
@@ -977,6 +978,7 @@ Common artifact paths under the output directory:
 - `so101_model_bundle_probe/README.md`
 - `so101_training_readiness_gate/so101_training_readiness_gate.json`
 - `so101_training_readiness_gate/so101_training_readiness_gate_checklist.csv`
+- `so101_training_readiness_gate/so101_training_readiness_gate_priority_queue.csv`
 - `so101_training_readiness_gate/README.md`
 - `so101_model_contract/so101_model_contract_summary.json`
 - `so101_model_contract/so101_model_contract_checklist.csv`

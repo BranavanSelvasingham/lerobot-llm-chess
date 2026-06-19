@@ -19,6 +19,7 @@ from smoke_sim_calibration_regression_suite import (  # noqa: E402
     REVIEWED_SO101_MODEL_AUTHORITY,
     SO101_TRAINING_PRIORITY_STAGE_IDS,
     so101_training_readiness_gate_section,
+    write_so101_training_readiness_gate_artifacts,
 )
 
 DEFAULT_OUTPUT_DIR = (
@@ -79,6 +80,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "next_priority_gate_id",
         "next_priority_action_ids",
         "priority_gate_order",
+        "priority_gate_queue_csv",
         "blockers",
         "expected_gate_ready",
         "errors",
@@ -969,6 +971,28 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
     summary_path = case_dir / "so101_training_readiness_gate.json"
     case_dir.mkdir(parents=True, exist_ok=True)
     write_json(summary_path, gate)
+    artifact_payload = write_so101_training_readiness_gate_artifacts(case_dir, gate)
+    artifact_paths = artifact_payload.get("artifacts")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    priority_queue_csv_path = artifact_paths.get("priority_gate_queue_csv")
+    if not isinstance(priority_queue_csv_path, str) or not Path(priority_queue_csv_path).is_file():
+        errors.append("priority_gate_queue_csv: expected existing artifact path")
+        priority_queue_csv_rows: list[dict[str, Any]] = []
+    else:
+        with Path(priority_queue_csv_path).open(newline="") as handle:
+            priority_queue_csv_rows = list(csv.DictReader(handle))
+        add_error(
+            errors,
+            "priority_gate_queue_csv_row_count",
+            len(priority_queue_csv_rows),
+            len(SO101_TRAINING_PRIORITY_STAGE_IDS),
+        )
+        add_error(
+            errors,
+            "priority_gate_queue_csv_gate_ids",
+            [row.get("gate_id") for row in priority_queue_csv_rows],
+            list(SO101_TRAINING_PRIORITY_STAGE_IDS),
+        )
     return {
         "case_id": spec["case_id"],
         "ok": not errors,
@@ -976,6 +1000,7 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         "errors": errors,
         "expected": expect,
         "summary_path": str(summary_path),
+        "artifacts": artifact_paths,
         "gate": gate,
     }
 
@@ -1014,6 +1039,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "next_priority_gate_id": gate.get("next_priority_gate_id"),
         "next_priority_action_ids": gate.get("next_priority_action_ids"),
         "priority_gate_order": gate.get("priority_gate_order"),
+        "priority_gate_queue_csv": case.get("artifacts", {}).get("priority_gate_queue_csv"),
         "blockers": gate.get("blockers"),
         "expected_gate_ready": case["expected"].get("ready"),
         "errors": case["errors"],
@@ -1058,6 +1084,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "",
             "- `all_ready_reviewed_contract_state` exercises the ready branch only; its injected dictionaries are not reviewed robot evidence.",
             "- `priority_gate_queue` preserves reviewed authority, MuJoCo scene, Gymnasium task wiring, scripted pick/place, then training rollout order.",
+            "- Each case writes `so101_training_readiness_gate_priority_queue.csv` so the prioritized missing-gate order is reviewable without parsing nested JSON.",
             "- Draft, development, and fixture-only model-authority labels are rejected even when raw readiness booleans are true.",
             "- Board-pick readiness requires detailed source-start, contact, lift, transfer, place, release, final-board-contact, and target-tolerance evidence.",
             "- Reviewed rollout readiness requires status `ok`, reviewed-policy-ready authority status, `policy_training` use, policy-authority evidence, and no serious-policy blockers.",

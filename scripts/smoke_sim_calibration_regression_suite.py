@@ -106,6 +106,9 @@ SO101_TRAINING_READINESS_GATE_SCHEMA = "lerobot.sim.so101_training_readiness_gat
 SO101_TRAINING_READINESS_GATE_DIR_NAME = "so101_training_readiness_gate"
 SO101_TRAINING_READINESS_GATE_SUMMARY_NAME = "so101_training_readiness_gate.json"
 SO101_TRAINING_READINESS_GATE_CHECKLIST_NAME = "so101_training_readiness_gate_checklist.csv"
+SO101_TRAINING_READINESS_GATE_PRIORITY_QUEUE_NAME = (
+    "so101_training_readiness_gate_priority_queue.csv"
+)
 SO101_TRAINING_READINESS_GATE_README_NAME = "README.md"
 SO101_TRAINING_ROLLOUTS_DIR_NAME = "so101_training_rollouts"
 SO101_TRAINING_ROLLOUTS_SUMMARY_NAME = "so101_training_rollouts_summary.json"
@@ -1674,6 +1677,7 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         f"- `{SO101_MUJOCO_BOARD_PICK_PROBE_DIR_NAME}/{SO101_MUJOCO_BOARD_PICK_PROBE_SUMMARY_NAME}`",
         f"- `{SO101_TRAINING_READINESS_GATE_DIR_NAME}/{SO101_TRAINING_READINESS_GATE_SUMMARY_NAME}`",
         f"- `{SO101_TRAINING_READINESS_GATE_DIR_NAME}/{SO101_TRAINING_READINESS_GATE_CHECKLIST_NAME}`",
+        f"- `{SO101_TRAINING_READINESS_GATE_DIR_NAME}/{SO101_TRAINING_READINESS_GATE_PRIORITY_QUEUE_NAME}`",
         f"- `{SO101_TRAINING_READINESS_GATE_DIR_NAME}/{SO101_TRAINING_READINESS_GATE_README_NAME}`",
         f"- `{SO101_TRAINING_ROLLOUTS_DIR_NAME}/{SO101_TRAINING_ROLLOUTS_SUMMARY_NAME}`",
         "- `gripper_camera_pov_review/gripper_camera_pov_review_summary.json`",
@@ -5608,10 +5612,12 @@ def write_so101_training_readiness_gate_artifacts(
     gate_dir = output_dir / SO101_TRAINING_READINESS_GATE_DIR_NAME
     summary_path = gate_dir / SO101_TRAINING_READINESS_GATE_SUMMARY_NAME
     checklist_path = gate_dir / SO101_TRAINING_READINESS_GATE_CHECKLIST_NAME
+    priority_queue_path = gate_dir / SO101_TRAINING_READINESS_GATE_PRIORITY_QUEUE_NAME
     readme_path = gate_dir / SO101_TRAINING_READINESS_GATE_README_NAME
     artifacts = {
         "summary_json": str(summary_path),
         "checklist_csv": str(checklist_path),
+        "priority_gate_queue_csv": str(priority_queue_path),
         "readme_md": str(readme_path),
     }
     payload = {
@@ -5703,6 +5709,31 @@ def write_so101_training_readiness_gate_artifacts(
         writer.writeheader()
         for row in checklist_rows:
             writer.writerow(row)
+
+    priority_fieldnames = (
+        "priority",
+        "gate_id",
+        "title",
+        "required_state",
+        "status",
+        "training_ready",
+        "automation_evidence_ready",
+        "blocked_by_prior_gate_ids",
+        "next_action_ids",
+        "evidence_artifact_paths",
+    )
+    with priority_queue_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=priority_fieldnames)
+        writer.writeheader()
+        for stage in gate.get("priority_gate_queue", []):
+            if isinstance(stage, dict):
+                writer.writerow(
+                    {
+                        field: csv_cell(stage.get(field))
+                        for field in priority_fieldnames
+                    }
+                )
+
     blocker_lines = (
         [f"- `{blocker}`" for blocker in gate.get("blockers", [])]
         if gate.get("blockers")
@@ -5733,6 +5764,7 @@ def write_so101_training_readiness_gate_artifacts(
                 f"`{markdown_list_value(gate.get('next_priority_action_ids'))}`",
                 "- Priority gate order: "
                 f"`{markdown_list_value(gate.get('priority_gate_order'))}`",
+                f"- Priority gate queue rows: `{priority_queue_path}`",
                 "",
                 "## Blockers",
                 "",
