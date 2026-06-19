@@ -90,6 +90,14 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "ready_for_model_backed_ik",
         "ready_for_policy_training",
         "physical_authority",
+        "reviewed_mujoco_handoff_requested",
+        "reviewed_mujoco_handoff_required",
+        "reviewed_mujoco_handoff_intake_status",
+        "reviewed_mujoco_handoff_ready",
+        "reviewed_mujoco_handoff_model_authority",
+        "reviewed_mujoco_handoff_physical_truth_claimed",
+        "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority",
+        "scene_uses_reviewed_mujoco_handoff",
         "mujoco_scene_validity_status",
         "configuration_error",
         "model_xml_exists",
@@ -123,6 +131,41 @@ def read_json_object(path: Path, *, label: str) -> dict[str, Any]:
     return payload
 
 
+def handoff_fixture_payload(state: str) -> dict[str, Any]:
+    ready = state == "ready"
+    fixture_ready = state == "fixture"
+    return {
+        "schema": "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1",
+        "ok": True,
+        "status": "physical_reviewed_mujoco_handoff_ready"
+        if ready
+        else "fixture_mujoco_handoff_ready_not_physical_authority"
+        if fixture_ready
+        else "waiting_for_reviewed_bundle_authority",
+        "model_authority": "downstream_handoff_not_authority",
+        "downstream_handoff_ready": ready,
+        "fixture_handoff_ready_not_physical_so101_authority": fixture_ready,
+        "observed_evidence_is_authority": False,
+        "physical_so101_truth_claimed": False,
+        "development_fixture_evidence_not_physical_so101_truth": True,
+        "handoff_item_count": 1,
+        "handoff_item_ids": ["downstream_gate_handoff"],
+        "handoff_items": [
+            {
+                "priority": 1,
+                "handoff_key": "downstream_gate_handoff",
+                "status": "physical_reviewed_mujoco_handoff_ready"
+                if ready
+                else "fixture_mujoco_handoff_ready_not_physical_authority"
+                if fixture_ready
+                else "waiting_for_reviewed_bundle_authority",
+                "ready_for_downstream": ready,
+                "authority_status": "physical_handoff_ready" if ready else "blocked",
+            }
+        ],
+    }
+
+
 def case_specs() -> list[dict[str, Any]]:
     return [
         {"case_id": "center_file_scene_e4_e5", "source_square": "e4", "target_square": "e5", "expect_ok": True},
@@ -150,6 +193,27 @@ def case_specs() -> list[dict[str, Any]]:
             "max_steps": 0,
             "expect_ok": False,
             "expected_error_contains": "max_steps must be positive",
+        },
+        {
+            "case_id": "required_handoff_not_ready_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": False,
+            "handoff_state": "not_ready",
+            "require_handoff": True,
+            "expected_status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "expected_handoff_intake_status": "reviewed_mujoco_handoff_not_ready",
+            "expected_handoff_ready": False,
+        },
+        {
+            "case_id": "ready_handoff_intake_still_development_scene",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": True,
+            "handoff_state": "ready",
+            "expected_handoff_intake_status": "reviewed_mujoco_handoff_ready_for_scene_intake",
+            "expected_handoff_ready": True,
         },
     ]
 
@@ -210,11 +274,17 @@ def summarize_case(
     manifest_path = artifacts.get("manifest_json")
     expect_ok = bool(spec.get("expect_ok", True))
     expected_return_code = 0 if expect_ok else 1
-    expected_status = "ok" if expect_ok else "invalid_task_configuration"
+    expected_status = spec.get(
+        "expected_status",
+        "ok" if expect_ok else "invalid_task_configuration",
+    )
     expected_scene_validity_status = (
-        "development_scene_validated_not_physical_authority"
-        if expect_ok
-        else "invalid_task_configuration"
+        spec.get("expected_scene_validity_status")
+        or (
+            "development_scene_validated_not_physical_authority"
+            if expect_ok
+            else "invalid_task_configuration"
+        )
     )
     configuration_error = summary.get("configuration_error")
     configuration_error = configuration_error if isinstance(configuration_error, dict) else {}
@@ -237,6 +307,30 @@ def summarize_case(
         "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
         "ready_for_policy_training": summary.get("ready_for_policy_training"),
         "physical_authority": summary.get("observed_evidence_is_physical_so101_authority"),
+        "reviewed_mujoco_handoff_requested": summary.get(
+            "reviewed_mujoco_handoff_requested"
+        ),
+        "reviewed_mujoco_handoff_required": summary.get(
+            "reviewed_mujoco_handoff_required"
+        ),
+        "reviewed_mujoco_handoff_intake_status": summary.get(
+            "reviewed_mujoco_handoff_intake_status"
+        ),
+        "reviewed_mujoco_handoff_ready": summary.get(
+            "reviewed_mujoco_handoff_ready"
+        ),
+        "reviewed_mujoco_handoff_model_authority": summary.get(
+            "reviewed_mujoco_handoff_model_authority"
+        ),
+        "reviewed_mujoco_handoff_physical_truth_claimed": summary.get(
+            "reviewed_mujoco_handoff_physical_truth_claimed"
+        ),
+        "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": summary.get(
+            "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority"
+        ),
+        "scene_uses_reviewed_mujoco_handoff": summary.get(
+            "scene_uses_reviewed_mujoco_handoff"
+        ),
         "mujoco_scene_validity_status": summary.get("mujoco_scene_validity_status"),
         "configuration_error": configuration_error,
         "model_xml_exists": isinstance(model_xml_path, str) and Path(model_xml_path).is_file(),
@@ -306,6 +400,53 @@ def summarize_case(
     add_error(errors, f"{case_id}.ready_for_model_backed_ik", observations["ready_for_model_backed_ik"], False)
     add_error(errors, f"{case_id}.ready_for_policy_training", observations["ready_for_policy_training"], False)
     add_error(errors, f"{case_id}.physical_authority", observations["physical_authority"], False)
+    expected_handoff_requested = "handoff_state" in spec
+    add_error(
+        errors,
+        f"{case_id}.reviewed_mujoco_handoff_requested",
+        observations["reviewed_mujoco_handoff_requested"],
+        expected_handoff_requested,
+    )
+    add_error(
+        errors,
+        f"{case_id}.reviewed_mujoco_handoff_required",
+        observations["reviewed_mujoco_handoff_required"],
+        bool(spec.get("require_handoff", False)),
+    )
+    if "expected_handoff_intake_status" in spec:
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_intake_status",
+            observations["reviewed_mujoco_handoff_intake_status"],
+            spec["expected_handoff_intake_status"],
+        )
+    if "expected_handoff_ready" in spec:
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_ready",
+            observations["reviewed_mujoco_handoff_ready"],
+            spec["expected_handoff_ready"],
+        )
+    if expected_handoff_requested:
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_model_authority",
+            observations["reviewed_mujoco_handoff_model_authority"],
+            "downstream_handoff_not_authority",
+        )
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_physical_truth_claimed",
+            observations["reviewed_mujoco_handoff_physical_truth_claimed"],
+            False,
+        )
+    if expect_ok:
+        add_error(
+            errors,
+            f"{case_id}.scene_uses_reviewed_mujoco_handoff",
+            observations["scene_uses_reviewed_mujoco_handoff"],
+            False,
+        )
     artifacts = observations["artifacts"]
     if not isinstance(artifacts, dict):
         errors.append(f"{case_id}.artifacts: expected dict")
@@ -348,6 +489,11 @@ def run_case(
 ) -> dict[str, Any]:
     case_id = spec["case_id"]
     case_dir = output_dir / "cases" / case_id
+    handoff_state = spec.get("handoff_state")
+    handoff_path = None
+    if isinstance(handoff_state, str):
+        handoff_path = case_dir / "reviewed_mujoco_handoff.json"
+        write_json(handoff_path, handoff_fixture_payload(handoff_state))
     command = [
         executable_arg(python_path),
         str(SCENE_SCRIPT),
@@ -360,6 +506,10 @@ def run_case(
         "--max-steps",
         str(spec.get("max_steps", 96)),
     ]
+    if handoff_path is not None:
+        command.extend(["--reviewed-mujoco-handoff-json", str(handoff_path)])
+    if spec.get("require_handoff") is True:
+        command.append("--require-reviewed-mujoco-handoff")
     record, summary = run_child(
         case_dir=case_dir,
         command=command,
@@ -391,6 +541,30 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "ready_for_model_backed_ik": observations.get("ready_for_model_backed_ik"),
         "ready_for_policy_training": observations.get("ready_for_policy_training"),
         "physical_authority": observations.get("physical_authority"),
+        "reviewed_mujoco_handoff_requested": observations.get(
+            "reviewed_mujoco_handoff_requested"
+        ),
+        "reviewed_mujoco_handoff_required": observations.get(
+            "reviewed_mujoco_handoff_required"
+        ),
+        "reviewed_mujoco_handoff_intake_status": observations.get(
+            "reviewed_mujoco_handoff_intake_status"
+        ),
+        "reviewed_mujoco_handoff_ready": observations.get(
+            "reviewed_mujoco_handoff_ready"
+        ),
+        "reviewed_mujoco_handoff_model_authority": observations.get(
+            "reviewed_mujoco_handoff_model_authority"
+        ),
+        "reviewed_mujoco_handoff_physical_truth_claimed": observations.get(
+            "reviewed_mujoco_handoff_physical_truth_claimed"
+        ),
+        "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": observations.get(
+            "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority"
+        ),
+        "scene_uses_reviewed_mujoco_handoff": observations.get(
+            "scene_uses_reviewed_mujoco_handoff"
+        ),
         "mujoco_scene_validity_status": observations.get("mujoco_scene_validity_status"),
         "configuration_error": observations.get("configuration_error"),
         "model_xml_exists": observations.get("model_xml_exists"),
@@ -414,17 +588,18 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         "",
         "## Cases",
         "",
-        "| Case | Status | Source | Target | Squares | Target Frame | Target Marker | Env Complete | Summary |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Case | Status | Source | Target | Handoff | Squares | Target Frame | Target Marker | Env Complete | Summary |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for case in summary["cases"]:
         obs = case["observations"]
         lines.append(
-            "| `{case_id}` | `{status}` | `{source}` | `{target}` | `{squares}` | `{frame}` | `{marker}` | `{env}` | `{summary}` |".format(
+            "| `{case_id}` | `{status}` | `{source}` | `{target}` | `{handoff}` | `{squares}` | `{frame}` | `{marker}` | `{env}` | `{summary}` |".format(
                 case_id=case["case_id"],
                 status=case["status"],
                 source=obs.get("source_square"),
                 target=obs.get("target_square"),
+                handoff=obs.get("reviewed_mujoco_handoff_intake_status"),
                 squares=obs.get("square_geom_count"),
                 frame=obs.get("target_frame_site_present"),
                 marker=obs.get("target_marker_present"),
@@ -438,6 +613,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "## Caveats",
             "",
             "- All cases use generated `development_scaffold_not_reviewed` MJCF.",
+            "- Reviewed handoff cases exercise intake/fail-closed behavior only; the generated scene still does not use a reviewed robot model.",
             "- Passing cases prove MuJoCo loading, joint sync, target marker/site presence, and Gymnasium loop plumbing only.",
             "- `ready_for_model_backed_ik` and `ready_for_policy_training` must remain false.",
         ]

@@ -3350,6 +3350,20 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "joint_state_fallback_active",
         "gymnasium_task_wiring_status",
         "mujoco_scene_validity_status",
+        "reviewed_mujoco_handoff_requested",
+        "reviewed_mujoco_handoff_required",
+        "reviewed_mujoco_handoff_path",
+        "reviewed_mujoco_handoff_intake_status",
+        "reviewed_mujoco_handoff_intake_ok",
+        "reviewed_mujoco_handoff_ready",
+        "reviewed_mujoco_handoff_source_status",
+        "reviewed_mujoco_handoff_model_authority",
+        "reviewed_mujoco_handoff_observed_evidence_is_authority",
+        "reviewed_mujoco_handoff_physical_truth_claimed",
+        "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority",
+        "reviewed_mujoco_handoff_item_ids",
+        "reviewed_mujoco_handoff_blockers",
+        "scene_uses_reviewed_mujoco_handoff",
         "max_steps",
         "square_geom_count",
         "target_frame_site_present",
@@ -6701,6 +6715,10 @@ def main() -> int:
 
     so101_mujoco_scene_dir = output_dir / SO101_MUJOCO_SCENE_DIR_NAME
     so101_mujoco_scene_summary_path = so101_mujoco_scene_dir / SO101_MUJOCO_SCENE_SUMMARY_NAME
+    so101_reviewed_mujoco_downstream_handoff_path = (
+        so101_reviewed_mujoco_bundle_dir
+        / SO101_REVIEWED_MUJOCO_BUNDLE_DOWNSTREAM_HANDOFF_NAME
+    )
     so101_mujoco_scene_record, so101_mujoco_scene = run_child(
         name="so101_mujoco_scene",
         command=[
@@ -6712,6 +6730,8 @@ def main() -> int:
             str(args.source_square),
             "--target-square",
             str(args.target_square),
+            "--reviewed-mujoco-handoff-json",
+            str(so101_reviewed_mujoco_downstream_handoff_path),
         ],
         output_dir=so101_mujoco_scene_dir,
         expected_json_path=so101_mujoco_scene_summary_path,

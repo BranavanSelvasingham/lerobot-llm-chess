@@ -31,6 +31,7 @@ SO101_JOINTS: tuple[str, ...] = (
     "gripper",
 )
 DEVELOPMENT_MODEL_AUTHORITY = "development_scaffold_not_reviewed"
+DOWNSTREAM_HANDOFF_MODEL_AUTHORITY = "downstream_handoff_not_authority"
 
 
 def parse_args() -> argparse.Namespace:
@@ -45,6 +46,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source-square", default="e4")
     parser.add_argument("--target-square", default="e5")
     parser.add_argument("--max-steps", type=int, default=96)
+    parser.add_argument(
+        "--reviewed-mujoco-handoff-json",
+        type=Path,
+        default=None,
+        help=(
+            "Optional reviewed MuJoCo downstream handoff JSON from "
+            "smoke_sim_so101_reviewed_mujoco_bundle.py. The generated scene stays "
+            "development-only; this intake records whether reviewed scene work is "
+            "blocked by the handoff gate."
+        ),
+    )
+    parser.add_argument(
+        "--require-reviewed-mujoco-handoff",
+        action="store_true",
+        help="Fail closed unless --reviewed-mujoco-handoff-json is present and downstream_handoff_ready is true.",
+    )
     return parser.parse_args()
 
 
@@ -74,6 +91,131 @@ def write_steps(path: Path, rows: list[dict[str, Any]]) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow({field: row.get(field, "") for field in fieldnames})
+
+
+def reviewed_handoff_intake(
+    path: Path | None,
+    *,
+    required: bool,
+) -> dict[str, Any]:
+    if path is None:
+        return {
+            "reviewed_mujoco_handoff_requested": False,
+            "reviewed_mujoco_handoff_required": required,
+            "reviewed_mujoco_handoff_path": None,
+            "reviewed_mujoco_handoff_intake_status": "not_requested",
+            "reviewed_mujoco_handoff_intake_ok": not required,
+            "reviewed_mujoco_handoff_ready": False,
+            "reviewed_mujoco_handoff_source_status": None,
+            "reviewed_mujoco_handoff_model_authority": None,
+            "reviewed_mujoco_handoff_observed_evidence_is_authority": None,
+            "reviewed_mujoco_handoff_physical_truth_claimed": None,
+            "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": False,
+            "reviewed_mujoco_handoff_item_ids": [],
+            "reviewed_mujoco_handoff_blockers": ["supply_reviewed_mujoco_downstream_handoff"]
+            if required
+            else [],
+        }
+
+    resolved = path.expanduser().resolve(strict=False)
+    if not resolved.is_file():
+        return {
+            "reviewed_mujoco_handoff_requested": True,
+            "reviewed_mujoco_handoff_required": required,
+            "reviewed_mujoco_handoff_path": str(resolved),
+            "reviewed_mujoco_handoff_intake_status": "handoff_json_missing",
+            "reviewed_mujoco_handoff_intake_ok": False,
+            "reviewed_mujoco_handoff_ready": False,
+            "reviewed_mujoco_handoff_source_status": None,
+            "reviewed_mujoco_handoff_model_authority": None,
+            "reviewed_mujoco_handoff_observed_evidence_is_authority": None,
+            "reviewed_mujoco_handoff_physical_truth_claimed": None,
+            "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": False,
+            "reviewed_mujoco_handoff_item_ids": [],
+            "reviewed_mujoco_handoff_blockers": ["supply_reviewed_mujoco_downstream_handoff"],
+        }
+
+    try:
+        payload = json.loads(resolved.read_text())
+    except Exception as exc:
+        return {
+            "reviewed_mujoco_handoff_requested": True,
+            "reviewed_mujoco_handoff_required": required,
+            "reviewed_mujoco_handoff_path": str(resolved),
+            "reviewed_mujoco_handoff_intake_status": "handoff_json_parse_error",
+            "reviewed_mujoco_handoff_intake_ok": False,
+            "reviewed_mujoco_handoff_ready": False,
+            "reviewed_mujoco_handoff_source_status": None,
+            "reviewed_mujoco_handoff_model_authority": None,
+            "reviewed_mujoco_handoff_observed_evidence_is_authority": None,
+            "reviewed_mujoco_handoff_physical_truth_claimed": None,
+            "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": False,
+            "reviewed_mujoco_handoff_item_ids": [],
+            "reviewed_mujoco_handoff_blockers": [f"{type(exc).__name__}: {exc}"],
+        }
+    if not isinstance(payload, dict):
+        return {
+            "reviewed_mujoco_handoff_requested": True,
+            "reviewed_mujoco_handoff_required": required,
+            "reviewed_mujoco_handoff_path": str(resolved),
+            "reviewed_mujoco_handoff_intake_status": "handoff_json_not_object",
+            "reviewed_mujoco_handoff_intake_ok": False,
+            "reviewed_mujoco_handoff_ready": False,
+            "reviewed_mujoco_handoff_source_status": None,
+            "reviewed_mujoco_handoff_model_authority": None,
+            "reviewed_mujoco_handoff_observed_evidence_is_authority": None,
+            "reviewed_mujoco_handoff_physical_truth_claimed": None,
+            "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": False,
+            "reviewed_mujoco_handoff_item_ids": [],
+            "reviewed_mujoco_handoff_blockers": ["handoff_json_not_object"],
+        }
+
+    item_ids = payload.get("handoff_item_ids")
+    item_ids = [str(item) for item in item_ids] if isinstance(item_ids, list) else []
+    contract_ok = (
+        payload.get("model_authority") == DOWNSTREAM_HANDOFF_MODEL_AUTHORITY
+        and payload.get("observed_evidence_is_authority") is False
+        and payload.get("physical_so101_truth_claimed") is False
+        and "downstream_gate_handoff" in item_ids
+    )
+    ready = payload.get("downstream_handoff_ready") is True
+    fixture_ready = (
+        payload.get("fixture_handoff_ready_not_physical_so101_authority") is True
+    )
+    if not contract_ok:
+        intake_status = "handoff_contract_invalid"
+    elif ready:
+        intake_status = "reviewed_mujoco_handoff_ready_for_scene_intake"
+    elif fixture_ready:
+        intake_status = "fixture_handoff_not_physical_so101_authority"
+    else:
+        intake_status = "reviewed_mujoco_handoff_not_ready"
+    blockers = []
+    if not contract_ok:
+        blockers.append("provide_valid_reviewed_mujoco_downstream_handoff")
+    if not ready:
+        blockers.append("make_reviewed_mujoco_downstream_handoff_ready")
+    return {
+        "reviewed_mujoco_handoff_requested": True,
+        "reviewed_mujoco_handoff_required": required,
+        "reviewed_mujoco_handoff_path": str(resolved),
+        "reviewed_mujoco_handoff_intake_status": intake_status,
+        "reviewed_mujoco_handoff_intake_ok": contract_ok and (ready or not required),
+        "reviewed_mujoco_handoff_ready": ready,
+        "reviewed_mujoco_handoff_source_status": payload.get("status"),
+        "reviewed_mujoco_handoff_model_authority": payload.get("model_authority"),
+        "reviewed_mujoco_handoff_observed_evidence_is_authority": payload.get(
+            "observed_evidence_is_authority"
+        ),
+        "reviewed_mujoco_handoff_physical_truth_claimed": payload.get(
+            "physical_so101_truth_claimed"
+        ),
+        "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": (
+            fixture_ready
+        ),
+        "reviewed_mujoco_handoff_item_ids": item_ids,
+        "reviewed_mujoco_handoff_blockers": blockers,
+    }
 
 
 def joint_positions_from_obs(obs: dict[str, Any]) -> dict[str, float]:
@@ -238,6 +380,8 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- MuJoCo model load ok: `{summary['mujoco_model_load'].get('ok')}`",
         f"- SimRobot MuJoCo sync ok: `{summary['sim_robot_mujoco_sync'].get('ok')}`",
         f"- Env scripted pick/place complete: `{summary['env_scripted_pick_place'].get('scripted_pick_place_complete')}`",
+        f"- Reviewed MuJoCo handoff intake: `{summary.get('reviewed_mujoco_handoff_intake_status')}`",
+        f"- Reviewed MuJoCo handoff ready: `{summary.get('reviewed_mujoco_handoff_ready')}`",
         f"- Generated model: `{summary['artifacts']['model_xml']}`",
         "",
         "This is not a reviewed SO-101 model bundle and must not be used as IK truth.",
@@ -249,6 +393,7 @@ def invalid_task_summary(
     *,
     args: argparse.Namespace,
     deps: dict[str, bool],
+    handoff_intake: dict[str, Any],
     summary_path: Path,
     model_path: Path,
     manifest_path: Path,
@@ -268,6 +413,7 @@ def invalid_task_summary(
         "source_square": args.source_square,
         "target_square": args.target_square,
         "max_steps": args.max_steps,
+        **handoff_intake,
         "configuration_error": {
             "type": "ValueError",
             "message": message,
@@ -310,6 +456,10 @@ def invalid_task_summary(
 def main() -> int:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    handoff_intake = reviewed_handoff_intake(
+        args.reviewed_mujoco_handoff_json,
+        required=bool(args.require_reviewed_mujoco_handoff),
+    )
     deps = {
         "numpy": module_available("numpy"),
         "draccus": module_available("draccus"),
@@ -322,13 +472,69 @@ def main() -> int:
     manifest_path = args.output_dir / MANIFEST_NAME
     steps_path = args.output_dir / STEPS_NAME
     readme_path = args.output_dir / README_NAME
+    if args.require_reviewed_mujoco_handoff and not handoff_intake.get(
+        "reviewed_mujoco_handoff_ready"
+    ):
+        summary = {
+            "schema": "lerobot.sim.so101_mujoco_scene_smoke.v1",
+            "ok": False,
+            "status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "model_authority": DEVELOPMENT_MODEL_AUTHORITY,
+            "observed_evidence_is_physical_so101_authority": False,
+            "ready_for_model_backed_ik": False,
+            "ready_for_policy_training": False,
+            "mujoco_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "source_square": args.source_square,
+            "target_square": args.target_square,
+            "max_steps": args.max_steps,
+            **handoff_intake,
+            "dependencies": deps,
+            "mujoco_model_load": {
+                "ok": False,
+                "status": "not_attempted_reviewed_handoff_not_ready",
+            },
+            "sim_robot_mujoco_sync": {
+                "ok": False,
+                "status": "not_attempted_reviewed_handoff_not_ready",
+            },
+            "env_scripted_pick_place": {
+                "scripted_pick_place_complete": False,
+                "status": "not_attempted_reviewed_handoff_not_ready",
+            },
+            "artifacts": {
+                "summary_json": str(summary_path),
+                "model_xml": str(model_path),
+                "manifest_json": str(manifest_path),
+                "steps_csv": str(steps_path),
+                "readme": str(readme_path),
+            },
+            "limitations": [
+                "Reviewed MuJoCo handoff was required, so the development scene was not generated.",
+                "This failure is hardware-free and does not claim physical SO-101 evidence.",
+            ],
+            "next_required_for_goal": handoff_intake.get(
+                "reviewed_mujoco_handoff_blockers"
+            )
+            or ["make_reviewed_mujoco_downstream_handoff_ready"],
+        }
+        write_json(summary_path, summary)
+        write_steps(steps_path, [])
+        write_readme(readme_path, summary)
+        print(json.dumps({"ok": False, "status": summary["status"], "summary_json": str(summary_path)}, indent=2))
+        return 1
     if missing:
         summary = {
             "schema": "lerobot.sim.so101_mujoco_scene_smoke.v1",
             "ok": False,
             "status": "missing_runtime_dependencies",
+            "model_authority": DEVELOPMENT_MODEL_AUTHORITY,
+            "observed_evidence_is_physical_so101_authority": False,
+            "ready_for_model_backed_ik": False,
+            "ready_for_policy_training": False,
+            "mujoco_scene_validity_status": "missing_runtime_dependencies",
             "missing_dependencies": missing,
             "dependencies": deps,
+            **handoff_intake,
             "artifacts": {
                 "summary_json": str(summary_path),
                 "model_xml": str(model_path),
@@ -339,7 +545,7 @@ def main() -> int:
         }
         write_json(summary_path, summary)
         write_steps(steps_path, [])
-        write_readme(readme_path, {**summary, "model_authority": "not_generated", "mujoco_model_load": {}, "sim_robot_mujoco_sync": {}, "env_scripted_pick_place": {}})
+        write_readme(readme_path, {**summary, "mujoco_model_load": {}, "sim_robot_mujoco_sync": {}, "env_scripted_pick_place": {}})
         print(json.dumps({"ok": False, "status": summary["status"], "summary_json": str(summary_path)}, indent=2))
         return 1
 
@@ -358,6 +564,7 @@ def main() -> int:
         summary = invalid_task_summary(
             args=args,
             deps=deps,
+            handoff_intake=handoff_intake,
             summary_path=summary_path,
             model_path=model_path,
             manifest_path=manifest_path,
@@ -399,6 +606,8 @@ def main() -> int:
         "source_square": args.source_square,
         "target_square": args.target_square,
         "max_steps": args.max_steps,
+        **handoff_intake,
+        "scene_uses_reviewed_mujoco_handoff": False,
         "square_geom_count": model_load.get("square_geom_count"),
         "target_frame_site_present": not bool(model_load.get("missing_required_sites")),
         "target_marker_present": "target_square_marker" not in set(model_load.get("missing_required_geoms") or []),
@@ -423,6 +632,7 @@ def main() -> int:
             "Supply reviewed SO-101 URDF/MJCF/Xacro/XML model path.",
             "Supply mesh asset roots and pass asset preflight.",
             "Fill reviewed authority/provenance, TCP offset, and base-to-board transform in the model bundle manifest.",
+            *handoff_intake.get("reviewed_mujoco_handoff_blockers", []),
         ],
     }
     write_json(summary_path, summary)

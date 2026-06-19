@@ -2242,6 +2242,36 @@ def collect_so101_mujoco_smoke_artifacts(
         ),
         "downstream_handoff_item_count": smoke.get("downstream_handoff_item_count"),
         "downstream_handoff_item_ids": smoke.get("downstream_handoff_item_ids"),
+        "reviewed_mujoco_handoff_requested": smoke.get(
+            "reviewed_mujoco_handoff_requested"
+        ),
+        "reviewed_mujoco_handoff_required": smoke.get(
+            "reviewed_mujoco_handoff_required"
+        ),
+        "reviewed_mujoco_handoff_intake_status": smoke.get(
+            "reviewed_mujoco_handoff_intake_status"
+        ),
+        "reviewed_mujoco_handoff_intake_ok": smoke.get(
+            "reviewed_mujoco_handoff_intake_ok"
+        ),
+        "reviewed_mujoco_handoff_ready": smoke.get(
+            "reviewed_mujoco_handoff_ready"
+        ),
+        "reviewed_mujoco_handoff_source_status": smoke.get(
+            "reviewed_mujoco_handoff_source_status"
+        ),
+        "reviewed_mujoco_handoff_model_authority": smoke.get(
+            "reviewed_mujoco_handoff_model_authority"
+        ),
+        "reviewed_mujoco_handoff_physical_truth_claimed": smoke.get(
+            "reviewed_mujoco_handoff_physical_truth_claimed"
+        ),
+        "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": smoke.get(
+            "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority"
+        ),
+        "scene_uses_reviewed_mujoco_handoff": smoke.get(
+            "scene_uses_reviewed_mujoco_handoff"
+        ),
         "manifest_status": smoke.get("manifest_status"),
         "missing_inputs": smoke.get("missing_inputs"),
         "gymnasium_available": dependencies.get("gymnasium"),
