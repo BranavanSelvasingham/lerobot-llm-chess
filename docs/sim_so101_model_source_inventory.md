@@ -86,7 +86,9 @@ inventory reports `review_evidence_required_groups`,
 `review_evidence_missing_required_groups`, and blocks thin metadata as
 `authority_review_evidence:review_trace` and
 `authority_review_evidence:review_artifact` until a stable artifact handle
-(`review_id` or `review_url`) is supplied. The inventory also reports
+(`review_id` or HTTP(S) `review_url`) is supplied. Use `review_id` for ticket
+IDs, commit IDs, or other non-URL handles; malformed `review_url` values are
+reported as invalid review evidence. The inventory also reports
 `source_authority_review_scope_ready`,
 `source_authority_required_review_scope_ids`,
 `source_authority_supplied_review_scope_ids`, and

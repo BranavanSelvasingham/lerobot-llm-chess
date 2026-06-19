@@ -11,6 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 SCHEMA = "lerobot.sim.so101_model_bundle_probe.v1"
 CANDIDATE_SCHEMA = "lerobot.sim.so101_model_bundle_candidate.v1"
@@ -631,17 +632,46 @@ def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str,
         missing.append("reviewed_by")
     if not args.authority_review_id and not args.authority_review_url:
         missing.append("review_id_or_review_url")
+    invalid_fields = []
+    if args.authority_review_url:
+        parsed_url = urlparse(args.authority_review_url.strip())
+        if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+            invalid_fields.append("review_url")
     if missing:
         return {}, {
             "status": "TODO_authority_review_required",
             "required_fields": ["reviewed_by", "review_id_or_review_url"],
             "optional_fields": ["reviewed_at"],
             "missing_fields": missing,
+            "invalid_fields": invalid_fields,
             "supplied_fields": {key: value for key, value in supplied.items() if value},
             "reason": (
                 "The probe never infers reviewed model authority from a path or asset root; "
                 "reviewed authority needs reviewer identity plus review_id or review_url."
             ),
+        }
+    if invalid_fields and not args.authority_review_id:
+        return {}, {
+            "status": "TODO_authority_review_required",
+            "required_fields": ["reviewed_by", "review_id_or_review_url"],
+            "optional_fields": ["reviewed_at"],
+            "missing_fields": ["review_id_or_valid_review_url"],
+            "invalid_fields": invalid_fields,
+            "supplied_fields": {key: value for key, value in supplied.items() if value},
+            "reason": (
+                "review_url must be an http(s) URL; use review_id for ticket IDs, "
+                "commit IDs, or other non-URL artifact handles."
+            ),
+        }
+    if invalid_fields:
+        return {}, {
+            "status": "TODO_authority_review_required",
+            "required_fields": ["reviewed_by", "review_id_or_review_url"],
+            "optional_fields": ["reviewed_at"],
+            "missing_fields": [],
+            "invalid_fields": invalid_fields,
+            "supplied_fields": {key: value for key, value in supplied.items() if value},
+            "reason": "Remove or fix invalid review_url before recording authority.",
         }
     authority = {
         "source_authority_status": "operator_reviewed",
@@ -658,6 +688,7 @@ def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str,
         "required_fields": ["reviewed_by", "review_id_or_review_url"],
         "optional_fields": ["reviewed_at"],
         "missing_fields": [],
+        "invalid_fields": [],
     }
 
 

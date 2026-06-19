@@ -90,6 +90,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "source_authority_review_status",
         "source_authority_review_ready",
         "review_evidence_valid_fields",
+        "review_evidence_invalid_fields",
         "review_evidence_missing_required_groups",
         "required_metadata_valid_fields",
         "required_metadata_placeholder_fields",
@@ -238,6 +239,25 @@ def thin_review_args() -> list[str]:
         "license",
         "--authority-reviewed-by",
         "smoke_sim_so101_source_authority_matrix",
+    ]
+
+
+def invalid_review_url_args() -> list[str]:
+    return [
+        "--authority-license-basis",
+        "synthetic fixture license for hardware-free source-authority matrix only",
+        "--authority-review-scope",
+        "model_identity",
+        "--authority-review-scope",
+        "provenance",
+        "--authority-review-scope",
+        "license",
+        "--authority-reviewed-by",
+        "smoke_sim_so101_source_authority_matrix",
+        "--authority-review-url",
+        "source-authority-matrix-fixture",
+        "--authority-source-reference",
+        "generated synthetic fixture under the smoke output directory",
     ]
 
 
@@ -399,6 +419,44 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                     "authority_review_evidence:review_trace",
                     "authority_review_evidence:review_artifact",
                 ],
+            },
+        },
+        {
+            "case_id": "authoritative_invalid_review_url",
+            "args": [
+                "--root",
+                str(fixtures["single_root"]),
+                "--authoritative-path",
+                str(fixtures["single_model"]),
+                *invalid_review_url_args(),
+            ],
+            "expect": {
+                "status": "authoritative_model_found",
+                "candidate_count": 1,
+                "authoritative_candidate_count": 1,
+                "source_authority_gate_status": "source_authority_blocked_review_metadata",
+                "source_authority_review_status": "review_metadata_missing",
+                "source_authority_review_ready": False,
+                "source_intake_status": "source_review_metadata_required",
+                "review_packet_status": "review_packet_source_authority_review_metadata_needed",
+                "blockers_contain": ["record_source_authority_review_metadata"],
+                "actions_contain": [
+                    "record_source_authority_review_metadata",
+                    "run_so101_model_bundle_probe",
+                    "supply_reviewed_so101_model_bundle_manifest",
+                ],
+                "review_evidence_valid_fields_contain": ["authority_reviewed_by"],
+                "review_evidence_invalid_fields_contain": ["authority_review_url"],
+                "review_evidence_satisfied_required_groups_contain": ["review_actor"],
+                "review_evidence_missing_required_groups_contain": [
+                    "review_trace",
+                    "review_artifact",
+                ],
+                "missing_required_fields_contain": [
+                    "authority_review_evidence:review_trace",
+                    "authority_review_evidence:review_artifact",
+                ],
+                "missing_review_scope_ids": [],
             },
         },
         {
@@ -752,6 +810,12 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
     )
     expect_contains(
         errors,
+        f"{case_id}.review_evidence_invalid_fields",
+        source_review.get("review_evidence_invalid_fields"),
+        expect.get("review_evidence_invalid_fields_contain", []),
+    )
+    expect_contains(
+        errors,
         f"{case_id}.review_evidence_satisfied_required_groups",
         source_review.get("review_evidence_satisfied_required_groups"),
         expect.get("review_evidence_satisfied_required_groups_contain", []),
@@ -829,6 +893,9 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
             "source_authority_review_evidence_valid_fields": source_review.get(
                 "review_evidence_valid_fields"
             ),
+            "source_authority_review_evidence_invalid_fields": source_review.get(
+                "review_evidence_invalid_fields"
+            ),
             "source_authority_review_evidence_missing_required_groups": source_review.get(
                 "review_evidence_missing_required_groups"
             ),
@@ -872,6 +939,9 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "source_authority_review_ready": observations.get("source_authority_review_ready"),
         "review_evidence_valid_fields": observations.get(
             "source_authority_review_evidence_valid_fields"
+        ),
+        "review_evidence_invalid_fields": observations.get(
+            "source_authority_review_evidence_invalid_fields"
         ),
         "review_evidence_missing_required_groups": observations.get(
             "source_authority_review_evidence_missing_required_groups"

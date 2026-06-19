@@ -12,6 +12,7 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = "lerobot.sim.so101_model_source_inventory.v1"
@@ -73,6 +74,7 @@ CSV_FIELDNAMES = (
     "license_status",
     "source_authority_status",
     "source_authority_review_status",
+    "review_evidence_invalid_fields",
     "authoritative",
     "diagnostics",
 )
@@ -316,6 +318,21 @@ def placeholder_review_evidence(value: Any) -> bool:
     return normalized in PLACEHOLDER_REVIEW_EVIDENCE_VALUES or any(
         normalized.startswith(prefix) for prefix in PLACEHOLDER_REVIEW_EVIDENCE_PREFIXES
     )
+
+
+def invalid_review_url(value: Any) -> bool:
+    if not non_empty(value):
+        return False
+    if not isinstance(value, str):
+        return True
+    parsed = urlparse(value.strip())
+    return parsed.scheme not in {"http", "https"} or not parsed.netloc
+
+
+def invalid_review_evidence(field_name: str, value: Any) -> bool:
+    if field_name != "authority_review_url":
+        return False
+    return invalid_review_url(value)
 
 
 def review_evidence_group_summary(valid_review_fields: set[str]) -> dict[str, Any]:
@@ -729,10 +746,15 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
     placeholder_review_fields = sorted(
         key for key, value in supplied_review_evidence.items() if placeholder_review_evidence(value)
     )
+    invalid_review_fields = sorted(
+        key
+        for key, value in supplied_review_evidence.items()
+        if key not in placeholder_review_fields and invalid_review_evidence(key, value)
+    )
     valid_review_evidence = {
         key: value
         for key, value in supplied_review_evidence.items()
-        if key not in placeholder_review_fields
+        if key not in placeholder_review_fields and key not in invalid_review_fields
     }
     review_evidence_groups = review_evidence_group_summary(set(valid_review_evidence))
     supplied_required_metadata = {
@@ -756,6 +778,9 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
     ]
     missing_required = []
     diagnostics = [f"authority_review_evidence_placeholder:{field}" for field in placeholder_review_fields]
+    diagnostics.extend(
+        f"authority_review_evidence_invalid:{field}" for field in invalid_review_fields
+    )
     diagnostics.extend(
         f"authority_required_metadata_placeholder:{field}"
         for field in required_metadata_placeholder_fields
@@ -795,6 +820,7 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
         "review_evidence_fields": sorted(review_evidence),
         "review_evidence_valid_fields": sorted(valid_review_evidence),
         "review_evidence_placeholder_fields": placeholder_review_fields,
+        "review_evidence_invalid_fields": invalid_review_fields,
         "review_evidence_required_groups": review_evidence_groups["required_groups"],
         "review_evidence_satisfied_required_groups": review_evidence_groups[
             "satisfied_required_groups"
@@ -813,6 +839,7 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
         "ready_if_authoritative_source_declared": (
             not missing_required
             and not placeholder_review_fields
+            and not invalid_review_fields
             and not required_metadata_placeholder_fields
         ),
         "notes": [
@@ -865,6 +892,7 @@ def source_authority_review_summary(
         "diagnostics": review_input.get("diagnostics", []),
         "review_evidence_valid_fields": review_input.get("review_evidence_valid_fields", []),
         "review_evidence_placeholder_fields": review_input.get("review_evidence_placeholder_fields", []),
+        "review_evidence_invalid_fields": review_input.get("review_evidence_invalid_fields", []),
         "required_metadata_fields": review_input.get("required_metadata_fields", []),
         "required_metadata_valid_fields": review_input.get("required_metadata_valid_fields", []),
         "required_metadata_placeholder_fields": review_input.get("required_metadata_placeholder_fields", []),
@@ -974,6 +1002,9 @@ def build_candidate(
         "license_status": provenance["license"]["status"],
         "source_authority_status": authority_status,
         "source_authority_review_status": authority_review_status,
+        "review_evidence_invalid_fields": authority_review_input.get(
+            "review_evidence_invalid_fields", []
+        ),
         "source_authority_evidence": authority_evidence,
         "authoritative": authoritative,
         "diagnostics": diagnostics,
@@ -1442,6 +1473,10 @@ def build_source_intake_checklist(summary: dict[str, Any]) -> dict[str, Any]:
         or [],
         "review_evidence_placeholder_fields": source_authority_review.get(
             "review_evidence_placeholder_fields"
+        )
+        or [],
+        "review_evidence_invalid_fields": source_authority_review.get(
+            "review_evidence_invalid_fields"
         )
         or [],
         "required_metadata_valid_fields": source_authority_review.get(

@@ -84,7 +84,7 @@ inventing reviewed target-frame authority, limits, calibrated TCP, or
 board-alignment values. That means the generated manifest remains
 diagnostic-only until an operator replaces those placeholders with reviewed
 fields and this checker reports `ready_for_model_backed_ik: true`.
-When `--authority-reviewed-by` and `--authority-review-id` or
+When `--authority-reviewed-by` and `--authority-review-id` or a valid HTTP(S)
 `--authority-review-url` are supplied, the probe writes
 `authority.source_authority_status: "operator_reviewed"`, which is one of the
 manifest checker's accepted reviewed statuses; that still only covers
@@ -197,7 +197,9 @@ Each authority section reports `review_evidence_required_groups`,
 machine-readable group names are `review_actor` for `reviewed_by` and
 `review_trace` for `reviewed_at`, `review_id`, or `review_url`. The
 `review_artifact` group also requires `review_id` or `review_url`, so a date
-alone cannot make a reviewed SO-101 authority section ready.
+alone cannot make a reviewed SO-101 authority section ready. `review_url`
+values must be HTTP(S) URLs; use `review_id` for ticket IDs, commit IDs, or
+other non-URL artifact handles.
 
 ## Integrated Suite Mode
 
@@ -437,7 +439,7 @@ true:
 - `model_path` exists
 - `asset_roots` is present and all supplied roots are directories
 - `authority` declares an accepted reviewed status plus traceable review
-  evidence (`reviewed_by` plus `review_id` or `review_url`)
+  evidence (`reviewed_by` plus `review_id` or HTTP(S) `review_url`)
 - `provenance` declares source reference, export tool, and license basis fields;
   fixture-only provenance is still non-physical automation evidence
 - finite numeric joint limits cover every SO-101 joint and include accepted

@@ -2421,6 +2421,9 @@ def collect_so101_model_bundle_manifest_artifacts(
         "review_packet_development_fixture_evidence_not_physical_so101_truth": bundle.get(
             "review_packet_development_fixture_evidence_not_physical_so101_truth"
         ),
+        "authority_review_evidence_invalid_fields": bundle.get(
+            "authority_review_evidence_invalid_fields"
+        ),
         "next_required_for_goal": next_required,
         "next_required_action_ids": next_required_action_ids,
         "next_required_action_count": next_required_action_count,

@@ -9,6 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "calibration_regression_suite"
@@ -437,6 +438,21 @@ def placeholder_review_evidence(value: Any) -> bool:
     )
 
 
+def invalid_review_url(value: Any) -> bool:
+    if value in (None, "", [], {}):
+        return False
+    if not isinstance(value, str):
+        return True
+    parsed = urlparse(value.strip())
+    return parsed.scheme not in {"http", "https"} or not parsed.netloc
+
+
+def invalid_source_authority_review_evidence(field_name: str, value: Any) -> bool:
+    if field_name != "authority_review_url":
+        return False
+    return invalid_review_url(value)
+
+
 def normalized_review_scope_ids(value: Any) -> list[str]:
     raw_values: list[Any]
     if value is None:
@@ -553,8 +569,16 @@ def so101_source_authority_review_forwarding(
     placeholder_review_fields = [
         key for key in supplied_review_fields if placeholder_review_evidence(values.get(key))
     ]
+    invalid_review_fields = [
+        key
+        for key in supplied_review_fields
+        if key not in placeholder_review_fields
+        and invalid_source_authority_review_evidence(key, values.get(key))
+    ]
     valid_review_fields = [
-        key for key in supplied_review_fields if key not in placeholder_review_fields
+        key
+        for key in supplied_review_fields
+        if key not in placeholder_review_fields and key not in invalid_review_fields
     ]
     review_evidence_groups = source_authority_review_evidence_group_summary(
         set(valid_review_fields)
@@ -569,6 +593,9 @@ def so101_source_authority_review_forwarding(
     ]
     missing_required_fields = []
     diagnostics = [f"authority_review_evidence_placeholder:{field}" for field in placeholder_review_fields]
+    diagnostics.extend(
+        f"authority_review_evidence_invalid:{field}" for field in invalid_review_fields
+    )
     required_metadata = {
         "authority_source_reference": values.get("authority_source_reference"),
         "authority_license_basis": values.get("authority_license_basis"),
@@ -612,6 +639,7 @@ def so101_source_authority_review_forwarding(
         "ready_if_authoritative_source_declared": (
             not missing_required_fields
             and not placeholder_review_fields
+            and not invalid_review_fields
             and not required_metadata_placeholder_fields
         ),
         "missing_required_fields": missing_required_fields,
@@ -621,6 +649,7 @@ def so101_source_authority_review_forwarding(
         "review_scope_ready": not missing_review_scope_ids,
         "review_evidence_valid_fields": valid_review_fields,
         "review_evidence_placeholder_fields": placeholder_review_fields,
+        "review_evidence_invalid_fields": invalid_review_fields,
         "required_metadata_fields": sorted(required_metadata),
         "required_metadata_valid_fields": sorted(valid_required_metadata_fields),
         "required_metadata_placeholder_fields": sorted(required_metadata_placeholder_fields),
@@ -3712,6 +3741,7 @@ def so101_model_bundle_manifest_section(
         "authority_diagnostics": authority.get("diagnostics"),
         "authority_review_evidence_valid_fields": authority.get("review_evidence_valid_fields"),
         "authority_review_evidence_placeholder_fields": authority.get("review_evidence_placeholder_fields"),
+        "authority_review_evidence_invalid_fields": authority.get("review_evidence_invalid_fields"),
         "provenance_status": provenance.get("status"),
         "provenance_diagnostics": provenance.get("diagnostics"),
         "provenance_synthetic_fixture_only": provenance.get("synthetic_fixture_only"),

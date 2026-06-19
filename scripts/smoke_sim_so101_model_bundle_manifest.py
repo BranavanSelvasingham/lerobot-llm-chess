@@ -11,6 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 SCHEMA = "lerobot.sim.so101_model_bundle_manifest.v1"
 REVIEW_PACKET_SCHEMA = "lerobot.sim.so101_model_bundle_manifest_review_packet.v1"
@@ -559,6 +560,21 @@ def placeholder_review_evidence(value: Any) -> bool:
     )
 
 
+def invalid_review_url(value: Any) -> bool:
+    if not non_empty(value):
+        return False
+    if not isinstance(value, str):
+        return True
+    parsed = urlparse(value.strip())
+    return parsed.scheme not in {"http", "https"} or not parsed.netloc
+
+
+def invalid_review_evidence(field_name: str, value: Any) -> bool:
+    if field_name != "review_url":
+        return False
+    return invalid_review_url(value)
+
+
 def fixture_only_provenance_evidence(value: Any) -> bool:
     if not non_empty(value):
         return False
@@ -575,6 +591,7 @@ def review_evidence_summary(
     supplied_fields: list[str] = []
     valid_fields: list[str] = []
     placeholder_fields: list[str] = []
+    invalid_fields: list[str] = []
     for field_name in field_names:
         field_value = value.get(field_name)
         if not non_empty(field_value):
@@ -582,6 +599,8 @@ def review_evidence_summary(
         supplied_fields.append(field_name)
         if placeholder_review_evidence(field_value):
             placeholder_fields.append(field_name)
+        elif invalid_review_evidence(field_name, field_value):
+            invalid_fields.append(field_name)
         else:
             valid_fields.append(field_name)
     valid_field_set = set(valid_fields)
@@ -607,11 +626,17 @@ def review_evidence_summary(
         "supplied_fields": supplied_fields,
         "valid_fields": valid_fields,
         "placeholder_fields": placeholder_fields,
+        "invalid_fields": invalid_fields,
         "present": bool(valid_fields),
         "required_groups": required_groups,
         "satisfied_required_groups": satisfied_required_groups,
         "missing_required_groups": missing_required_groups,
-        "ok": bool(valid_fields) and not placeholder_fields and not missing_required_groups,
+        "ok": (
+            bool(valid_fields)
+            and not placeholder_fields
+            and not invalid_fields
+            and not missing_required_groups
+        ),
     }
 
 
@@ -620,6 +645,7 @@ def review_evidence_report_fields(review_evidence: dict[str, Any]) -> dict[str, 
         "review_evidence_present": review_evidence["present"],
         "review_evidence_valid_fields": review_evidence["valid_fields"],
         "review_evidence_placeholder_fields": review_evidence["placeholder_fields"],
+        "review_evidence_invalid_fields": review_evidence["invalid_fields"],
         "review_evidence_required_groups": review_evidence["required_groups"],
         "review_evidence_satisfied_required_groups": review_evidence[
             "satisfied_required_groups"
@@ -975,6 +1001,8 @@ def inspect_authority(manifest: dict[str, Any] | None) -> dict[str, Any]:
         diagnostics.append(f"authority_review_evidence_missing_required_group:{group_name}")
     for field_name in review_evidence["placeholder_fields"]:
         diagnostics.append(f"authority_review_evidence_placeholder:{field_name}")
+    for field_name in review_evidence["invalid_fields"]:
+        diagnostics.append(f"authority_review_evidence_invalid:{field_name}")
 
     is_synthetic_fixture = status_value == SYNTHETIC_FIXTURE_AUTHORITY_STATUS
     if is_synthetic_fixture and "hardware-free" not in str(value.get("scope", "")).lower():
@@ -1191,6 +1219,8 @@ def inspect_joint_limit_review(
         )
     for field_name in review_evidence["placeholder_fields"]:
         diagnostics.append(f"joint_limit_authority_review_evidence_placeholder:{field_name}")
+    for field_name in review_evidence["invalid_fields"]:
+        diagnostics.append(f"joint_limit_authority_review_evidence_invalid:{field_name}")
 
     is_synthetic_fixture = status_value == SYNTHETIC_FIXTURE_JOINT_LIMIT_STATUS
     if is_synthetic_fixture and "hardware-free" not in str(review_source.get("scope", "")).lower():
@@ -1382,6 +1412,8 @@ def inspect_review_metadata(
         )
     for field_name in review_evidence["placeholder_fields"]:
         diagnostics.append(f"{diagnostic_prefix}_review_evidence_placeholder:{field_name}")
+    for field_name in review_evidence["invalid_fields"]:
+        diagnostics.append(f"{diagnostic_prefix}_review_evidence_invalid:{field_name}")
 
     is_synthetic_fixture = status_value == synthetic_status
     if is_synthetic_fixture and "hardware-free" not in str(review_source.get("scope", "")).lower():
@@ -1811,6 +1843,8 @@ def inspect_mesh_asset_review(manifest: dict[str, Any] | None) -> dict[str, Any]
         )
     for field_name in review_evidence["placeholder_fields"]:
         diagnostics.append(f"mesh_asset_authority_review_evidence_placeholder:{field_name}")
+    for field_name in review_evidence["invalid_fields"]:
+        diagnostics.append(f"mesh_asset_authority_review_evidence_invalid:{field_name}")
 
     is_synthetic_fixture = status_value == SYNTHETIC_FIXTURE_MESH_ASSET_STATUS
     if is_synthetic_fixture and "hardware-free" not in str(review_source.get("scope", "")).lower():

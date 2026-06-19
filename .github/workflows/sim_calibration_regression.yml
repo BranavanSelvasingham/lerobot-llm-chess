@@ -230,6 +230,7 @@ jobs:
               "authoritative_missing_review_metadata",
               "authoritative_placeholder_review_metadata",
               "authoritative_thin_review_metadata",
+              "authoritative_invalid_review_url",
               "authoritative_placeholder_source_metadata",
               "authoritative_complete_source_review",
               "authoritative_single_root_complete_source_review",
@@ -245,6 +246,10 @@ jobs:
           assert "review_trace" in thin_review["observations"]["source_authority_review_evidence_missing_required_groups"], thin_review
           assert "review_artifact" in thin_review["observations"]["source_authority_review_evidence_missing_required_groups"], thin_review
           assert "record_source_authority_review_metadata" in thin_review["observations"]["next_required_action_ids"], thin_review
+          invalid_review_url = by_case["authoritative_invalid_review_url"]
+          assert invalid_review_url["observations"]["source_authority_gate_status"] == "source_authority_blocked_review_metadata", invalid_review_url
+          assert "authority_review_url" in invalid_review_url["observations"]["source_authority_review_evidence_invalid_fields"], invalid_review_url
+          assert "review_artifact" in invalid_review_url["observations"]["source_authority_review_evidence_missing_required_groups"], invalid_review_url
           placeholder_source_metadata = by_case["authoritative_placeholder_source_metadata"]
           assert placeholder_source_metadata["observations"]["source_authority_gate_status"] == "source_authority_blocked_review_metadata", placeholder_source_metadata
           assert placeholder_source_metadata["observations"]["source_authority_review_status"] == "review_metadata_missing", placeholder_source_metadata
@@ -1408,6 +1413,7 @@ jobs:
           assert isinstance(source_authority_review.get("diagnostics"), list), source_authority_review
           assert isinstance(source_authority_review.get("review_evidence_valid_fields"), list), source_authority_review
           assert isinstance(source_authority_review.get("review_evidence_placeholder_fields"), list), source_authority_review
+          assert isinstance(source_authority_review.get("review_evidence_invalid_fields"), list), source_authority_review
           assert isinstance(source_authority_review.get("review_evidence_required_groups"), list), source_authority_review
           assert isinstance(source_authority_review.get("review_evidence_satisfied_required_groups"), list), source_authority_review
           assert isinstance(source_authority_review.get("review_evidence_missing_required_groups"), list), source_authority_review
@@ -2356,6 +2362,7 @@ jobs:
               assert isinstance(source_authority_review.get("diagnostics"), list), source_authority_review
               assert isinstance(source_authority_review.get("review_evidence_valid_fields"), list), source_authority_review
               assert isinstance(source_authority_review.get("review_evidence_placeholder_fields"), list), source_authority_review
+              assert isinstance(source_authority_review.get("review_evidence_invalid_fields"), list), source_authority_review
               assert isinstance(source_authority_review.get("review_evidence_required_groups"), list), source_authority_review
               assert isinstance(source_authority_review.get("review_evidence_satisfied_required_groups"), list), source_authority_review
               assert isinstance(source_authority_review.get("review_evidence_missing_required_groups"), list), source_authority_review
@@ -2615,6 +2622,7 @@ jobs:
               assert metrics.get("review_packet_action_ids") == metrics.get("next_required_action_ids"), metrics
               assert metrics.get("review_packet_observed_evidence_is_authority") is False, metrics
               assert metrics.get("review_packet_development_fixture_evidence_not_physical_so101_truth") is True, metrics
+              assert metrics.get("authority_review_evidence_invalid_fields") in (None, []) or isinstance(metrics.get("authority_review_evidence_invalid_fields"), list), metrics
               if metrics.get("manifest_request_status") == "model_bundle_manifest_not_supplied":
                   assert metrics.get("next_required_action_ids", [None])[0] == "supply_reviewed_so101_model_bundle_manifest", metrics
               if metrics.get("ready_for_model_backed_ik") is True:
