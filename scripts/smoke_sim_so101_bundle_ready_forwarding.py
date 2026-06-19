@@ -151,6 +151,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `pending_review_metadata_manifest`: `{summary['fixtures']['pending_review_metadata_manifest_path']}`",
         f"- `weak_review_manifest`: `{summary['fixtures']['weak_review_manifest_path']}`",
         f"- `placeholder_provenance_manifest`: `{summary['fixtures']['placeholder_provenance_manifest_path']}`",
+        f"- `invalid_provenance_url_manifest`: `{summary['fixtures']['invalid_provenance_url_manifest_path']}`",
         f"- `fixture_provenance_reviewed_authority_manifest`: `{summary['fixtures']['fixture_provenance_reviewed_authority_manifest_path']}`",
         f"- `weak_joint_limits_manifest`: `{summary['fixtures']['weak_joint_limits_manifest_path']}`",
         f"- `weak_mesh_manifest`: `{summary['fixtures']['weak_mesh_manifest_path']}`",
@@ -304,7 +305,7 @@ def manifest_payload(*, ready: bool, model_filename: str = "synthetic_so101.urdf
             "scope": "hardware-free forwarding regression only",
         },
         "provenance": {
-            "source_url": "local synthetic fixture",
+            "source_path": "local synthetic fixture",
             "source_commit": "not_applicable",
             "export_tool": "smoke_sim_so101_bundle_ready_forwarding.py",
             "license": "test-only",
@@ -390,6 +391,16 @@ def placeholder_provenance_manifest_payload(model_filename: str) -> dict[str, An
         "source_url": "TODO",
         "export_tool": "unknown",
         "license": "TBD",
+    }
+    return payload
+
+
+def invalid_provenance_url_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["provenance"] = {
+        "source_url": "local synthetic fixture",
+        "export_tool": "smoke_sim_so101_bundle_ready_forwarding.py",
+        "license": "test-only",
     }
     return payload
 
@@ -558,6 +569,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     pending_review_metadata_dir = fixture_dir / "pending_review_metadata_bundle"
     weak_review_dir = fixture_dir / "weak_review_bundle"
     placeholder_provenance_dir = fixture_dir / "placeholder_provenance_bundle"
+    invalid_provenance_url_dir = fixture_dir / "invalid_provenance_url_bundle"
     fixture_provenance_reviewed_authority_dir = (
         fixture_dir / "fixture_provenance_reviewed_authority_bundle"
     )
@@ -584,6 +596,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         pending_review_metadata_dir,
         weak_review_dir,
         placeholder_provenance_dir,
+        invalid_provenance_url_dir,
         fixture_provenance_reviewed_authority_dir,
         weak_joint_limits_dir,
         weak_mesh_dir,
@@ -626,6 +639,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         placeholder_provenance_dir / "model" / "synthetic_so101_mujoco.xml"
     )
     placeholder_provenance_model_path.write_text(mjcf_with_mesh_reference())
+    invalid_provenance_url_model_path = (
+        invalid_provenance_url_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    invalid_provenance_url_model_path.write_text(mjcf_with_mesh_reference())
     fixture_provenance_reviewed_authority_model_path = (
         fixture_provenance_reviewed_authority_dir
         / "model"
@@ -676,6 +693,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_review_manifest_path = weak_review_dir / "so101_model_bundle.weak_review.json"
     placeholder_provenance_manifest_path = (
         placeholder_provenance_dir / "so101_model_bundle.placeholder_provenance.json"
+    )
+    invalid_provenance_url_manifest_path = (
+        invalid_provenance_url_dir / "so101_model_bundle.invalid_provenance_url.json"
     )
     fixture_provenance_reviewed_authority_manifest_path = (
         fixture_provenance_reviewed_authority_dir
@@ -750,6 +770,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         placeholder_provenance_model_path,
     )
     write_manifest_json(
+        invalid_provenance_url_manifest_path,
+        invalid_provenance_url_manifest_payload(
+            model_filename=invalid_provenance_url_model_path.name
+        ),
+        invalid_provenance_url_model_path,
+    )
+    write_manifest_json(
         fixture_provenance_reviewed_authority_manifest_path,
         fixture_provenance_reviewed_authority_manifest_payload(
             model_filename=fixture_provenance_reviewed_authority_model_path.name
@@ -814,6 +841,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "pending_review_metadata_manifest_path": pending_review_metadata_manifest_path,
         "weak_review_manifest_path": weak_review_manifest_path,
         "placeholder_provenance_manifest_path": placeholder_provenance_manifest_path,
+        "invalid_provenance_url_manifest_path": invalid_provenance_url_manifest_path,
         "fixture_provenance_reviewed_authority_manifest_path": (
             fixture_provenance_reviewed_authority_manifest_path
         ),
@@ -836,6 +864,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "pending_review_metadata_model_path": pending_review_metadata_model_path,
         "weak_review_model_path": weak_review_model_path,
         "placeholder_provenance_model_path": placeholder_provenance_model_path,
+        "invalid_provenance_url_model_path": invalid_provenance_url_model_path,
         "fixture_provenance_reviewed_authority_model_path": (
             fixture_provenance_reviewed_authority_model_path
         ),
@@ -1775,6 +1804,48 @@ def summarize_case(
         assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
         assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
         assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
+    elif expectation == "invalid_provenance_url_not_forwarded":
+        assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_not_ready",
+        )
+        assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
+        assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
+        assert_equal(
+            errors,
+            f"{case_id}.diagnostic_reason",
+            forwarding.get("diagnostic_only_reason"),
+            "bundle_not_ready_for_model_backed_ik:model_bundle_manifest_needs_follow_up",
+        )
+        assert_false(errors, f"{case_id}.used_for_downstream_contract", forwarding.get("used_for_downstream_contract"))
+        assert_equal(errors, f"{case_id}.ik_model_path_source", forwarding.get("ik_model_path_source"), "not_supplied")
+        assert_equal(errors, f"{case_id}.authority_status", bundle.get("authority_status"), "present")
+        assert_equal(errors, f"{case_id}.provenance_status", bundle.get("provenance_status"), "needs_review")
+        missing_inputs = bundle.get("missing_inputs")
+        if not isinstance(missing_inputs, list) or "provenance" not in missing_inputs:
+            errors.append(f"{case_id}.missing_inputs: expected provenance, got {missing_inputs!r}")
+        diagnostics = bundle.get("provenance_diagnostics") or []
+        expected_diagnostics = {
+            "provenance_source_reference_invalid:source_url",
+        }
+        missing_diagnostics = [
+            diagnostic
+            for diagnostic in sorted(expected_diagnostics)
+            if diagnostic not in diagnostics
+        ]
+        if missing_diagnostics:
+            errors.append(
+                f"{case_id}.provenance_diagnostics: missing {missing_diagnostics!r} from {diagnostics!r}"
+            )
+        assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
+        assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
+        assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
+        assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
     elif expectation == "fixture_provenance_reviewed_authority_not_physical":
         assert_true(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
         assert_equal(
@@ -2320,6 +2391,12 @@ def main() -> int:
             "manifest_path": fixtures["placeholder_provenance_manifest_path"],
             "explicit_model_path": None,
             "expectation": "placeholder_provenance_not_forwarded",
+        },
+        {
+            "case_id": "invalid_provenance_url_not_forwarded",
+            "manifest_path": fixtures["invalid_provenance_url_manifest_path"],
+            "explicit_model_path": None,
+            "expectation": "invalid_provenance_url_not_forwarded",
         },
         {
             "case_id": "fixture_provenance_reviewed_authority_not_physical",

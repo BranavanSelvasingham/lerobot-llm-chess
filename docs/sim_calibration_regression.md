@@ -697,9 +697,9 @@ synthetic fixture manifest that must stay
 manifest whose referenced model file is missing, placeholder alignment,
 placeholder/thin/invalid review evidence, generic review scopes, ready-shaped
 review metadata with pending follow-up, weak field-specific authority,
-placeholder provenance, reviewed-status fixture provenance, wrong target frame,
-invalid TCP/alignment payloads, and mismatched model SHA. Ready fixture cases
-exercise the manifest state machine only; they must keep
+placeholder or malformed provenance, reviewed-status fixture provenance, wrong
+target frame, invalid TCP/alignment payloads, and mismatched model SHA. Ready
+fixture cases exercise the manifest state machine only; they must keep
 `physical_so101_model_authority_ready: false`.
 
 The standalone model-bundle probe matrix writes

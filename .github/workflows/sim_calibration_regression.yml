@@ -417,6 +417,7 @@ jobs:
               "pending_review_metadata_not_ready",
               "weak_review_manifest_not_ready",
               "placeholder_provenance_not_ready",
+              "invalid_provenance_url_not_ready",
               "reviewed_status_with_fixture_provenance_not_physical_authority",
               "weak_joint_limit_authority_not_ready",
               "weak_mesh_asset_authority_not_ready",
@@ -517,6 +518,9 @@ jobs:
           placeholder_provenance = by_case["placeholder_provenance_not_ready"]["observations"]
           assert placeholder_provenance["provenance_status"] == "needs_review", placeholder_provenance
           assert "provenance" in placeholder_provenance["missing_inputs"], placeholder_provenance
+          invalid_provenance_url = by_case["invalid_provenance_url_not_ready"]["observations"]
+          assert invalid_provenance_url["provenance_status"] == "needs_review", invalid_provenance_url
+          assert "provenance" in invalid_provenance_url["missing_inputs"], invalid_provenance_url
           wrong_frame = by_case["wrong_target_frame_not_ready"]["observations"]
           assert wrong_frame["target_frame_status"] == "invalid", wrong_frame
           assert "target_frame" in wrong_frame["missing_inputs"], wrong_frame
@@ -4610,7 +4614,7 @@ jobs:
           )
           assert model_bundle_manifest_matrix["ok"] is True, model_bundle_manifest_matrix
           assert model_bundle_manifest_matrix["status"] == "ok", model_bundle_manifest_matrix
-          assert model_bundle_manifest_matrix["case_count"] == 21, model_bundle_manifest_matrix
+          assert model_bundle_manifest_matrix["case_count"] == 22, model_bundle_manifest_matrix
           assert model_bundle_manifest_matrix["failed_case_ids"] == [], model_bundle_manifest_matrix
           assert (
               model_bundle_manifest_matrix["model_authority"]

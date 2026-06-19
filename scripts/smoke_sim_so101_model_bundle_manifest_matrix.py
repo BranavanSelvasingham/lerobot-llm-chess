@@ -355,6 +355,16 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "invalid_provenance_url_not_ready",
+            "manifest_path": fixtures["invalid_provenance_url_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "provenance_status": "needs_review",
+                "missing_inputs": ["provenance"],
+            },
+        },
+        {
             "case_id": "reviewed_status_with_fixture_provenance_not_physical_authority",
             "manifest_path": fixtures["fixture_provenance_reviewed_authority_manifest_path"],
             "expect": {
@@ -849,7 +859,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "",
             "## Authority Boundary",
             "",
-            "- Placeholder review metadata, generic review scopes, invalid review URLs, weak field-specific authority, placeholder provenance, wrong target frame, invalid TCP/alignment, and model SHA mismatch all remain not ready.",
+            "- Placeholder review metadata, generic review scopes, invalid review URLs, weak field-specific authority, placeholder or malformed provenance, wrong target frame, invalid TCP/alignment, and model SHA mismatch all remain not ready.",
             "- The ready synthetic fixture cases may set `ready_for_model_backed_ik: true` but must keep `physical_so101_model_authority_ready: false`.",
             "- Review packets, intake checklists, and generated templates are operator intake only and never promote fixture evidence into physical SO-101 truth.",
         ]

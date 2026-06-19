@@ -211,7 +211,10 @@ reported as `review_evidence_placeholder` diagnostics and do not satisfy
 authority readiness, even when the review status itself is an accepted value.
 The same placeholder rule applies to provenance source, export-tool, and
 license-basis fields: a ready-shaped manifest with placeholder provenance stays
-`model_bundle_manifest_needs_follow_up` and remains diagnostic-only.
+`model_bundle_manifest_needs_follow_up` and remains diagnostic-only. Provenance
+fields that are explicitly URL-shaped, such as `source_url`, `repository_url`,
+`cad_url`, or `license_url`, must contain HTTP(S) URLs; use `source_path` or
+`source_reference` for local/non-URL source handles.
 Each authority section reports `review_evidence_required_groups`,
 `review_evidence_satisfied_required_groups`, and
 `review_evidence_missing_required_groups` in the JSON summary. It also reports

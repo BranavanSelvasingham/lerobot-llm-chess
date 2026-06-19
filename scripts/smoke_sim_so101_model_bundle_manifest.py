@@ -213,6 +213,12 @@ PROVENANCE_LICENSE_FIELDS = (
     "license_review",
     "license_basis",
 )
+PROVENANCE_URL_FIELDS = {
+    "source_url",
+    "cad_url",
+    "repository_url",
+    "license_url",
+}
 PROVENANCE_FIXTURE_ONLY_MARKERS = (
     "synthetic",
     "hardware free",
@@ -681,6 +687,12 @@ def invalid_review_url(value: Any) -> bool:
 
 def invalid_review_evidence(field_name: str, value: Any) -> bool:
     if field_name != "review_url":
+        return False
+    return invalid_review_url(value)
+
+
+def invalid_provenance_url(field_name: str, value: Any) -> bool:
+    if field_name not in PROVENANCE_URL_FIELDS:
         return False
     return invalid_review_url(value)
 
@@ -1237,8 +1249,11 @@ def inspect_provenance(manifest: dict[str, Any] | None) -> dict[str, Any]:
 
     def first_valid_provenance_field(
         field_names: tuple[str, ...],
-    ) -> tuple[str | None, Any, list[str]]:
+    ) -> tuple[str | None, Any, list[str], list[str]]:
         placeholder_fields: list[str] = []
+        invalid_fields: list[str] = []
+        selected_field = None
+        selected_value = None
         for field_name in field_names:
             field_value = value.get(field_name)
             if not non_empty(field_value):
@@ -1246,18 +1261,32 @@ def inspect_provenance(manifest: dict[str, Any] | None) -> dict[str, Any]:
             if placeholder_review_evidence(field_value):
                 placeholder_fields.append(field_name)
                 continue
-            return field_name, field_value, placeholder_fields
-        return None, None, placeholder_fields
+            if invalid_provenance_url(field_name, field_value):
+                invalid_fields.append(field_name)
+                continue
+            if selected_field is None:
+                selected_field = field_name
+                selected_value = field_value
+        return selected_field, selected_value, placeholder_fields, invalid_fields
 
-    source_field, source_value, source_placeholder_fields = first_valid_provenance_field(
-        PROVENANCE_SOURCE_FIELDS
-    )
-    export_field, export_value, export_placeholder_fields = first_valid_provenance_field(
-        PROVENANCE_EXPORT_FIELDS
-    )
-    license_field, license_value, license_placeholder_fields = first_valid_provenance_field(
-        PROVENANCE_LICENSE_FIELDS
-    )
+    (
+        source_field,
+        source_value,
+        source_placeholder_fields,
+        source_invalid_fields,
+    ) = first_valid_provenance_field(PROVENANCE_SOURCE_FIELDS)
+    (
+        export_field,
+        export_value,
+        export_placeholder_fields,
+        export_invalid_fields,
+    ) = first_valid_provenance_field(PROVENANCE_EXPORT_FIELDS)
+    (
+        license_field,
+        license_value,
+        license_placeholder_fields,
+        license_invalid_fields,
+    ) = first_valid_provenance_field(PROVENANCE_LICENSE_FIELDS)
     blocking_diagnostics: list[str] = []
     diagnostics: list[str] = []
     fixture_only_fields: list[str] = []
@@ -1281,6 +1310,12 @@ def inspect_provenance(manifest: dict[str, Any] | None) -> dict[str, Any]:
         blocking_diagnostics.append(f"provenance_export_tool_placeholder:{field_name}")
     for field_name in license_placeholder_fields:
         blocking_diagnostics.append(f"provenance_license_basis_placeholder:{field_name}")
+    for field_name in source_invalid_fields:
+        blocking_diagnostics.append(f"provenance_source_reference_invalid:{field_name}")
+    for field_name in export_invalid_fields:
+        blocking_diagnostics.append(f"provenance_export_tool_invalid:{field_name}")
+    for field_name in license_invalid_fields:
+        blocking_diagnostics.append(f"provenance_license_basis_invalid:{field_name}")
     diagnostics = [*blocking_diagnostics, *diagnostics]
 
     return {
@@ -1289,12 +1324,15 @@ def inspect_provenance(manifest: dict[str, Any] | None) -> dict[str, Any]:
         "source_field": source_field,
         "source_value": source_value,
         "source_placeholder_fields": source_placeholder_fields,
+        "source_invalid_fields": source_invalid_fields,
         "export_field": export_field,
         "export_value": export_value,
         "export_placeholder_fields": export_placeholder_fields,
+        "export_invalid_fields": export_invalid_fields,
         "license_field": license_field,
         "license_value": license_value,
         "license_placeholder_fields": license_placeholder_fields,
+        "license_invalid_fields": license_invalid_fields,
         "synthetic_fixture_only": bool(fixture_only_fields),
         "fixture_only_fields": fixture_only_fields,
         "blocking_diagnostics": blocking_diagnostics,
