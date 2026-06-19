@@ -949,6 +949,7 @@ jobs:
               "board_draft_authority_rejected",
               "board_seeded_reviewed_authority_rejected",
               "board_manual_reset_pose_reviewed_authority_rejected",
+              "board_missing_release_detail_reviewed_authority_rejected",
               "rollout_raw_ready_development_authority_rejected",
               "rollout_reviewed_authority_not_ready",
               "all_ready_reviewed_contract_state",
@@ -964,6 +965,7 @@ jobs:
           draft = by_case["board_draft_authority_rejected"]["gate"]
           assert draft["ready"] is False, draft
           assert draft["board_pick_reviewed_model_authority_ready"] is False, draft
+          assert draft["board_pick_detailed_evidence_ready"] is True, draft
           assert draft["reviewed_model_backed_board_source_pick_place"] is False, draft
           raw_dev = by_case["rollout_raw_ready_development_authority_rejected"]["gate"]
           assert raw_dev["rollout_ready_for_policy_training"] is True, raw_dev
@@ -979,14 +981,23 @@ jobs:
           assert "wire_reviewed_so101_chess_gymnasium_task" in gym_dev["next_priority_action_ids"], gym_dev
           seeded = by_case["board_seeded_reviewed_authority_rejected"]["gate"]
           assert seeded["board_pick_reviewed_model_authority_ready"] is True, seeded
+          assert seeded["board_pick_detailed_evidence_ready"] is True, seeded
           assert seeded["reviewed_model_backed_board_source_pick_place"] is False, seeded
           manual = by_case["board_manual_reset_pose_reviewed_authority_rejected"]["gate"]
           assert manual["board_pick_reviewed_model_authority_ready"] is True, manual
+          assert manual["board_pick_detailed_evidence_ready"] is True, manual
           assert manual["board_pick_manual_piece_pose_used_after_reset"] is True, manual
           assert manual["reviewed_model_backed_board_source_pick_place"] is False, manual
           assert manual["ready"] is False, manual
+          missing_release = by_case["board_missing_release_detail_reviewed_authority_rejected"]["gate"]
+          assert missing_release["board_pick_reviewed_model_authority_ready"] is True, missing_release
+          assert missing_release["board_pick_detailed_evidence_ready"] is False, missing_release
+          assert missing_release["board_pick_release_contact_cleared_after_retreat"] is False, missing_release
+          assert missing_release["reviewed_model_backed_board_source_pick_place"] is False, missing_release
+          assert missing_release["ready"] is False, missing_release
           ready = by_case["all_ready_reviewed_contract_state"]["gate"]
           assert ready["ready"] is True, ready
+          assert ready["board_pick_detailed_evidence_ready"] is True, ready
           assert ready["development_fixture_evidence_not_policy_training_truth"] is False, ready
           assert ready["blockers"] == [], ready
           for relative_path in (
@@ -1989,6 +2000,7 @@ jobs:
               reviewed_model_authority_gate["physical_reviewed_model_motion_checked"] is True
           ), training_readiness_gate
           assert isinstance(training_readiness_gate["board_pick_reviewed_model_authority_ready"], bool), training_readiness_gate
+          assert isinstance(training_readiness_gate["board_pick_detailed_evidence_ready"], bool), training_readiness_gate
           assert isinstance(training_readiness_gate["rollout_policy_training_authority_ready"], bool), training_readiness_gate
           assert isinstance(training_readiness_gate["blockers"], list), training_readiness_gate
           assert training_readiness_gate["blocker_count"] == len(training_readiness_gate["blockers"]), training_readiness_gate
@@ -2007,6 +2019,7 @@ jobs:
               assert "reviewed_model_backed_board_source_pick_place" in training_readiness_gate["blockers"], training_readiness_gate
               assert training_readiness_gate["rollout_ready_for_policy_training"] is False, training_readiness_gate
               assert training_readiness_gate["board_pick_reviewed_model_authority_ready"] is False, training_readiness_gate
+              assert training_readiness_gate["board_pick_detailed_evidence_ready"] is True, training_readiness_gate
               assert training_readiness_gate["rollout_policy_training_authority_ready"] is False, training_readiness_gate
           training_readiness_artifacts = training_readiness_gate["artifacts"]
           for key in ("summary_json", "checklist_csv", "readme_md"):
@@ -2845,6 +2858,7 @@ jobs:
               assert metrics.get("reviewed_model_authority_ready") in {True, False, None}, metrics
               assert metrics.get("reviewed_model_backed_board_source_pick_place") in {True, False, None}, metrics
               assert metrics.get("board_pick_reviewed_model_authority_ready") in {True, False, None}, metrics
+              assert metrics.get("board_pick_detailed_evidence_ready") in {True, False, None}, metrics
               assert metrics.get("rollout_ready_for_policy_training") in {True, False, None}, metrics
               assert metrics.get("rollout_policy_training_authority_ready") in {True, False, None}, metrics
               assert isinstance(metrics.get("blockers"), list), metrics

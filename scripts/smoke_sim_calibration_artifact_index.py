@@ -2995,6 +2995,9 @@ def collect_so101_training_readiness_gate_artifacts(
         "board_pick_reviewed_model_authority_ready": gate.get(
             "board_pick_reviewed_model_authority_ready"
         ),
+        "board_pick_detailed_evidence_ready": gate.get(
+            "board_pick_detailed_evidence_ready"
+        ),
         "board_pick_ready_for_model_backed_ik": gate.get(
             "board_pick_ready_for_model_backed_ik"
         ),

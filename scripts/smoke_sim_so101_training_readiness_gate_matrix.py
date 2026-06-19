@@ -68,6 +68,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_model_physical_motion_checked",
         "reviewed_model_backed_board_source_pick_place",
         "board_pick_reviewed_model_authority_ready",
+        "board_pick_detailed_evidence_ready",
         "rollout_ready_for_policy_training",
         "rollout_policy_training_authority_ready",
         "development_fixture_evidence_not_policy_training_truth",
@@ -121,6 +122,8 @@ def board_pick_state(
     manual_piece_pose_after_reset: bool = False,
     verified: bool = True,
 ) -> dict[str, Any]:
+    final_target_xy_error_m = 0.002 if verified else 0.05
+    target_xy_tolerance_m = 0.01
     return {
         "status": (
             "reviewed_model_backed_board_source_pick_place_verified"
@@ -134,6 +137,16 @@ def board_pick_state(
             else "board_source_pick_place_not_verified"
         ),
         "board_source_pick_place_verified": verified,
+        "source_pick_started_at_source": verified,
+        "close_two_finger_contact_observed": verified,
+        "lift_verified": verified,
+        "board_contact_cleared_during_lift": verified,
+        "transfer_verified": verified,
+        "place_without_manual_piece_pose_verified": verified,
+        "release_contact_cleared_after_retreat": verified,
+        "final_board_contact_observed": verified,
+        "final_target_xy_error_m": final_target_xy_error_m,
+        "target_xy_tolerance_m": target_xy_tolerance_m,
         "ready_for_model_backed_ik": ready_for_model_backed_ik,
         "model_authority": model_authority,
         "robot_pose_seeded_for_source_fixture": seeded_source_pose,
@@ -242,6 +255,15 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         ready_for_model_backed_ik=True,
         seeded_source_pose=False,
     )
+    board_reviewed_missing_release = {
+        **board_pick_state(
+            summaries / "board_reviewed_missing_release.json",
+            model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+            ready_for_model_backed_ik=True,
+            seeded_source_pose=False,
+        ),
+        "release_contact_cleared_after_retreat": False,
+    }
     rollout_dev_blocked = rollout_state(
         summaries / "rollout_dev_blocked.json",
         ready_for_policy_training=False,
@@ -290,6 +312,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": False,
                 "board_pick": False,
                 "board_authority": False,
+                "board_detail": True,
                 "rollout_authority": False,
                 "development_caveat": True,
                 "blockers_contain": [
@@ -314,6 +337,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_motion": False,
                 "board_pick": True,
                 "board_authority": True,
+                "board_detail": True,
                 "rollout_raw": True,
                 "rollout_authority": True,
                 "development_caveat": True,
@@ -335,6 +359,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": False,
                 "board_authority": False,
+                "board_detail": True,
                 "rollout_raw": True,
                 "rollout_authority": True,
                 "development_caveat": True,
@@ -356,6 +381,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": True,
                 "board_authority": True,
+                "board_detail": True,
                 "rollout_raw": True,
                 "rollout_authority": True,
                 "development_caveat": True,
@@ -377,6 +403,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": True,
                 "board_authority": True,
+                "board_detail": True,
                 "rollout_raw": True,
                 "rollout_authority": True,
                 "development_caveat": True,
@@ -403,6 +430,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": False,
                 "board_authority": False,
+                "board_detail": True,
                 "rollout_raw": True,
                 "rollout_authority": True,
                 "development_caveat": True,
@@ -429,6 +457,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": False,
                 "board_authority": True,
+                "board_detail": True,
                 "rollout_raw": True,
                 "rollout_authority": True,
                 "development_caveat": True,
@@ -456,6 +485,29 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": False,
                 "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "blockers_contain": ["reviewed_model_backed_board_source_pick_place"],
+                "next_priority_gate": "scripted_contact_grasp_pick_place",
+            },
+        },
+        {
+            "case_id": "board_missing_release_detail_reviewed_authority_rejected",
+            "authority": authority_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed_missing_release,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": False,
+                "board_authority": True,
+                "board_detail": False,
                 "rollout_raw": True,
                 "rollout_authority": True,
                 "development_caveat": True,
@@ -482,6 +534,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": True,
                 "board_authority": True,
+                "board_detail": True,
                 "rollout_raw": True,
                 "rollout_authority": False,
                 "development_caveat": True,
@@ -508,6 +561,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": True,
                 "board_authority": True,
+                "board_detail": True,
                 "rollout_raw": False,
                 "rollout_authority": False,
                 "development_caveat": True,
@@ -529,6 +583,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": True,
                 "board_authority": True,
+                "board_detail": True,
                 "rollout_raw": True,
                 "rollout_authority": True,
                 "development_caveat": False,
@@ -595,6 +650,13 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         gate.get("board_pick_reviewed_model_authority_ready"),
         expect["board_authority"],
     )
+    if "board_detail" in expect:
+        add_error(
+            errors,
+            "board_pick_detailed_evidence_ready",
+            gate.get("board_pick_detailed_evidence_ready"),
+            expect["board_detail"],
+        )
     if "rollout_raw" in expect:
         add_error(
             errors,
@@ -682,6 +744,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "board_pick_reviewed_model_authority_ready": gate.get(
             "board_pick_reviewed_model_authority_ready"
         ),
+        "board_pick_detailed_evidence_ready": gate.get("board_pick_detailed_evidence_ready"),
         "rollout_ready_for_policy_training": gate.get("rollout_ready_for_policy_training"),
         "rollout_policy_training_authority_ready": gate.get(
             "rollout_policy_training_authority_ready"
@@ -737,6 +800,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "- `all_ready_reviewed_contract_state` exercises the ready branch only; its injected dictionaries are not reviewed robot evidence.",
             "- `priority_gate_queue` preserves reviewed authority, MuJoCo scene, Gymnasium task wiring, scripted pick/place, then training rollout order.",
             "- Draft, development, and fixture-only model-authority labels are rejected even when raw readiness booleans are true.",
+            "- Board-pick readiness requires detailed source-start, contact, lift, transfer, place, release, final-board-contact, and target-tolerance evidence.",
             "- Use this smoke to protect training-readiness gate logic. Use reviewed SO-101 model-backed pick/place and rollout evidence before serious training.",
         ]
     )

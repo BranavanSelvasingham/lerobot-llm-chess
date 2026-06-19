@@ -5107,6 +5107,36 @@ def _summary_path(value: dict[str, Any]) -> str | None:
     return path if isinstance(path, str) and path else None
 
 
+def _json_number(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
+def so101_board_pick_detailed_evidence_ready(board_pick: dict[str, Any]) -> bool:
+    final_target_xy_error_m = _json_number(board_pick.get("final_target_xy_error_m"))
+    target_xy_tolerance_m = _json_number(board_pick.get("target_xy_tolerance_m"))
+    final_target_within_tolerance = (
+        final_target_xy_error_m is not None
+        and target_xy_tolerance_m is not None
+        and final_target_xy_error_m <= target_xy_tolerance_m
+    )
+    return (
+        board_pick.get("board_source_pick_place_verified") is True
+        and board_pick.get("source_pick_started_at_source") is True
+        and board_pick.get("close_two_finger_contact_observed") is True
+        and board_pick.get("lift_verified") is True
+        and board_pick.get("board_contact_cleared_during_lift") is True
+        and board_pick.get("transfer_verified") is True
+        and board_pick.get("place_without_manual_piece_pose_verified") is True
+        and board_pick.get("release_contact_cleared_after_retreat") is True
+        and board_pick.get("final_board_contact_observed") is True
+        and final_target_within_tolerance
+    )
+
+
 def so101_training_priority_gate_queue(
     reviewed_authority_gate: dict[str, Any],
     board_pick: dict[str, Any],
@@ -5150,8 +5180,11 @@ def so101_training_priority_gate_queue(
     board_pick_reviewed_model_authority_ready = (
         board_pick.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
     )
+    board_pick_detailed_evidence_ready = so101_board_pick_detailed_evidence_ready(
+        board_pick
+    )
     reviewed_model_backed_board_pick_place = (
-        board_pick.get("board_source_pick_place_verified") is True
+        board_pick_detailed_evidence_ready
         and board_pick.get("ready_for_model_backed_ik") is True
         and board_pick_reviewed_model_authority_ready
         and board_pick.get("robot_pose_seeded_for_source_fixture") is not True
@@ -5160,7 +5193,7 @@ def so101_training_priority_gate_queue(
     scripted_pick_place_automation_ready = (
         contact_automation_ready
         and grasp_automation_ready
-        and board_pick.get("board_source_pick_place_verified") is True
+        and board_pick_detailed_evidence_ready
     )
     scripted_pick_place_training_ready = (
         gym_training_ready and reviewed_model_backed_board_pick_place
@@ -5333,8 +5366,11 @@ def so101_training_readiness_gate_section(
     board_pick_reviewed_model_authority_ready = (
         board_pick.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
     )
+    board_pick_detailed_evidence_ready = so101_board_pick_detailed_evidence_ready(
+        board_pick
+    )
     reviewed_model_backed_board_pick_place = (
-        board_pick.get("board_source_pick_place_verified") is True
+        board_pick_detailed_evidence_ready
         and board_pick.get("ready_for_model_backed_ik") is True
         and board_pick_reviewed_model_authority_ready
         and board_pick.get("robot_pose_seeded_for_source_fixture") is not True
@@ -5400,7 +5436,30 @@ def so101_training_readiness_gate_section(
         "board_pick_status": board_pick.get("status"),
         "board_pick_model_authority": board_pick.get("model_authority"),
         "board_pick_reviewed_model_authority_ready": board_pick_reviewed_model_authority_ready,
+        "board_pick_detailed_evidence_ready": board_pick_detailed_evidence_ready,
         "board_pick_ready_for_model_backed_ik": board_pick.get("ready_for_model_backed_ik"),
+        "board_pick_source_pick_started_at_source": board_pick.get(
+            "source_pick_started_at_source"
+        ),
+        "board_pick_close_two_finger_contact_observed": board_pick.get(
+            "close_two_finger_contact_observed"
+        ),
+        "board_pick_lift_verified": board_pick.get("lift_verified"),
+        "board_pick_board_contact_cleared_during_lift": board_pick.get(
+            "board_contact_cleared_during_lift"
+        ),
+        "board_pick_transfer_verified": board_pick.get("transfer_verified"),
+        "board_pick_place_without_manual_piece_pose_verified": board_pick.get(
+            "place_without_manual_piece_pose_verified"
+        ),
+        "board_pick_release_contact_cleared_after_retreat": board_pick.get(
+            "release_contact_cleared_after_retreat"
+        ),
+        "board_pick_final_board_contact_observed": board_pick.get(
+            "final_board_contact_observed"
+        ),
+        "board_pick_final_target_xy_error_m": board_pick.get("final_target_xy_error_m"),
+        "board_pick_target_xy_tolerance_m": board_pick.get("target_xy_tolerance_m"),
         "board_pick_robot_pose_seeded_for_source_fixture": board_pick.get(
             "robot_pose_seeded_for_source_fixture"
         ),
