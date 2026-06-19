@@ -77,6 +77,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "source_authority_blockers",
         "source_authority_pending_action_ids",
         "physical_bundle_ready",
+        "physical_bundle_authority_status_ready",
+        "physical_bundle_authority_contradictory_ready_state",
+        "physical_bundle_authority_blockers",
+        "physical_bundle_authority_pending_action_ids",
         "source_bundle_consistency_status",
         "source_bundle_consistency_ready",
         "selected_authoritative_candidate_declared_by_authoritative_path",
@@ -337,6 +341,33 @@ def bundle_physical_ready(
         },
         "summary_path": str(summary_path),
     }
+
+
+def bundle_physical_ready_with_stale_blocker(
+    summary_path: Path,
+    model_path: Path,
+) -> dict[str, Any]:
+    payload = bundle_physical_ready(summary_path, model_path)
+    payload["physical_authority_blockers"] = [
+        "stale_physical_bundle_authority_blocker_should_fail_closed"
+    ]
+    return payload
+
+
+def bundle_physical_ready_with_pending_action(
+    summary_path: Path,
+    model_path: Path,
+) -> dict[str, Any]:
+    payload = bundle_physical_ready(summary_path, model_path)
+    action = gate_action(
+        "record_reviewed_so101_bundle_manifest_review",
+        "reviewed_model_authority",
+        "Record reviewed SO-101 bundle-manifest review",
+        "Pending bundle-authority action must fail closed even with ready status.",
+    )
+    payload["next_required_for_goal"] = [action]
+    payload["next_required_action_ids"] = [action["action_id"]]
+    return payload
 
 
 def bundle_hardware_fixture(summary_path: Path, model_path: Path) -> dict[str, Any]:
@@ -609,6 +640,80 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "action_required_contains": ["source_authority_ready"],
                 "blocker_packet_next_actions_contain": [
                     "record_source_authority_review_metadata"
+                ],
+                "blocked_prior_contains": [
+                    "source_bundle_consistency",
+                    "physical_reviewed_mujoco_motion_checked",
+                ],
+            },
+        },
+        {
+            "case_id": "physical_bundle_ready_with_stale_blocker_source_ready",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready_with_stale_blocker(
+                summary_dir / "bundle_ready_stale_blocker.json",
+                source_model,
+            ),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
+            "expect": {
+                "ready": False,
+                "physical_bundle_status_ready": True,
+                "physical_bundle_authority_ready": False,
+                "physical_bundle_contradictory": True,
+                "physical_bundle_blockers": [
+                    "stale_physical_bundle_authority_blocker_should_fail_closed"
+                ],
+                "physical_bundle_pending_actions": [],
+                "consistency_status": "not_checked_prerequisites_not_ready",
+                "consistency_ready": False,
+                "development_fixture": True,
+                "blockers_contain": [
+                    "stale_physical_bundle_authority_blocker_should_fail_closed",
+                    "resolve_contradictory_physical_bundle_authority_gate_state",
+                ],
+                "actions_contain": [
+                    "resolve_contradictory_physical_bundle_authority_gate_state"
+                ],
+                "action_required_contains": ["physical_bundle_authority_ready"],
+                "blocker_packet_next_actions_contain": [
+                    "resolve_contradictory_physical_bundle_authority_gate_state"
+                ],
+                "blocked_prior_contains": [
+                    "source_bundle_consistency",
+                    "physical_reviewed_mujoco_motion_checked",
+                ],
+            },
+        },
+        {
+            "case_id": "physical_bundle_ready_with_pending_action_source_ready",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready_with_pending_action(
+                summary_dir / "bundle_ready_pending_action.json",
+                source_model,
+            ),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
+            "expect": {
+                "ready": False,
+                "physical_bundle_status_ready": True,
+                "physical_bundle_authority_ready": False,
+                "physical_bundle_contradictory": True,
+                "physical_bundle_blockers": [],
+                "physical_bundle_pending_actions": [
+                    "record_reviewed_so101_bundle_manifest_review"
+                ],
+                "consistency_status": "not_checked_prerequisites_not_ready",
+                "consistency_ready": False,
+                "development_fixture": True,
+                "blockers_contain": [
+                    "resolve_contradictory_physical_bundle_authority_gate_state"
+                ],
+                "actions_contain": [
+                    "record_reviewed_so101_bundle_manifest_review",
+                    "resolve_contradictory_physical_bundle_authority_gate_state",
+                ],
+                "action_required_contains": ["physical_bundle_authority_ready"],
+                "blocker_packet_next_actions_contain": [
+                    "record_reviewed_so101_bundle_manifest_review"
                 ],
                 "blocked_prior_contains": [
                     "source_bundle_consistency",
@@ -1446,6 +1551,41 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             gate.get("source_authority_pending_action_ids"),
             expect["source_pending_actions"],
         )
+    if "physical_bundle_status_ready" in expect:
+        add_error(
+            errors,
+            "physical_bundle_authority_status_ready",
+            gate.get("physical_bundle_authority_status_ready"),
+            expect["physical_bundle_status_ready"],
+        )
+    if "physical_bundle_authority_ready" in expect:
+        add_error(
+            errors,
+            "physical_so101_model_authority_ready",
+            gate.get("physical_so101_model_authority_ready"),
+            expect["physical_bundle_authority_ready"],
+        )
+    if "physical_bundle_contradictory" in expect:
+        add_error(
+            errors,
+            "physical_bundle_authority_contradictory_ready_state",
+            gate.get("physical_bundle_authority_contradictory_ready_state"),
+            expect["physical_bundle_contradictory"],
+        )
+    if "physical_bundle_blockers" in expect:
+        add_error(
+            errors,
+            "physical_bundle_authority_blockers",
+            gate.get("physical_bundle_authority_blockers"),
+            expect["physical_bundle_blockers"],
+        )
+    if "physical_bundle_pending_actions" in expect:
+        add_error(
+            errors,
+            "physical_bundle_authority_pending_action_ids",
+            gate.get("physical_bundle_authority_pending_action_ids"),
+            expect["physical_bundle_pending_actions"],
+        )
 
     source_bundle_consistency = gate.get("source_bundle_consistency")
     if not isinstance(source_bundle_consistency, dict):
@@ -1827,6 +1967,18 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
             "source_authority_pending_action_ids"
         ),
         "physical_bundle_ready": gate.get("physical_so101_model_authority_ready"),
+        "physical_bundle_authority_status_ready": gate.get(
+            "physical_bundle_authority_status_ready"
+        ),
+        "physical_bundle_authority_contradictory_ready_state": gate.get(
+            "physical_bundle_authority_contradictory_ready_state"
+        ),
+        "physical_bundle_authority_blockers": gate.get(
+            "physical_bundle_authority_blockers"
+        ),
+        "physical_bundle_authority_pending_action_ids": gate.get(
+            "physical_bundle_authority_pending_action_ids"
+        ),
         "source_bundle_consistency_status": gate.get("source_bundle_consistency_status"),
         "source_bundle_consistency_ready": gate.get("source_bundle_consistency_ready"),
         "selected_authoritative_candidate_declared_by_authoritative_path": (

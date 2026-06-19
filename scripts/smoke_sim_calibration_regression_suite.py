@@ -4377,7 +4377,44 @@ def so101_reviewed_model_authority_gate_section(
         and not source_authority_blockers
         and not source_authority_pending_action_ids
     )
-    physical_authority_ready = bundle_manifest.get("physical_so101_model_authority_ready") is True
+    physical_bundle_authority_status_ready = (
+        bundle_manifest.get("physical_so101_model_authority_ready") is True
+    )
+    physical_bundle_authority_blockers = unique_string_values(
+        bundle_manifest.get("physical_authority_blockers") or []
+    )
+    bundle_next_required = bundle_manifest.get("next_required_action_ids")
+    physical_bundle_next_required_action_ids = unique_string_values(
+        bundle_next_required if isinstance(bundle_next_required, list) else []
+    )
+    bundle_next_required_for_goal = bundle_manifest.get("next_required_for_goal")
+    physical_bundle_next_required_for_goal_action_ids = unique_string_values(
+        [
+            action.get("action_id")
+            for action in bundle_next_required_for_goal
+            if isinstance(action, dict)
+        ]
+        if isinstance(bundle_next_required_for_goal, list)
+        else []
+    )
+    physical_bundle_authority_pending_action_ids = unique_string_values(
+        [
+            *physical_bundle_next_required_action_ids,
+            *physical_bundle_next_required_for_goal_action_ids,
+        ]
+    )
+    physical_bundle_authority_contradictory_ready_state = bool(
+        physical_bundle_authority_status_ready
+        and (
+            physical_bundle_authority_blockers
+            or physical_bundle_authority_pending_action_ids
+        )
+    )
+    physical_authority_ready = (
+        physical_bundle_authority_status_ready
+        and not physical_bundle_authority_blockers
+        and not physical_bundle_authority_pending_action_ids
+    )
     bundle_fixture_ready = bundle_manifest.get("hardware_free_regression_fixture_ready") is True
     physical_reviewed_motion_reported = (
         reviewed_mujoco_bundle.get("physical_reviewed_model_motion_checked") is True
@@ -4435,7 +4472,12 @@ def so101_reviewed_model_authority_gate_section(
                 if source_authority_contradictory_ready_state
                 else []
             ),
-            *(bundle_manifest.get("physical_authority_blockers") or []),
+            *physical_bundle_authority_blockers,
+            *(
+                ["resolve_contradictory_physical_bundle_authority_gate_state"]
+                if physical_bundle_authority_contradictory_ready_state
+                else []
+            ),
             *(
                 []
                 if source_bundle_consistency.get("blocker") is None
@@ -4675,6 +4717,22 @@ def so101_reviewed_model_authority_gate_section(
         if source_authority_contradictory_ready_state
         else []
     )
+    physical_bundle_authority_contradiction_actions = (
+        [
+            {
+                "action_id": "resolve_contradictory_physical_bundle_authority_gate_state",
+                "gate": "reviewed_model_authority",
+                "title": "Resolve contradictory physical-bundle authority state",
+                "detail": (
+                    "Rerun or inspect the SO-101 model-bundle manifest because it "
+                    "reports physical_so101_model_authority_ready while still "
+                    "carrying physical-authority blockers or pending bundle actions."
+                ),
+            }
+        ]
+        if physical_bundle_authority_contradictory_ready_state
+        else []
+    )
     motion_actions = (
         [
             {
@@ -4722,17 +4780,14 @@ def so101_reviewed_model_authority_gate_section(
         source_inventory.get("next_required_for_goal"),
         source_authority_contradiction_actions,
         bundle_manifest.get("next_required_for_goal"),
+        physical_bundle_authority_contradiction_actions,
         reviewed_mujoco_bundle.get("next_required_for_goal"),
         consistency_actions,
         motion_consistency_actions,
         fixture_boundary_actions,
         motion_actions,
     )
-    bundle_next_required = bundle_manifest.get("next_required_action_ids")
     reviewed_mujoco_next_required = reviewed_mujoco_bundle.get("next_required_for_goal")
-    physical_bundle_next_required_action_ids = unique_string_values(
-        bundle_next_required if isinstance(bundle_next_required, list) else []
-    )
     reviewed_mujoco_next_required_action_ids = unique_string_values(
         [
             action.get("action_id")
@@ -4757,6 +4812,14 @@ def so101_reviewed_model_authority_gate_section(
             source_authority_contradictory_ready_state
         ),
         "physical_so101_model_authority_ready": physical_authority_ready,
+        "physical_bundle_authority_status_ready": physical_bundle_authority_status_ready,
+        "physical_bundle_authority_blockers": physical_bundle_authority_blockers,
+        "physical_bundle_authority_pending_action_ids": (
+            physical_bundle_authority_pending_action_ids
+        ),
+        "physical_bundle_authority_contradictory_ready_state": (
+            physical_bundle_authority_contradictory_ready_state
+        ),
         "hardware_free_regression_fixture_ready": bundle_fixture_ready,
         "physical_authority_gate_status": bundle_manifest.get("physical_authority_gate_status"),
         "source_bundle_consistency_ready": source_bundle_consistency_ready,
@@ -4904,6 +4967,8 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
     bundle_next_action_id = (
         bundle_next_required_action_ids[0]
         if bundle_next_required_action_ids
+        else "resolve_contradictory_physical_bundle_authority_gate_state"
+        if gate.get("physical_bundle_authority_contradictory_ready_state") is True
         else "supply_reviewed_so101_model_bundle_manifest"
     )
     item_specs = [
@@ -5002,6 +5067,8 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
                     or "tcp" in blocker
                     or "base" in blocker
                     or "contract" in blocker
+                    or "physical_bundle" in blocker
+                    or "physical_authority" in blocker
                 )
             )
             or (

@@ -626,9 +626,13 @@ enough to authorize a different model file in the same tree, and a path match
 with a digest mismatch is also blocked. The gate also fails closed when a source
 inventory reports `source_authority_ready` while still carrying source blockers
 or pending source-authority actions; those contradictory states must be resolved
-before source/bundle identity consistency is checked. The reviewed-authority
-matrix includes
-ready-source-with-stale-blocker and ready-source-with-pending-action cases,
+before source/bundle identity consistency is checked. The same fail-closed rule
+applies when a bundle manifest summary reports physical bundle authority ready
+while still carrying physical-authority blockers or pending bundle-authority
+actions. The reviewed-authority matrix includes
+ready-source-with-stale-blocker, ready-source-with-pending-action,
+physical-bundle-ready-with-stale-blocker, and
+physical-bundle-ready-with-pending-action cases,
 missing selected source path, unconfigured selected source authority,
 selected-source/outside-authority mismatch, same-root unselected-model,
 source-digest-missing, malformed selected-source digest,
