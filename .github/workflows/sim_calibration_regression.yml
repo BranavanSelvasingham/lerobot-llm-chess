@@ -447,6 +447,8 @@ jobs:
               "source_ready_physical_bundle_path_mismatch",
               "source_ready_physical_bundle_same_root_unselected_model",
               "source_ready_physical_bundle_path_match_motion_missing",
+              "physical_motion_ready_with_missing_input_rejected",
+              "physical_motion_ready_with_pending_action_rejected",
               "source_ready_physical_bundle_digest_missing",
               "source_ready_physical_bundle_malformed_source_digest",
               "source_ready_physical_bundle_declared_digest_missing",
@@ -561,6 +563,35 @@ jobs:
           assert same_root["reviewed_mujoco_motion_bundle_consistency_status"] == "not_checked_prerequisites_not_ready", same_root
           assert same_root["development_fixture_evidence_not_physical_so101_truth"] is True, same_root
           assert "align_source_inventory_with_bundle_manifest_model_path" in same_root["next_required_action_ids"], same_root
+          motion_missing_input_case = by_case["physical_motion_ready_with_missing_input_rejected"]
+          motion_missing_input = motion_missing_input_case["gate"]
+          assert motion_missing_input["ready"] is False, motion_missing_input
+          assert motion_missing_input["physical_reviewed_model_motion_reported"] is True, motion_missing_input
+          assert motion_missing_input["physical_reviewed_model_motion_status_ready"] is True, motion_missing_input
+          assert motion_missing_input["physical_reviewed_model_motion_child_ready"] is False, motion_missing_input
+          assert motion_missing_input["physical_reviewed_model_motion_checked"] is False, motion_missing_input
+          assert motion_missing_input["reviewed_mujoco_motion_contradictory_ready_state"] is True, motion_missing_input
+          assert motion_missing_input["reviewed_mujoco_motion_missing_inputs"] == ["stale_reviewed_mujoco_motion_missing_input_should_fail_closed"], motion_missing_input
+          assert motion_missing_input["reviewed_mujoco_motion_pending_action_ids"] == [], motion_missing_input
+          assert motion_missing_input["reviewed_mujoco_motion_bundle_consistency_status"] == "not_checked_prerequisites_not_ready", motion_missing_input
+          assert "resolve_contradictory_reviewed_mujoco_motion_gate_state" in motion_missing_input["next_required_action_ids"], motion_missing_input
+          assert "physical_reviewed_mujoco_motion_checked" in motion_missing_input_case["blocker_packet"]["action_required_item_ids"], motion_missing_input_case
+          assert "resolve_contradictory_reviewed_mujoco_motion_gate_state" in motion_missing_input_case["blocker_packet"]["next_action_ids"], motion_missing_input_case
+          motion_pending_action_case = by_case["physical_motion_ready_with_pending_action_rejected"]
+          motion_pending_action = motion_pending_action_case["gate"]
+          assert motion_pending_action["ready"] is False, motion_pending_action
+          assert motion_pending_action["physical_reviewed_model_motion_reported"] is True, motion_pending_action
+          assert motion_pending_action["physical_reviewed_model_motion_status_ready"] is True, motion_pending_action
+          assert motion_pending_action["physical_reviewed_model_motion_child_ready"] is False, motion_pending_action
+          assert motion_pending_action["physical_reviewed_model_motion_checked"] is False, motion_pending_action
+          assert motion_pending_action["reviewed_mujoco_motion_contradictory_ready_state"] is True, motion_pending_action
+          assert motion_pending_action["reviewed_mujoco_motion_missing_inputs"] == [], motion_pending_action
+          assert motion_pending_action["reviewed_mujoco_motion_pending_action_ids"] == ["rerun_reviewed_mujoco_motion_evidence"], motion_pending_action
+          assert motion_pending_action["reviewed_mujoco_motion_bundle_consistency_status"] == "not_checked_prerequisites_not_ready", motion_pending_action
+          assert "rerun_reviewed_mujoco_motion_evidence" in motion_pending_action["next_required_action_ids"], motion_pending_action
+          assert "resolve_contradictory_reviewed_mujoco_motion_gate_state" in motion_pending_action["next_required_action_ids"], motion_pending_action
+          assert "physical_reviewed_mujoco_motion_checked" in motion_pending_action_case["blocker_packet"]["action_required_item_ids"], motion_pending_action_case
+          assert "rerun_reviewed_mujoco_motion_evidence" in motion_pending_action_case["blocker_packet"]["next_action_ids"], motion_pending_action_case
           digest_missing_case = by_case["source_ready_physical_bundle_digest_missing"]
           digest_missing = digest_missing_case["gate"]
           assert digest_missing["ready"] is False, digest_missing

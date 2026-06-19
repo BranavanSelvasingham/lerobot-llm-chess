@@ -4425,13 +4425,35 @@ def so101_reviewed_model_authority_gate_section(
     reviewed_mujoco_motion_authority_status = reviewed_mujoco_bundle.get(
         "motion_authority_status"
     )
+    reviewed_mujoco_motion_missing_inputs = unique_string_values(
+        reviewed_mujoco_bundle.get("missing_inputs") or []
+    )
+    reviewed_mujoco_next_required = reviewed_mujoco_bundle.get("next_required_for_goal")
+    reviewed_mujoco_next_required_action_ids = unique_string_values(
+        [
+            action.get("action_id") if isinstance(action, dict) else action
+            for action in reviewed_mujoco_next_required
+        ]
+        if isinstance(reviewed_mujoco_next_required, list)
+        else []
+    )
     physical_reviewed_motion_status_ready = (
         reviewed_mujoco_bundle_status == "reviewed_mujoco_bundle_motion_checked"
         and reviewed_mujoco_motion_authority_status
         == "physical_reviewed_model_motion_checked"
     )
+    reviewed_mujoco_motion_contradictory_ready_state = bool(
+        physical_reviewed_motion_reported
+        and physical_reviewed_motion_status_ready
+        and (
+            reviewed_mujoco_motion_missing_inputs
+            or reviewed_mujoco_next_required_action_ids
+        )
+    )
     physical_reviewed_motion_child_ready = (
         physical_reviewed_motion_reported and physical_reviewed_motion_status_ready
+        and not reviewed_mujoco_motion_missing_inputs
+        and not reviewed_mujoco_next_required_action_ids
     )
     source_bundle_consistency = so101_source_bundle_consistency_section(
         source_inventory,
@@ -4487,6 +4509,11 @@ def so101_reviewed_model_authority_gate_section(
                 []
                 if reviewed_mujoco_motion_bundle_consistency.get("blocker") is None
                 else [reviewed_mujoco_motion_bundle_consistency["blocker"]]
+            ),
+            *(
+                ["resolve_contradictory_reviewed_mujoco_motion_gate_state"]
+                if reviewed_mujoco_motion_contradictory_ready_state
+                else []
             ),
             *(
                 []
@@ -4733,6 +4760,22 @@ def so101_reviewed_model_authority_gate_section(
         if physical_bundle_authority_contradictory_ready_state
         else []
     )
+    reviewed_mujoco_motion_contradiction_actions = (
+        [
+            {
+                "action_id": "resolve_contradictory_reviewed_mujoco_motion_gate_state",
+                "gate": "mujoco_scene_validity",
+                "title": "Resolve contradictory reviewed MuJoCo motion state",
+                "detail": (
+                    "Rerun or inspect the reviewed MuJoCo bundle summary because it "
+                    "reports physical reviewed motion while still carrying missing "
+                    "inputs or pending reviewed-motion actions."
+                ),
+            }
+        ]
+        if reviewed_mujoco_motion_contradictory_ready_state
+        else []
+    )
     motion_actions = (
         [
             {
@@ -4782,20 +4825,11 @@ def so101_reviewed_model_authority_gate_section(
         bundle_manifest.get("next_required_for_goal"),
         physical_bundle_authority_contradiction_actions,
         reviewed_mujoco_bundle.get("next_required_for_goal"),
+        reviewed_mujoco_motion_contradiction_actions,
         consistency_actions,
         motion_consistency_actions,
         fixture_boundary_actions,
         motion_actions,
-    )
-    reviewed_mujoco_next_required = reviewed_mujoco_bundle.get("next_required_for_goal")
-    reviewed_mujoco_next_required_action_ids = unique_string_values(
-        [
-            action.get("action_id")
-            for action in reviewed_mujoco_next_required
-            if isinstance(action, dict)
-        ]
-        if isinstance(reviewed_mujoco_next_required, list)
-        else []
     )
     return {
         "status": "reviewed_model_authority_ready"
@@ -4838,6 +4872,11 @@ def so101_reviewed_model_authority_gate_section(
         "physical_reviewed_model_motion_reported": physical_reviewed_motion_reported,
         "physical_reviewed_model_motion_status_ready": physical_reviewed_motion_status_ready,
         "physical_reviewed_model_motion_child_ready": physical_reviewed_motion_child_ready,
+        "reviewed_mujoco_motion_missing_inputs": reviewed_mujoco_motion_missing_inputs,
+        "reviewed_mujoco_motion_pending_action_ids": reviewed_mujoco_next_required_action_ids,
+        "reviewed_mujoco_motion_contradictory_ready_state": (
+            reviewed_mujoco_motion_contradictory_ready_state
+        ),
         "hardware_free_fixture_motion_checked": fixture_motion_checked,
         "development_fixture_evidence_present": development_fixture_evidence_present,
         "reviewed_mujoco_bundle_status": reviewed_mujoco_bundle_status,
@@ -4940,6 +4979,20 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
     elif motion_bundle_consistency_status == "reviewed_mujoco_motion_model_digest_mismatch":
         physical_motion_next_action_id = (
             "align_reviewed_mujoco_motion_with_bundle_model_digest"
+        )
+    elif gate.get("reviewed_mujoco_motion_contradictory_ready_state") is True:
+        reviewed_mujoco_next_required_action_ids = gate.get(
+            "reviewed_mujoco_next_required_action_ids"
+        )
+        reviewed_mujoco_next_required_action_ids = (
+            reviewed_mujoco_next_required_action_ids
+            if isinstance(reviewed_mujoco_next_required_action_ids, list)
+            else []
+        )
+        physical_motion_next_action_id = (
+            reviewed_mujoco_next_required_action_ids[0]
+            if reviewed_mujoco_next_required_action_ids
+            else "resolve_contradictory_reviewed_mujoco_motion_gate_state"
         )
     else:
         physical_motion_next_action_id = "prove_physical_reviewed_model_motion"
@@ -5097,6 +5150,7 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
                             or "rerun_reviewed_mujoco_motion" in blocker
                             or "align_reviewed_mujoco_motion" in blocker
                             or "record_reviewed_mujoco_motion" in blocker
+                            or "reviewed_mujoco_motion" in blocker
                         )
                     )
                     or (

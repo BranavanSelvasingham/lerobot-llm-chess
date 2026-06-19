@@ -98,6 +98,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "physical_reviewed_model_motion_reported",
         "physical_reviewed_model_motion_status_ready",
         "physical_reviewed_model_motion_child_ready",
+        "reviewed_mujoco_motion_missing_inputs",
+        "reviewed_mujoco_motion_pending_action_ids",
+        "reviewed_mujoco_motion_contradictory_ready_state",
         "reviewed_mujoco_bundle_status",
         "reviewed_mujoco_motion_authority_status",
         "development_fixture_evidence_not_physical_so101_truth",
@@ -469,6 +472,34 @@ def motion_physical_ready(
         "next_required_for_goal": [],
         "summary_path": str(summary_path),
     }
+
+
+def motion_physical_ready_with_missing_input(
+    summary_path: Path,
+    *,
+    model_path: Path,
+) -> dict[str, Any]:
+    payload = motion_physical_ready(summary_path, model_path=model_path)
+    payload["missing_inputs"] = [
+        "stale_reviewed_mujoco_motion_missing_input_should_fail_closed"
+    ]
+    return payload
+
+
+def motion_physical_ready_with_pending_action(
+    summary_path: Path,
+    *,
+    model_path: Path,
+) -> dict[str, Any]:
+    payload = motion_physical_ready(summary_path, model_path=model_path)
+    action = gate_action(
+        "rerun_reviewed_mujoco_motion_evidence",
+        "mujoco_scene_validity",
+        "Rerun reviewed MuJoCo motion evidence",
+        "Pending reviewed-motion action must fail closed even with ready status.",
+    )
+    payload["next_required_for_goal"] = [action]
+    return payload
 
 
 def motion_inconsistent_status(summary_path: Path) -> dict[str, Any]:
@@ -899,6 +930,77 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                     "prove_physical_reviewed_model_motion",
                 ],
                 "action_required_contains": ["physical_reviewed_mujoco_motion_checked"],
+            },
+        },
+        {
+            "case_id": "physical_motion_ready_with_missing_input_rejected",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready_with_missing_input(
+                summary_dir / "motion_ready_stale_missing_input.json",
+                model_path=source_model,
+            ),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_bundle_model_path_and_digest_consistent",
+                "consistency_ready": True,
+                "development_fixture": True,
+                "motion_reported": True,
+                "motion_status_ready": True,
+                "motion_child_ready": False,
+                "motion_contradictory": True,
+                "motion_missing_inputs": [
+                    "stale_reviewed_mujoco_motion_missing_input_should_fail_closed"
+                ],
+                "motion_pending_actions": [],
+                "motion_bundle_consistency_status": "not_checked_prerequisites_not_ready",
+                "motion_bundle_consistency_ready": False,
+                "blockers_contain": [
+                    "resolve_contradictory_reviewed_mujoco_motion_gate_state",
+                    "load_reviewed_model_in_mujoco",
+                ],
+                "actions_contain": [
+                    "resolve_contradictory_reviewed_mujoco_motion_gate_state"
+                ],
+                "action_required_contains": ["physical_reviewed_mujoco_motion_checked"],
+                "blocker_packet_next_actions_contain": [
+                    "resolve_contradictory_reviewed_mujoco_motion_gate_state"
+                ],
+            },
+        },
+        {
+            "case_id": "physical_motion_ready_with_pending_action_rejected",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready_with_pending_action(
+                summary_dir / "motion_ready_pending_action.json",
+                model_path=source_model,
+            ),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_bundle_model_path_and_digest_consistent",
+                "consistency_ready": True,
+                "development_fixture": True,
+                "motion_reported": True,
+                "motion_status_ready": True,
+                "motion_child_ready": False,
+                "motion_contradictory": True,
+                "motion_missing_inputs": [],
+                "motion_pending_actions": ["rerun_reviewed_mujoco_motion_evidence"],
+                "motion_bundle_consistency_status": "not_checked_prerequisites_not_ready",
+                "motion_bundle_consistency_ready": False,
+                "blockers_contain": [
+                    "resolve_contradictory_reviewed_mujoco_motion_gate_state",
+                    "load_reviewed_model_in_mujoco",
+                ],
+                "actions_contain": [
+                    "rerun_reviewed_mujoco_motion_evidence",
+                    "resolve_contradictory_reviewed_mujoco_motion_gate_state"
+                ],
+                "action_required_contains": ["physical_reviewed_mujoco_motion_checked"],
+                "blocker_packet_next_actions_contain": [
+                    "rerun_reviewed_mujoco_motion_evidence"
+                ],
             },
         },
         {
@@ -1487,6 +1589,27 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             gate.get("physical_reviewed_model_motion_child_ready"),
             expect["motion_child_ready"],
         )
+    if "motion_contradictory" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_motion_contradictory_ready_state",
+            gate.get("reviewed_mujoco_motion_contradictory_ready_state"),
+            expect["motion_contradictory"],
+        )
+    if "motion_missing_inputs" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_motion_missing_inputs",
+            gate.get("reviewed_mujoco_motion_missing_inputs"),
+            expect["motion_missing_inputs"],
+        )
+    if "motion_pending_actions" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_motion_pending_action_ids",
+            gate.get("reviewed_mujoco_motion_pending_action_ids"),
+            expect["motion_pending_actions"],
+        )
     if "development_fixture_present" in expect:
         add_error(
             errors,
@@ -2033,6 +2156,15 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "physical_reviewed_model_motion_child_ready": gate.get(
             "physical_reviewed_model_motion_child_ready"
+        ),
+        "reviewed_mujoco_motion_missing_inputs": gate.get(
+            "reviewed_mujoco_motion_missing_inputs"
+        ),
+        "reviewed_mujoco_motion_pending_action_ids": gate.get(
+            "reviewed_mujoco_motion_pending_action_ids"
+        ),
+        "reviewed_mujoco_motion_contradictory_ready_state": gate.get(
+            "reviewed_mujoco_motion_contradictory_ready_state"
         ),
         "reviewed_mujoco_bundle_status": gate.get("reviewed_mujoco_bundle_status"),
         "reviewed_mujoco_motion_authority_status": gate.get(

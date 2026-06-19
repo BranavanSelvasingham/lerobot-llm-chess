@@ -650,8 +650,11 @@ The gate reports `physical_reviewed_model_motion_reported` separately from
 `physical_reviewed_model_motion_status_ready`; it only reports
 `physical_reviewed_model_motion_checked: true` when the reviewed-MuJoCo child
 status is `reviewed_mujoco_bundle_motion_checked` and
-`motion_authority_status` is `physical_reviewed_model_motion_checked`, and when
-the motion evidence matches the reviewed bundle model identity. The
+`motion_authority_status` is `physical_reviewed_model_motion_checked`, when the
+child summary has no reviewed-motion missing inputs or pending actions, and when
+the motion evidence matches the reviewed bundle model identity. A child summary
+that reports physical reviewed motion while still carrying missing inputs or
+pending motion actions is treated as contradictory and remains blocked. The
 physical-reviewed MuJoCo motion summary must carry the same reviewed bundle
 model path and declared SHA-256 as the bundle manifest, and its observed
 model-file SHA-256 must be present and match that reviewed motion declaration.
