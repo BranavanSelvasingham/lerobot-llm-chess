@@ -550,6 +550,7 @@ jobs:
               "nonstandard_json_constant_parse_error",
               "invalid_tcp_offset_shape_not_ready",
               "invalid_nonfinite_joint_limits_not_ready",
+              "invalid_reversed_joint_limits_not_ready",
               "invalid_nonfinite_tcp_offset_not_ready",
               "invalid_base_to_board_transform_not_ready",
               "invalid_nonfinite_base_to_board_transform_not_ready",
@@ -668,6 +669,13 @@ jobs:
           assert nonfinite_joints["observations"]["joint_limits_status"] == "invalid", nonfinite_joints
           assert "joint_limits_deg" in nonfinite_joints["observations"]["missing_inputs"], nonfinite_joints
           assert nonfinite_joints["observations"]["reviewed_model_motion_checked"] is False, nonfinite_joints
+          reversed_joints = by_case["invalid_reversed_joint_limits_not_ready"]
+          assert reversed_joints["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", reversed_joints
+          assert reversed_joints["observations"]["ready_for_model_backed_ik"] is False, reversed_joints
+          assert reversed_joints["observations"]["joint_limits_status"] == "invalid", reversed_joints
+          assert "joint_limits_deg" in reversed_joints["observations"]["missing_inputs"], reversed_joints
+          assert "joint_limit_invalid:shoulder_pan:joint_limit_lower_not_below_upper" in reversed_joints["observations"]["joint_limits_diagnostics"], reversed_joints
+          assert reversed_joints["observations"]["reviewed_model_motion_checked"] is False, reversed_joints
           nonfinite_tcp = by_case["invalid_nonfinite_tcp_offset_not_ready"]
           assert nonfinite_tcp["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", nonfinite_tcp
           assert nonfinite_tcp["observations"]["ready_for_model_backed_ik"] is False, nonfinite_tcp

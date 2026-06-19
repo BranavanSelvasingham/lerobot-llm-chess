@@ -665,7 +665,8 @@ path, a not-ready placeholder manifest, placeholder review metadata on otherwise
 complete fields, generic-review-scope and per-field weak-authority fixtures,
 manifest/model target-frame mismatches that must block motion authority,
 non-standard JSON constants that must parse-fail, malformed
-and non-finite TCP/alignment manifest payloads, non-finite joint limits, a
+and non-finite TCP/alignment manifest payloads, non-finite or reversed joint
+limits, a
 ready manifest whose declared body-joint bounds intentionally mismatch the
 loaded MuJoCo `jnt_range`, and a ready synthetic fixture manifest whose MuJoCo/SimRobot motion
 check must remain

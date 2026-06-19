@@ -127,6 +127,11 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
     nonfinite_joint_limits_path = fixture_dir / "so101_model_bundle.nonfinite_joint_limits.json"
     write_json(nonfinite_joint_limits_path, nonfinite_joint_limits)
 
+    reversed_joint_limits = json_clone(ready_payload)
+    reversed_joint_limits["joint_limits_deg"]["shoulder_pan"] = [110.0, -110.0]
+    reversed_joint_limits_path = fixture_dir / "so101_model_bundle.reversed_joint_limits.json"
+    write_json(reversed_joint_limits_path, reversed_joint_limits)
+
     nonfinite_tcp = json_clone(ready_payload)
     nonfinite_tcp["tcp_offset_m"]["z"] = "Infinity"
     nonfinite_tcp_path = fixture_dir / "so101_model_bundle.nonfinite_tcp_offset.json"
@@ -160,6 +165,7 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
         "tiny_gripper_range_manifest_path": tiny_gripper_manifest_path,
         "tiny_gripper_range_model_path": tiny_gripper_model_path,
         "nonfinite_joint_limits_manifest_path": nonfinite_joint_limits_path,
+        "reversed_joint_limits_manifest_path": reversed_joint_limits_path,
         "nonfinite_tcp_manifest_path": nonfinite_tcp_path,
         "nonfinite_alignment_manifest_path": nonfinite_alignment_path,
         "nonstandard_json_constant_manifest_path": nonstandard_json_constant_path,
@@ -634,6 +640,27 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "invalid_reversed_joint_limits_not_ready",
+            "manifest_path": fixtures["reversed_joint_limits_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "joint_limits_status": "invalid",
+                "missing_inputs_contains": ["joint_limits_deg"],
+                "joint_limits_diagnostics_contains": [
+                    "joint_limit_invalid:shoulder_pan:joint_limit_lower_not_below_upper"
+                ],
+            },
+        },
+        {
             "case_id": "invalid_nonfinite_tcp_offset_not_ready",
             "manifest_path": fixtures["nonfinite_tcp_manifest_path"],
             "require_ready": False,
@@ -1043,6 +1070,7 @@ def summarize_case(
             "authority_status": (summary.get("authority") or {}).get("status"),
             "provenance_status": (summary.get("provenance") or {}).get("status"),
             "joint_limits_status": (summary.get("joint_limits") or {}).get("status"),
+            "joint_limits_diagnostics": (summary.get("joint_limits") or {}).get("diagnostics"),
             "mesh_assets_status": (summary.get("mesh_assets") or {}).get("status"),
             "target_frame_status": (summary.get("target_frame") or {}).get("status"),
             "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
