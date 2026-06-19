@@ -1899,6 +1899,9 @@ jobs:
               "board_missing_release_detail_reviewed_authority_rejected",
               "board_missing_final_contact_reviewed_authority_rejected",
               "board_target_tolerance_reviewed_authority_rejected",
+              "board_missing_phase_evidence_reviewed_authority_rejected",
+              "board_z_tolerance_missing_reviewed_authority_rejected",
+              "board_z_tolerance_reviewed_authority_rejected",
               "rollout_raw_ready_development_authority_rejected",
               "rollout_reviewed_authority_not_ready",
               "rollout_reviewed_ready_failed_status_rejected",
@@ -2041,6 +2044,30 @@ jobs:
           assert target_outside_tolerance["board_pick_final_target_xy_error_m"] > target_outside_tolerance["board_pick_target_xy_tolerance_m"], target_outside_tolerance
           assert target_outside_tolerance["reviewed_model_backed_board_source_pick_place"] is False, target_outside_tolerance
           assert target_outside_tolerance["ready"] is False, target_outside_tolerance
+          missing_phase = by_case["board_missing_phase_evidence_reviewed_authority_rejected"]["gate"]
+          assert missing_phase["board_pick_reviewed_model_authority_ready"] is True, missing_phase
+          assert missing_phase["board_pick_detailed_evidence_ready"] is False, missing_phase
+          assert missing_phase["board_pick_phase_evidence_ready"] is False, missing_phase
+          assert missing_phase["board_pick_phase_ids"] == [], missing_phase
+          assert missing_phase["board_pick_phase_count"] == 0, missing_phase
+          assert missing_phase["reviewed_model_backed_board_source_pick_place"] is False, missing_phase
+          assert missing_phase["ready"] is False, missing_phase
+          missing_z = by_case["board_z_tolerance_missing_reviewed_authority_rejected"]["gate"]
+          assert missing_z["board_pick_reviewed_model_authority_ready"] is True, missing_z
+          assert missing_z["board_pick_detailed_evidence_ready"] is False, missing_z
+          assert missing_z["board_pick_phase_evidence_ready"] is True, missing_z
+          assert missing_z["board_pick_final_place_z_within_tolerance"] is False, missing_z
+          assert missing_z["board_pick_place_z_tolerance_m"] is None, missing_z
+          assert missing_z["reviewed_model_backed_board_source_pick_place"] is False, missing_z
+          assert missing_z["ready"] is False, missing_z
+          z_outside_tolerance = by_case["board_z_tolerance_reviewed_authority_rejected"]["gate"]
+          assert z_outside_tolerance["board_pick_reviewed_model_authority_ready"] is True, z_outside_tolerance
+          assert z_outside_tolerance["board_pick_detailed_evidence_ready"] is False, z_outside_tolerance
+          assert z_outside_tolerance["board_pick_phase_evidence_ready"] is True, z_outside_tolerance
+          assert z_outside_tolerance["board_pick_final_place_z_error_m"] > z_outside_tolerance["board_pick_place_z_tolerance_m"], z_outside_tolerance
+          assert z_outside_tolerance["board_pick_final_place_z_within_tolerance"] is False, z_outside_tolerance
+          assert z_outside_tolerance["reviewed_model_backed_board_source_pick_place"] is False, z_outside_tolerance
+          assert z_outside_tolerance["ready"] is False, z_outside_tolerance
           ready = by_case["all_ready_reviewed_contract_state"]["gate"]
           assert ready["ready"] is True, ready
           assert ready["reviewed_mujoco_downstream_handoff_contract_ok"] is True, ready
@@ -2049,6 +2076,8 @@ jobs:
           assert ready["reviewed_mujoco_downstream_handoff_physical_motion_checked"] is True, ready
           assert ready["reviewed_mujoco_downstream_handoff_physical_truth_claimed"] is False, ready
           assert ready["board_pick_detailed_evidence_ready"] is True, ready
+          assert ready["board_pick_phase_evidence_ready"] is True, ready
+          assert ready["board_pick_final_place_z_within_tolerance"] is True, ready
           assert ready["rollout_status"] == "ok", ready
           assert ready["rollout_training_authority_status"] == "reviewed_policy_training_rollouts_ready", ready
           assert ready["rollout_use"] == "policy_training", ready
