@@ -6,6 +6,7 @@ import argparse
 import csv
 import importlib.util
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,20 @@ SO101_JOINTS: tuple[str, ...] = (
     "wrist_roll",
     "gripper",
 )
+REQUIRED_MODEL_JOINTS: tuple[str, ...] = (*SO101_JOINTS, "piece_source_freejoint")
+REQUIRED_LIMITED_JOINTS: tuple[str, ...] = SO101_JOINTS
+REQUIRED_BODIES: tuple[str, ...] = ("chess_board", "piece_source")
+REQUIRED_GRIPPER_COLLISION_GEOMS: tuple[str, ...] = (
+    "gripper_fixed_finger_collision",
+    "gripper_moving_finger_collision",
+)
+REQUIRED_GEOMS: tuple[str, ...] = (
+    "chess_board_collision",
+    "piece_source_collision",
+    *REQUIRED_GRIPPER_COLLISION_GEOMS,
+    "target_square_marker",
+)
+REQUIRED_SITES: tuple[str, ...] = ("gripper_frame_link",)
 DEVELOPMENT_MODEL_AUTHORITY = "development_scaffold_not_reviewed"
 DOWNSTREAM_HANDOFF_MODEL_AUTHORITY = "downstream_handoff_not_authority"
 DOWNSTREAM_HANDOFF_SCHEMA = "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1"
@@ -489,39 +504,76 @@ def validate_loaded_model(model_path: Path) -> dict[str, Any]:
     geom_names = mujoco_names(mujoco, model, mujoco.mjtObj.mjOBJ_GEOM, model.ngeom)
     body_names = mujoco_names(mujoco, model, mujoco.mjtObj.mjOBJ_BODY, model.nbody)
     site_names = mujoco_names(mujoco, model, mujoco.mjtObj.mjOBJ_SITE, model.nsite)
-    required_joints = set(SO101_JOINTS)
-    required_model_joints = required_joints | {"piece_source_freejoint"}
-    required_bodies = {"piece_source", "chess_board"}
-    required_geoms = {
-        "chess_board_collision",
-        "piece_source_collision",
-        "gripper_fixed_finger_collision",
-        "gripper_moving_finger_collision",
-        "target_square_marker",
-    }
-    required_sites = {"gripper_frame_link"}
     square_geoms = [name for name in geom_names if name.startswith("square_")]
+    joint_set = set(joint_names)
+    geom_set = set(geom_names)
+    body_set = set(body_names)
+    site_set = set(site_names)
+    limited_joint_evidence: dict[str, dict[str, Any]] = {}
+    missing_limited_joints: list[str] = []
+    unlimited_required_joints: list[str] = []
+    invalid_required_joint_ranges: list[str] = []
+    for joint_name in REQUIRED_LIMITED_JOINTS:
+        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
+        if joint_id < 0:
+            missing_limited_joints.append(joint_name)
+            continue
+        joint_range = [
+            float(model.jnt_range[joint_id][0]),
+            float(model.jnt_range[joint_id][1]),
+        ]
+        limited = bool(model.jnt_limited[joint_id])
+        finite_range = all(math.isfinite(value) for value in joint_range)
+        nonzero_range = joint_range[1] > joint_range[0]
+        if not limited:
+            unlimited_required_joints.append(joint_name)
+        if not finite_range or not nonzero_range:
+            invalid_required_joint_ranges.append(joint_name)
+        limited_joint_evidence[joint_name] = {
+            "limited": limited,
+            "range": joint_range,
+            "finite_range": finite_range,
+            "nonzero_range": nonzero_range,
+        }
+    missing_required_geoms = sorted(set(REQUIRED_GEOMS) - geom_set)
+    missing_gripper_collision_geoms = sorted(
+        set(REQUIRED_GRIPPER_COLLISION_GEOMS) - geom_set
+    )
     return {
         "ok": (
-            required_model_joints.issubset(joint_names)
-            and required_bodies.issubset(body_names)
-            and required_geoms.issubset(geom_names)
-            and required_sites.issubset(site_names)
+            set(REQUIRED_MODEL_JOINTS).issubset(joint_set)
+            and set(REQUIRED_BODIES).issubset(body_set)
+            and set(REQUIRED_GEOMS).issubset(geom_set)
+            and set(REQUIRED_SITES).issubset(site_set)
             and len(square_geoms) == 64
+            and not missing_limited_joints
+            and not unlimited_required_joints
+            and not invalid_required_joint_ranges
         ),
         "model_path": str(model_path),
         "nq": int(model.nq),
         "nv": int(model.nv),
+        "required_model_joints": list(REQUIRED_MODEL_JOINTS),
+        "required_limited_joints": list(REQUIRED_LIMITED_JOINTS),
         "joint_names": joint_names,
-        "missing_joints": sorted(required_model_joints - set(joint_names)),
+        "missing_joints": sorted(set(REQUIRED_MODEL_JOINTS) - joint_set),
+        "limited_joint_evidence": limited_joint_evidence,
+        "missing_limited_joints": missing_limited_joints,
+        "unlimited_required_joints": unlimited_required_joints,
+        "invalid_required_joint_ranges": invalid_required_joint_ranges,
+        "required_bodies": list(REQUIRED_BODIES),
         "body_names": body_names,
-        "missing_bodies": sorted(required_bodies - set(body_names)),
+        "missing_bodies": sorted(set(REQUIRED_BODIES) - body_set),
+        "required_sites": list(REQUIRED_SITES),
         "site_names": site_names,
-        "missing_required_sites": sorted(required_sites - set(site_names)),
+        "missing_required_sites": sorted(set(REQUIRED_SITES) - site_set),
+        "required_geoms": list(REQUIRED_GEOMS),
+        "required_gripper_collision_geoms": list(REQUIRED_GRIPPER_COLLISION_GEOMS),
         "geom_count": len(geom_names),
         "body_count": len(body_names),
         "square_geom_count": len(square_geoms),
-        "missing_required_geoms": sorted(required_geoms - set(geom_names)),
+        "missing_required_geoms": missing_required_geoms,
+        "missing_gripper_collision_geoms": missing_gripper_collision_geoms,
     }
 
 

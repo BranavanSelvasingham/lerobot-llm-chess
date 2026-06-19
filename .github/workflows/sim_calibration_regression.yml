@@ -1455,6 +1455,27 @@ jobs:
               "ready_handoff_intake_still_development_scene",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
+          expected_required_model_joints = [
+              "shoulder_pan",
+              "shoulder_lift",
+              "elbow_flex",
+              "wrist_flex",
+              "wrist_roll",
+              "gripper",
+              "piece_source_freejoint",
+          ]
+          expected_limited_so101_joints = [
+              "shoulder_pan",
+              "shoulder_lift",
+              "elbow_flex",
+              "wrist_flex",
+              "wrist_roll",
+              "gripper",
+          ]
+          expected_gripper_collision_geoms = [
+              "gripper_fixed_finger_collision",
+              "gripper_moving_finger_collision",
+          ]
           negative_case_ids = {
               "invalid_source_square_rejected",
               "invalid_target_square_rejected",
@@ -1574,6 +1595,16 @@ jobs:
                   assert obs["status"] == "invalid_task_configuration", case
                   assert obs["mujoco_scene_validity_status"] == "invalid_task_configuration", case
                   assert obs["model_load_ok"] is False, case
+                  assert obs["required_model_joints"] is None, case
+                  assert obs["missing_joints"] is None, case
+                  assert obs["required_limited_joints"] is None, case
+                  assert obs["limited_joint_evidence_count"] == 0, case
+                  assert obs["missing_limited_joints"] is None, case
+                  assert obs["unlimited_required_joints"] is None, case
+                  assert obs["invalid_required_joint_ranges"] is None, case
+                  assert obs["required_gripper_collision_geoms"] is None, case
+                  assert obs["missing_gripper_collision_geoms"] is None, case
+                  assert obs["gripper_collision_geoms_present"] is None, case
                   assert obs["sim_robot_sync_ok"] is False, case
                   assert obs["env_scripted_pick_place_complete"] is False, case
                   assert obs["model_xml_exists"] is False, case
@@ -1584,6 +1615,16 @@ jobs:
                   assert obs["status"] == "reviewed_mujoco_handoff_required_but_not_ready", case
                   assert obs["mujoco_scene_validity_status"] == "reviewed_handoff_required_but_not_ready", case
                   assert obs["model_load_ok"] is False, case
+                  assert obs["required_model_joints"] is None, case
+                  assert obs["missing_joints"] is None, case
+                  assert obs["required_limited_joints"] is None, case
+                  assert obs["limited_joint_evidence_count"] == 0, case
+                  assert obs["missing_limited_joints"] is None, case
+                  assert obs["unlimited_required_joints"] is None, case
+                  assert obs["invalid_required_joint_ranges"] is None, case
+                  assert obs["required_gripper_collision_geoms"] is None, case
+                  assert obs["missing_gripper_collision_geoms"] is None, case
+                  assert obs["gripper_collision_geoms_present"] is None, case
                   assert obs["sim_robot_sync_ok"] is False, case
                   assert obs["env_scripted_pick_place_complete"] is False, case
                   assert obs["model_xml_exists"] is False, case
@@ -1594,6 +1635,16 @@ jobs:
               assert obs["target_frame_site_present"] is True, case
               assert obs["target_marker_present"] is True, case
               assert obs["model_load_ok"] is True, case
+              assert obs["required_model_joints"] == expected_required_model_joints, case
+              assert obs["missing_joints"] == [], case
+              assert obs["required_limited_joints"] == expected_limited_so101_joints, case
+              assert obs["limited_joint_evidence_count"] == len(expected_limited_so101_joints), case
+              assert obs["missing_limited_joints"] == [], case
+              assert obs["unlimited_required_joints"] == [], case
+              assert obs["invalid_required_joint_ranges"] == [], case
+              assert obs["required_gripper_collision_geoms"] == expected_gripper_collision_geoms, case
+              assert obs["missing_gripper_collision_geoms"] == [], case
+              assert obs["gripper_collision_geoms_present"] is True, case
               assert obs["sim_robot_sync_ok"] is True, case
               assert obs["env_scripted_pick_place_complete"] is True, case
               assert obs["missing_required_geoms"] == [], case
@@ -3269,6 +3320,27 @@ jobs:
               "missing_model",
               "model_unavailable",
           }, model_diagnostic
+          expected_required_model_joints = [
+              "shoulder_pan",
+              "shoulder_lift",
+              "elbow_flex",
+              "wrist_flex",
+              "wrist_roll",
+              "gripper",
+              "piece_source_freejoint",
+          ]
+          expected_limited_so101_joints = [
+              "shoulder_pan",
+              "shoulder_lift",
+              "elbow_flex",
+              "wrist_flex",
+              "wrist_roll",
+              "gripper",
+          ]
+          expected_gripper_collision_geoms = [
+              "gripper_fixed_finger_collision",
+              "gripper_moving_finger_collision",
+          ]
           so101_mujoco_scene = summary["so101_mujoco_scene"]
           assert so101_mujoco_scene["ok"] is True, so101_mujoco_scene
           assert so101_mujoco_scene["status"] == "ok", so101_mujoco_scene
@@ -3293,6 +3365,16 @@ jobs:
           assert so101_mujoco_scene["target_frame_site_present"] is True, so101_mujoco_scene
           assert so101_mujoco_scene["target_marker_present"] is True, so101_mujoco_scene
           assert so101_mujoco_scene["mujoco_model_load"]["ok"] is True, so101_mujoco_scene
+          scene_model_load = so101_mujoco_scene["mujoco_model_load"]
+          assert scene_model_load["required_model_joints"] == expected_required_model_joints, scene_model_load
+          assert scene_model_load["missing_joints"] == [], scene_model_load
+          assert scene_model_load["required_limited_joints"] == expected_limited_so101_joints, scene_model_load
+          assert len(scene_model_load["limited_joint_evidence"]) == len(expected_limited_so101_joints), scene_model_load
+          assert scene_model_load["missing_limited_joints"] == [], scene_model_load
+          assert scene_model_load["unlimited_required_joints"] == [], scene_model_load
+          assert scene_model_load["invalid_required_joint_ranges"] == [], scene_model_load
+          assert scene_model_load["required_gripper_collision_geoms"] == expected_gripper_collision_geoms, scene_model_load
+          assert scene_model_load["missing_gripper_collision_geoms"] == [], scene_model_load
           assert so101_mujoco_scene["sim_robot_mujoco_sync"]["ok"] is True, so101_mujoco_scene
           assert so101_mujoco_scene["env_scripted_pick_place"]["scripted_pick_place_complete"] is True, so101_mujoco_scene
           for key in ("summary_json", "model_xml", "manifest_json", "steps_csv", "readme"):

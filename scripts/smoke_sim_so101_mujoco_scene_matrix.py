@@ -18,6 +18,27 @@ SCHEMA = "lerobot.sim.so101_mujoco_scene_matrix.v1"
 SCENE_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_mujoco_scene.py"
 SCENE_SUMMARY_NAME = "so101_mujoco_scene_summary.json"
 DOWNSTREAM_HANDOFF_SCHEMA = "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1"
+EXPECTED_REQUIRED_MODEL_JOINTS: tuple[str, ...] = (
+    "shoulder_pan",
+    "shoulder_lift",
+    "elbow_flex",
+    "wrist_flex",
+    "wrist_roll",
+    "gripper",
+    "piece_source_freejoint",
+)
+EXPECTED_LIMITED_SO101_JOINTS: tuple[str, ...] = (
+    "shoulder_pan",
+    "shoulder_lift",
+    "elbow_flex",
+    "wrist_flex",
+    "wrist_roll",
+    "gripper",
+)
+EXPECTED_GRIPPER_COLLISION_GEOMS: tuple[str, ...] = (
+    "gripper_fixed_finger_collision",
+    "gripper_moving_finger_collision",
+)
 EXPECTED_DOWNSTREAM_HANDOFF_ITEM_IDS: tuple[str, ...] = (
     "model_authority",
     "model_identity",
@@ -101,6 +122,16 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "square_geom_count",
         "target_frame_site_present",
         "target_marker_present",
+        "required_model_joints",
+        "missing_joints",
+        "required_limited_joints",
+        "limited_joint_evidence_count",
+        "missing_limited_joints",
+        "unlimited_required_joints",
+        "invalid_required_joint_ranges",
+        "required_gripper_collision_geoms",
+        "missing_gripper_collision_geoms",
+        "gripper_collision_geoms_present",
         "model_load_ok",
         "sim_robot_sync_ok",
         "env_scripted_pick_place_complete",
@@ -557,6 +588,26 @@ def summarize_case(
         "square_geom_count": summary.get("square_geom_count"),
         "target_frame_site_present": summary.get("target_frame_site_present"),
         "target_marker_present": summary.get("target_marker_present"),
+        "required_model_joints": model_load.get("required_model_joints"),
+        "missing_joints": model_load.get("missing_joints"),
+        "required_limited_joints": model_load.get("required_limited_joints"),
+        "limited_joint_evidence_count": len(model_load.get("limited_joint_evidence") or {}),
+        "missing_limited_joints": model_load.get("missing_limited_joints"),
+        "unlimited_required_joints": model_load.get("unlimited_required_joints"),
+        "invalid_required_joint_ranges": model_load.get(
+            "invalid_required_joint_ranges"
+        ),
+        "required_gripper_collision_geoms": model_load.get(
+            "required_gripper_collision_geoms"
+        ),
+        "missing_gripper_collision_geoms": model_load.get(
+            "missing_gripper_collision_geoms"
+        ),
+        "gripper_collision_geoms_present": (
+            not bool(model_load.get("missing_gripper_collision_geoms"))
+            if isinstance(model_load.get("missing_gripper_collision_geoms"), list)
+            else None
+        ),
         "model_load_ok": model_load.get("ok"),
         "sim_robot_sync_ok": sim_sync.get("ok"),
         "env_scripted_pick_place_complete": env_result.get("scripted_pick_place_complete"),
@@ -645,6 +696,61 @@ def summarize_case(
         add_error(errors, f"{case_id}.target_frame_site_present", observations["target_frame_site_present"], True)
         add_error(errors, f"{case_id}.target_marker_present", observations["target_marker_present"], True)
         add_error(errors, f"{case_id}.model_load_ok", observations["model_load_ok"], True)
+        add_error(
+            errors,
+            f"{case_id}.required_model_joints",
+            observations["required_model_joints"],
+            list(EXPECTED_REQUIRED_MODEL_JOINTS),
+        )
+        add_error(errors, f"{case_id}.missing_joints", observations["missing_joints"], [])
+        add_error(
+            errors,
+            f"{case_id}.required_limited_joints",
+            observations["required_limited_joints"],
+            list(EXPECTED_LIMITED_SO101_JOINTS),
+        )
+        add_error(
+            errors,
+            f"{case_id}.limited_joint_evidence_count",
+            observations["limited_joint_evidence_count"],
+            len(EXPECTED_LIMITED_SO101_JOINTS),
+        )
+        add_error(
+            errors,
+            f"{case_id}.missing_limited_joints",
+            observations["missing_limited_joints"],
+            [],
+        )
+        add_error(
+            errors,
+            f"{case_id}.unlimited_required_joints",
+            observations["unlimited_required_joints"],
+            [],
+        )
+        add_error(
+            errors,
+            f"{case_id}.invalid_required_joint_ranges",
+            observations["invalid_required_joint_ranges"],
+            [],
+        )
+        add_error(
+            errors,
+            f"{case_id}.required_gripper_collision_geoms",
+            observations["required_gripper_collision_geoms"],
+            list(EXPECTED_GRIPPER_COLLISION_GEOMS),
+        )
+        add_error(
+            errors,
+            f"{case_id}.missing_gripper_collision_geoms",
+            observations["missing_gripper_collision_geoms"],
+            [],
+        )
+        add_error(
+            errors,
+            f"{case_id}.gripper_collision_geoms_present",
+            observations["gripper_collision_geoms_present"],
+            True,
+        )
         add_error(errors, f"{case_id}.sim_robot_sync_ok", observations["sim_robot_sync_ok"], True)
         add_error(
             errors,
@@ -667,6 +773,56 @@ def summarize_case(
         add_error(errors, f"{case_id}.target_frame_site_present", observations["target_frame_site_present"], None)
         add_error(errors, f"{case_id}.target_marker_present", observations["target_marker_present"], None)
         add_error(errors, f"{case_id}.model_load_ok", observations["model_load_ok"], False)
+        add_error(errors, f"{case_id}.required_model_joints", observations["required_model_joints"], None)
+        add_error(errors, f"{case_id}.missing_joints", observations["missing_joints"], None)
+        add_error(
+            errors,
+            f"{case_id}.required_limited_joints",
+            observations["required_limited_joints"],
+            None,
+        )
+        add_error(
+            errors,
+            f"{case_id}.limited_joint_evidence_count",
+            observations["limited_joint_evidence_count"],
+            0,
+        )
+        add_error(
+            errors,
+            f"{case_id}.missing_limited_joints",
+            observations["missing_limited_joints"],
+            None,
+        )
+        add_error(
+            errors,
+            f"{case_id}.unlimited_required_joints",
+            observations["unlimited_required_joints"],
+            None,
+        )
+        add_error(
+            errors,
+            f"{case_id}.invalid_required_joint_ranges",
+            observations["invalid_required_joint_ranges"],
+            None,
+        )
+        add_error(
+            errors,
+            f"{case_id}.required_gripper_collision_geoms",
+            observations["required_gripper_collision_geoms"],
+            None,
+        )
+        add_error(
+            errors,
+            f"{case_id}.missing_gripper_collision_geoms",
+            observations["missing_gripper_collision_geoms"],
+            None,
+        )
+        add_error(
+            errors,
+            f"{case_id}.gripper_collision_geoms_present",
+            observations["gripper_collision_geoms_present"],
+            None,
+        )
         add_error(errors, f"{case_id}.sim_robot_sync_ok", observations["sim_robot_sync_ok"], False)
         add_error(
             errors,
@@ -886,6 +1042,26 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "square_geom_count": observations.get("square_geom_count"),
         "target_frame_site_present": observations.get("target_frame_site_present"),
         "target_marker_present": observations.get("target_marker_present"),
+        "required_model_joints": observations.get("required_model_joints"),
+        "missing_joints": observations.get("missing_joints"),
+        "required_limited_joints": observations.get("required_limited_joints"),
+        "limited_joint_evidence_count": observations.get(
+            "limited_joint_evidence_count"
+        ),
+        "missing_limited_joints": observations.get("missing_limited_joints"),
+        "unlimited_required_joints": observations.get("unlimited_required_joints"),
+        "invalid_required_joint_ranges": observations.get(
+            "invalid_required_joint_ranges"
+        ),
+        "required_gripper_collision_geoms": observations.get(
+            "required_gripper_collision_geoms"
+        ),
+        "missing_gripper_collision_geoms": observations.get(
+            "missing_gripper_collision_geoms"
+        ),
+        "gripper_collision_geoms_present": observations.get(
+            "gripper_collision_geoms_present"
+        ),
         "model_load_ok": observations.get("model_load_ok"),
         "sim_robot_sync_ok": observations.get("sim_robot_sync_ok"),
         "env_scripted_pick_place_complete": observations.get("env_scripted_pick_place_complete"),

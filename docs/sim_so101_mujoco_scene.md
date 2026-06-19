@@ -35,6 +35,12 @@ The summary must report:
 - source and target squares, `square_geom_count: 64`, target-frame site
   presence, and target marker presence
 - `mujoco_model_load.ok: true`
+- `mujoco_model_load.required_model_joints` containing the six controlled
+  SO-101 joints plus `piece_source_freejoint`, with `missing_joints: []`
+- `mujoco_model_load.required_limited_joints` containing the six controlled
+  SO-101 joints, with no missing, unlimited, or invalid-range required joints
+- `mujoco_model_load.required_gripper_collision_geoms` containing both gripper
+  finger collision geoms, with `missing_gripper_collision_geoms: []`
 - `sim_robot_mujoco_sync.ok: true`
 - `sim_robot_mujoco_sync.after_status.fallback: null`
 - `env_scripted_pick_place.scripted_pick_place_complete: true`
@@ -84,6 +90,9 @@ handoffs that claim authority/physical SO-101 truth, plus valid optional and
 required ready-handoff intake cases that still keep the generated scene
 development-only,
 while keeping every case labeled as non-authoritative development scaffolding.
+Passing matrix cases also assert the required model joint set, finite limited
+joint ranges for the six controlled SO-101 joints, and both gripper collision
+geoms so scene-validity regressions cannot hide behind aggregate load status.
 
 This scene is intentionally not an authoritative model bundle. It is generated
 from approximate repo-local dimensions and exists to validate MuJoCo loading,
