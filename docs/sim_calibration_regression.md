@@ -339,7 +339,11 @@ blocker can be inspected without digging through the full suite summary. The
 checklist CSV preserves priority, status, prior-blocker IDs, and next-action IDs
 from the blocker packet, so downstream MuJoCo motion rows remain
 `blocked_by_prior_requirements` until source and physical bundle authority are
-ready. The gate summary also rolls child source-inventory, bundle-manifest, and
+ready. Blocked rows also carry `blocked_by_prior_requirement_statuses`, a compact
+map from each prior requirement ID to its current status, so reviewers can see
+whether a downstream row is waiting on an action-required prerequisite or another
+blocked prerequisite without cross-referencing the JSON packet. The gate summary
+also rolls child source-inventory, bundle-manifest, and
 reviewed-MuJoCo missing work into ordered `next_required_for_goal`,
 `next_required_action_ids`, and `next_required_action_count` fields. The blocker
 packet is review intake only

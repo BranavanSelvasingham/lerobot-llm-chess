@@ -5178,13 +5178,26 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
     ]
     items: list[dict[str, Any]] = []
     all_blockers = gate.get("blockers") or []
+
+    def blocker_item_status(spec: dict[str, Any]) -> str:
+        if spec["observed_ready"]:
+            return "ready"
+        if spec.get("blocked_by_prior_requirements"):
+            return "blocked_by_prior_requirements"
+        return "action_required"
+
+    item_status_by_id = {
+        spec["item_id"]: blocker_item_status(spec)
+        for spec in item_specs
+        if isinstance(spec.get("item_id"), str)
+    }
+
     for priority, spec in enumerate(item_specs, start=1):
-        status = (
-            "ready"
-            if spec["observed_ready"]
-            else "blocked_by_prior_requirements"
-            if spec.get("blocked_by_prior_requirements")
-            else "action_required"
+        status = blocker_item_status(spec)
+        blocked_by_prior_requirement_ids = (
+            spec.get("blocked_by_prior_requirement_ids", [])
+            if status == "blocked_by_prior_requirements"
+            else []
         )
         related_blockers = [
             blocker
@@ -5265,11 +5278,11 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
                 **spec,
                 "status": status,
                 "blockers": related_blockers,
-                "blocked_by_prior_requirement_ids": (
-                    spec.get("blocked_by_prior_requirement_ids", [])
-                    if status == "blocked_by_prior_requirements"
-                    else []
-                ),
+                "blocked_by_prior_requirement_ids": blocked_by_prior_requirement_ids,
+                "blocked_by_prior_requirement_statuses": {
+                    requirement_id: item_status_by_id.get(requirement_id)
+                    for requirement_id in blocked_by_prior_requirement_ids
+                },
                 "development_fixture_evidence_not_physical_so101_truth": gate.get(
                     "development_fixture_evidence_not_physical_so101_truth"
                 )
@@ -5458,6 +5471,19 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         )
         return [str(value) for value in blocked] if isinstance(blocked, list) else []
 
+    def checklist_blocked_by_prior_requirement_statuses(item_id: str) -> dict[str, str]:
+        item = blocker_items_by_id.get(item_id)
+        statuses = (
+            item.get("blocked_by_prior_requirement_statuses")
+            if isinstance(item, dict)
+            else None
+        )
+        return (
+            {str(key): str(value) for key, value in statuses.items()}
+            if isinstance(statuses, dict)
+            else {}
+        )
+
     checklist_rows = [
         {
             "requirement_id": "source_authority_ready",
@@ -5472,6 +5498,9 @@ def write_so101_reviewed_model_authority_gate_artifacts(
             "observed_value": markdown_bool(gate.get("source_authority_ready")),
             "expected_value": "true",
             "blocked_by_prior_requirement_ids": checklist_blocked_by_prior_requirement_ids(
+                "source_authority_ready"
+            ),
+            "blocked_by_prior_requirement_statuses": checklist_blocked_by_prior_requirement_statuses(
                 "source_authority_ready"
             ),
             "next_action_id": checklist_next_action_id("source_authority_ready"),
@@ -5495,6 +5524,9 @@ def write_so101_reviewed_model_authority_gate_artifacts(
             "observed_value": markdown_bool(gate.get("physical_so101_model_authority_ready")),
             "expected_value": "true",
             "blocked_by_prior_requirement_ids": checklist_blocked_by_prior_requirement_ids(
+                "physical_bundle_authority_ready"
+            ),
+            "blocked_by_prior_requirement_statuses": checklist_blocked_by_prior_requirement_statuses(
                 "physical_bundle_authority_ready"
             ),
             "next_action_id": checklist_next_action_id(
@@ -5521,6 +5553,9 @@ def write_so101_reviewed_model_authority_gate_artifacts(
             "observed_value": gate.get("source_bundle_consistency_status"),
             "expected_value": "source_bundle_model_path_and_digest_consistent",
             "blocked_by_prior_requirement_ids": checklist_blocked_by_prior_requirement_ids(
+                "source_bundle_consistency"
+            ),
+            "blocked_by_prior_requirement_statuses": checklist_blocked_by_prior_requirement_statuses(
                 "source_bundle_consistency"
             ),
             "next_action_id": checklist_next_action_id("source_bundle_consistency"),
@@ -5551,6 +5586,9 @@ def write_so101_reviewed_model_authority_gate_artifacts(
             "blocked_by_prior_requirement_ids": checklist_blocked_by_prior_requirement_ids(
                 "physical_reviewed_mujoco_motion_checked"
             ),
+            "blocked_by_prior_requirement_statuses": checklist_blocked_by_prior_requirement_statuses(
+                "physical_reviewed_mujoco_motion_checked"
+            ),
             "next_action_id": checklist_next_action_id(
                 "physical_reviewed_mujoco_motion_checked"
             ),
@@ -5578,6 +5616,9 @@ def write_so101_reviewed_model_authority_gate_artifacts(
             "blocked_by_prior_requirement_ids": checklist_blocked_by_prior_requirement_ids(
                 "development_fixture_authority_boundary"
             ),
+            "blocked_by_prior_requirement_statuses": checklist_blocked_by_prior_requirement_statuses(
+                "development_fixture_authority_boundary"
+            ),
             "next_action_id": checklist_next_action_id(
                 "development_fixture_authority_boundary"
             ),
@@ -5598,6 +5639,11 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         for row in checklist_rows
         if row.get("blocked_by_prior_requirement_ids")
     }
+    payload["checklist_blocked_by_prior_requirement_statuses_by_requirement_id"] = {
+        row["requirement_id"]: row["blocked_by_prior_requirement_statuses"]
+        for row in checklist_rows
+        if row.get("blocked_by_prior_requirement_statuses")
+    }
     gate_dir.mkdir(parents=True, exist_ok=True)
     write_json(summary_path, payload)
     fieldnames = (
@@ -5608,6 +5654,7 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "observed_value",
         "expected_value",
         "blocked_by_prior_requirement_ids",
+        "blocked_by_prior_requirement_statuses",
         "next_action_id",
         "blockers",
         "notes",
@@ -5626,6 +5673,7 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "status",
         "observed_ready",
         "blocked_by_prior_requirement_ids",
+        "blocked_by_prior_requirement_statuses",
         "next_action_id",
         "source_bundle_consistency_status",
         "source_bundle_consistency_blocker",
