@@ -429,7 +429,10 @@ plus a stable artifact handle (`review_id` or `review_url`) and the
 `tcp_offset` review scope.
 Numeric TCP offsets must be finite; values such as `NaN` or `Infinity`, or
 offsets without this metadata, remain diagnostic evidence and are not reviewed
-physical SO-101 TCP truth.
+physical SO-101 TCP truth. The checker also applies a conservative automation
+sanity bound: the TCP/gripper-tip offset vector norm must be no more than
+`0.50 m`, otherwise the manifest remains not ready and reports
+`tcp_offset_norm_exceeds_limit`.
 
 Base-to-board alignment authority must be declared in
 `base_to_board_alignment_authority`, `base_to_board_authority`,
@@ -442,8 +445,10 @@ hardware-free regression fixtures. Review evidence must include `reviewed_by`
 plus a stable artifact handle (`review_id` or `review_url`) and the
 `base_to_board_alignment` review scope.
 The transform value must include finite x/y/z translation and roll/pitch/yaw
-rotation fields; a non-empty object without that shape or without review
-metadata does not make the bundle ready.
+rotation fields; the x/y/z translation norm must be no more than `2.00 m` under
+the current tabletop chess automation sanity bound. A non-empty object without
+that shape, outside that broad bound, or without review metadata does not make
+the bundle ready.
 
 ## Readiness Rule
 
@@ -465,11 +470,11 @@ true:
   review evidence
 - the target frame is explicitly declared and includes accepted target-frame
   review authority
-- a valid finite x/y/z TCP offset in meters is present and includes accepted TCP
-  review authority
+- a valid finite x/y/z TCP offset in meters is present, stays within the broad
+  automation sanity bound, and includes accepted TCP review authority
 - a real `base_to_board_transform` or `base_to_board_alignment` is populated
-  with finite translation/rotation fields and includes accepted alignment
-  review authority
+  with finite translation/rotation fields, stays within the broad automation
+  sanity bound, and includes accepted alignment review authority
 - the child SO-101 model contract checker reports `model_contract_checked`, or
   the URDF has the expected static joint/frame contract and the only runtime
   follow-up is missing optional `placo`

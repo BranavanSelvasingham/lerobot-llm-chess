@@ -181,10 +181,26 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
     nonfinite_tcp_path = fixture_dir / "so101_model_bundle.nonfinite_tcp_offset.json"
     write_json(nonfinite_tcp_path, nonfinite_tcp)
 
+    out_of_range_tcp = json_clone(ready_payload)
+    out_of_range_tcp["tcp_offset_m"]["z"] = 1.25
+    out_of_range_tcp_path = fixture_dir / "so101_model_bundle.out_of_range_tcp_offset.json"
+    write_json(out_of_range_tcp_path, out_of_range_tcp)
+
     nonfinite_alignment = json_clone(ready_payload)
     nonfinite_alignment["base_to_board_transform"]["rotation_rpy_rad"]["yaw"] = "NaN"
     nonfinite_alignment_path = fixture_dir / "so101_model_bundle.nonfinite_alignment.json"
     write_json(nonfinite_alignment_path, nonfinite_alignment)
+
+    out_of_range_alignment = json_clone(ready_payload)
+    out_of_range_alignment["base_to_board_transform"]["translation_m"] = {
+        "x": 2.25,
+        "y": 0.0,
+        "z": 0.0,
+    }
+    out_of_range_alignment_path = (
+        fixture_dir / "so101_model_bundle.out_of_range_alignment.json"
+    )
+    write_json(out_of_range_alignment_path, out_of_range_alignment)
 
     nonstandard_json_constant = json_clone(ready_payload)
     nonstandard_json_constant["tcp_offset_m"]["z"] = float("nan")
@@ -216,7 +232,9 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
         "missing_mesh_manifest_path": missing_mesh_manifest_path,
         "reversed_joint_limits_manifest_path": reversed_joint_limits_path,
         "nonfinite_tcp_manifest_path": nonfinite_tcp_path,
+        "out_of_range_tcp_manifest_path": out_of_range_tcp_path,
         "nonfinite_alignment_manifest_path": nonfinite_alignment_path,
+        "out_of_range_alignment_manifest_path": out_of_range_alignment_path,
         "nonstandard_json_constant_manifest_path": nonstandard_json_constant_path,
         "mismatched_joint_limits_manifest_path": mismatched_joint_limits_path,
         "mismatched_model_sha_manifest_path": mismatched_model_sha_path,
@@ -830,6 +848,25 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "invalid_out_of_range_tcp_offset_not_ready",
+            "manifest_path": fixtures["out_of_range_tcp_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "tcp_offset_status": "invalid",
+                "missing_inputs_contains": ["tcp_offset_m"],
+                "tcp_offset_diagnostics_contains": ["tcp_offset_norm_exceeds_limit"],
+            },
+        },
+        {
             "case_id": "invalid_base_to_board_transform_not_ready",
             "manifest_path": fixtures["invalid_alignment_manifest_path"],
             "require_ready": False,
@@ -865,6 +902,27 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "alignment_status": "invalid",
                 "missing_inputs_contains": ["base_to_board_transform"],
                 "alignment_diagnostics_contains": ["rotation_rpy:non_finite_axis:yaw"],
+            },
+        },
+        {
+            "case_id": "invalid_out_of_range_base_to_board_transform_not_ready",
+            "manifest_path": fixtures["out_of_range_alignment_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "alignment_status": "invalid",
+                "missing_inputs_contains": ["base_to_board_transform"],
+                "alignment_diagnostics_contains": [
+                    "translation:base_to_board_translation_norm_exceeds_limit"
+                ],
             },
         },
         {

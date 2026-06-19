@@ -259,6 +259,8 @@ ALIGNMENT_PLACEHOLDER_FIELDS = (
     "base_to_board_alignment_placeholder",
     "alignment_placeholders",
 )
+MAX_TCP_OFFSET_NORM_M = 0.50
+MAX_BASE_TO_BOARD_TRANSLATION_NORM_M = 2.00
 REQUIRED_INPUTS = (
     {
         "input": "manifest_path",
@@ -873,6 +875,19 @@ def vector_status(value: Any, axes: tuple[str, str, str]) -> dict[str, Any]:
 
 def vector3_status(value: Any) -> dict[str, Any]:
     return vector_status(value, ("x", "y", "z"))
+
+
+def vector_norm(value: Any) -> float | None:
+    if isinstance(value, dict):
+        items = list(value.values())
+    elif isinstance(value, list):
+        items = value
+    else:
+        return None
+    try:
+        return math.sqrt(sum(float(item) ** 2 for item in items))
+    except (TypeError, ValueError):
+        return None
 
 
 def find_first_field(manifest: dict[str, Any], field_names: tuple[str, ...]) -> tuple[str | None, Any]:
@@ -1607,12 +1622,23 @@ def inspect_tcp_offset(manifest: dict[str, Any] | None) -> dict[str, Any]:
     vector = vector3_status(value)
     review = inspect_tcp_offset_review(manifest, field_name, value)
     diagnostics = list(vector["diagnostics"])
-    if vector["valid"] and review["status"] != "present":
+    norm_m = vector_norm(vector["value"]) if vector["valid"] else None
+    if norm_m is not None and norm_m > MAX_TCP_OFFSET_NORM_M:
+        diagnostics.append(
+            f"tcp_offset_norm_exceeds_limit:{norm_m:.6g}>{MAX_TCP_OFFSET_NORM_M:.6g}"
+        )
+    value_valid = bool(vector["valid"] and not any(
+        diagnostic.startswith("tcp_offset_norm_exceeds_limit")
+        for diagnostic in diagnostics
+    ))
+    if value_valid and review["status"] != "present":
         diagnostics.extend(review.get("diagnostics", []))
     return {
-        "status": "present" if not diagnostics else "needs_review" if vector["valid"] else "invalid",
+        "status": "present" if not diagnostics else "needs_review" if value_valid else "invalid",
         "field": field_name,
         "value": vector["value"],
+        "norm_m": norm_m,
+        "max_norm_m": MAX_TCP_OFFSET_NORM_M,
         "review": review,
         "review_status": review.get("status"),
         "review_diagnostics": review.get("diagnostics", []),
@@ -1642,11 +1668,22 @@ def alignment_transform_status(value: Any) -> dict[str, Any]:
         diagnostics.append("base_to_board_translation_missing")
     else:
         translation = vector3_status(translation_value)
+        translation_norm_m = vector_norm(translation["value"]) if translation["valid"] else None
         normalized["translation"] = {
             "field": translation_field,
             "value": translation["value"],
+            "norm_m": translation_norm_m,
+            "max_norm_m": MAX_BASE_TO_BOARD_TRANSLATION_NORM_M,
         }
         diagnostics.extend(f"translation:{diagnostic}" for diagnostic in translation["diagnostics"])
+        if (
+            translation_norm_m is not None
+            and translation_norm_m > MAX_BASE_TO_BOARD_TRANSLATION_NORM_M
+        ):
+            diagnostics.append(
+                "translation:base_to_board_translation_norm_exceeds_limit:"
+                f"{translation_norm_m:.6g}>{MAX_BASE_TO_BOARD_TRANSLATION_NORM_M:.6g}"
+            )
     if rotation_field is None:
         diagnostics.append("base_to_board_rotation_rpy_missing")
     else:

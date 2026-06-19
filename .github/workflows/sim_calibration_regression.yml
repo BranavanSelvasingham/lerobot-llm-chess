@@ -597,8 +597,10 @@ jobs:
               "file_asset_root_not_ready",
               "invalid_reversed_joint_limits_not_ready",
               "invalid_nonfinite_tcp_offset_not_ready",
+              "invalid_out_of_range_tcp_offset_not_ready",
               "invalid_base_to_board_transform_not_ready",
               "invalid_nonfinite_base_to_board_transform_not_ready",
+              "invalid_out_of_range_base_to_board_transform_not_ready",
               "mismatched_model_sha_not_ready",
               "ready_manifest_mismatched_mujoco_joint_limits",
               "ready_manifest_gripper_range_not_moving",
@@ -776,6 +778,13 @@ jobs:
           assert nonfinite_tcp["observations"]["tcp_offset_status"] == "invalid", nonfinite_tcp
           assert "tcp_offset_m" in nonfinite_tcp["observations"]["missing_inputs"], nonfinite_tcp
           assert nonfinite_tcp["observations"]["reviewed_model_motion_checked"] is False, nonfinite_tcp
+          out_of_range_tcp = by_case["invalid_out_of_range_tcp_offset_not_ready"]
+          assert out_of_range_tcp["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", out_of_range_tcp
+          assert out_of_range_tcp["observations"]["ready_for_model_backed_ik"] is False, out_of_range_tcp
+          assert out_of_range_tcp["observations"]["tcp_offset_status"] == "invalid", out_of_range_tcp
+          assert "tcp_offset_m" in out_of_range_tcp["observations"]["missing_inputs"], out_of_range_tcp
+          assert "tcp_offset_norm_exceeds_limit" in "\n".join(out_of_range_tcp["observations"]["tcp_offset_diagnostics"]), out_of_range_tcp
+          assert out_of_range_tcp["observations"]["reviewed_model_motion_checked"] is False, out_of_range_tcp
           invalid_alignment = by_case["invalid_base_to_board_transform_not_ready"]
           assert invalid_alignment["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", invalid_alignment
           assert invalid_alignment["observations"]["ready_for_model_backed_ik"] is False, invalid_alignment
@@ -788,6 +797,13 @@ jobs:
           assert nonfinite_alignment["observations"]["alignment_status"] == "invalid", nonfinite_alignment
           assert "base_to_board_transform" in nonfinite_alignment["observations"]["missing_inputs"], nonfinite_alignment
           assert nonfinite_alignment["observations"]["reviewed_model_motion_checked"] is False, nonfinite_alignment
+          out_of_range_alignment = by_case["invalid_out_of_range_base_to_board_transform_not_ready"]
+          assert out_of_range_alignment["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", out_of_range_alignment
+          assert out_of_range_alignment["observations"]["ready_for_model_backed_ik"] is False, out_of_range_alignment
+          assert out_of_range_alignment["observations"]["alignment_status"] == "invalid", out_of_range_alignment
+          assert "base_to_board_transform" in out_of_range_alignment["observations"]["missing_inputs"], out_of_range_alignment
+          assert "translation:base_to_board_translation_norm_exceeds_limit" in "\n".join(out_of_range_alignment["observations"]["alignment_diagnostics"]), out_of_range_alignment
+          assert out_of_range_alignment["observations"]["reviewed_model_motion_checked"] is False, out_of_range_alignment
           mismatched_sha = by_case["mismatched_model_sha_not_ready"]
           assert mismatched_sha["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", mismatched_sha
           assert mismatched_sha["observations"]["ready_for_model_backed_ik"] is False, mismatched_sha
