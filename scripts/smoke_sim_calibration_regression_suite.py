@@ -82,6 +82,9 @@ SO101_MODEL_BUNDLE_MANIFEST_INTAKE_CHECKLIST_JSON_NAME = (
 SO101_MODEL_BUNDLE_MANIFEST_INTAKE_CHECKLIST_CSV_NAME = (
     "so101_model_bundle_manifest_intake_checklist.csv"
 )
+SO101_MODEL_BUNDLE_MANIFEST_TEMPLATE_JSON_NAME = (
+    "so101_model_bundle_manifest_template.json"
+)
 SO101_MODEL_CONTRACT_SUMMARY_NAME = "so101_model_contract_summary.json"
 SO101_REVIEWED_MODEL_AUTHORITY_GATE_SCHEMA = "lerobot.sim.so101_reviewed_model_authority_gate.v1"
 SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME = "so101_reviewed_model_authority_gate"
@@ -1649,6 +1652,7 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_REVIEW_PACKET_CSV_NAME}`",
         f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_INTAKE_CHECKLIST_JSON_NAME}`",
         f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_INTAKE_CHECKLIST_CSV_NAME}`",
+        f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_TEMPLATE_JSON_NAME}`",
         "- `so101_model_bundle_manifest/README.md`",
         f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_SUMMARY_NAME}`",
         f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_CHECKLIST_NAME}`",
@@ -3756,6 +3760,26 @@ def so101_model_bundle_manifest_section(
         "bundle_intake_checklist_csv_path": bundle.get("bundle_intake_checklist_csv_path")
         or artifacts.get("bundle_intake_checklist_csv"),
         "bundle_intake_checklist": bundle.get("bundle_intake_checklist"),
+        "reviewed_manifest_template_status": bundle.get(
+            "reviewed_manifest_template_status"
+        ),
+        "reviewed_manifest_template_model_authority": bundle.get(
+            "reviewed_manifest_template_model_authority"
+        ),
+        "reviewed_manifest_template_observed_evidence_is_authority": bundle.get(
+            "reviewed_manifest_template_observed_evidence_is_authority"
+        ),
+        "reviewed_manifest_template_physical_so101_truth_claimed": bundle.get(
+            "reviewed_manifest_template_physical_so101_truth_claimed"
+        ),
+        "reviewed_manifest_template_development_fixture_evidence_not_physical_so101_truth": bundle.get(
+            "reviewed_manifest_template_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "reviewed_manifest_template_json_path": bundle.get(
+            "reviewed_manifest_template_json_path"
+        )
+        or artifacts.get("reviewed_manifest_template_json"),
+        "reviewed_manifest_template": bundle.get("reviewed_manifest_template"),
         "next_required_for_goal": bundle.get("next_required_for_goal"),
         "next_required_action_ids": bundle.get("next_required_action_ids"),
         "next_required_action_count": bundle.get("next_required_action_count"),
@@ -3882,6 +3906,9 @@ def so101_model_bundle_manifest_section(
                 "bundle_intake_checklist_json"
             ),
             "bundle_intake_checklist_csv": artifacts.get("bundle_intake_checklist_csv"),
+            "reviewed_manifest_template_json": artifacts.get(
+                "reviewed_manifest_template_json"
+            ),
             "readme_md": artifacts.get("readme_md"),
         },
         "hardware_skipped": bundle.get("hardware_skipped"),

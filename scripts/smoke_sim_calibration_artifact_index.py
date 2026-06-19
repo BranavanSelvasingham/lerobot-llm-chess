@@ -2434,6 +2434,21 @@ def collect_so101_model_bundle_manifest_artifacts(
         "bundle_intake_development_fixture_evidence_not_physical_so101_truth": bundle.get(
             "bundle_intake_development_fixture_evidence_not_physical_so101_truth"
         ),
+        "reviewed_manifest_template_status": bundle.get(
+            "reviewed_manifest_template_status"
+        ),
+        "reviewed_manifest_template_model_authority": bundle.get(
+            "reviewed_manifest_template_model_authority"
+        ),
+        "reviewed_manifest_template_observed_evidence_is_authority": bundle.get(
+            "reviewed_manifest_template_observed_evidence_is_authority"
+        ),
+        "reviewed_manifest_template_physical_so101_truth_claimed": bundle.get(
+            "reviewed_manifest_template_physical_so101_truth_claimed"
+        ),
+        "reviewed_manifest_template_development_fixture_evidence_not_physical_so101_truth": bundle.get(
+            "reviewed_manifest_template_development_fixture_evidence_not_physical_so101_truth"
+        ),
         "authority_review_evidence_invalid_fields": bundle.get(
             "authority_review_evidence_invalid_fields"
         ),
@@ -2490,6 +2505,7 @@ def collect_so101_model_bundle_manifest_artifacts(
         ("review_packet_csv", "review_packet_rows"),
         ("bundle_intake_checklist_json", "bundle_intake"),
         ("bundle_intake_checklist_csv", "bundle_intake_rows"),
+        ("reviewed_manifest_template_json", "reviewed_manifest_template"),
         ("readme_md", "readme"),
     ):
         add_path(
@@ -2550,6 +2566,9 @@ def collect_so101_model_bundle_manifest_artifacts(
         ),
         "bundle_intake_checklist_csv_path": artifact_paths.get(
             "bundle_intake_checklist_csv"
+        ),
+        "reviewed_manifest_template_json_path": artifact_paths.get(
+            "reviewed_manifest_template_json"
         ),
         "readme_md_path": artifact_paths.get("readme_md"),
         "manifest_request": manifest_request,

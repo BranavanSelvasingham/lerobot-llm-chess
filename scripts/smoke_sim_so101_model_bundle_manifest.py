@@ -16,6 +16,9 @@ from urllib.parse import urlparse
 SCHEMA = "lerobot.sim.so101_model_bundle_manifest.v1"
 REVIEW_PACKET_SCHEMA = "lerobot.sim.so101_model_bundle_manifest_review_packet.v1"
 BUNDLE_INTAKE_SCHEMA = "lerobot.sim.so101_model_bundle_manifest_intake_checklist.v1"
+REVIEWED_MANIFEST_TEMPLATE_SCHEMA = (
+    "lerobot.sim.so101_model_bundle_manifest_template.v1"
+)
 DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "so101_model_bundle_manifest"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_CHECKER_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_contract.py"
@@ -2503,6 +2506,128 @@ def bundle_intake_command_template(action_id: str) -> list[str]:
     ]
 
 
+def reviewed_manifest_template_status(summary: dict[str, Any]) -> str:
+    if summary.get("physical_so101_model_authority_ready") is True:
+        return "physical_authority_manifest_supplied"
+    manifest_request = summary.get("manifest_request")
+    manifest_request = manifest_request if isinstance(manifest_request, dict) else {}
+    if manifest_request.get("status") == "model_bundle_manifest_loaded":
+        return "template_for_manifest_follow_up"
+    return "template_waiting_for_reviewed_manifest"
+
+
+def reviewed_manifest_template_payload() -> dict[str, Any]:
+    return {
+        "model_path": "<reviewed-so101-model.urdf-or-mjcf>",
+        "model_sha256": "<sha256-of-reviewed-model-file>",
+        "asset_roots": ["<reviewed-mesh-or-asset-root>"],
+        "authority": {
+            "source_authority_status": "reviewed",
+            "reviewed_by": "<reviewer-or-team>",
+            "reviewed_at": "<review-date-YYYY-MM-DD>",
+            "review_id": "<stable-review-ticket-commit-or-artifact-id>",
+            "review_scopes": ["model_identity", "provenance", "license"],
+        },
+        "provenance": {
+            "source_reference": "<reviewed-source-url-path-or-record>",
+            "export_tool": "<reviewed-export-tool-and-version>",
+            "license_basis": "<reviewed-license-file-url-or-record>",
+        },
+        "target_frame": EXPECTED_TARGET_FRAME,
+        "target_frame_authority": {
+            "target_frame_authority_status": "reviewed",
+            "reviewed_by": "<reviewer-or-team>",
+            "reviewed_at": "<review-date-YYYY-MM-DD>",
+            "review_id": "<stable-target-frame-review-artifact-id>",
+            "review_scope": "target_frame",
+            "source": "<reviewed-target-frame-or-tcp-reference-record>",
+        },
+        "joint_limits_deg": {
+            joint: ["<lower-deg-or-mm>", "<upper-deg-or-mm>"]
+            for joint in EXPECTED_SO101_JOINTS
+        },
+        "joint_limit_authority": {
+            "joint_limit_authority_status": "reviewed",
+            "reviewed_by": "<reviewer-or-team>",
+            "reviewed_at": "<review-date-YYYY-MM-DD>",
+            "review_id": "<stable-joint-limit-review-artifact-id>",
+            "review_scope": "joint_limits",
+            "source": "<reviewed-joint-limit-record>",
+        },
+        "mesh_asset_authority": {
+            "mesh_asset_authority_status": "reviewed",
+            "reviewed_by": "<reviewer-or-team>",
+            "reviewed_at": "<review-date-YYYY-MM-DD>",
+            "review_id": "<stable-mesh-asset-review-artifact-id>",
+            "review_scope": "mesh_assets",
+            "source": "<reviewed-model-export-or-mesh-root-record>",
+        },
+        "tcp_offset_m": {"x": "<meters>", "y": "<meters>", "z": "<meters>"},
+        "tcp_offset_authority": {
+            "tcp_offset_authority_status": "reviewed",
+            "reviewed_by": "<reviewer-or-team>",
+            "reviewed_at": "<review-date-YYYY-MM-DD>",
+            "review_id": "<stable-tcp-offset-review-artifact-id>",
+            "review_scope": "tcp_offset",
+            "source": "<reviewed-tcp-or-gripper-tip-calibration-record>",
+        },
+        "base_to_board_transform": {
+            "translation_m": {"x": "<meters>", "y": "<meters>", "z": "<meters>"},
+            "rotation_rpy_rad": {
+                "roll": "<radians>",
+                "pitch": "<radians>",
+                "yaw": "<radians>",
+            },
+        },
+        "base_to_board_alignment_authority": {
+            "base_to_board_alignment_authority_status": "reviewed",
+            "reviewed_by": "<reviewer-or-team>",
+            "reviewed_at": "<review-date-YYYY-MM-DD>",
+            "review_id": "<stable-base-board-review-artifact-id>",
+            "review_scope": "base_to_board_alignment",
+            "source": "<reviewed-board-registration-or-calibration-record>",
+        },
+    }
+
+
+def build_reviewed_manifest_template(summary: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema": REVIEWED_MANIFEST_TEMPLATE_SCHEMA,
+        "ok": True,
+        "status": reviewed_manifest_template_status(summary),
+        "model_authority": "reviewed_manifest_template_not_authority",
+        "manifest_status": summary.get("status"),
+        "manifest_request_status": (
+            summary.get("manifest_request", {}).get("status")
+            if isinstance(summary.get("manifest_request"), dict)
+            else None
+        ),
+        "ready_for_model_backed_ik": False,
+        "physical_so101_model_authority_ready": False,
+        "observed_evidence_is_authority": False,
+        "physical_so101_truth_claimed": False,
+        "development_fixture_evidence_not_physical_so101_truth": True,
+        "missing_inputs": summary.get("missing_inputs") or [],
+        "next_required_for_goal": summary.get("next_required_for_goal") or [],
+        "next_required_action_ids": summary.get("next_required_action_ids") or [],
+        "required_review_scopes_by_field": {
+            "authority": ["model_identity", "provenance", "license"],
+            "target_frame_authority": ["target_frame"],
+            "joint_limit_authority": ["joint_limits"],
+            "mesh_asset_authority": ["mesh_assets"],
+            "tcp_offset_authority": ["tcp_offset"],
+            "base_to_board_alignment_authority": ["base_to_board_alignment"],
+        },
+        "rerun_command": bundle_intake_command_template("supply_reviewed_manifest"),
+        "manifest_template": reviewed_manifest_template_payload(),
+        "caveats": [
+            "This reviewed-manifest template is not reviewed physical SO-101 authority.",
+            "Placeholder values must be replaced with reviewed model, digest, provenance, authority, TCP, and board-alignment data.",
+            "After editing a copy of manifest_template, rerun the manifest checker and require physical_so101_model_authority_ready before trusting model-backed IK.",
+        ],
+    }
+
+
 def build_bundle_manifest_intake_checklist(summary: dict[str, Any]) -> dict[str, Any]:
     actions: list[dict[str, Any]] = []
     for action in summary.get("next_required_for_goal") or []:
@@ -2810,6 +2935,9 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         f"- `bundle_intake_action_ids`: `{', '.join(summary.get('bundle_intake_action_ids') or []) if summary.get('bundle_intake_action_ids') else 'none'}`",
         f"- `bundle_intake_checklist_json`: `{summary['artifacts'].get('bundle_intake_checklist_json')}`",
         f"- `bundle_intake_checklist_csv`: `{summary['artifacts'].get('bundle_intake_checklist_csv')}`",
+        f"- `reviewed_manifest_template_status`: `{summary.get('reviewed_manifest_template_status')}`",
+        f"- `reviewed_manifest_template_model_authority`: `{summary.get('reviewed_manifest_template_model_authority')}`",
+        f"- `reviewed_manifest_template_json`: `{summary['artifacts'].get('reviewed_manifest_template_json')}`",
         f"- `contract_summary_json`: `{contract.get('artifacts', {}).get('summary_json')}`",
         "",
         "## Missing Inputs",
@@ -2864,6 +2992,23 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         )
     if not summary["bundle_intake_checklist"].get("actions"):
         lines.append("| none | none | n/a | none | n/a |")
+
+    lines.extend(
+        [
+            "",
+            "## Reviewed Manifest Template",
+            "",
+            (
+                "A copyable reviewed-manifest template is written as JSON with "
+                "placeholder values. It is not reviewed physical SO-101 authority; "
+                "replace every placeholder and rerun this checker before using it."
+            ),
+            "",
+            f"- `status`: `{summary.get('reviewed_manifest_template_status')}`",
+            f"- `model_authority`: `{summary.get('reviewed_manifest_template_model_authority')}`",
+            f"- `path`: `{summary['artifacts'].get('reviewed_manifest_template_json')}`",
+        ]
+    )
 
     lines.extend(
         [
@@ -3019,6 +3164,9 @@ def main() -> int:
     bundle_intake_csv_path = (
         output_dir / "so101_model_bundle_manifest_intake_checklist.csv"
     )
+    reviewed_manifest_template_path = (
+        output_dir / "so101_model_bundle_manifest_template.json"
+    )
     artifacts = {
         "summary_json": str(summary_path),
         "checklist_csv": str(csv_path),
@@ -3027,6 +3175,7 @@ def main() -> int:
         "review_packet_csv": str(review_packet_csv_path),
         "bundle_intake_checklist_json": str(bundle_intake_path),
         "bundle_intake_checklist_csv": str(bundle_intake_csv_path),
+        "reviewed_manifest_template_json": str(reviewed_manifest_template_path),
     }
 
     manifest, manifest_request = load_manifest(args.manifest_path)
@@ -3090,6 +3239,30 @@ def main() -> int:
             "bundle_intake_checklist": bundle_intake_checklist,
         }
     )
+    reviewed_manifest_template = build_reviewed_manifest_template(summary)
+    summary.update(
+        {
+            "reviewed_manifest_template_status": reviewed_manifest_template["status"],
+            "reviewed_manifest_template_model_authority": reviewed_manifest_template[
+                "model_authority"
+            ],
+            "reviewed_manifest_template_observed_evidence_is_authority": (
+                reviewed_manifest_template["observed_evidence_is_authority"]
+            ),
+            "reviewed_manifest_template_physical_so101_truth_claimed": (
+                reviewed_manifest_template["physical_so101_truth_claimed"]
+            ),
+            "reviewed_manifest_template_development_fixture_evidence_not_physical_so101_truth": (
+                reviewed_manifest_template[
+                    "development_fixture_evidence_not_physical_so101_truth"
+                ]
+            ),
+            "reviewed_manifest_template_json_path": artifacts.get(
+                "reviewed_manifest_template_json"
+            ),
+            "reviewed_manifest_template": reviewed_manifest_template,
+        }
+    )
 
     write_json(summary_path, summary)
     write_csv(csv_path, rows)
@@ -3097,6 +3270,7 @@ def main() -> int:
     write_review_packet_csv(review_packet_csv_path, review_packet_rows)
     write_json(bundle_intake_path, bundle_intake_checklist)
     write_bundle_intake_csv(bundle_intake_csv_path, bundle_intake_checklist)
+    write_json(reviewed_manifest_template_path, reviewed_manifest_template)
     write_markdown(readme_path, summary, rows)
 
     print(
@@ -3117,6 +3291,9 @@ def main() -> int:
                 "review_packet_action_ids": summary["review_packet_action_ids"],
                 "bundle_intake_status": summary["bundle_intake_status"],
                 "bundle_intake_action_ids": summary["bundle_intake_action_ids"],
+                "reviewed_manifest_template_status": summary[
+                    "reviewed_manifest_template_status"
+                ],
                 "manifest_path": summary["manifest_request"]["path"],
                 "model_path": summary["model_path"]["path"],
                 "asset_roots": summary["asset_roots"]["asset_roots"],
@@ -3131,6 +3308,9 @@ def main() -> int:
                 "review_packet_csv": str(review_packet_csv_path),
                 "bundle_intake_checklist_json": str(bundle_intake_path),
                 "bundle_intake_checklist_csv": str(bundle_intake_csv_path),
+                "reviewed_manifest_template_json": str(
+                    reviewed_manifest_template_path
+                ),
                 "readme_md": str(readme_path),
             },
             sort_keys=True,

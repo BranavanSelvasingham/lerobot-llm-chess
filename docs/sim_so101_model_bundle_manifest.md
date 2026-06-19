@@ -138,6 +138,7 @@ The script writes:
 - `so101_model_bundle_manifest_checklist.csv`
 - `so101_model_bundle_manifest_review_packet.json`
 - `so101_model_bundle_manifest_review_packet.csv`
+- `so101_model_bundle_manifest_template.json`
 - `README.md`
 - `so101_model_contract/so101_model_contract_summary.json`
 - `so101_model_contract/so101_model_contract_checklist.csv`
@@ -182,6 +183,16 @@ shortcut instead of an alphabetic sort. It always reports
 `observed_evidence_is_authority: false`, and
 `development_fixture_evidence_not_physical_so101_truth: true`; it does not
 upgrade diagnostic manifest fields to reviewed SO-101 truth.
+
+The checker also writes `so101_model_bundle_manifest_template.json`, a wrapper
+with a copyable nested `manifest_template` object for the required reviewed
+model path, SHA-256 digest, provenance, review scopes, mesh roots, joint
+limits, target frame, TCP offset, and base-to-board alignment fields. It always
+reports `model_authority: "reviewed_manifest_template_not_authority"`, false
+observed-evidence and physical-truth flags, and placeholder caveats. Edit a
+copy of the nested template, replace every placeholder with reviewed inputs,
+then rerun this checker; the template artifact itself is never reviewed
+physical SO-101 authority.
 
 Review evidence fields must be actual identifiers, dates, tickets, or URLs.
 Placeholder strings such as `TODO`, `TBD`, `unknown`, `placeholder`, or
