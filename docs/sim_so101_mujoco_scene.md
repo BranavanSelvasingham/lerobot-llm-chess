@@ -76,8 +76,9 @@ development scenes across center, corner, back-rank, and edge placements, plus
 fail-closed invalid-square, same-source/target, and non-positive max-step cases,
 fail-closed required handoff cases for not-ready, fixture-only, forged-ready, and
 incomplete-ready handoffs, ready handoffs with open review work, and ready
-handoffs that claim authority/physical SO-101 truth, plus a valid ready-handoff
-intake case that still keeps the generated scene development-only,
+handoffs that claim authority/physical SO-101 truth, plus valid optional and
+required ready-handoff intake cases that still keep the generated scene
+development-only,
 while keeping every case labeled as non-authoritative development scaffolding.
 
 This scene is intentionally not an authoritative model bundle. It is generated

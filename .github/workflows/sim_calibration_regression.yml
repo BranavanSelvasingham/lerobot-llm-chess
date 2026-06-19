@@ -1316,6 +1316,7 @@ jobs:
               "ready_handoff_with_missing_input_rejected",
               "ready_handoff_with_pending_action_rejected",
               "ready_handoff_physical_truth_claim_rejected",
+              "required_ready_handoff_intake_still_development_scene",
               "ready_handoff_intake_still_development_scene",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -1387,8 +1388,21 @@ jobs:
           assert physical_truth_handoff["reviewed_mujoco_handoff_physical_truth_claimed"] is True, physical_truth_handoff
           assert "mark_downstream_handoff_as_non_authority_snapshot" in physical_truth_handoff["reviewed_mujoco_handoff_blockers"], physical_truth_handoff
           assert "remove_physical_so101_truth_claim_from_downstream_handoff" in physical_truth_handoff["reviewed_mujoco_handoff_blockers"], physical_truth_handoff
+          required_ready_handoff = by_case["required_ready_handoff_intake_still_development_scene"]["observations"]
+          assert required_ready_handoff["status"] == "ok", required_ready_handoff
+          assert required_ready_handoff["reviewed_mujoco_handoff_required"] is True, required_ready_handoff
+          assert required_ready_handoff["reviewed_mujoco_handoff_intake_status"] == "reviewed_mujoco_handoff_ready_for_scene_intake", required_ready_handoff
+          assert required_ready_handoff["reviewed_mujoco_handoff_contract_ok"] is True, required_ready_handoff
+          assert required_ready_handoff["reviewed_mujoco_handoff_ready"] is True, required_ready_handoff
+          assert required_ready_handoff["reviewed_mujoco_handoff_physical_motion_checked"] is True, required_ready_handoff
+          assert required_ready_handoff["reviewed_mujoco_handoff_hardware_free_fixture_motion_checked"] is False, required_ready_handoff
+          assert required_ready_handoff["reviewed_mujoco_handoff_motion_authority_status"] == "physical_reviewed_model_motion_checked", required_ready_handoff
+          assert required_ready_handoff["reviewed_mujoco_handoff_model_authority"] == "downstream_handoff_not_authority", required_ready_handoff
+          assert required_ready_handoff["reviewed_mujoco_handoff_physical_truth_claimed"] is False, required_ready_handoff
+          assert required_ready_handoff["scene_uses_reviewed_mujoco_handoff"] is False, required_ready_handoff
           ready_handoff = by_case["ready_handoff_intake_still_development_scene"]["observations"]
           assert ready_handoff["status"] == "ok", ready_handoff
+          assert ready_handoff["reviewed_mujoco_handoff_required"] is False, ready_handoff
           assert ready_handoff["reviewed_mujoco_handoff_intake_status"] == "reviewed_mujoco_handoff_ready_for_scene_intake", ready_handoff
           assert ready_handoff["reviewed_mujoco_handoff_contract_ok"] is True, ready_handoff
           assert ready_handoff["reviewed_mujoco_handoff_ready"] is True, ready_handoff

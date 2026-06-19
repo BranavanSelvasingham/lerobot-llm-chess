@@ -397,6 +397,17 @@ def case_specs() -> list[dict[str, Any]]:
             ],
         },
         {
+            "case_id": "required_ready_handoff_intake_still_development_scene",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": True,
+            "handoff_state": "ready",
+            "require_handoff": True,
+            "expected_handoff_intake_status": "reviewed_mujoco_handoff_ready_for_scene_intake",
+            "expected_handoff_ready": True,
+            "expected_handoff_contract_ok": True,
+        },
+        {
             "case_id": "ready_handoff_intake_still_development_scene",
             "source_square": "e4",
             "target_square": "e5",
