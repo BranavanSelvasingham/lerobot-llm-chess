@@ -86,6 +86,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "all_mujoco_piece_release_synced",
         "development_prerequisites_satisfied",
         "board_pick_prerequisite_status",
+        "board_pick_failed_checks",
         "ready_for_policy_training",
         "policy_authority",
         "rollout_use",
@@ -185,7 +186,40 @@ def write_failed_board_pick_prerequisite(path: Path) -> None:
     write_json(path, payload)
 
 
-def case_specs(output_dir: Path, valid_prerequisite: Path, failed_prerequisite: Path) -> list[dict[str, Any]]:
+def write_incomplete_final_board_pick_prerequisite(path: Path) -> None:
+    payload = {
+        "schema": "lerobot.sim.so101_training_rollouts_matrix.incomplete_board_pick_prerequisite.v1",
+        "ok": True,
+        "status": "development_board_source_pick_place_verified",
+        "model_authority": "development_scaffold_not_reviewed",
+        "observed_evidence_is_physical_so101_authority": False,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "board_source_pick_place_verified": True,
+        "source_pick_started_at_source": True,
+        "close_two_finger_contact_observed": True,
+        "lift_verified": True,
+        "board_contact_cleared_during_lift": True,
+        "transfer_verified": True,
+        "place_without_manual_piece_pose_verified": True,
+        "release_contact_cleared_after_retreat": True,
+        "final_board_contact_observed": False,
+        "final_target_xy_error_m": 0.05,
+        "target_xy_tolerance_m": 0.01,
+        "manual_piece_pose_used_after_reset": False,
+        "robot_pose_seeded_for_source_fixture": True,
+        "source_square": "e4",
+        "target_square": "e5",
+    }
+    write_json(path, payload)
+
+
+def case_specs(
+    output_dir: Path,
+    valid_prerequisite: Path,
+    failed_prerequisite: Path,
+    incomplete_final_prerequisite: Path,
+) -> list[dict[str, Any]]:
     return [
         {
             "case_id": "valid_development_default_curriculum_debug_rollouts",
@@ -227,6 +261,25 @@ def case_specs(output_dir: Path, valid_prerequisite: Path, failed_prerequisite: 
             "expected_rollout_ok": False,
             "expected_development_prerequisites_satisfied": False,
             "expected_board_pick_prerequisite_status": "development_board_pick_prerequisite_failed",
+            "expected_all_complete": True,
+            "expected_release_synced": True,
+            "expected_episode_count": 1,
+            "expect_transition_count_positive": True,
+        },
+        {
+            "case_id": "incomplete_final_board_pick_prerequisite_fails_closed",
+            "prerequisite_path": incomplete_final_prerequisite,
+            "tasks": ["e4:e5"],
+            "max_steps": 96,
+            "expected_return_code": 1,
+            "expected_status": "failed_prerequisite_or_rollout_check",
+            "expected_rollout_ok": False,
+            "expected_development_prerequisites_satisfied": False,
+            "expected_board_pick_prerequisite_status": "development_board_pick_prerequisite_failed",
+            "expected_board_pick_failed_checks_contain": [
+                "final_board_contact_observed",
+                "final_target_xy_within_tolerance",
+            ],
             "expected_all_complete": True,
             "expected_release_synced": True,
             "expected_episode_count": 1,
@@ -287,6 +340,7 @@ def summarize_case(
         "development_prerequisites_satisfied": summary.get("development_prerequisites_satisfied"),
         "board_pick_prerequisite_status": board_pick.get("status"),
         "board_pick_prerequisite_ok": board_pick.get("ok"),
+        "board_pick_failed_checks": board_pick.get("failed_checks"),
         "serious_policy_training_blockers": blockers,
         "artifacts": artifacts,
     }
@@ -337,6 +391,12 @@ def summarize_case(
         observations["board_pick_prerequisite_status"],
         spec["expected_board_pick_prerequisite_status"],
     )
+    for failed_check in spec.get("expected_board_pick_failed_checks_contain", []):
+        failed_checks = observations["board_pick_failed_checks"]
+        if not isinstance(failed_checks, list) or failed_check not in failed_checks:
+            errors.append(
+                f"{case_id}.board_pick_failed_checks: expected {failed_check!r} in {failed_checks!r}"
+            )
     add_error(
         errors,
         f"{case_id}.all_scripted_pick_place_complete",
@@ -434,6 +494,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "all_mujoco_piece_release_synced": observations.get("all_mujoco_piece_release_synced"),
         "development_prerequisites_satisfied": observations.get("development_prerequisites_satisfied"),
         "board_pick_prerequisite_status": observations.get("board_pick_prerequisite_status"),
+        "board_pick_failed_checks": observations.get("board_pick_failed_checks"),
         "ready_for_policy_training": observations.get("ready_for_policy_training"),
         "policy_authority": observations.get("observed_evidence_is_policy_training_authority"),
         "rollout_use": observations.get("rollout_use"),
@@ -481,7 +542,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "## Caveats",
             "",
             "- Passing rollout cases use generated `development_scaffold_not_reviewed` MJCF.",
-            "- Missing or failed board-pick prerequisites must keep rollout status non-OK.",
+            "- Missing, failed, or incomplete-final board-pick prerequisites must keep rollout status non-OK.",
             "- Short-budget rollouts must record incomplete episodes instead of becoming policy-ready.",
             "- `ready_for_policy_training` and policy authority flags must remain false.",
         ]
@@ -500,11 +561,20 @@ def main() -> int:
     prereq_record, prereq_summary = run_valid_board_pick_prerequisite(output_dir, args.python)
     failed_prerequisite = output_dir / "prerequisites" / "failed_board_pick_summary.json"
     write_failed_board_pick_prerequisite(failed_prerequisite)
+    incomplete_final_prerequisite = (
+        output_dir / "prerequisites" / "incomplete_final_board_pick_summary.json"
+    )
+    write_incomplete_final_board_pick_prerequisite(incomplete_final_prerequisite)
 
     valid_prerequisite = Path(prereq_record["summary_path"])
     cases = [
         run_case(output_dir=output_dir, python_path=args.python, spec=spec)
-        for spec in case_specs(output_dir, valid_prerequisite, failed_prerequisite)
+        for spec in case_specs(
+            output_dir,
+            valid_prerequisite,
+            failed_prerequisite,
+            incomplete_final_prerequisite,
+        )
     ]
     ok = all(case["ok"] for case in cases) and prereq_summary.get("ok") is True
     passed_rollout_cases = [

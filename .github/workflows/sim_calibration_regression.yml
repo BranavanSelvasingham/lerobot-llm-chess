@@ -870,6 +870,7 @@ jobs:
               "valid_development_default_curriculum_debug_rollouts",
               "missing_board_pick_prerequisite_fails_closed",
               "failed_board_pick_prerequisite_fails_closed",
+              "incomplete_final_board_pick_prerequisite_fails_closed",
               "short_budget_records_incomplete_rollout",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -879,6 +880,7 @@ jobs:
           assert summary["expected_failure_case_ids"] == [
               "missing_board_pick_prerequisite_fails_closed",
               "failed_board_pick_prerequisite_fails_closed",
+              "incomplete_final_board_pick_prerequisite_fails_closed",
               "short_budget_records_incomplete_rollout",
           ], summary["expected_failure_case_ids"]
           by_case = {case["case_id"]: case for case in summary["cases"]}
@@ -899,6 +901,13 @@ jobs:
           assert failed["observations"]["ok"] is False, failed
           assert failed["observations"]["board_pick_prerequisite_status"] == "development_board_pick_prerequisite_failed", failed
           assert failed["observations"]["development_prerequisites_satisfied"] is False, failed
+          incomplete_final = by_case["incomplete_final_board_pick_prerequisite_fails_closed"]
+          assert incomplete_final["record"]["return_code"] == 1, incomplete_final
+          assert incomplete_final["observations"]["ok"] is False, incomplete_final
+          assert incomplete_final["observations"]["board_pick_prerequisite_status"] == "development_board_pick_prerequisite_failed", incomplete_final
+          assert "final_board_contact_observed" in incomplete_final["observations"]["board_pick_failed_checks"], incomplete_final
+          assert "final_target_xy_within_tolerance" in incomplete_final["observations"]["board_pick_failed_checks"], incomplete_final
+          assert incomplete_final["observations"]["development_prerequisites_satisfied"] is False, incomplete_final
           short = by_case["short_budget_records_incomplete_rollout"]
           assert short["record"]["return_code"] == 1, short
           assert short["observations"]["ok"] is False, short

@@ -42,6 +42,14 @@ SO101_JOINTS: tuple[str, ...] = (
 )
 
 
+def json_number(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -164,6 +172,14 @@ def inspect_board_pick_prerequisite(path: Path) -> dict[str, Any]:
         "transfer_verified": summary.get("transfer_verified") is True,
         "place_without_manual_piece_pose_verified": summary.get("place_without_manual_piece_pose_verified") is True,
         "release_contact_cleared_after_retreat": summary.get("release_contact_cleared_after_retreat") is True,
+        "final_board_contact_observed": summary.get("final_board_contact_observed") is True,
+        "final_target_xy_within_tolerance": (
+            (final_target_xy_error_m := json_number(summary.get("final_target_xy_error_m")))
+            is not None
+            and (target_xy_tolerance_m := json_number(summary.get("target_xy_tolerance_m")))
+            is not None
+            and final_target_xy_error_m <= target_xy_tolerance_m
+        ),
         "manual_piece_pose_used_after_reset": summary.get("manual_piece_pose_used_after_reset") is False,
         "robot_pose_seeded_for_source_fixture": summary.get("robot_pose_seeded_for_source_fixture") is True,
     }
@@ -181,6 +197,7 @@ def inspect_board_pick_prerequisite(path: Path) -> dict[str, Any]:
             "robot_pose_seeded_for_source_fixture": summary.get("robot_pose_seeded_for_source_fixture"),
             "final_target_xy_error_m": summary.get("final_target_xy_error_m"),
             "target_xy_tolerance_m": summary.get("target_xy_tolerance_m"),
+            "final_board_contact_observed": summary.get("final_board_contact_observed"),
             "required_checks": required_checks,
             "failed_checks": missing,
             "diagnostics": missing,
@@ -337,7 +354,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- Rollouts JSONL: `{summary['artifacts']['transitions_jsonl']}`",
         "",
         "The rollouts use the development MJCF scaffold and are not physical SO-101 training truth.",
-        "The board-pick prerequisite proves only development-fixture board-source pick/place before rollout collection.",
+        "The board-pick prerequisite must include final board contact and target-tolerance evidence, but still proves only development-fixture board-source pick/place before rollout collection.",
     ]
     path.write_text("\n".join(lines) + "\n")
 
