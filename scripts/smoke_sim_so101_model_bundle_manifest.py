@@ -16,6 +16,9 @@ from urllib.parse import urlparse
 SCHEMA = "lerobot.sim.so101_model_bundle_manifest.v1"
 REVIEW_PACKET_SCHEMA = "lerobot.sim.so101_model_bundle_manifest_review_packet.v1"
 BUNDLE_INTAKE_SCHEMA = "lerobot.sim.so101_model_bundle_manifest_intake_checklist.v1"
+REVIEW_REQUIREMENTS_SCHEMA = (
+    "lerobot.sim.so101_model_bundle_manifest_review_requirements.v1"
+)
 REVIEWED_MANIFEST_TEMPLATE_SCHEMA = (
     "lerobot.sim.so101_model_bundle_manifest_template.v1"
 )
@@ -473,6 +476,19 @@ BUNDLE_INTAKE_FIELDNAMES = (
     "command",
     "required_inputs",
 )
+REVIEW_REQUIREMENTS_FIELDNAMES = (
+    "priority",
+    "requirement_id",
+    "gate",
+    "manifest_fields",
+    "accepted_review_statuses",
+    "required_review_scope_ids",
+    "required_evidence_groups",
+    "required_inputs",
+    "placeholder_rule",
+    "synthetic_fixture_status",
+    "notes",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -568,6 +584,20 @@ def write_bundle_intake_csv(path: Path, bundle_intake: dict[str, Any]) -> None:
         for action in bundle_intake.get("actions") or []:
             writer.writerow(
                 {field: csv_value(action.get(field)) for field in BUNDLE_INTAKE_FIELDNAMES}
+            )
+
+
+def write_review_requirements_csv(path: Path, review_requirements: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=REVIEW_REQUIREMENTS_FIELDNAMES)
+        writer.writeheader()
+        for item in review_requirements.get("requirements") or []:
+            writer.writerow(
+                {
+                    field: csv_value(item.get(field))
+                    for field in REVIEW_REQUIREMENTS_FIELDNAMES
+                }
             )
 
 
@@ -2509,6 +2539,238 @@ def bundle_intake_command_template(action_id: str) -> list[str]:
     ]
 
 
+def review_requirement_item(
+    *,
+    priority: int,
+    requirement_id: str,
+    gate: str,
+    manifest_fields: list[str],
+    accepted_review_statuses: list[str] | None = None,
+    required_review_scope_ids: list[str] | None = None,
+    required_inputs: list[str] | None = None,
+    synthetic_fixture_status: str | None = None,
+    notes: str,
+) -> dict[str, Any]:
+    required_groups = [
+        {
+            "group": group_name,
+            "fields": list(group_fields),
+        }
+        for group_name, group_fields in REVIEW_EVIDENCE_REQUIRED_GROUPS
+    ]
+    return {
+        "priority": priority,
+        "requirement_id": requirement_id,
+        "gate": gate,
+        "manifest_fields": manifest_fields,
+        "accepted_review_statuses": accepted_review_statuses or [],
+        "required_review_scope_ids": required_review_scope_ids or [],
+        "required_review_scope_descriptions": {
+            scope_id: REVIEW_SCOPE_DESCRIPTIONS.get(scope_id, "")
+            for scope_id in (required_review_scope_ids or [])
+        },
+        "required_evidence_groups": required_groups
+        if accepted_review_statuses
+        else [],
+        "required_inputs": required_inputs or [],
+        "placeholder_rule": (
+            "TODO/TBD/unknown, placeholder/review-required values, and unedited "
+            "<...> template tokens are rejected."
+        ),
+        "synthetic_fixture_status": synthetic_fixture_status,
+        "notes": notes,
+    }
+
+
+def build_review_requirements(summary: dict[str, Any]) -> dict[str, Any]:
+    requirements = [
+        review_requirement_item(
+            priority=1,
+            requirement_id="model_identity",
+            gate="reviewed_model_authority",
+            manifest_fields=["model_path", *MODEL_SHA256_FIELDS],
+            required_inputs=[
+                "model_path resolves to a file",
+                "declared SHA-256 matches the resolved model file",
+            ],
+            notes=(
+                "The selected SO-101 model path and digest must be stable before "
+                "authority review can protect against model drift."
+            ),
+        ),
+        review_requirement_item(
+            priority=2,
+            requirement_id="source_authority",
+            gate="reviewed_model_authority",
+            manifest_fields=["authority"],
+            accepted_review_statuses=sorted(REVIEWED_AUTHORITY_STATUSES),
+            required_review_scope_ids=list(AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS),
+            required_inputs=[
+                "authority.reviewed_by",
+                "authority.review_id or authority.review_url",
+            ],
+            synthetic_fixture_status=SYNTHETIC_FIXTURE_AUTHORITY_STATUS,
+            notes=(
+                "Source authority must identify who reviewed model identity, "
+                "provenance, and license basis, plus a stable review artifact."
+            ),
+        ),
+        review_requirement_item(
+            priority=3,
+            requirement_id="provenance",
+            gate="reviewed_model_authority",
+            manifest_fields=["provenance"],
+            required_inputs=[
+                "source reference",
+                "export tool",
+                "license basis",
+            ],
+            notes=(
+                "Provenance is not a reviewed-status block, but source, export, "
+                "and license fields must be real non-placeholder records."
+            ),
+        ),
+        review_requirement_item(
+            priority=4,
+            requirement_id="mesh_assets",
+            gate="reviewed_model_authority",
+            manifest_fields=["asset_roots", *MESH_ASSET_REVIEW_FIELDS],
+            accepted_review_statuses=sorted(REVIEWED_MESH_ASSET_STATUSES),
+            required_review_scope_ids=list(MESH_ASSET_REQUIRED_REVIEW_SCOPE_IDS),
+            required_inputs=[
+                "mesh references visible to asset preflight",
+                "missing_asset_count == 0",
+                "unresolved_reference_count == 0",
+                "mesh_asset_authority.reviewed_by",
+                "mesh_asset_authority.review_id or mesh_asset_authority.review_url",
+            ],
+            synthetic_fixture_status=SYNTHETIC_FIXTURE_MESH_ASSET_STATUS,
+            notes="Mesh roots/assets must be reviewed and repeatably resolvable.",
+        ),
+        review_requirement_item(
+            priority=5,
+            requirement_id="joint_limits",
+            gate="reviewed_model_authority",
+            manifest_fields=list(JOINT_LIMIT_FIELDS + JOINT_LIMIT_REVIEW_FIELDS),
+            accepted_review_statuses=sorted(REVIEWED_JOINT_LIMIT_STATUSES),
+            required_review_scope_ids=list(JOINT_LIMIT_REQUIRED_REVIEW_SCOPE_IDS),
+            required_inputs=[
+                f"limits for {joint}"
+                for joint in EXPECTED_SO101_JOINTS
+            ]
+            + [
+                "joint_limit_authority.reviewed_by",
+                "joint_limit_authority.review_id or joint_limit_authority.review_url",
+            ],
+            synthetic_fixture_status=SYNTHETIC_FIXTURE_JOINT_LIMIT_STATUS,
+            notes=(
+                "Every expected SO-101 joint must have numeric lower/upper limits "
+                "and separate joint-limit review authority."
+            ),
+        ),
+        review_requirement_item(
+            priority=6,
+            requirement_id="target_frame",
+            gate="reviewed_model_authority",
+            manifest_fields=["target_frame", *TARGET_FRAME_REVIEW_FIELDS],
+            accepted_review_statuses=sorted(REVIEWED_TARGET_FRAME_STATUSES),
+            required_review_scope_ids=list(TARGET_FRAME_REQUIRED_REVIEW_SCOPE_IDS),
+            required_inputs=[
+                f"target_frame == {EXPECTED_TARGET_FRAME}",
+                "target frame visible in model structure",
+                "target_frame_authority.reviewed_by",
+                "target_frame_authority.review_id or target_frame_authority.review_url",
+            ],
+            synthetic_fixture_status=SYNTHETIC_FIXTURE_TARGET_FRAME_STATUS,
+            notes="The simulator contract currently requires the reviewed target frame to be gripper_frame_link.",
+        ),
+        review_requirement_item(
+            priority=7,
+            requirement_id="tcp_offset",
+            gate="reviewed_model_authority",
+            manifest_fields=list(TCP_OFFSET_FIELDS + TCP_OFFSET_REVIEW_FIELDS),
+            accepted_review_statuses=sorted(REVIEWED_TCP_OFFSET_STATUSES),
+            required_review_scope_ids=list(TCP_OFFSET_REQUIRED_REVIEW_SCOPE_IDS),
+            required_inputs=[
+                "numeric x/y/z meters",
+                f"norm <= {MAX_TCP_OFFSET_NORM_M} m",
+                "tcp_offset_authority.reviewed_by",
+                "tcp_offset_authority.review_id or tcp_offset_authority.review_url",
+            ],
+            synthetic_fixture_status=SYNTHETIC_FIXTURE_TCP_OFFSET_STATUS,
+            notes="TCP/gripper-tip offset must be calibrated and reviewed separately from target-frame selection.",
+        ),
+        review_requirement_item(
+            priority=8,
+            requirement_id="base_to_board_alignment",
+            gate="reviewed_model_authority",
+            manifest_fields=list(ALIGNMENT_FIELDS + ALIGNMENT_REVIEW_FIELDS),
+            accepted_review_statuses=sorted(REVIEWED_ALIGNMENT_STATUSES),
+            required_review_scope_ids=list(ALIGNMENT_REQUIRED_REVIEW_SCOPE_IDS),
+            required_inputs=[
+                "translation x/y/z meters",
+                "rotation roll/pitch/yaw radians",
+                f"translation norm <= {MAX_BASE_TO_BOARD_TRANSLATION_NORM_M} m",
+                "base_to_board_alignment_authority.reviewed_by",
+                "base_to_board_alignment_authority.review_id or base_to_board_alignment_authority.review_url",
+            ],
+            synthetic_fixture_status=SYNTHETIC_FIXTURE_ALIGNMENT_STATUS,
+            notes="Board registration must be a reviewed transform, not a placeholder.",
+        ),
+        review_requirement_item(
+            priority=9,
+            requirement_id="model_contract_and_asset_preflight",
+            gate="mujoco_scene_validity",
+            manifest_fields=["model_path", "asset_roots", "target_frame"],
+            required_inputs=[
+                "contract checker non-blocking",
+                "SO-101 joints visible",
+                "target frame visible",
+                "mesh asset preflight non-blocking",
+            ],
+            notes=(
+                "The child model contract checker is the handoff from reviewed "
+                "bundle intake to MuJoCo scene validity."
+            ),
+        ),
+    ]
+    return {
+        "schema": REVIEW_REQUIREMENTS_SCHEMA,
+        "ok": True,
+        "status": "review_requirements_for_so101_model_bundle",
+        "model_authority": "review_requirements_not_authority",
+        "manifest_status": summary.get("status"),
+        "manifest_request_status": (
+            summary.get("manifest_request", {}).get("status")
+            if isinstance(summary.get("manifest_request"), dict)
+            else None
+        ),
+        "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
+        "physical_so101_model_authority_ready": summary.get(
+            "physical_so101_model_authority_ready"
+        ),
+        "observed_evidence_is_authority": False,
+        "physical_so101_truth_claimed": False,
+        "development_fixture_evidence_not_physical_so101_truth": True,
+        "requirement_count": len(requirements),
+        "requirement_ids": [item["requirement_id"] for item in requirements],
+        "missing_inputs": summary.get("missing_inputs") or [],
+        "next_required_action_ids": summary.get("next_required_action_ids") or [],
+        "placeholder_policy": {
+            "angle_bracket_template_tokens_rejected": True,
+            "placeholder_values": sorted(PLACEHOLDER_REVIEW_EVIDENCE_VALUES),
+            "placeholder_prefixes": list(PLACEHOLDER_REVIEW_EVIDENCE_PREFIXES),
+        },
+        "requirements": requirements,
+        "rerun_command": bundle_intake_command_template("review_requirements"),
+        "caveats": [
+            "This requirements artifact is an operator review aid only.",
+            "It is not reviewed physical SO-101 authority and does not make a manifest ready.",
+            "The manifest checker summary is the readiness authority for model-backed IK forwarding.",
+        ],
+    }
+
+
 def reviewed_manifest_template_status(summary: dict[str, Any]) -> str:
     if summary.get("physical_so101_model_authority_ready") is True:
         return "physical_authority_manifest_supplied"
@@ -2933,6 +3195,11 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         f"- `review_packet_item_count`: `{summary.get('review_packet_item_count')}`",
         f"- `review_packet_json`: `{summary['artifacts'].get('review_packet_json')}`",
         f"- `review_packet_csv`: `{summary['artifacts'].get('review_packet_csv')}`",
+        f"- `review_requirements_status`: `{summary.get('review_requirements_status')}`",
+        f"- `review_requirements_model_authority`: `{summary.get('review_requirements_model_authority')}`",
+        f"- `review_requirements_requirement_count`: `{summary.get('review_requirements_requirement_count')}`",
+        f"- `review_requirements_json`: `{summary['artifacts'].get('review_requirements_json')}`",
+        f"- `review_requirements_csv`: `{summary['artifacts'].get('review_requirements_csv')}`",
         f"- `bundle_intake_status`: `{summary.get('bundle_intake_status')}`",
         f"- `bundle_intake_model_authority`: `{summary.get('bundle_intake_model_authority')}`",
         f"- `bundle_intake_action_ids`: `{', '.join(summary.get('bundle_intake_action_ids') or []) if summary.get('bundle_intake_action_ids') else 'none'}`",
@@ -2966,6 +3233,26 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
             lines.append(f"  - {action['detail']}")
     else:
         lines.append("- none")
+
+    lines.extend(
+        [
+            "",
+            "## Review Requirements",
+            "",
+            (
+                "This artifact lists the required review scopes, evidence groups, "
+                "accepted statuses, and placeholder rejection policy for the reviewed "
+                "SO-101 bundle. It is operator guidance only, not reviewed physical "
+                "SO-101 authority."
+            ),
+            "",
+            f"- `status`: `{summary.get('review_requirements_status')}`",
+            f"- `model_authority`: `{summary.get('review_requirements_model_authority')}`",
+            f"- `requirement_count`: `{summary.get('review_requirements_requirement_count')}`",
+            f"- `json`: `{summary['artifacts'].get('review_requirements_json')}`",
+            f"- `csv`: `{summary['artifacts'].get('review_requirements_csv')}`",
+        ]
+    )
 
     lines.extend(
         [
@@ -3163,6 +3450,12 @@ def main() -> int:
     readme_path = output_dir / "README.md"
     review_packet_path = output_dir / "so101_model_bundle_manifest_review_packet.json"
     review_packet_csv_path = output_dir / "so101_model_bundle_manifest_review_packet.csv"
+    review_requirements_path = (
+        output_dir / "so101_model_bundle_manifest_review_requirements.json"
+    )
+    review_requirements_csv_path = (
+        output_dir / "so101_model_bundle_manifest_review_requirements.csv"
+    )
     bundle_intake_path = output_dir / "so101_model_bundle_manifest_intake_checklist.json"
     bundle_intake_csv_path = (
         output_dir / "so101_model_bundle_manifest_intake_checklist.csv"
@@ -3176,6 +3469,8 @@ def main() -> int:
         "readme_md": str(readme_path),
         "review_packet_json": str(review_packet_path),
         "review_packet_csv": str(review_packet_csv_path),
+        "review_requirements_json": str(review_requirements_path),
+        "review_requirements_csv": str(review_requirements_csv_path),
         "bundle_intake_checklist_json": str(bundle_intake_path),
         "bundle_intake_checklist_csv": str(bundle_intake_csv_path),
         "reviewed_manifest_template_json": str(reviewed_manifest_template_path),
@@ -3208,6 +3503,39 @@ def main() -> int:
                 "development_fixture_evidence_not_physical_so101_truth"
             ],
             "review_packet": review_packet,
+        }
+    )
+    review_requirements = build_review_requirements(summary)
+    summary.update(
+        {
+            "review_requirements_status": review_requirements["status"],
+            "review_requirements_model_authority": review_requirements[
+                "model_authority"
+            ],
+            "review_requirements_requirement_count": review_requirements[
+                "requirement_count"
+            ],
+            "review_requirements_requirement_ids": review_requirements[
+                "requirement_ids"
+            ],
+            "review_requirements_observed_evidence_is_authority": (
+                review_requirements["observed_evidence_is_authority"]
+            ),
+            "review_requirements_physical_so101_truth_claimed": (
+                review_requirements["physical_so101_truth_claimed"]
+            ),
+            "review_requirements_development_fixture_evidence_not_physical_so101_truth": (
+                review_requirements[
+                    "development_fixture_evidence_not_physical_so101_truth"
+                ]
+            ),
+            "review_requirements_json_path": artifacts.get(
+                "review_requirements_json"
+            ),
+            "review_requirements_csv_path": artifacts.get(
+                "review_requirements_csv"
+            ),
+            "review_requirements": review_requirements,
         }
     )
     bundle_intake_checklist = build_bundle_manifest_intake_checklist(summary)
@@ -3271,6 +3599,8 @@ def main() -> int:
     write_csv(csv_path, rows)
     write_json(review_packet_path, review_packet)
     write_review_packet_csv(review_packet_csv_path, review_packet_rows)
+    write_json(review_requirements_path, review_requirements)
+    write_review_requirements_csv(review_requirements_csv_path, review_requirements)
     write_json(bundle_intake_path, bundle_intake_checklist)
     write_bundle_intake_csv(bundle_intake_csv_path, bundle_intake_checklist)
     write_json(reviewed_manifest_template_path, reviewed_manifest_template)
@@ -3309,6 +3639,8 @@ def main() -> int:
                 "checklist_csv": str(csv_path),
                 "review_packet_json": str(review_packet_path),
                 "review_packet_csv": str(review_packet_csv_path),
+                "review_requirements_json": str(review_requirements_path),
+                "review_requirements_csv": str(review_requirements_csv_path),
                 "bundle_intake_checklist_json": str(bundle_intake_path),
                 "bundle_intake_checklist_csv": str(bundle_intake_csv_path),
                 "reviewed_manifest_template_json": str(

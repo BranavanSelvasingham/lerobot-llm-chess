@@ -2421,6 +2421,25 @@ def collect_so101_model_bundle_manifest_artifacts(
         "review_packet_development_fixture_evidence_not_physical_so101_truth": bundle.get(
             "review_packet_development_fixture_evidence_not_physical_so101_truth"
         ),
+        "review_requirements_status": bundle.get("review_requirements_status"),
+        "review_requirements_model_authority": bundle.get(
+            "review_requirements_model_authority"
+        ),
+        "review_requirements_requirement_count": bundle.get(
+            "review_requirements_requirement_count"
+        ),
+        "review_requirements_requirement_ids": bundle.get(
+            "review_requirements_requirement_ids"
+        ),
+        "review_requirements_observed_evidence_is_authority": bundle.get(
+            "review_requirements_observed_evidence_is_authority"
+        ),
+        "review_requirements_physical_so101_truth_claimed": bundle.get(
+            "review_requirements_physical_so101_truth_claimed"
+        ),
+        "review_requirements_development_fixture_evidence_not_physical_so101_truth": bundle.get(
+            "review_requirements_development_fixture_evidence_not_physical_so101_truth"
+        ),
         "bundle_intake_status": bundle.get("bundle_intake_status"),
         "bundle_intake_model_authority": bundle.get("bundle_intake_model_authority"),
         "bundle_intake_action_count": bundle.get("bundle_intake_action_count"),
@@ -2503,6 +2522,8 @@ def collect_so101_model_bundle_manifest_artifacts(
         ("checklist_csv", "checklist"),
         ("review_packet_json", "review_packet"),
         ("review_packet_csv", "review_packet_rows"),
+        ("review_requirements_json", "review_requirements"),
+        ("review_requirements_csv", "review_requirements_rows"),
         ("bundle_intake_checklist_json", "bundle_intake"),
         ("bundle_intake_checklist_csv", "bundle_intake_rows"),
         ("reviewed_manifest_template_json", "reviewed_manifest_template"),
@@ -2561,6 +2582,12 @@ def collect_so101_model_bundle_manifest_artifacts(
         "checklist_csv_path": artifact_paths.get("checklist_csv"),
         "review_packet_json_path": artifact_paths.get("review_packet_json"),
         "review_packet_csv_path": artifact_paths.get("review_packet_csv"),
+        "review_requirements_json_path": artifact_paths.get(
+            "review_requirements_json"
+        ),
+        "review_requirements_csv_path": artifact_paths.get(
+            "review_requirements_csv"
+        ),
         "bundle_intake_checklist_json_path": artifact_paths.get(
             "bundle_intake_checklist_json"
         ),

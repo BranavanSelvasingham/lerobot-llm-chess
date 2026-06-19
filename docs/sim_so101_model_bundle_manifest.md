@@ -138,6 +138,8 @@ The script writes:
 - `so101_model_bundle_manifest_checklist.csv`
 - `so101_model_bundle_manifest_review_packet.json`
 - `so101_model_bundle_manifest_review_packet.csv`
+- `so101_model_bundle_manifest_review_requirements.json`
+- `so101_model_bundle_manifest_review_requirements.csv`
 - `so101_model_bundle_manifest_template.json`
 - `README.md`
 - `so101_model_contract/so101_model_contract_summary.json`
@@ -193,6 +195,14 @@ observed-evidence and physical-truth flags, and placeholder caveats. Edit a
 copy of the nested template, replace every placeholder with reviewed inputs,
 then rerun this checker; the template artifact itself is never reviewed
 physical SO-101 authority.
+
+The checker also writes `so101_model_bundle_manifest_review_requirements.json`
+and `.csv`. These files are a machine-readable review map for the manifest
+authority gate: required review sections, manifest fields, accepted review
+statuses, review scopes, evidence groups, placeholder rejection policy, and the
+handoff to child model contract and asset-preflight checks. They always report
+`model_authority: "review_requirements_not_authority"` and are operator intake
+guidance only; they do not make a manifest reviewed physical SO-101 truth.
 
 Review evidence fields must be actual identifiers, dates, tickets, or URLs.
 Placeholder strings such as `TODO`, `TBD`, `unknown`, `placeholder`,

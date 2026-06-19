@@ -1784,6 +1784,30 @@ jobs:
           assert bundle_manifest["review_packet_action_ids"] == bundle_manifest["next_required_action_ids"], bundle_manifest
           assert bundle_manifest["review_packet_observed_evidence_is_authority"] is False, bundle_manifest
           assert bundle_manifest["review_packet_development_fixture_evidence_not_physical_so101_truth"] is True, bundle_manifest
+          assert bundle_manifest["review_requirements_status"] == "review_requirements_for_so101_model_bundle", bundle_manifest
+          assert bundle_manifest["review_requirements_model_authority"] == "review_requirements_not_authority", bundle_manifest
+          assert isinstance(bundle_manifest["review_requirements_requirement_count"], int), bundle_manifest
+          assert bundle_manifest["review_requirements_requirement_count"] == len(bundle_manifest["review_requirements_requirement_ids"]), bundle_manifest
+          assert bundle_manifest["review_requirements_requirement_ids"] == [
+              "model_identity",
+              "source_authority",
+              "provenance",
+              "mesh_assets",
+              "joint_limits",
+              "target_frame",
+              "tcp_offset",
+              "base_to_board_alignment",
+              "model_contract_and_asset_preflight",
+          ], bundle_manifest
+          assert bundle_manifest["review_requirements_observed_evidence_is_authority"] is False, bundle_manifest
+          assert bundle_manifest["review_requirements_physical_so101_truth_claimed"] is False, bundle_manifest
+          assert bundle_manifest["review_requirements_development_fixture_evidence_not_physical_so101_truth"] is True, bundle_manifest
+          assert isinstance(bundle_manifest["review_requirements_json_path"], str), bundle_manifest
+          assert isinstance(bundle_manifest["review_requirements_csv_path"], str), bundle_manifest
+          assert Path(bundle_manifest["review_requirements_json_path"]).is_file(), bundle_manifest
+          assert Path(bundle_manifest["review_requirements_csv_path"]).is_file(), bundle_manifest
+          assert bundle_manifest["review_requirements"]["model_authority"] == "review_requirements_not_authority", bundle_manifest
+          assert bundle_manifest["review_requirements"]["placeholder_policy"]["angle_bracket_template_tokens_rejected"] is True, bundle_manifest
           assert bundle_manifest["bundle_intake_status"] in {
               "manifest_required",
               "bundle_review_required",
@@ -1851,7 +1875,15 @@ jobs:
               assert bundle_manifest["next_required_for_goal"][0]["action_id"] == "supply_reviewed_so101_model_bundle_manifest", bundle_manifest
               assert bundle_manifest["forwarding"]["diagnostic_only"] is True, bundle_manifest["forwarding"]
           bundle_artifacts = bundle_manifest["artifacts"]
-          for key in ("summary_json", "checklist_csv", "review_packet_json", "review_packet_csv", "readme_md"):
+          for key in (
+              "summary_json",
+              "checklist_csv",
+              "review_packet_json",
+              "review_packet_csv",
+              "review_requirements_json",
+              "review_requirements_csv",
+              "readme_md",
+          ):
               assert isinstance(bundle_artifacts.get(key), str) and Path(bundle_artifacts[key]).is_file(), (
                   key,
                   bundle_artifacts,
@@ -3283,6 +3315,11 @@ jobs:
               assert metrics.get("reviewed_manifest_template_observed_evidence_is_authority") is False, metrics
               assert metrics.get("reviewed_manifest_template_physical_so101_truth_claimed") is False, metrics
               assert metrics.get("reviewed_manifest_template_development_fixture_evidence_not_physical_so101_truth") is True, metrics
+              assert metrics.get("review_requirements_model_authority") == "review_requirements_not_authority", metrics
+              assert metrics.get("review_requirements_observed_evidence_is_authority") is False, metrics
+              assert metrics.get("review_requirements_physical_so101_truth_claimed") is False, metrics
+              assert metrics.get("review_requirements_development_fixture_evidence_not_physical_so101_truth") is True, metrics
+              assert metrics.get("review_requirements_requirement_count") == len(metrics.get("review_requirements_requirement_ids") or []), metrics
               assert metrics.get("authority_review_evidence_invalid_fields") in (None, []) or isinstance(metrics.get("authority_review_evidence_invalid_fields"), list), metrics
               assert metrics.get("authority_required_review_scope_ids") in (None, []) or isinstance(metrics.get("authority_required_review_scope_ids"), list), metrics
               assert metrics.get("authority_supplied_review_scope_ids") in (None, []) or isinstance(metrics.get("authority_supplied_review_scope_ids"), list), metrics
@@ -3314,6 +3351,20 @@ jobs:
           ), artifacts_by_category["so101_model_bundle_manifest"]
           assert any(
               row.get("label") == "so101_model_bundle_manifest:review_packet_rows"
+              and row.get("kind") == "csv"
+              and row.get("exists") is True
+              for row in artifacts_by_category["so101_model_bundle_manifest"]
+          ), artifacts_by_category["so101_model_bundle_manifest"]
+          assert any(
+              row.get("label") == "so101_model_bundle_manifest:review_requirements"
+              and row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("review_requirements_model_authority") == "review_requirements_not_authority"
+              and row.get("metrics", {}).get("review_requirements_observed_evidence_is_authority") is False
+              for row in artifacts_by_category["so101_model_bundle_manifest"]
+          ), artifacts_by_category["so101_model_bundle_manifest"]
+          assert any(
+              row.get("label") == "so101_model_bundle_manifest:review_requirements_rows"
               and row.get("kind") == "csv"
               and row.get("exists") is True
               for row in artifacts_by_category["so101_model_bundle_manifest"]

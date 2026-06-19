@@ -76,6 +76,12 @@ SO101_MODEL_BUNDLE_MANIFEST_REVIEW_PACKET_JSON_NAME = (
 SO101_MODEL_BUNDLE_MANIFEST_REVIEW_PACKET_CSV_NAME = (
     "so101_model_bundle_manifest_review_packet.csv"
 )
+SO101_MODEL_BUNDLE_MANIFEST_REVIEW_REQUIREMENTS_JSON_NAME = (
+    "so101_model_bundle_manifest_review_requirements.json"
+)
+SO101_MODEL_BUNDLE_MANIFEST_REVIEW_REQUIREMENTS_CSV_NAME = (
+    "so101_model_bundle_manifest_review_requirements.csv"
+)
 SO101_MODEL_BUNDLE_MANIFEST_INTAKE_CHECKLIST_JSON_NAME = (
     "so101_model_bundle_manifest_intake_checklist.json"
 )
@@ -1653,6 +1659,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `so101_model_bundle_manifest/so101_model_bundle_manifest_checklist.csv`",
         f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_REVIEW_PACKET_JSON_NAME}`",
         f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_REVIEW_PACKET_CSV_NAME}`",
+        f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_REVIEW_REQUIREMENTS_JSON_NAME}`",
+        f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_REVIEW_REQUIREMENTS_CSV_NAME}`",
         f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_INTAKE_CHECKLIST_JSON_NAME}`",
         f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_INTAKE_CHECKLIST_CSV_NAME}`",
         f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_TEMPLATE_JSON_NAME}`",
@@ -3743,6 +3751,30 @@ def so101_model_bundle_manifest_section(
         "review_packet_development_fixture_evidence_not_physical_so101_truth": bundle.get(
             "review_packet_development_fixture_evidence_not_physical_so101_truth"
         ),
+        "review_requirements_status": bundle.get("review_requirements_status"),
+        "review_requirements_model_authority": bundle.get(
+            "review_requirements_model_authority"
+        ),
+        "review_requirements_requirement_count": bundle.get(
+            "review_requirements_requirement_count"
+        ),
+        "review_requirements_requirement_ids": bundle.get(
+            "review_requirements_requirement_ids"
+        ),
+        "review_requirements_observed_evidence_is_authority": bundle.get(
+            "review_requirements_observed_evidence_is_authority"
+        ),
+        "review_requirements_physical_so101_truth_claimed": bundle.get(
+            "review_requirements_physical_so101_truth_claimed"
+        ),
+        "review_requirements_development_fixture_evidence_not_physical_so101_truth": bundle.get(
+            "review_requirements_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "review_requirements_json_path": bundle.get("review_requirements_json_path")
+        or artifacts.get("review_requirements_json"),
+        "review_requirements_csv_path": bundle.get("review_requirements_csv_path")
+        or artifacts.get("review_requirements_csv"),
+        "review_requirements": bundle.get("review_requirements"),
         "bundle_intake_status": bundle.get("bundle_intake_status"),
         "bundle_intake_model_authority": bundle.get("bundle_intake_model_authority"),
         "bundle_intake_action_count": bundle.get("bundle_intake_action_count"),
@@ -3905,6 +3937,8 @@ def so101_model_bundle_manifest_section(
             "checklist_csv": artifacts.get("checklist_csv"),
             "review_packet_json": artifacts.get("review_packet_json"),
             "review_packet_csv": artifacts.get("review_packet_csv"),
+            "review_requirements_json": artifacts.get("review_requirements_json"),
+            "review_requirements_csv": artifacts.get("review_requirements_csv"),
             "bundle_intake_checklist_json": artifacts.get(
                 "bundle_intake_checklist_json"
             ),
