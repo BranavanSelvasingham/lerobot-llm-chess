@@ -17,6 +17,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 from smoke_sim_calibration_regression_suite import (  # noqa: E402
     REVIEWED_SO101_MODEL_AUTHORITY,
+    SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_ITEM_IDS,
     SO101_TRAINING_PRIORITY_STAGE_IDS,
     so101_training_readiness_gate_section,
     write_so101_training_readiness_gate_artifacts,
@@ -67,11 +68,18 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "gate_ready",
         "reviewed_model_authority_ready",
         "reviewed_model_physical_motion_checked",
+        "reviewed_mujoco_downstream_handoff_contract_ok",
+        "reviewed_mujoco_downstream_handoff_contract_status",
+        "reviewed_mujoco_downstream_handoff_raw_ready",
         "reviewed_mujoco_downstream_handoff_ready",
         "reviewed_mujoco_downstream_handoff_status",
         "reviewed_mujoco_downstream_handoff_model_authority",
         "reviewed_mujoco_downstream_handoff_physical_truth_claimed",
         "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority",
+        "reviewed_mujoco_downstream_handoff_physical_motion_checked",
+        "reviewed_mujoco_downstream_handoff_hardware_free_fixture_motion_checked",
+        "reviewed_mujoco_downstream_handoff_missing_item_ids",
+        "reviewed_mujoco_downstream_handoff_contract_blockers",
         "reviewed_model_backed_board_source_pick_place",
         "board_pick_reviewed_model_authority_ready",
         "board_pick_detailed_evidence_ready",
@@ -272,7 +280,53 @@ def reviewed_mujoco_bundle_state(
     handoff_ready: bool,
     fixture_handoff_ready: bool = False,
     status: str | None = None,
+    physical_motion_checked: bool | None = None,
+    fixture_motion_checked: bool | None = None,
+    reviewed_motion_checked: bool | None = None,
+    motion_authority_status: str | None = None,
+    physical_model_authority_ready: bool | None = None,
+    motion_evidence_not_physical: bool | None = None,
+    item_ids: list[str] | None = None,
+    item_count: int | None = None,
+    physical_truth_claimed: bool = False,
+    observed_evidence_is_authority: bool = False,
+    development_fixture_evidence_not_physical_truth: bool = True,
 ) -> dict[str, Any]:
+    physical_motion_checked = (
+        handoff_ready if physical_motion_checked is None else physical_motion_checked
+    )
+    fixture_motion_checked = (
+        fixture_handoff_ready
+        if fixture_motion_checked is None
+        else fixture_motion_checked
+    )
+    if reviewed_motion_checked is None:
+        reviewed_motion_checked = physical_motion_checked or fixture_motion_checked
+    physical_model_authority_ready = (
+        handoff_ready
+        if physical_model_authority_ready is None
+        else physical_model_authority_ready
+    )
+    motion_evidence_not_physical = (
+        fixture_handoff_ready
+        if motion_evidence_not_physical is None
+        else motion_evidence_not_physical
+    )
+    motion_authority_status = (
+        motion_authority_status
+        if motion_authority_status is not None
+        else "physical_reviewed_model_motion_checked"
+        if handoff_ready
+        else "hardware_free_fixture_motion_checked_not_physical_so101_authority"
+        if fixture_handoff_ready
+        else "not_checked_manifest_not_ready"
+    )
+    item_ids = (
+        list(SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_ITEM_IDS)
+        if item_ids is None
+        else item_ids
+    )
+    item_count = len(item_ids) if item_count is None else item_count
     return {
         "status": (
             "reviewed_mujoco_bundle_motion_checked"
@@ -290,10 +344,22 @@ def reviewed_mujoco_bundle_state(
         ),
         "downstream_handoff_ready": handoff_ready,
         "downstream_handoff_model_authority": "downstream_handoff_not_authority",
-        "downstream_handoff_observed_evidence_is_authority": False,
-        "downstream_handoff_physical_so101_truth_claimed": False,
-        "downstream_handoff_development_fixture_evidence_not_physical_so101_truth": True,
+        "downstream_handoff_observed_evidence_is_authority": (
+            observed_evidence_is_authority
+        ),
+        "downstream_handoff_physical_so101_truth_claimed": physical_truth_claimed,
+        "downstream_handoff_development_fixture_evidence_not_physical_so101_truth": (
+            development_fixture_evidence_not_physical_truth
+        ),
+        "downstream_handoff_item_count": item_count,
+        "downstream_handoff_item_ids": item_ids,
         "fixture_handoff_ready_not_physical_so101_authority": fixture_handoff_ready,
+        "reviewed_model_motion_checked": reviewed_motion_checked,
+        "physical_reviewed_model_motion_checked": physical_motion_checked,
+        "hardware_free_fixture_motion_checked": fixture_motion_checked,
+        "motion_authority_status": motion_authority_status,
+        "physical_so101_model_authority_ready": physical_model_authority_ready,
+        "motion_evidence_not_physical_so101_authority": motion_evidence_not_physical,
         "summary_path": str(summary_path),
     }
 
@@ -386,6 +452,29 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         summaries / "reviewed_mujoco_bundle_ready.json",
         handoff_ready=True,
     )
+    handoff_fixture_ready = reviewed_mujoco_bundle_state(
+        summaries / "reviewed_mujoco_bundle_fixture_ready.json",
+        handoff_ready=False,
+        fixture_handoff_ready=True,
+    )
+    handoff_raw_ready_without_physical_motion = reviewed_mujoco_bundle_state(
+        summaries / "reviewed_mujoco_bundle_raw_ready_without_physical_motion.json",
+        handoff_ready=True,
+        physical_motion_checked=False,
+        reviewed_motion_checked=False,
+        motion_authority_status="not_checked_manifest_not_ready",
+        physical_model_authority_ready=False,
+    )
+    handoff_incomplete_items = reviewed_mujoco_bundle_state(
+        summaries / "reviewed_mujoco_bundle_incomplete_items.json",
+        handoff_ready=True,
+        item_ids=["downstream_gate_handoff"],
+    )
+    handoff_physical_truth_claimed = reviewed_mujoco_bundle_state(
+        summaries / "reviewed_mujoco_bundle_physical_truth_claimed.json",
+        handoff_ready=True,
+        physical_truth_claimed=True,
+    )
     return [
         {
             "case_id": "all_development_evidence_blocked",
@@ -457,6 +546,136 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "rollout_authority": True,
                 "development_caveat": True,
                 "blockers_contain": ["make_reviewed_mujoco_downstream_handoff_ready"],
+                "next_priority_gate": "mujoco_scene_validity",
+            },
+        },
+        {
+            "case_id": "reviewed_authority_fixture_handoff_not_training_ready",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_fixture_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "reviewed_downstream_handoff": False,
+                "reviewed_downstream_handoff_contract": True,
+                "reviewed_downstream_fixture_handoff": True,
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "blockers_contain": ["make_reviewed_mujoco_downstream_handoff_ready"],
+                "next_priority_gate": "mujoco_scene_validity",
+            },
+        },
+        {
+            "case_id": "reviewed_authority_raw_handoff_ready_without_physical_motion_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_raw_ready_without_physical_motion,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "reviewed_motion": True,
+                "reviewed_downstream_handoff": False,
+                "reviewed_downstream_handoff_contract": False,
+                "reviewed_handoff_physical_motion": False,
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "handoff_contract_blockers_contain": [
+                    "repair_physical_reviewed_mujoco_handoff_readiness_flags"
+                ],
+                "blockers_contain": [
+                    "repair_physical_reviewed_mujoco_handoff_readiness_flags",
+                    "make_reviewed_mujoco_downstream_handoff_ready",
+                ],
+                "next_priority_gate": "mujoco_scene_validity",
+            },
+        },
+        {
+            "case_id": "reviewed_authority_incomplete_handoff_items_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_incomplete_items,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "reviewed_downstream_handoff": False,
+                "reviewed_downstream_handoff_contract": False,
+                "reviewed_handoff_missing_items": [
+                    "base_to_board_alignment",
+                    "joint_limits",
+                    "mesh_assets",
+                    "model_authority",
+                    "model_identity",
+                    "mujoco_motion",
+                    "target_frame",
+                    "tcp_offset_m",
+                ],
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "handoff_contract_blockers_contain": [
+                    "provide_complete_reviewed_mujoco_downstream_handoff_items"
+                ],
+                "blockers_contain": [
+                    "provide_complete_reviewed_mujoco_downstream_handoff_items"
+                ],
+                "next_priority_gate": "mujoco_scene_validity",
+            },
+        },
+        {
+            "case_id": "reviewed_authority_handoff_physical_truth_claim_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_physical_truth_claimed,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "reviewed_downstream_handoff": False,
+                "reviewed_downstream_handoff_contract": False,
+                "reviewed_handoff_physical_truth_claimed": True,
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "handoff_contract_blockers_contain": [
+                    "remove_physical_so101_truth_claim_from_downstream_handoff"
+                ],
+                "blockers_contain": [
+                    "remove_physical_so101_truth_claim_from_downstream_handoff"
+                ],
                 "next_priority_gate": "mujoco_scene_validity",
             },
         },
@@ -961,11 +1180,41 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             gate.get("reviewed_mujoco_downstream_handoff_ready"),
             expect["reviewed_downstream_handoff"],
         )
+    if "reviewed_downstream_handoff_contract" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_downstream_handoff_contract_ok",
+            gate.get("reviewed_mujoco_downstream_handoff_contract_ok"),
+            expect["reviewed_downstream_handoff_contract"],
+        )
+    if "reviewed_downstream_fixture_handoff" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority",
+            gate.get(
+                "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority"
+            ),
+            expect["reviewed_downstream_fixture_handoff"],
+        )
+    if "reviewed_handoff_physical_motion" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_downstream_handoff_physical_motion_checked",
+            gate.get("reviewed_mujoco_downstream_handoff_physical_motion_checked"),
+            expect["reviewed_handoff_physical_motion"],
+        )
+    if "reviewed_handoff_missing_items" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_downstream_handoff_missing_item_ids",
+            gate.get("reviewed_mujoco_downstream_handoff_missing_item_ids"),
+            expect["reviewed_handoff_missing_items"],
+        )
     add_error(
         errors,
         "reviewed_mujoco_downstream_handoff_physical_truth_claimed",
         gate.get("reviewed_mujoco_downstream_handoff_physical_truth_claimed"),
-        False,
+        expect.get("reviewed_handoff_physical_truth_claimed", False),
     )
     add_error(
         errors,
@@ -1069,6 +1318,12 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         gate.get("blockers"),
         expect.get("blockers_contain", []),
     )
+    expect_contains(
+        errors,
+        "reviewed_mujoco_downstream_handoff_contract_blockers",
+        gate.get("reviewed_mujoco_downstream_handoff_contract_blockers"),
+        expect.get("handoff_contract_blockers_contain", []),
+    )
 
     summary_path = case_dir / "so101_training_readiness_gate.json"
     case_dir.mkdir(parents=True, exist_ok=True)
@@ -1118,6 +1373,15 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "reviewed_model_physical_motion_checked": gate.get(
             "reviewed_model_physical_motion_checked"
         ),
+        "reviewed_mujoco_downstream_handoff_contract_ok": gate.get(
+            "reviewed_mujoco_downstream_handoff_contract_ok"
+        ),
+        "reviewed_mujoco_downstream_handoff_contract_status": gate.get(
+            "reviewed_mujoco_downstream_handoff_contract_status"
+        ),
+        "reviewed_mujoco_downstream_handoff_raw_ready": gate.get(
+            "reviewed_mujoco_downstream_handoff_raw_ready"
+        ),
         "reviewed_mujoco_downstream_handoff_ready": gate.get(
             "reviewed_mujoco_downstream_handoff_ready"
         ),
@@ -1132,6 +1396,18 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority": gate.get(
             "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority"
+        ),
+        "reviewed_mujoco_downstream_handoff_physical_motion_checked": gate.get(
+            "reviewed_mujoco_downstream_handoff_physical_motion_checked"
+        ),
+        "reviewed_mujoco_downstream_handoff_hardware_free_fixture_motion_checked": gate.get(
+            "reviewed_mujoco_downstream_handoff_hardware_free_fixture_motion_checked"
+        ),
+        "reviewed_mujoco_downstream_handoff_missing_item_ids": gate.get(
+            "reviewed_mujoco_downstream_handoff_missing_item_ids"
+        ),
+        "reviewed_mujoco_downstream_handoff_contract_blockers": gate.get(
+            "reviewed_mujoco_downstream_handoff_contract_blockers"
         ),
         "reviewed_model_backed_board_source_pick_place": gate.get(
             "reviewed_model_backed_board_source_pick_place"
@@ -1177,17 +1453,20 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         "",
         "## Cases",
         "",
-        "| Case | Status | Ready | Next Gate | Handoff | Board Pick | Rollout Authority | Fixture Caveat | Blockers |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Case | Status | Ready | Next Gate | Handoff Contract | Handoff | Board Pick | Rollout Authority | Fixture Caveat | Blockers |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for case in summary["cases"]:
         gate = case["gate"]
         lines.append(
-            "| `{case_id}` | `{status}` | `{ready}` | `{next_gate}` | `{handoff}` | `{board}` | `{rollout}` | `{fixture}` | `{blockers}` |".format(
+            "| `{case_id}` | `{status}` | `{ready}` | `{next_gate}` | `{handoff_contract}` | `{handoff}` | `{board}` | `{rollout}` | `{fixture}` | `{blockers}` |".format(
                 case_id=case["case_id"],
                 status=case["status"],
                 ready=gate.get("ready"),
                 next_gate=gate.get("next_priority_gate_id") or "none",
+                handoff_contract=gate.get(
+                    "reviewed_mujoco_downstream_handoff_contract_ok"
+                ),
                 handoff=gate.get("reviewed_mujoco_downstream_handoff_ready"),
                 board=gate.get("reviewed_model_backed_board_source_pick_place"),
                 rollout=gate.get("rollout_policy_training_authority_ready"),
@@ -1204,6 +1483,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "- `priority_gate_queue` preserves reviewed authority, reviewed MuJoCo handoff and scene validity, Gymnasium task wiring, scripted pick/place, then training rollout order.",
             "- Each case writes `so101_training_readiness_gate_priority_queue.csv` so the prioritized missing-gate order is reviewable without parsing nested JSON.",
             "- Draft, development, and fixture-only model-authority labels are rejected even when raw readiness booleans are true.",
+            "- Reviewed-MuJoCo downstream handoff readiness requires a complete summary-level handoff contract; raw-ready, fixture-only, incomplete, or physical-truth-claiming handoffs cannot unblock training.",
             "- Board-pick readiness requires detailed source-start, contact, lift, transfer, place, release, final-board-contact, and target-tolerance evidence.",
             "- Reviewed rollout readiness requires status `ok`, reviewed-policy-ready authority status, `policy_training` use, policy-authority evidence, and no serious-policy blockers.",
             "- Use this smoke to protect training-readiness gate logic. Use reviewed SO-101 model-backed pick/place and rollout evidence before serious training.",

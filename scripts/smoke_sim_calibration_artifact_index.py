@@ -3121,6 +3121,15 @@ def collect_so101_training_readiness_gate_artifacts(
         "reviewed_mujoco_downstream_handoff_status": gate.get(
             "reviewed_mujoco_downstream_handoff_status"
         ),
+        "reviewed_mujoco_downstream_handoff_contract_status": gate.get(
+            "reviewed_mujoco_downstream_handoff_contract_status"
+        ),
+        "reviewed_mujoco_downstream_handoff_contract_ok": gate.get(
+            "reviewed_mujoco_downstream_handoff_contract_ok"
+        ),
+        "reviewed_mujoco_downstream_handoff_raw_ready": gate.get(
+            "reviewed_mujoco_downstream_handoff_raw_ready"
+        ),
         "reviewed_mujoco_downstream_handoff_ready": gate.get(
             "reviewed_mujoco_downstream_handoff_ready"
         ),
@@ -3129,6 +3138,24 @@ def collect_so101_training_readiness_gate_artifacts(
         ),
         "reviewed_mujoco_downstream_handoff_physical_truth_claimed": gate.get(
             "reviewed_mujoco_downstream_handoff_physical_truth_claimed"
+        ),
+        "reviewed_mujoco_downstream_handoff_observed_evidence_is_authority": gate.get(
+            "reviewed_mujoco_downstream_handoff_observed_evidence_is_authority"
+        ),
+        "reviewed_mujoco_downstream_handoff_physical_motion_checked": gate.get(
+            "reviewed_mujoco_downstream_handoff_physical_motion_checked"
+        ),
+        "reviewed_mujoco_downstream_handoff_hardware_free_fixture_motion_checked": gate.get(
+            "reviewed_mujoco_downstream_handoff_hardware_free_fixture_motion_checked"
+        ),
+        "reviewed_mujoco_downstream_handoff_motion_authority_status": gate.get(
+            "reviewed_mujoco_downstream_handoff_motion_authority_status"
+        ),
+        "reviewed_mujoco_downstream_handoff_missing_item_ids": gate.get(
+            "reviewed_mujoco_downstream_handoff_missing_item_ids"
+        ),
+        "reviewed_mujoco_downstream_handoff_contract_blockers": gate.get(
+            "reviewed_mujoco_downstream_handoff_contract_blockers"
         ),
         "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority": gate.get(
             "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority"

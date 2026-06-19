@@ -137,6 +137,17 @@ SO101_TRAINING_READINESS_GATE_README_NAME = "README.md"
 SO101_TRAINING_ROLLOUTS_DIR_NAME = "so101_training_rollouts"
 SO101_TRAINING_ROLLOUTS_SUMMARY_NAME = "so101_training_rollouts_summary.json"
 REVIEWED_SO101_MODEL_AUTHORITY = "reviewed_so101_model_bundle_manifest"
+SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_ITEM_IDS = (
+    "model_authority",
+    "model_identity",
+    "target_frame",
+    "tcp_offset_m",
+    "base_to_board_alignment",
+    "joint_limits",
+    "mesh_assets",
+    "mujoco_motion",
+    "downstream_gate_handoff",
+)
 SO101_TRAINING_PRIORITY_STAGE_IDS = (
     "reviewed_model_authority",
     "mujoco_scene_validity",
@@ -5448,6 +5459,164 @@ def so101_board_pick_detailed_evidence_ready(board_pick: dict[str, Any]) -> bool
     )
 
 
+def so101_reviewed_mujoco_downstream_handoff_contract(
+    reviewed_mujoco_bundle: dict[str, Any],
+) -> dict[str, Any]:
+    item_ids = reviewed_mujoco_bundle.get("downstream_handoff_item_ids")
+    item_ids = [str(item) for item in item_ids] if isinstance(item_ids, list) else []
+    missing_item_ids = sorted(
+        set(SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_ITEM_IDS) - set(item_ids)
+    )
+    item_count = reviewed_mujoco_bundle.get("downstream_handoff_item_count")
+    item_count_ok = (
+        isinstance(item_count, int)
+        and item_count == len(item_ids)
+        and item_count >= len(SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_ITEM_IDS)
+    )
+    raw_ready = reviewed_mujoco_bundle.get("downstream_handoff_ready") is True
+    fixture_ready = (
+        reviewed_mujoco_bundle.get("fixture_handoff_ready_not_physical_so101_authority")
+        is True
+    )
+    physical_motion_checked = (
+        reviewed_mujoco_bundle.get("physical_reviewed_model_motion_checked") is True
+    )
+    fixture_motion_checked = (
+        reviewed_mujoco_bundle.get("hardware_free_fixture_motion_checked") is True
+    )
+    reviewed_model_motion_checked = (
+        reviewed_mujoco_bundle.get("reviewed_model_motion_checked") is True
+    )
+    motion_authority_status = reviewed_mujoco_bundle.get("motion_authority_status")
+    physical_model_authority_ready = (
+        reviewed_mujoco_bundle.get("physical_so101_model_authority_ready") is True
+    )
+    motion_evidence_not_physical = (
+        reviewed_mujoco_bundle.get(
+            "motion_evidence_not_physical_so101_authority"
+        )
+        is True
+    )
+    status = reviewed_mujoco_bundle.get("downstream_handoff_status")
+    physical_truth_claimed = (
+        reviewed_mujoco_bundle.get("downstream_handoff_physical_so101_truth_claimed")
+        is True
+    )
+    development_fixture_not_truth = (
+        reviewed_mujoco_bundle.get(
+            "downstream_handoff_development_fixture_evidence_not_physical_so101_truth"
+        )
+        is True
+    )
+
+    physical_ready_contract_ok = (
+        not raw_ready
+        or (
+            physical_motion_checked
+            and reviewed_model_motion_checked
+            and status == "physical_reviewed_mujoco_handoff_ready"
+            and motion_authority_status == "physical_reviewed_model_motion_checked"
+            and physical_model_authority_ready
+            and fixture_ready is False
+            and fixture_motion_checked is False
+            and motion_evidence_not_physical is False
+        )
+    )
+    fixture_contract_ok = (
+        not fixture_ready
+        or (
+            raw_ready is False
+            and physical_motion_checked is False
+            and fixture_motion_checked
+            and reviewed_model_motion_checked
+            and status == "fixture_mujoco_handoff_ready_not_physical_authority"
+            and motion_authority_status
+            == "hardware_free_fixture_motion_checked_not_physical_so101_authority"
+            and motion_evidence_not_physical
+        )
+    )
+    blockers: list[str] = []
+    if reviewed_mujoco_bundle.get("downstream_handoff_model_authority") != (
+        "downstream_handoff_not_authority"
+    ):
+        blockers.append("repair_reviewed_mujoco_downstream_handoff_authority")
+    if (
+        reviewed_mujoco_bundle.get(
+            "downstream_handoff_observed_evidence_is_authority"
+        )
+        is not False
+    ):
+        blockers.append("mark_downstream_handoff_as_non_authority_snapshot")
+    if physical_truth_claimed:
+        blockers.append("remove_physical_so101_truth_claim_from_downstream_handoff")
+    if not development_fixture_not_truth:
+        blockers.append("mark_downstream_handoff_development_fixture_boundary")
+    if missing_item_ids:
+        blockers.append("provide_complete_reviewed_mujoco_downstream_handoff_items")
+    if not item_count_ok:
+        blockers.append("fix_reviewed_mujoco_downstream_handoff_item_count")
+    if raw_ready and not physical_ready_contract_ok:
+        blockers.append("repair_physical_reviewed_mujoco_handoff_readiness_flags")
+    if fixture_ready and not fixture_contract_ok:
+        blockers.append("repair_fixture_reviewed_mujoco_handoff_flags")
+    if reviewed_mujoco_bundle.get("downstream_handoff_ready") != (
+        physical_motion_checked
+    ):
+        blockers.append("align_downstream_handoff_ready_with_physical_motion_check")
+    if reviewed_model_motion_checked != (
+        physical_motion_checked or fixture_motion_checked
+    ):
+        blockers.append("align_reviewed_model_motion_checked_with_motion_source")
+
+    contract_ok = not blockers
+    ready = contract_ok and raw_ready
+    fixture_contract_ready = contract_ok and fixture_ready
+    if not contract_ok:
+        contract_status = "handoff_contract_invalid"
+    elif ready:
+        contract_status = "physical_reviewed_mujoco_handoff_ready"
+    elif fixture_contract_ready:
+        contract_status = "fixture_handoff_not_physical_so101_authority"
+    else:
+        contract_status = "reviewed_mujoco_handoff_not_ready"
+    next_action_ids = unique_string_values(
+        [
+            *blockers,
+            *([] if ready else ["make_reviewed_mujoco_downstream_handoff_ready"]),
+        ]
+    )
+    return {
+        "contract_ok": contract_ok,
+        "contract_status": contract_status,
+        "ready": ready,
+        "raw_ready": raw_ready,
+        "fixture_handoff_ready_not_physical_so101_authority": fixture_contract_ready,
+        "raw_fixture_handoff_ready_not_physical_so101_authority": fixture_ready,
+        "status": status,
+        "model_authority": reviewed_mujoco_bundle.get(
+            "downstream_handoff_model_authority"
+        ),
+        "observed_evidence_is_authority": reviewed_mujoco_bundle.get(
+            "downstream_handoff_observed_evidence_is_authority"
+        ),
+        "physical_truth_claimed": physical_truth_claimed,
+        "development_fixture_evidence_not_physical_so101_truth": (
+            development_fixture_not_truth
+        ),
+        "item_count": item_count,
+        "item_ids": item_ids,
+        "missing_item_ids": missing_item_ids,
+        "blockers": blockers,
+        "next_action_ids": next_action_ids,
+        "physical_motion_checked": physical_motion_checked,
+        "hardware_free_fixture_motion_checked": fixture_motion_checked,
+        "reviewed_model_motion_checked": reviewed_model_motion_checked,
+        "motion_authority_status": motion_authority_status,
+        "physical_so101_model_authority_ready": physical_model_authority_ready,
+        "motion_evidence_not_physical_so101_authority": motion_evidence_not_physical,
+    }
+
+
 def so101_training_priority_gate_queue(
     reviewed_authority_gate: dict[str, Any],
     board_pick: dict[str, Any],
@@ -5471,11 +5640,14 @@ def so101_training_priority_gate_queue(
     reviewed_motion_ready = (
         reviewed_authority_gate.get("physical_reviewed_model_motion_checked") is True
     )
-    reviewed_downstream_handoff_ready = (
-        reviewed_mujoco_bundle.get("downstream_handoff_ready") is True
+    downstream_handoff_contract = (
+        so101_reviewed_mujoco_downstream_handoff_contract(reviewed_mujoco_bundle)
     )
+    reviewed_downstream_handoff_ready = downstream_handoff_contract.get("ready") is True
     fixture_downstream_handoff_ready = (
-        reviewed_mujoco_bundle.get("fixture_handoff_ready_not_physical_so101_authority")
+        downstream_handoff_contract.get(
+            "fixture_handoff_ready_not_physical_so101_authority"
+        )
         is True
     )
     mujoco_scene_automation_ready = mujoco_scene.get("status") == "ok"
@@ -5568,6 +5740,7 @@ def so101_training_priority_gate_queue(
                 or fixture_downstream_handoff_ready
             ),
             "next_action_ids": [
+                *downstream_handoff_contract.get("next_action_ids", []),
                 "make_reviewed_mujoco_downstream_handoff_ready",
                 "load_reviewed_model_in_mujoco",
                 "prove_physical_reviewed_model_motion",
@@ -5706,16 +5879,20 @@ def so101_training_readiness_gate_section(
     reviewed_model_physical_motion_checked = (
         reviewed_authority_gate.get("physical_reviewed_model_motion_checked") is True
     )
+    downstream_handoff_contract = (
+        so101_reviewed_mujoco_downstream_handoff_contract(reviewed_mujoco_bundle)
+    )
     reviewed_mujoco_downstream_handoff_ready = (
-        reviewed_mujoco_bundle.get("downstream_handoff_ready") is True
+        downstream_handoff_contract.get("ready") is True
     )
     reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority = (
-        reviewed_mujoco_bundle.get("fixture_handoff_ready_not_physical_so101_authority")
+        downstream_handoff_contract.get(
+            "fixture_handoff_ready_not_physical_so101_authority"
+        )
         is True
     )
     reviewed_mujoco_downstream_handoff_physical_truth_claimed = (
-        reviewed_mujoco_bundle.get("downstream_handoff_physical_so101_truth_claimed")
-        is True
+        downstream_handoff_contract.get("physical_truth_claimed") is True
     )
     board_pick_reviewed_model_authority_ready = (
         board_pick.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
@@ -5763,6 +5940,11 @@ def so101_training_readiness_gate_section(
         [
             *(
                 []
+                if downstream_handoff_contract.get("contract_ok") is True
+                else downstream_handoff_contract.get("blockers", [])
+            ),
+            *(
+                []
                 if reviewed_authority_ready
                 else reviewed_authority_gate.get("blockers", [])
             ),
@@ -5798,20 +5980,74 @@ def so101_training_readiness_gate_section(
         "reviewed_model_authority_ready": reviewed_authority_ready,
         "reviewed_model_authority_status": reviewed_authority_gate.get("status"),
         "reviewed_model_physical_motion_checked": reviewed_model_physical_motion_checked,
-        "reviewed_mujoco_downstream_handoff_status": reviewed_mujoco_bundle.get(
-            "downstream_handoff_status"
+        "reviewed_mujoco_downstream_handoff_status": downstream_handoff_contract.get(
+            "status"
+        ),
+        "reviewed_mujoco_downstream_handoff_contract_status": (
+            downstream_handoff_contract.get("contract_status")
+        ),
+        "reviewed_mujoco_downstream_handoff_contract_ok": (
+            downstream_handoff_contract.get("contract_ok")
+        ),
+        "reviewed_mujoco_downstream_handoff_raw_ready": (
+            downstream_handoff_contract.get("raw_ready")
         ),
         "reviewed_mujoco_downstream_handoff_ready": (
             reviewed_mujoco_downstream_handoff_ready
         ),
         "reviewed_mujoco_downstream_handoff_model_authority": (
-            reviewed_mujoco_bundle.get("downstream_handoff_model_authority")
+            downstream_handoff_contract.get("model_authority")
+        ),
+        "reviewed_mujoco_downstream_handoff_observed_evidence_is_authority": (
+            downstream_handoff_contract.get("observed_evidence_is_authority")
         ),
         "reviewed_mujoco_downstream_handoff_physical_truth_claimed": (
             reviewed_mujoco_downstream_handoff_physical_truth_claimed
         ),
+        "reviewed_mujoco_downstream_handoff_development_fixture_evidence_not_physical_so101_truth": (
+            downstream_handoff_contract.get(
+                "development_fixture_evidence_not_physical_so101_truth"
+            )
+        ),
         "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority": (
             reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority
+        ),
+        "reviewed_mujoco_downstream_handoff_raw_fixture_ready_not_physical_so101_authority": (
+            downstream_handoff_contract.get(
+                "raw_fixture_handoff_ready_not_physical_so101_authority"
+            )
+        ),
+        "reviewed_mujoco_downstream_handoff_motion_authority_status": (
+            downstream_handoff_contract.get("motion_authority_status")
+        ),
+        "reviewed_mujoco_downstream_handoff_physical_motion_checked": (
+            downstream_handoff_contract.get("physical_motion_checked")
+        ),
+        "reviewed_mujoco_downstream_handoff_hardware_free_fixture_motion_checked": (
+            downstream_handoff_contract.get("hardware_free_fixture_motion_checked")
+        ),
+        "reviewed_mujoco_downstream_handoff_reviewed_model_motion_checked": (
+            downstream_handoff_contract.get("reviewed_model_motion_checked")
+        ),
+        "reviewed_mujoco_downstream_handoff_physical_so101_model_authority_ready": (
+            downstream_handoff_contract.get("physical_so101_model_authority_ready")
+        ),
+        "reviewed_mujoco_downstream_handoff_motion_evidence_not_physical_so101_authority": (
+            downstream_handoff_contract.get(
+                "motion_evidence_not_physical_so101_authority"
+            )
+        ),
+        "reviewed_mujoco_downstream_handoff_item_count": (
+            downstream_handoff_contract.get("item_count")
+        ),
+        "reviewed_mujoco_downstream_handoff_item_ids": (
+            downstream_handoff_contract.get("item_ids")
+        ),
+        "reviewed_mujoco_downstream_handoff_missing_item_ids": (
+            downstream_handoff_contract.get("missing_item_ids")
+        ),
+        "reviewed_mujoco_downstream_handoff_contract_blockers": (
+            downstream_handoff_contract.get("blockers")
         ),
         "reviewed_model_backed_board_source_pick_place": reviewed_model_backed_board_pick_place,
         "board_pick_status": board_pick.get("status"),
@@ -5933,7 +6169,7 @@ def write_so101_training_readiness_gate_artifacts(
             ),
             "expected_value": "true",
             "blockers": "; ".join(gate.get("blockers", [])),
-            "notes": "Scene, Gymnasium, pick/place, and rollout gates must consume a reviewed MuJoCo handoff, not a fixture handoff.",
+            "notes": "Scene, Gymnasium, pick/place, and rollout gates must consume a contract-valid reviewed MuJoCo handoff, not a fixture or malformed raw-ready handoff.",
         },
         {
             "requirement_id": "reviewed_model_backed_board_pick_place",
@@ -6045,10 +6281,17 @@ def write_so101_training_readiness_gate_artifacts(
                 f"`{markdown_bool(gate.get('reviewed_model_authority_ready'))}`",
                 "- Reviewed MuJoCo downstream handoff status: "
                 f"`{gate.get('reviewed_mujoco_downstream_handoff_status')}`",
+                "- Reviewed MuJoCo downstream handoff contract: "
+                f"`{gate.get('reviewed_mujoco_downstream_handoff_contract_status')}` / "
+                f"`{markdown_bool(gate.get('reviewed_mujoco_downstream_handoff_contract_ok'))}`",
+                "- Reviewed MuJoCo downstream handoff raw ready: "
+                f"`{markdown_bool(gate.get('reviewed_mujoco_downstream_handoff_raw_ready'))}`",
                 "- Reviewed MuJoCo downstream handoff ready: "
                 f"`{markdown_bool(gate.get('reviewed_mujoco_downstream_handoff_ready'))}`",
                 "- Fixture MuJoCo handoff is not physical SO-101 authority: "
                 f"`{markdown_bool(gate.get('reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority'))}`",
+                "- Reviewed MuJoCo downstream handoff missing items: "
+                f"`{markdown_list_value(gate.get('reviewed_mujoco_downstream_handoff_missing_item_ids'))}`",
                 "- Reviewed model-backed board-source pick/place: "
                 f"`{markdown_bool(gate.get('reviewed_model_backed_board_source_pick_place'))}`",
                 "- Board-pick reviewed model authority ready: "
