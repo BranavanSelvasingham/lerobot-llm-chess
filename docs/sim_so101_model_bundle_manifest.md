@@ -246,7 +246,8 @@ resolved from the manifest directory.
     "source_authority_status": "reviewed",
     "reviewed_by": "operator-or-review-id",
     "reviewed_at": "2026-06-16",
-    "review_id": "review-ticket-or-commit"
+    "review_id": "review-ticket-or-commit",
+    "review_scopes": ["model_identity", "provenance", "license"]
   },
   "provenance": {
     "source_url": "https://cad.onshape.com/...",
@@ -260,6 +261,7 @@ resolved from the manifest directory.
     "reviewed_by": "operator-or-review-id",
     "reviewed_at": "2026-06-16",
     "review_id": "review-ticket-or-commit",
+    "review_scope": "target_frame",
     "source": "reviewed model target frame or TCP-frame record"
   },
   "joint_limits_deg": {
@@ -275,6 +277,7 @@ resolved from the manifest directory.
     "reviewed_by": "operator-or-review-id",
     "reviewed_at": "2026-06-16",
     "review_id": "review-ticket-or-commit",
+    "review_scope": "joint_limits",
     "source": "reviewed model bundle or calibration record"
   },
   "mesh_asset_authority": {
@@ -282,6 +285,7 @@ resolved from the manifest directory.
     "reviewed_by": "operator-or-review-id",
     "reviewed_at": "2026-06-16",
     "review_id": "review-ticket-or-commit",
+    "review_scope": "mesh_assets",
     "source": "reviewed mesh root or model export"
   },
   "tcp_offset_m": {
@@ -294,6 +298,7 @@ resolved from the manifest directory.
     "reviewed_by": "operator-or-review-id",
     "reviewed_at": "2026-06-16",
     "review_id": "review-ticket-or-commit",
+    "review_scope": "tcp_offset",
     "source": "reviewed TCP/gripper-tip calibration record"
   },
   "base_to_board_transform": {
@@ -313,6 +318,7 @@ resolved from the manifest directory.
     "reviewed_by": "operator-or-review-id",
     "reviewed_at": "2026-06-16",
     "review_id": "review-ticket-or-commit",
+    "review_scope": "base_to_board_alignment",
     "source": "reviewed board registration or calibration record"
   }
 }
@@ -347,9 +353,14 @@ the synthetic fixture fields. Fixture-only provenance gets the same physical
 authority treatment even when the review-status fields themselves are
 reviewed-looking. Every reviewed authority section must include reviewer
 identity plus a stable artifact handle: `reviewed_by` and `review_id` or
-`review_url`. Thin review metadata that supplies only a reviewer identity is
-reported as missing `review_trace` and `review_artifact`, and does not satisfy
-readiness.
+`review_url`. It must also include explicit `review_scope` or `review_scopes`
+values covering the field being authorized. The top-level `authority` block
+requires `model_identity`, `provenance`, and `license`; section authorities
+require `joint_limits`, `mesh_assets`, `target_frame`, `tcp_offset`, or
+`base_to_board_alignment` as appropriate. Thin review metadata that supplies
+only a reviewer identity is reported as missing `review_trace` and
+`review_artifact`, and generic review scope metadata is reported through
+`missing_review_scope_ids`; neither satisfies readiness.
 
 When the integrated calibration regression suite evaluates the reviewed model
 authority gate, this manifest is checked against the SO-101 model-source
@@ -380,7 +391,8 @@ the joint-limit field itself. Accepted review statuses are `reviewed`,
 `model_bundle_reviewed`, plus
 `synthetic_fixture_reviewed_for_automation_only` only for explicitly
 hardware-free regression fixtures. Review evidence must include `reviewed_by`
-plus a stable artifact handle: `review_id` or `review_url`.
+plus a stable artifact handle (`review_id` or `review_url`) and the
+`joint_limits` review scope.
 
 Mesh/asset-root authority must be declared in `mesh_asset_authority`,
 `mesh_assets_review`, `mesh_asset_review`, or `mesh_assets_metadata`. Accepted
@@ -388,7 +400,8 @@ mesh review statuses are `reviewed`, `operator_reviewed`,
 `mesh_assets_reviewed`, `source_reviewed`, and `model_bundle_reviewed`, plus
 `synthetic_fixture_reviewed_for_automation_only` only for explicitly
 hardware-free regression fixtures. Review evidence must include `reviewed_by`
-plus a stable artifact handle: `review_id` or `review_url`.
+plus a stable artifact handle (`review_id` or `review_url`) and the
+`mesh_assets` review scope.
 Resolved mesh files
 without this review metadata remain diagnostic evidence, not reviewed physical
 SO-101 mesh truth.
@@ -401,9 +414,9 @@ Accepted target-frame review statuses are `reviewed`, `operator_reviewed`,
 `target_frame_reviewed`, `tcp_frame_reviewed`, and `model_bundle_reviewed`,
 plus `synthetic_fixture_reviewed_for_automation_only` only for explicitly
 hardware-free regression fixtures. Review evidence must include `reviewed_by`
-plus a stable artifact handle: `review_id` or `review_url`. A frame name
-without this metadata remains diagnostic evidence, not reviewed physical
-SO-101 TCP-frame truth.
+plus a stable artifact handle (`review_id` or `review_url`) and the
+`target_frame` review scope. A frame name without this metadata remains
+diagnostic evidence, not reviewed physical SO-101 TCP-frame truth.
 
 TCP/gripper-tip offset authority must be declared in `tcp_offset_authority`,
 `tcp_offset_review`, `gripper_tip_offset_review`, or `tcp_calibration`.
@@ -412,7 +425,8 @@ Accepted TCP review statuses are `reviewed`, `operator_reviewed`,
 `model_bundle_reviewed`, plus
 `synthetic_fixture_reviewed_for_automation_only` only for explicitly
 hardware-free regression fixtures. Review evidence must include `reviewed_by`
-plus a stable artifact handle: `review_id` or `review_url`.
+plus a stable artifact handle (`review_id` or `review_url`) and the
+`tcp_offset` review scope.
 Numeric TCP offsets must be finite; values such as `NaN` or `Infinity`, or
 offsets without this metadata, remain diagnostic evidence and are not reviewed
 physical SO-101 TCP truth.
@@ -425,7 +439,8 @@ Base-to-board alignment authority must be declared in
 `calibration_reviewed`, and `model_bundle_reviewed`, plus
 `synthetic_fixture_reviewed_for_automation_only` only for explicitly
 hardware-free regression fixtures. Review evidence must include `reviewed_by`
-plus a stable artifact handle: `review_id` or `review_url`.
+plus a stable artifact handle (`review_id` or `review_url`) and the
+`base_to_board_alignment` review scope.
 The transform value must include finite x/y/z translation and roll/pitch/yaw
 rotation fields; a non-empty object without that shape or without review
 metadata does not make the bundle ready.

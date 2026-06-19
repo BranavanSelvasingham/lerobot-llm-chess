@@ -2424,6 +2424,16 @@ def collect_so101_model_bundle_manifest_artifacts(
         "authority_review_evidence_invalid_fields": bundle.get(
             "authority_review_evidence_invalid_fields"
         ),
+        "authority_required_review_scope_ids": bundle.get(
+            "authority_required_review_scope_ids"
+        ),
+        "authority_supplied_review_scope_ids": bundle.get(
+            "authority_supplied_review_scope_ids"
+        ),
+        "authority_missing_review_scope_ids": bundle.get(
+            "authority_missing_review_scope_ids"
+        ),
+        "authority_review_scope_ready": bundle.get("authority_review_scope_ready"),
         "next_required_for_goal": next_required,
         "next_required_action_ids": next_required_action_ids,
         "next_required_action_count": next_required_action_count,

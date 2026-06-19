@@ -287,6 +287,7 @@ def manifest_payload(*, ready: bool, model_filename: str = "synthetic_so101.urdf
             "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
             "reviewed_at": "2026-06-16",
             "review_id": "bundle-ready-forwarding:source-authority",
+            "review_scopes": ["model_identity", "provenance", "license"],
             "scope": "hardware-free forwarding regression only",
         },
         "provenance": {
@@ -301,6 +302,7 @@ def manifest_payload(*, ready: bool, model_filename: str = "synthetic_so101.urdf
             "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
             "reviewed_at": "2026-06-18",
             "review_id": "bundle-ready-forwarding:target-frame",
+            "review_scope": "target_frame",
             "scope": "hardware-free forwarding regression only",
         },
         "joint_limits_deg": {
@@ -316,6 +318,7 @@ def manifest_payload(*, ready: bool, model_filename: str = "synthetic_so101.urdf
             "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
             "reviewed_at": "2026-06-18",
             "review_id": "bundle-ready-forwarding:joint-limits",
+            "review_scope": "joint_limits",
             "scope": "hardware-free forwarding regression only",
         },
         "mesh_asset_authority": {
@@ -323,6 +326,7 @@ def manifest_payload(*, ready: bool, model_filename: str = "synthetic_so101.urdf
             "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
             "reviewed_at": "2026-06-18",
             "review_id": "bundle-ready-forwarding:mesh-assets",
+            "review_scope": "mesh_assets",
             "scope": "hardware-free forwarding regression only",
         },
         "tcp_offset_authority": {
@@ -330,6 +334,7 @@ def manifest_payload(*, ready: bool, model_filename: str = "synthetic_so101.urdf
             "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
             "reviewed_at": "2026-06-18",
             "review_id": "bundle-ready-forwarding:tcp-offset",
+            "review_scope": "tcp_offset",
             "scope": "hardware-free forwarding regression only",
         },
         "base_to_board_alignment_authority": {
@@ -337,6 +342,7 @@ def manifest_payload(*, ready: bool, model_filename: str = "synthetic_so101.urdf
             "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
             "reviewed_at": "2026-06-18",
             "review_id": "bundle-ready-forwarding:base-to-board",
+            "review_scope": "base_to_board_alignment",
             "scope": "hardware-free forwarding regression only",
         },
         "tcp_offset_m": {"x": 0.0, "y": 0.0, "z": 0.075},
@@ -442,6 +448,21 @@ def invalid_review_url_manifest_payload(model_filename: str) -> dict[str, Any]:
     return payload
 
 
+def generic_review_scope_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    for review_field in (
+        "authority",
+        "target_frame_authority",
+        "joint_limit_authority",
+        "mesh_asset_authority",
+        "tcp_offset_authority",
+        "base_to_board_alignment_authority",
+    ):
+        payload[review_field].pop("review_scopes", None)
+        payload[review_field]["review_scope"] = "model_bundle"
+    return payload
+
+
 def weak_joint_limit_authority_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload.pop("joint_limit_authority", None)
@@ -500,6 +521,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     placeholder_review_dir = fixture_dir / "placeholder_review_bundle"
     thin_review_dir = fixture_dir / "thin_review_bundle"
     invalid_review_url_dir = fixture_dir / "invalid_review_url_bundle"
+    generic_review_scope_dir = fixture_dir / "generic_review_scope_bundle"
     weak_review_dir = fixture_dir / "weak_review_bundle"
     placeholder_provenance_dir = fixture_dir / "placeholder_provenance_bundle"
     fixture_provenance_reviewed_authority_dir = (
@@ -523,6 +545,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         placeholder_review_dir,
         thin_review_dir,
         invalid_review_url_dir,
+        generic_review_scope_dir,
         weak_review_dir,
         placeholder_provenance_dir,
         fixture_provenance_reviewed_authority_dir,
@@ -555,6 +578,8 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     thin_review_model_path.write_text(mjcf_with_mesh_reference())
     invalid_review_url_model_path = invalid_review_url_dir / "model" / "synthetic_so101_mujoco.xml"
     invalid_review_url_model_path.write_text(mjcf_with_mesh_reference())
+    generic_review_scope_model_path = generic_review_scope_dir / "model" / "synthetic_so101_mujoco.xml"
+    generic_review_scope_model_path.write_text(mjcf_with_mesh_reference())
     weak_review_model_path = weak_review_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_review_model_path.write_text(mjcf_with_mesh_reference())
     placeholder_provenance_model_path = (
@@ -601,6 +626,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     placeholder_review_manifest_path = placeholder_review_dir / "so101_model_bundle.placeholder_review.json"
     thin_review_manifest_path = thin_review_dir / "so101_model_bundle.thin_review.json"
     invalid_review_url_manifest_path = invalid_review_url_dir / "so101_model_bundle.invalid_review_url.json"
+    generic_review_scope_manifest_path = generic_review_scope_dir / "so101_model_bundle.generic_review_scope.json"
     weak_review_manifest_path = weak_review_dir / "so101_model_bundle.weak_review.json"
     placeholder_provenance_manifest_path = (
         placeholder_provenance_dir / "so101_model_bundle.placeholder_provenance.json"
@@ -646,6 +672,11 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         invalid_review_url_manifest_path,
         invalid_review_url_manifest_payload(model_filename=invalid_review_url_model_path.name),
         invalid_review_url_model_path,
+    )
+    write_manifest_json(
+        generic_review_scope_manifest_path,
+        generic_review_scope_manifest_payload(model_filename=generic_review_scope_model_path.name),
+        generic_review_scope_model_path,
     )
     write_manifest_json(
         weak_review_manifest_path,
@@ -719,6 +750,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "placeholder_review_manifest_path": placeholder_review_manifest_path,
         "thin_review_manifest_path": thin_review_manifest_path,
         "invalid_review_url_manifest_path": invalid_review_url_manifest_path,
+        "generic_review_scope_manifest_path": generic_review_scope_manifest_path,
         "weak_review_manifest_path": weak_review_manifest_path,
         "placeholder_provenance_manifest_path": placeholder_provenance_manifest_path,
         "fixture_provenance_reviewed_authority_manifest_path": (
@@ -739,6 +771,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "placeholder_review_model_path": placeholder_review_model_path,
         "thin_review_model_path": thin_review_model_path,
         "invalid_review_url_model_path": invalid_review_url_model_path,
+        "generic_review_scope_model_path": generic_review_scope_model_path,
         "weak_review_model_path": weak_review_model_path,
         "placeholder_provenance_model_path": placeholder_provenance_model_path,
         "fixture_provenance_reviewed_authority_model_path": (
@@ -910,6 +943,25 @@ def assert_traceable_review_evidence(
         review_group_names(review, "review_evidence_missing_required_groups"),
         expected_missing_groups,
     )
+
+
+def assert_missing_review_scopes(
+    errors: list[str],
+    label: str,
+    review: Any,
+    *,
+    expected_missing_scopes: list[str],
+) -> None:
+    if not isinstance(review, dict):
+        errors.append(f"{label}: expected review dict, got {review!r}")
+        return
+    assert_contains_all(
+        errors,
+        f"{label}.missing_review_scope_ids",
+        review.get("missing_review_scope_ids"),
+        expected_missing_scopes,
+    )
+    assert_equal(errors, f"{label}.review_scope_ready", review.get("review_scope_ready"), False)
 
 
 def assert_not_ready_motion_authority(
@@ -1418,6 +1470,70 @@ def summarize_case(
                 f"{case_id}.{label}.review_evidence_missing_required_groups",
                 review_group_names(review, "review_evidence_missing_required_groups"),
                 ["review_artifact"],
+            )
+    elif expectation == "generic_review_scope_not_forwarded":
+        assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_not_ready",
+        )
+        assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
+        assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
+        assert_equal(
+            errors,
+            f"{case_id}.diagnostic_reason",
+            forwarding.get("diagnostic_only_reason"),
+            "bundle_not_ready_for_model_backed_ik:model_bundle_manifest_needs_follow_up",
+        )
+        assert_false(errors, f"{case_id}.used_for_downstream_contract", forwarding.get("used_for_downstream_contract"))
+        missing_inputs = set(bundle.get("missing_inputs") or [])
+        expected_missing = {
+            "authority",
+            "joint_limit_authority",
+            "mesh_asset_authority",
+            "target_frame_authority",
+            "tcp_offset_authority",
+            "base_to_board_alignment_authority",
+        }
+        if not expected_missing.issubset(missing_inputs):
+            errors.append(
+                f"{case_id}.missing_inputs: expected {sorted(expected_missing)!r} subset, got {sorted(missing_inputs)!r}"
+            )
+        assert_equal(errors, f"{case_id}.authority_status", bundle.get("authority_status"), "needs_review")
+        assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "needs_review")
+        assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "needs_review")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "needs_review")
+        assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "needs_review")
+        assert_equal(
+            errors,
+            f"{case_id}.alignment_status",
+            get_nested(bundle, ("base_to_board_alignment", "status")),
+            "needs_review",
+        )
+        manifest_summary = load_json_object(
+            get_nested(bundle, ("artifact_paths", "summary_json"))
+            or get_nested(bundle, ("artifacts", "summary_json"))
+        )
+        for label, review, missing_scopes in (
+            ("authority", get_nested(manifest_summary, ("authority",), {}), ["model_identity", "provenance", "license"]),
+            ("joint_limits", get_nested(manifest_summary, ("joint_limits", "review"), {}), ["joint_limits"]),
+            ("mesh_assets", get_nested(manifest_summary, ("mesh_assets", "review"), {}), ["mesh_assets"]),
+            ("target_frame", get_nested(manifest_summary, ("target_frame", "review"), {}), ["target_frame"]),
+            ("tcp_offset", get_nested(manifest_summary, ("tcp_offset", "review"), {}), ["tcp_offset"]),
+            (
+                "alignment",
+                get_nested(manifest_summary, ("base_to_board_alignment", "review"), {}),
+                ["base_to_board_alignment"],
+            ),
+        ):
+            assert_missing_review_scopes(
+                errors,
+                f"{case_id}.{label}",
+                review,
+                expected_missing_scopes=missing_scopes,
             )
     elif expectation == "weak_review_not_forwarded":
         assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
@@ -2011,6 +2127,12 @@ def main() -> int:
             "manifest_path": fixtures["invalid_review_url_manifest_path"],
             "explicit_model_path": None,
             "expectation": "invalid_review_url_not_forwarded",
+        },
+        {
+            "case_id": "generic_review_scope_not_forwarded",
+            "manifest_path": fixtures["generic_review_scope_manifest_path"],
+            "explicit_model_path": None,
+            "expectation": "generic_review_scope_not_forwarded",
         },
         {
             "case_id": "weak_review_manifest_not_forwarded",

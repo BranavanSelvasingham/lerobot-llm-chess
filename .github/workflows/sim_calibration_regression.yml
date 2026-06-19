@@ -2623,6 +2623,10 @@ jobs:
               assert metrics.get("review_packet_observed_evidence_is_authority") is False, metrics
               assert metrics.get("review_packet_development_fixture_evidence_not_physical_so101_truth") is True, metrics
               assert metrics.get("authority_review_evidence_invalid_fields") in (None, []) or isinstance(metrics.get("authority_review_evidence_invalid_fields"), list), metrics
+              assert metrics.get("authority_required_review_scope_ids") in (None, []) or isinstance(metrics.get("authority_required_review_scope_ids"), list), metrics
+              assert metrics.get("authority_supplied_review_scope_ids") in (None, []) or isinstance(metrics.get("authority_supplied_review_scope_ids"), list), metrics
+              assert metrics.get("authority_missing_review_scope_ids") in (None, []) or isinstance(metrics.get("authority_missing_review_scope_ids"), list), metrics
+              assert metrics.get("authority_review_scope_ready") in {True, False, None}, metrics
               if metrics.get("manifest_request_status") == "model_bundle_manifest_not_supplied":
                   assert metrics.get("next_required_action_ids", [None])[0] == "supply_reviewed_so101_model_bundle_manifest", metrics
               if metrics.get("ready_for_model_backed_ik") is True:
