@@ -778,12 +778,13 @@ reports `model_authority: "so101_training_rollouts_matrix_not_authority"`,
 `ready_for_model_backed_ik: false`, and `ready_for_policy_training: false`.
 It covers the default development rollout curriculum, missing and failed
 board-pick prerequisites, an otherwise broad-true board-pick prerequisite that
-is missing final board contact and target-tolerance evidence, a short-budget
-incomplete rollout, and invalid rollout task requests. Invalid rollout tasks
-must write summary/JSONL/CSV/README artifacts without generating model XML or
-manifests. Only the valid development-prerequisite case may pass as debug
-curriculum evidence; the other cases must fail closed without becoming
-policy-training authority.
+is missing final board contact and target-tolerance evidence, a forged-authority
+board-pick prerequisite that otherwise looks complete, a short-budget incomplete
+rollout, and invalid rollout task requests. Invalid rollout tasks must write
+summary/JSONL/CSV/README artifacts without generating model XML or manifests.
+Only the valid development-prerequisite case may pass as debug curriculum
+evidence; the other cases must fail closed without becoming policy-training
+authority.
 
 The standalone training-readiness gate matrix writes
 `so101_training_readiness_gate_matrix_summary.json`, `.csv`, and `README.md`.

@@ -187,6 +187,15 @@ def inspect_board_pick_prerequisite(path: Path) -> dict[str, Any]:
         "status": summary.get("status") == "development_board_source_pick_place_verified",
         "model_authority": summary.get("model_authority") == "development_scaffold_not_reviewed",
         "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik") is False,
+        "ready_for_policy_training": summary.get("ready_for_policy_training") is False,
+        "observed_evidence_is_physical_so101_authority": summary.get(
+            "observed_evidence_is_physical_so101_authority"
+        )
+        is False,
+        "observed_evidence_is_policy_training_authority": summary.get(
+            "observed_evidence_is_policy_training_authority"
+        )
+        is False,
         "board_source_pick_place_verified": summary.get("board_source_pick_place_verified") is True,
         "source_pick_started_at_source": summary.get("source_pick_started_at_source") is True,
         "close_two_finger_contact_observed": summary.get("close_two_finger_contact_observed") is True,
@@ -215,6 +224,13 @@ def inspect_board_pick_prerequisite(path: Path) -> dict[str, Any]:
             "target_square": summary.get("target_square"),
             "model_authority": summary.get("model_authority"),
             "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
+            "ready_for_policy_training": summary.get("ready_for_policy_training"),
+            "observed_evidence_is_physical_so101_authority": summary.get(
+                "observed_evidence_is_physical_so101_authority"
+            ),
+            "observed_evidence_is_policy_training_authority": summary.get(
+                "observed_evidence_is_policy_training_authority"
+            ),
             "board_source_pick_place_verified": summary.get("board_source_pick_place_verified"),
             "manual_piece_pose_used_after_reset": summary.get("manual_piece_pose_used_after_reset"),
             "robot_pose_seeded_for_source_fixture": summary.get("robot_pose_seeded_for_source_fixture"),

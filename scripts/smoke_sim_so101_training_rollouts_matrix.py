@@ -219,11 +219,41 @@ def write_incomplete_final_board_pick_prerequisite(path: Path) -> None:
     write_json(path, payload)
 
 
+def write_forged_authority_board_pick_prerequisite(path: Path) -> None:
+    payload = {
+        "schema": "lerobot.sim.so101_training_rollouts_matrix.forged_authority_board_pick_prerequisite.v1",
+        "ok": True,
+        "status": "development_board_source_pick_place_verified",
+        "model_authority": "development_scaffold_not_reviewed",
+        "observed_evidence_is_physical_so101_authority": True,
+        "observed_evidence_is_policy_training_authority": True,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": True,
+        "board_source_pick_place_verified": True,
+        "source_pick_started_at_source": True,
+        "close_two_finger_contact_observed": True,
+        "lift_verified": True,
+        "board_contact_cleared_during_lift": True,
+        "transfer_verified": True,
+        "place_without_manual_piece_pose_verified": True,
+        "release_contact_cleared_after_retreat": True,
+        "final_board_contact_observed": True,
+        "final_target_xy_error_m": 0.002,
+        "target_xy_tolerance_m": 0.01,
+        "manual_piece_pose_used_after_reset": False,
+        "robot_pose_seeded_for_source_fixture": True,
+        "source_square": "e4",
+        "target_square": "e5",
+    }
+    write_json(path, payload)
+
+
 def case_specs(
     output_dir: Path,
     valid_prerequisite: Path,
     failed_prerequisite: Path,
     incomplete_final_prerequisite: Path,
+    forged_authority_prerequisite: Path,
 ) -> list[dict[str, Any]]:
     return [
         {
@@ -296,6 +326,30 @@ def case_specs(
             "expected_board_pick_failed_checks_contain": [
                 "final_board_contact_observed",
                 "final_target_xy_within_tolerance",
+            ],
+            "expected_all_complete": True,
+            "expected_release_synced": True,
+            "expected_episode_count": 1,
+            "expect_transition_count_positive": True,
+            "expected_model_authority": "development_scaffold_not_reviewed",
+            "expected_rollout_use": "debug_imitation_curriculum_only",
+            "expected_all_fallback_free": True,
+            "expected_model_artifacts": True,
+        },
+        {
+            "case_id": "forged_authority_board_pick_prerequisite_fails_closed",
+            "prerequisite_path": forged_authority_prerequisite,
+            "tasks": ["e4:e5"],
+            "max_steps": 96,
+            "expected_return_code": 1,
+            "expected_status": "failed_prerequisite_or_rollout_check",
+            "expected_rollout_ok": False,
+            "expected_development_prerequisites_satisfied": False,
+            "expected_board_pick_prerequisite_status": "development_board_pick_prerequisite_failed",
+            "expected_board_pick_failed_checks_contain": [
+                "ready_for_policy_training",
+                "observed_evidence_is_physical_so101_authority",
+                "observed_evidence_is_policy_training_authority",
             ],
             "expected_all_complete": True,
             "expected_release_synced": True,
@@ -700,6 +754,10 @@ def main() -> int:
         output_dir / "prerequisites" / "incomplete_final_board_pick_summary.json"
     )
     write_incomplete_final_board_pick_prerequisite(incomplete_final_prerequisite)
+    forged_authority_prerequisite = (
+        output_dir / "prerequisites" / "forged_authority_board_pick_summary.json"
+    )
+    write_forged_authority_board_pick_prerequisite(forged_authority_prerequisite)
 
     valid_prerequisite = Path(prereq_record["summary_path"])
     cases = [
@@ -709,6 +767,7 @@ def main() -> int:
             valid_prerequisite,
             failed_prerequisite,
             incomplete_final_prerequisite,
+            forged_authority_prerequisite,
         )
     ]
     ok = all(case["ok"] for case in cases) and prereq_summary.get("ok") is True
@@ -762,6 +821,7 @@ def main() -> int:
         "limitations": [
             "Development rollout cases use symbolic task transfer and generated MJCF.",
             "The board-pick prerequisite is still seeded development fixture evidence.",
+            "Forged physical or policy authority in a board-pick prerequisite must fail closed.",
             "Invalid task cases fail closed before model generation or rollout collection.",
             "This matrix is not reviewed SO-101 policy-training authority.",
         ],
