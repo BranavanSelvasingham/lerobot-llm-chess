@@ -2979,6 +2979,17 @@ jobs:
           assert so101_env_resets["all_resets_ok"] is True, so101_env_resets
           assert so101_env_resets["all_mujoco_fallback_free"] is True, so101_env_resets
           assert isinstance(so101_env_resets["reset_count"], int) and so101_env_resets["reset_count"] > 0, so101_env_resets
+          assert so101_env_resets["invalid_reset_case_ids"] == [
+              "invalid_source_square_rejected",
+              "identical_source_target_rejected",
+              "malformed_task_option_rejected",
+              "sample_without_task_pool_rejected",
+          ], so101_env_resets
+          assert so101_env_resets["invalid_reset_count"] == 4, so101_env_resets
+          assert so101_env_resets["invalid_reset_failed_case_ids"] == [], so101_env_resets
+          assert so101_env_resets["all_invalid_resets_rejected"] is True, so101_env_resets
+          assert so101_env_resets["recovery_after_invalid_resets_ok"] is True, so101_env_resets
+          assert Path(so101_env_resets["artifacts"]["invalid_reset_cases_csv"]).is_file(), so101_env_resets
 
           so101_mujoco_contact_probe = summary["so101_mujoco_contact_probe"]
           assert so101_mujoco_contact_probe["ok"] is True, so101_mujoco_contact_probe

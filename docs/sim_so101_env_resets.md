@@ -11,6 +11,7 @@ The script writes:
 
 - `so101_env_resets_summary.json`
 - `so101_env_resets.csv`
+- `so101_env_reset_invalid_cases.csv`
 - `so101_chess_development.xml`
 - `so101_chess_development_manifest.json`
 - `README.md`
@@ -19,6 +20,11 @@ The smoke checks both explicit reset tasks and sampled reset tasks. Each reset
 must start at phase zero, place the symbolic piece on the reset source square,
 clear the holding flag, keep MuJoCo active with no fallback, and accept a first
 expert action after reset.
+
+The smoke also rejects invalid reset requests for malformed tasks, invalid
+chess squares, identical source/target squares, and sampled resets without a
+task pool. Each rejected case must record the `ValueError` and then prove the
+environment can recover with a valid reset.
 
 The generated MJCF remains `development_scaffold_not_reviewed` and
 `ready_for_model_backed_ik: false`. This smoke proves training-style reset
