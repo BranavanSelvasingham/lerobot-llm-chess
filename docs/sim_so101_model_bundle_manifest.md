@@ -240,8 +240,9 @@ machine-readable group names are `review_actor` for `reviewed_by` and
 alone cannot make a reviewed SO-101 authority section ready. `review_url`
 values must be HTTP(S) URLs; use `review_id` for ticket IDs, commit IDs, or
 other non-URL artifact handles. If supplied, `reviewed_at` must be an ISO
-`YYYY-MM-DD` date or ISO datetime; malformed review timestamps are invalid
-review evidence. Review authority objects that still carry
+`YYYY-MM-DD` date or ISO datetime and must not be in the future; malformed or
+future-dated review timestamps are invalid review evidence. Review authority
+objects that still carry
 non-empty `missing_inputs`, `next_required_for_goal`,
 `next_required_action_ids`, `pending_action_ids`, blockers, or open findings
 are also rejected. Those fields mean the review packet itself is still

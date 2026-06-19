@@ -208,6 +208,13 @@ def invalid_reviewed_at_args() -> list[str]:
     return args
 
 
+def future_reviewed_at_args() -> list[str]:
+    args = valid_authority_args()
+    reviewed_at_index = args.index("--authority-reviewed-at") + 1
+    args[reviewed_at_index] = "2999-01-01"
+    return args
+
+
 def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
     model_path = fixtures["model_path"]
     return [
@@ -259,6 +266,21 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
         {
             "case_id": "invalid_reviewed_at_rejected",
             "args": ["--model-path", str(model_path), *invalid_reviewed_at_args()],
+            "expect": {
+                "status": "candidate_manifest_needs_review",
+                "model_request_status": "model_supplied",
+                "authority_empty": True,
+                "provenance_empty": False,
+                "authority_row_status": "action_required",
+                "provenance_row_status": "ok",
+                "authority_invalid_fields": ["reviewed_at"],
+                "missing_inputs": ["authority"],
+                "next_actions": ["record_reviewed_model_source_authority"],
+            },
+        },
+        {
+            "case_id": "future_reviewed_at_rejected",
+            "args": ["--model-path", str(model_path), *future_reviewed_at_args()],
             "expect": {
                 "status": "candidate_manifest_needs_review",
                 "model_request_status": "model_supplied",
@@ -494,7 +516,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         "",
         "- Missing model input still emits a draft and keeps model path, authority, and provenance actions open.",
         "- Placeholder authority/provenance inputs stay in placeholder diagnostics and do not populate manifest fields.",
-        "- Malformed authority review timestamps keep authority open and do not populate manifest authority fields.",
+        "- Malformed or future-dated authority review timestamps keep authority open and do not populate manifest authority fields.",
         "- Valid authority/provenance metadata can populate the draft, but the draft remains non-ready until model digest, meshes, reviewed joint limits, target-frame authority, TCP offset, and base-to-board alignment are supplied.",
         "",
         "Summary:",

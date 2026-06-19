@@ -370,16 +370,21 @@ def invalid_reviewed_at(value: Any) -> bool:
     if not re.match(r"^\d{4}-\d{2}-\d{2}($|[T ])", raw):
         return True
     try:
-        date.fromisoformat(raw)
-        return False
+        parsed_date = date.fromisoformat(raw)
+        return parsed_date > date.today()
     except ValueError:
         pass
     normalized = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
     try:
-        datetime.fromisoformat(normalized)
+        parsed_datetime = datetime.fromisoformat(normalized)
     except ValueError:
         return True
-    return False
+    now = (
+        datetime.now(parsed_datetime.tzinfo)
+        if parsed_datetime.tzinfo is not None
+        else datetime.now()
+    )
+    return parsed_datetime > now
 
 
 def invalid_review_evidence(field_name: str, value: Any) -> bool:
@@ -911,7 +916,7 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
         "notes": [
             "This metadata describes the inventory-level source-authority review declaration only.",
             "Placeholder review evidence, source references, or license bases such as TODO/TBD/unknown or unedited <...> template tokens do not satisfy source-authority readiness.",
-            "If authority_reviewed_at is supplied, it must be an ISO YYYY-MM-DD date or ISO datetime.",
+            "If authority_reviewed_at is supplied, it must be an ISO YYYY-MM-DD date or ISO datetime and must not be in the future.",
             "Source-authority review evidence requires reviewer identity plus a stable review artifact handle: authority_review_id or authority_review_url.",
             "Source-authority readiness also requires explicit review scopes for model identity, provenance, and license, plus a non-placeholder source reference and license basis.",
             "The bundle manifest still must declare reviewed provenance, mesh authority, joint limits, target frame, TCP offset, and base-to-board alignment before model-backed IK is trusted.",

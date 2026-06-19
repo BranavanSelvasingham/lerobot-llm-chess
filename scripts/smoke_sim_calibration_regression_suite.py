@@ -5,8 +5,10 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import subprocess
 import sys
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -519,7 +521,35 @@ def invalid_review_url(value: Any) -> bool:
     return parsed.scheme not in {"http", "https"} or not parsed.netloc
 
 
+def invalid_reviewed_at(value: Any) -> bool:
+    if value in (None, "", [], {}):
+        return False
+    if not isinstance(value, str):
+        return True
+    raw = value.strip()
+    if not re.match(r"^\d{4}-\d{2}-\d{2}($|[T ])", raw):
+        return True
+    try:
+        parsed_date = date.fromisoformat(raw)
+        return parsed_date > date.today()
+    except ValueError:
+        pass
+    normalized = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+    try:
+        parsed_datetime = datetime.fromisoformat(normalized)
+    except ValueError:
+        return True
+    now = (
+        datetime.now(parsed_datetime.tzinfo)
+        if parsed_datetime.tzinfo is not None
+        else datetime.now()
+    )
+    return parsed_datetime > now
+
+
 def invalid_source_authority_review_evidence(field_name: str, value: Any) -> bool:
+    if field_name == "authority_reviewed_at":
+        return invalid_reviewed_at(value)
     if field_name != "authority_review_url":
         return False
     return invalid_review_url(value)
@@ -737,6 +767,7 @@ def so101_source_authority_review_forwarding(
         "notes": [
             "These values are forwarded only to the SO-101 model-source inventory.",
             "Placeholder review evidence, source references, or license bases such as TODO/TBD/unknown or unedited <...> template tokens do not satisfy source-authority readiness.",
+            "If authority_reviewed_at is supplied, it must be an ISO YYYY-MM-DD date or ISO datetime and must not be in the future.",
             "Source-authority review evidence requires reviewer identity plus a stable artifact handle: authority_review_id or authority_review_url.",
             "Source-authority readiness also requires explicit review scopes for model identity, provenance, and license, plus a non-placeholder source reference and license basis.",
             "They do not replace the bundle manifest's reviewed authority/provenance/readiness gate.",

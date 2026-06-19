@@ -494,6 +494,20 @@ def invalid_reviewed_at_manifest_payload(model_filename: str) -> dict[str, Any]:
     return payload
 
 
+def future_reviewed_at_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    for review_field in (
+        "authority",
+        "target_frame_authority",
+        "joint_limit_authority",
+        "mesh_asset_authority",
+        "tcp_offset_authority",
+        "base_to_board_alignment_authority",
+    ):
+        payload[review_field]["reviewed_at"] = "2999-01-01"
+    return payload
+
+
 def generic_review_scope_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     for review_field in (
@@ -588,6 +602,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     thin_review_dir = fixture_dir / "thin_review_bundle"
     invalid_review_url_dir = fixture_dir / "invalid_review_url_bundle"
     invalid_reviewed_at_dir = fixture_dir / "invalid_reviewed_at_bundle"
+    future_reviewed_at_dir = fixture_dir / "future_reviewed_at_bundle"
     generic_review_scope_dir = fixture_dir / "generic_review_scope_bundle"
     pending_review_metadata_dir = fixture_dir / "pending_review_metadata_bundle"
     weak_review_dir = fixture_dir / "weak_review_bundle"
@@ -616,6 +631,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         thin_review_dir,
         invalid_review_url_dir,
         invalid_reviewed_at_dir,
+        future_reviewed_at_dir,
         generic_review_scope_dir,
         pending_review_metadata_dir,
         weak_review_dir,
@@ -655,6 +671,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         invalid_reviewed_at_dir / "model" / "synthetic_so101_mujoco.xml"
     )
     invalid_reviewed_at_model_path.write_text(mjcf_with_mesh_reference())
+    future_reviewed_at_model_path = (
+        future_reviewed_at_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    future_reviewed_at_model_path.write_text(mjcf_with_mesh_reference())
     generic_review_scope_model_path = generic_review_scope_dir / "model" / "synthetic_so101_mujoco.xml"
     generic_review_scope_model_path.write_text(mjcf_with_mesh_reference())
     pending_review_metadata_model_path = (
@@ -716,6 +736,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     invalid_review_url_manifest_path = invalid_review_url_dir / "so101_model_bundle.invalid_review_url.json"
     invalid_reviewed_at_manifest_path = (
         invalid_reviewed_at_dir / "so101_model_bundle.invalid_reviewed_at.json"
+    )
+    future_reviewed_at_manifest_path = (
+        future_reviewed_at_dir / "so101_model_bundle.future_reviewed_at.json"
     )
     generic_review_scope_manifest_path = generic_review_scope_dir / "so101_model_bundle.generic_review_scope.json"
     pending_review_metadata_manifest_path = (
@@ -782,6 +805,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
             model_filename=invalid_reviewed_at_model_path.name
         ),
         invalid_reviewed_at_model_path,
+    )
+    write_manifest_json(
+        future_reviewed_at_manifest_path,
+        future_reviewed_at_manifest_payload(
+            model_filename=future_reviewed_at_model_path.name
+        ),
+        future_reviewed_at_model_path,
     )
     write_manifest_json(
         generic_review_scope_manifest_path,
@@ -876,6 +906,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "thin_review_manifest_path": thin_review_manifest_path,
         "invalid_review_url_manifest_path": invalid_review_url_manifest_path,
         "invalid_reviewed_at_manifest_path": invalid_reviewed_at_manifest_path,
+        "future_reviewed_at_manifest_path": future_reviewed_at_manifest_path,
         "generic_review_scope_manifest_path": generic_review_scope_manifest_path,
         "pending_review_metadata_manifest_path": pending_review_metadata_manifest_path,
         "weak_review_manifest_path": weak_review_manifest_path,
@@ -900,6 +931,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "thin_review_model_path": thin_review_model_path,
         "invalid_review_url_model_path": invalid_review_url_model_path,
         "invalid_reviewed_at_model_path": invalid_reviewed_at_model_path,
+        "future_reviewed_at_model_path": future_reviewed_at_model_path,
         "generic_review_scope_model_path": generic_review_scope_model_path,
         "pending_review_metadata_model_path": pending_review_metadata_model_path,
         "weak_review_model_path": weak_review_model_path,

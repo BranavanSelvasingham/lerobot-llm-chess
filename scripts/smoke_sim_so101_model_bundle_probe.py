@@ -254,16 +254,21 @@ def invalid_reviewed_at(value: Any) -> bool:
     if not re.match(r"^\d{4}-\d{2}-\d{2}($|[T ])", raw):
         return True
     try:
-        date.fromisoformat(raw)
-        return False
+        parsed_date = date.fromisoformat(raw)
+        return parsed_date > date.today()
     except ValueError:
         pass
     normalized = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
     try:
-        datetime.fromisoformat(normalized)
+        parsed_datetime = datetime.fromisoformat(normalized)
     except ValueError:
         return True
-    return False
+    now = (
+        datetime.now(parsed_datetime.tzinfo)
+        if parsed_datetime.tzinfo is not None
+        else datetime.now()
+    )
+    return parsed_datetime > now
 
 
 def executable_arg(path: Path) -> str:

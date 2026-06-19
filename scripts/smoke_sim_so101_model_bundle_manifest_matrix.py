@@ -567,6 +567,29 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "future_reviewed_at_not_ready",
+            "manifest_path": fixtures["future_reviewed_at_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "authority_status": "needs_review",
+                "joint_limits_status": "needs_review",
+                "mesh_assets_status": "needs_review",
+                "target_frame_status": "needs_review",
+                "tcp_offset_status": "needs_review",
+                "alignment_status": "needs_review",
+                "missing_inputs": [
+                    "authority",
+                    "joint_limit_authority",
+                    "mesh_asset_authority",
+                    "target_frame_authority",
+                    "tcp_offset_authority",
+                    "base_to_board_alignment_authority",
+                ],
+                "review_invalid_fields": ["reviewed_at"],
+            },
+        },
+        {
             "case_id": "generic_review_scope_not_ready",
             "manifest_path": fixtures["generic_review_scope_manifest_path"],
             "expect": {
@@ -1257,7 +1280,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "",
             "## Authority Boundary",
             "",
-            "- Placeholder review metadata, generic review scopes, invalid review URLs, malformed review timestamps, weak field-specific authority, placeholder or malformed provenance, wrong target frame, invalid TCP/alignment, and model SHA mismatch all remain not ready.",
+            "- Placeholder review metadata, generic review scopes, invalid review URLs, malformed or future-dated review timestamps, weak field-specific authority, placeholder or malformed provenance, wrong target frame, invalid TCP/alignment, and model SHA mismatch all remain not ready.",
             "- The ready synthetic fixture cases may set `ready_for_model_backed_ik: true` but must keep `physical_so101_model_authority_ready: false`.",
             "- Review packets, intake checklists, and generated templates are operator intake only and never promote fixture evidence into physical SO-101 truth.",
         ]

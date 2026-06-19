@@ -157,8 +157,9 @@ license, and authority have been reviewed. Pair them with
 `--authority-review-id` or `--authority-review-url` so the artifact
 distinguishes a bare authoritative-path declaration from a reviewed
 source-authority declaration. If `--authority-reviewed-at` is supplied, it must
-be an ISO `YYYY-MM-DD` date or ISO datetime; malformed review timestamps are
-treated as invalid review evidence.
+be an ISO `YYYY-MM-DD` date or ISO datetime and must not be in the future;
+malformed or future-dated review timestamps are treated as invalid review
+evidence.
 Without authoritative flags, a SO-101-looking file remains
 `source_authority_status: "unverified"` and does not count as authoritative.
 Without complete review metadata and scope coverage, an authoritative candidate
@@ -173,15 +174,15 @@ python scripts/smoke_sim_so101_source_authority_matrix.py --output-dir /private/
 ```
 
 The smoke generates synthetic URDF fixtures under the output directory and runs
-the inventory through fourteen non-hardware cases: missing source root,
+the inventory through fifteen non-hardware cases: missing source root,
 unverified candidate, candidate recommendation preference, authoritative path
 without review metadata, authoritative path with placeholder review metadata,
 authoritative path with angle-bracket template metadata, authoritative path with
 reviewer-only thin review metadata, authoritative path with invalid review URL,
 authoritative path with invalid review timestamp, authoritative path with
-placeholder source/license metadata, non-SO-101 authoritative relevance
-rejection, authoritative path with complete source-review metadata, single
-authoritative root with complete source-review metadata, and ambiguous
+placeholder source/license metadata, authoritative path with future-dated review
+timestamp, non-SO-101 authoritative relevance rejection, authoritative path with
+complete source-review metadata, single authoritative root with complete source-review metadata, and ambiguous
 authoritative root. It writes:
 
 - `so101_source_authority_matrix_summary.json`

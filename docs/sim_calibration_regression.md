@@ -278,8 +278,8 @@ The standalone `scripts/smoke_sim_so101_model_bundle_probe_matrix.py` smoke
 keeps this boundary repeatable: missing model input remains non-authority,
 placeholder authority/provenance values such as `TODO`, `TBD`, `unknown`, and
 `placeholder-*` stay in placeholder diagnostics instead of populating candidate
-manifest fields, malformed authority review timestamps keep authority open,
-and valid authority/provenance metadata still leaves the draft blocked on model
+manifest fields, malformed or future-dated authority review timestamps keep
+authority open, and valid authority/provenance metadata still leaves the draft blocked on model
 digest, mesh assets, reviewed joint limits, target-frame authority, TCP offset,
 and base-to-board alignment.
 The review packet groups observed candidate source, joint-limit, mesh, TCP, and
@@ -433,8 +433,8 @@ single-authoritative-root review, and ambiguous-authoritative-root cases, and wr
 source-authority-ready fixture case proves only the inventory state transition
 to `source_authority_ready`, including that a narrowed authoritative root
 selects the same authoritative model path as an explicit authoritative path;
-malformed `authority_reviewed_at` metadata must stay blocked as invalid review
-evidence;
+malformed or future-dated `authority_reviewed_at` metadata must stay blocked as
+invalid review evidence;
 the non-SO-101 authoritative fixture must stay blocked and must not queue bundle
 probing even when complete review metadata is supplied;
 every case keeps `source_intake_not_authority`,
@@ -720,8 +720,8 @@ It reports `model_authority: "model_bundle_manifest_matrix_not_authority"`,
 synthetic fixture manifest that must stay
 `hardware_free_regression_fixture_not_physical_so101_authority`, a ready-shaped
 manifest whose referenced model file is missing, placeholder alignment,
-placeholder/thin/invalid review evidence, malformed review timestamps, generic
-review scopes, ready-shaped review metadata with pending follow-up, weak
+placeholder/thin/invalid review evidence, malformed or future-dated review
+timestamps, generic review scopes, ready-shaped review metadata with pending follow-up, weak
 field-specific authority, placeholder or malformed provenance, reviewed-status
 fixture provenance, wrong target frame, invalid TCP/alignment payloads, and
 mismatched model SHA. Ready fixture cases exercise the manifest state machine
@@ -734,8 +734,8 @@ reports `model_authority: "model_bundle_probe_matrix_not_authority"`,
 `observed_evidence_is_physical_so101_authority: false`, and
 `ready_for_policy_training: false`. Its cases prove that missing model input
 stays non-authority, placeholder authority/provenance values do not populate the
-candidate manifest, malformed authority review timestamps keep authority open,
-and valid authority/provenance metadata still leaves the draft blocked until
+candidate manifest, malformed or future-dated authority review timestamps keep
+authority open, and valid authority/provenance metadata still leaves the draft blocked until
 model digest, meshes, reviewed joint limits, target-frame authority, TCP offset,
 and base-to-board alignment are supplied.
 
@@ -974,14 +974,14 @@ A passing summary should show:
 - `calibration_session.selected_candidate` populated with the rank-1 candidate
 - `perception_fixture.status: "ok"` and fixture artifact paths populated
 - `sim_camera_pose_fixture.status: "ok"` with deterministic nominal and perturbed case IDs, frame paths, annotated-frame paths, and metadata paths populated
-- `so101_model_bundle_manifest.status: "model_bundle_manifest_not_supplied"`, `"model_bundle_manifest_unavailable"`, `"model_bundle_manifest_parse_error"`, `"model_bundle_manifest_schema_error"`, `"model_bundle_manifest_needs_follow_up"`, or `"model_bundle_manifest_ready_for_model_backed_ik"` with readiness, physical-authority gate status/blockers, model path, asset roots, joint limits, mesh evidence, target frame, TCP offset, base-to-board alignment, ordered `next_required_for_goal` actions, matching ordered `next_required_action_ids` and `review_packet_action_ids`, forwarding reason, and summary/CSV/review-packet/README artifact paths populated. Accepted review metadata must provide reviewer identity plus a stable artifact handle (`review_id` or HTTP(S) `review_url`); a lone non-placeholder reviewer string, malformed review URL, or date-only trace is insufficient for reviewed physical authority or fixture forwarding.
+- `so101_model_bundle_manifest.status: "model_bundle_manifest_not_supplied"`, `"model_bundle_manifest_unavailable"`, `"model_bundle_manifest_parse_error"`, `"model_bundle_manifest_schema_error"`, `"model_bundle_manifest_needs_follow_up"`, or `"model_bundle_manifest_ready_for_model_backed_ik"` with readiness, physical-authority gate status/blockers, model path, asset roots, joint limits, mesh evidence, target frame, TCP offset, base-to-board alignment, ordered `next_required_for_goal` actions, matching ordered `next_required_action_ids` and `review_packet_action_ids`, forwarding reason, and summary/CSV/review-packet/README artifact paths populated. Accepted review metadata must provide reviewer identity plus a stable artifact handle (`review_id` or HTTP(S) `review_url`); a lone non-placeholder reviewer string, malformed review URL, future-dated review timestamp, or date-only trace is insufficient for reviewed physical authority or fixture forwarding.
   The bundle-intake status/action IDs must mirror the same next-action order,
   keep `bundle_manifest_intake_not_authority`, and keep observed-evidence and
   physical-truth flags false while populating summary/CSV/review-packet,
   bundle-intake, and README artifact paths.
   Bundle authority review metadata must also declare explicit `review_scope` or `review_scopes` values; top-level authority scope readiness is mirrored into artifact-index metrics as `authority_required_review_scope_ids`, `authority_supplied_review_scope_ids`, `authority_missing_review_scope_ids`, and `authority_review_scope_ready`.
 - `so101_reviewed_mujoco_bundle.status: "reviewed_mujoco_bundle_not_ready"` in default CI, `"reviewed_mujoco_bundle_motion_checked"` when a ready manifest is supplied, or `"reviewed_mujoco_bundle_handoff_blocked_open_work"` when ready-shaped motion evidence still carries handoff open work, with `reviewed_model_motion_checked`, per-joint motion-check CSV rows, `motion_authority_status`, physical-reviewed motion, fixture-motion, non-physical motion-evidence fields, downstream handoff `missing_inputs`, downstream handoff pending actions, ready-handoff open-work blockers, and summary/checklist/motion-checks/downstream-handoff/README artifact paths populated. Any raw-ready or fixture-ready downstream handoff with non-empty missing inputs or pending actions must fail closed before scene, Gymnasium, pick/place, or training readiness gates treat it as usable.
-- `so101_model_source_inventory.status: "missing_authoritative_model"`, `"ambiguous_authoritative_model"`, or `"authoritative_model_found"` with candidate counts, authoritative candidate count, authoritative source-selection status, selected authoritative path and SHA-256 digest when exactly one candidate is selected, source-authority review scope readiness/missing scope IDs, source-authority review evidence required/satisfied/missing groups, source-authority gate status/blockers, review-packet status/model-authority/item count/action IDs, source-intake recommended candidate path/root context, false observed-evidence-as-authority and physical-authority-ready flags, recommended contract-check path when present, and summary/CSV/review-packet/source-intake/README artifact paths populated. Accepted source-authority review evidence must provide reviewer identity plus a stable artifact handle (`review_id` or HTTP(S) `review_url`); a lone non-placeholder reviewer string, malformed review URL, or date-only trace is insufficient for source authority.
+- `so101_model_source_inventory.status: "missing_authoritative_model"`, `"ambiguous_authoritative_model"`, or `"authoritative_model_found"` with candidate counts, authoritative candidate count, authoritative source-selection status, selected authoritative path and SHA-256 digest when exactly one candidate is selected, source-authority review scope readiness/missing scope IDs, source-authority review evidence required/satisfied/missing groups, source-authority gate status/blockers, review-packet status/model-authority/item count/action IDs, source-intake recommended candidate path/root context, false observed-evidence-as-authority and physical-authority-ready flags, recommended contract-check path when present, and summary/CSV/review-packet/source-intake/README artifact paths populated. Accepted source-authority review evidence must provide reviewer identity plus a stable artifact handle (`review_id` or HTTP(S) `review_url`); a lone non-placeholder reviewer string, malformed review URL, future-dated review timestamp, or date-only trace is insufficient for source authority.
 - `so101_model_bundle_probe.status: "candidate_model_missing"`, `"candidate_model_unavailable"`, `"candidate_manifest_needs_review"`, or `"candidate_manifest_ready_for_model_backed_ik"` with `model_authority: "draft_candidate_not_reviewed"`, selected model path, model request status, observed source/joint/mesh hints, manifest status, review-packet status/item count, `missing_inputs`, `next_required_action_ids`, and summary/candidate-manifest/review-packet/checklist/README plus child contract/manifest-check artifacts populated; default CI must keep `ready_for_model_backed_ik: false`
 - `so101_reviewed_model_authority_gate.status: "reviewed_model_authority_blocked"` until source authority, physical bundle authority, source-to-bundle model path/digest consistency, and physical-reviewed MuJoCo motion are all true; the gate must expose `ready`, `blockers`, `blocker_count`, ordered `next_required_for_goal`/`next_required_action_ids`, source/bundle/consistency/motion readiness booleans, blocker-packet status/model-authority/item count/action-required IDs/blocked-by-prior IDs, checklist status/next-action/prior-blocker/prior-status mappings that agree with the blocker packet, `development_fixture_evidence_not_physical_so101_truth`, and summary/checklist/blocker-packet/README artifact paths
 - `so101_model_source_inventory.source_configuration.scan_mode: "default_repo_roots"` in the default run or `"explicit_roots"` when `--so101-model-source-root` is supplied, with configured roots/authority lists preserved

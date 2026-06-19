@@ -342,6 +342,13 @@ def invalid_reviewed_at_args() -> list[str]:
     ]
 
 
+def future_reviewed_at_args() -> list[str]:
+    args = invalid_reviewed_at_args()
+    reviewed_at_index = args.index("--authority-reviewed-at") + 1
+    args[reviewed_at_index] = "2999-01-01"
+    return args
+
+
 def placeholder_source_metadata_args() -> list[str]:
     return [
         "--authority-license-basis",
@@ -685,6 +692,43 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "missing_required_fields_contain": [
                     "authority_license_basis",
                     "authority_source_reference",
+                ],
+                "missing_review_scope_ids": [],
+            },
+        },
+        {
+            "case_id": "authoritative_future_reviewed_at",
+            "args": [
+                "--root",
+                str(fixtures["single_root"]),
+                "--authoritative-path",
+                str(fixtures["single_model"]),
+                *future_reviewed_at_args(),
+            ],
+            "expect": {
+                "status": "authoritative_model_found",
+                "candidate_count": 1,
+                "authoritative_candidate_count": 1,
+                "source_authority_gate_status": "source_authority_blocked_review_metadata",
+                "source_authority_review_status": "review_metadata_missing",
+                "source_authority_review_ready": False,
+                "source_intake_status": "source_review_metadata_required",
+                "review_packet_status": "review_packet_source_authority_review_metadata_needed",
+                "blockers_contain": ["record_source_authority_review_metadata"],
+                "actions_contain": [
+                    "record_source_authority_review_metadata",
+                    "run_so101_model_bundle_probe",
+                    "supply_reviewed_so101_model_bundle_manifest",
+                ],
+                "review_evidence_valid_fields_contain": [
+                    "authority_reviewed_by",
+                    "authority_review_id",
+                ],
+                "review_evidence_invalid_fields_contain": ["authority_reviewed_at"],
+                "review_evidence_satisfied_required_groups_contain": [
+                    "review_actor",
+                    "review_trace",
+                    "review_artifact",
                 ],
                 "missing_review_scope_ids": [],
             },
@@ -1321,6 +1365,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "## Caveats",
             "",
             "- Generic authoritative URDFs with complete review metadata still fail closed unless the selected candidate is SO-101-relevant.",
+            "- Malformed or future-dated `authority_reviewed_at` values remain invalid review evidence.",
             "- Source-authority-ready fixture cases still report source-intake and review-packet artifacts as not authority.",
             "- Physical SO-101 model authority remains false in every case.",
             "- A reviewed bundle manifest with mesh roots, joint limits, target frame, TCP offset, and base-to-board alignment is still required before model-backed work is trusted.",

@@ -237,6 +237,7 @@ jobs:
               "authoritative_invalid_review_url",
               "authoritative_invalid_reviewed_at",
               "authoritative_placeholder_source_metadata",
+              "authoritative_future_reviewed_at",
               "authoritative_non_so101_relevance_rejected",
               "authoritative_complete_source_review",
               "authoritative_single_root_complete_source_review",
@@ -283,6 +284,14 @@ jobs:
           assert "authority_reviewed_by" in invalid_reviewed_at["observations"]["source_authority_review_evidence_valid_fields"], invalid_reviewed_at
           assert "authority_review_id" in invalid_reviewed_at["observations"]["source_authority_review_evidence_valid_fields"], invalid_reviewed_at
           assert "record_source_authority_review_metadata" in invalid_reviewed_at["observations"]["next_required_action_ids"], invalid_reviewed_at
+          future_reviewed_at = by_case["authoritative_future_reviewed_at"]
+          assert future_reviewed_at["observations"]["source_authority_gate_status"] == "source_authority_blocked_review_metadata", future_reviewed_at
+          assert future_reviewed_at["observations"]["source_authority_review_status"] == "review_metadata_missing", future_reviewed_at
+          assert future_reviewed_at["observations"]["source_authority_review_ready"] is False, future_reviewed_at
+          assert "authority_reviewed_at" in future_reviewed_at["observations"]["source_authority_review_evidence_invalid_fields"], future_reviewed_at
+          assert "authority_reviewed_by" in future_reviewed_at["observations"]["source_authority_review_evidence_valid_fields"], future_reviewed_at
+          assert "authority_review_id" in future_reviewed_at["observations"]["source_authority_review_evidence_valid_fields"], future_reviewed_at
+          assert "record_source_authority_review_metadata" in future_reviewed_at["observations"]["next_required_action_ids"], future_reviewed_at
           placeholder_source_metadata = by_case["authoritative_placeholder_source_metadata"]
           assert placeholder_source_metadata["observations"]["source_authority_gate_status"] == "source_authority_blocked_review_metadata", placeholder_source_metadata
           assert placeholder_source_metadata["observations"]["source_authority_review_status"] == "review_metadata_missing", placeholder_source_metadata
@@ -346,6 +355,7 @@ jobs:
               "missing_model_probe_not_authority",
               "placeholder_authority_provenance_rejected",
               "invalid_reviewed_at_rejected",
+              "future_reviewed_at_rejected",
               "valid_authority_provenance_still_draft_not_ready",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -391,6 +401,16 @@ jobs:
           assert invalid_reviewed_at["authority_invalid_fields"] == ["reviewed_at"], invalid_reviewed_at
           assert "authority" in invalid_reviewed_at["missing_inputs"], invalid_reviewed_at
           assert "record_reviewed_model_source_authority" in invalid_reviewed_at["next_required_action_ids"], invalid_reviewed_at
+          future_reviewed_at = by_case["future_reviewed_at_rejected"]["observations"]
+          assert future_reviewed_at["status"] == "candidate_manifest_needs_review", future_reviewed_at
+          assert future_reviewed_at["model_request_status"] == "model_supplied", future_reviewed_at
+          assert future_reviewed_at["authority_empty"] is True, future_reviewed_at
+          assert future_reviewed_at["provenance_empty"] is False, future_reviewed_at
+          assert future_reviewed_at["authority_row_status"] == "action_required", future_reviewed_at
+          assert future_reviewed_at["provenance_row_status"] == "ok", future_reviewed_at
+          assert future_reviewed_at["authority_invalid_fields"] == ["reviewed_at"], future_reviewed_at
+          assert "authority" in future_reviewed_at["missing_inputs"], future_reviewed_at
+          assert "record_reviewed_model_source_authority" in future_reviewed_at["next_required_action_ids"], future_reviewed_at
           valid = by_case["valid_authority_provenance_still_draft_not_ready"]["observations"]
           assert valid["status"] == "candidate_manifest_needs_review", valid
           assert valid["model_request_status"] == "model_supplied", valid
@@ -445,6 +465,7 @@ jobs:
               "thin_review_metadata_not_ready",
               "invalid_review_url_not_ready",
               "invalid_reviewed_at_not_ready",
+              "future_reviewed_at_not_ready",
               "generic_review_scope_not_ready",
               "pending_review_metadata_not_ready",
               "weak_review_manifest_not_ready",
@@ -544,6 +565,34 @@ jobs:
               "base_to_board_alignment_authority",
           ):
               assert missing_input in invalid_reviewed_at["missing_inputs"], invalid_reviewed_at
+          future_reviewed_at = by_case["future_reviewed_at_not_ready"]["observations"]
+          for key in (
+              "authority_status",
+              "joint_limits_status",
+              "mesh_assets_status",
+              "target_frame_status",
+              "tcp_offset_status",
+              "alignment_status",
+          ):
+              assert future_reviewed_at[key] == "needs_review", future_reviewed_at
+          for key in (
+              "authority_review_invalid_fields",
+              "joint_limits_review_invalid_fields",
+              "mesh_assets_review_invalid_fields",
+              "target_frame_review_invalid_fields",
+              "tcp_offset_review_invalid_fields",
+              "alignment_review_invalid_fields",
+          ):
+              assert future_reviewed_at[key] == ["reviewed_at"], future_reviewed_at
+          for missing_input in (
+              "authority",
+              "joint_limit_authority",
+              "mesh_asset_authority",
+              "target_frame_authority",
+              "tcp_offset_authority",
+              "base_to_board_alignment_authority",
+          ):
+              assert missing_input in future_reviewed_at["missing_inputs"], future_reviewed_at
           pending_review = by_case["pending_review_metadata_not_ready"]["observations"]
           for key in (
               "authority_status",
@@ -4821,6 +4870,9 @@ jobs:
           assert (
               "invalid_reviewed_at_rejected" in model_bundle_probe_matrix["case_ids"]
           ), model_bundle_probe_matrix
+          assert (
+              "future_reviewed_at_rejected" in model_bundle_probe_matrix["case_ids"]
+          ), model_bundle_probe_matrix
           assert model_bundle_probe_matrix["failed_case_ids"] == [], model_bundle_probe_matrix
           assert (
               model_bundle_probe_matrix["model_authority"]
@@ -4840,6 +4892,10 @@ jobs:
           ), model_bundle_manifest_matrix
           assert (
               "invalid_reviewed_at_not_ready"
+              in model_bundle_manifest_matrix["case_ids"]
+          ), model_bundle_manifest_matrix
+          assert (
+              "future_reviewed_at_not_ready"
               in model_bundle_manifest_matrix["case_ids"]
           ), model_bundle_manifest_matrix
           assert model_bundle_manifest_matrix["failed_case_ids"] == [], model_bundle_manifest_matrix
