@@ -611,8 +611,9 @@ enough to authorize a different model file in the same tree, and a path match
 with a digest mismatch is also blocked. The reviewed-authority matrix includes
 missing selected source path, unconfigured selected source authority,
 selected-source/outside-authority mismatch, same-root unselected-model,
-source-digest-missing, bundle-declared-digest-missing,
-bundle-observed-digest-missing, bundle-observed-digest-mismatch, and
+source-digest-missing, malformed selected-source digest,
+bundle-declared-digest-missing, bundle-observed-digest-missing,
+bundle-observed-digest-mismatch, and
 source/bundle digest-mismatch
 negative cases so even physical-motion-ready injected state remains blocked on
 those mismatches. If source or bundle authority is not ready yet, the consistency

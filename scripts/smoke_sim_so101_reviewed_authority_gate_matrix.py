@@ -699,6 +699,30 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "source_ready_physical_bundle_malformed_source_digest",
+            "source": source_ready(
+                summary_dir / "source_ready_malformed_digest.json",
+                source_model,
+                sha256="not-a-sha256-digest",
+            ),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_bundle_model_digest_missing",
+                "consistency_ready": False,
+                "development_fixture": True,
+                "blockers_contain": ["record_reviewed_so101_model_file_sha256"],
+                "actions_contain": ["record_reviewed_so101_model_file_sha256"],
+                "action_required_contains": ["source_bundle_consistency"],
+                "blocker_packet_next_actions_contain": [
+                    "record_reviewed_so101_model_file_sha256"
+                ],
+                "selected_path_matches_bundle": True,
+                "selected_digest_matches_bundle": False,
+            },
+        },
+        {
             "case_id": "source_ready_physical_bundle_declared_digest_missing",
             "source": source_ready(summary_dir / "source_ready.json", source_model),
             "bundle": bundle_physical_ready(
