@@ -119,6 +119,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "blocker_bundle_model_observed_sha256",
         "blocker_motion_bundle_consistency_status",
         "blocker_motion_bundle_consistency_blocker",
+        "blocker_motion_bundle_model_path",
+        "blocker_motion_bundle_model_declared_sha256",
         "blocker_reviewed_mujoco_motion_model_path",
         "blocker_reviewed_mujoco_motion_model_declared_sha256",
         "blocker_reviewed_mujoco_motion_model_observed_sha256",
@@ -2295,6 +2297,10 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "blocker_motion_bundle_consistency_blocker": motion_item.get(
             "reviewed_mujoco_motion_bundle_consistency_blocker"
+        ),
+        "blocker_motion_bundle_model_path": motion_item.get("bundle_model_path"),
+        "blocker_motion_bundle_model_declared_sha256": motion_item.get(
+            "bundle_model_declared_sha256"
         ),
         "blocker_reviewed_mujoco_motion_model_path": motion_item.get(
             "reviewed_mujoco_motion_model_path"
