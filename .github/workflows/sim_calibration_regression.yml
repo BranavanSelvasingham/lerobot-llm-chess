@@ -88,6 +88,7 @@ env:
   PYTHON_VERSION: "3.12"
   CALIBRATION_REGRESSION_OUTPUT_DIR: "/tmp/lerobot_sim/calibration_regression_suite"
   SO101_SOURCE_AUTHORITY_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_source_authority_matrix"
+  SO101_MODEL_BUNDLE_PROBE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_model_bundle_probe_matrix"
   SO101_MODEL_BUNDLE_MANIFEST_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_model_bundle_manifest_matrix"
   SO101_REVIEWED_AUTHORITY_GATE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_reviewed_authority_gate_matrix"
   SO101_REVIEWED_MUJOCO_BUNDLE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_reviewed_mujoco_bundle_matrix"
@@ -296,6 +297,89 @@ jobs:
           for relative_path in (
               "so101_source_authority_matrix_summary.json",
               "so101_source_authority_matrix_cases.csv",
+              "README.md",
+          ):
+              assert (summary_path.parent / relative_path).is_file(), relative_path
+          PY
+
+      - name: Run SO-101 model bundle probe matrix
+        run: |
+          python scripts/smoke_sim_so101_model_bundle_probe_matrix.py \
+            --output-dir "${SO101_MODEL_BUNDLE_PROBE_MATRIX_OUTPUT_DIR}" \
+            --python "$(python -c 'import sys; print(sys.executable)')"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          summary_path = Path(os.environ["SO101_MODEL_BUNDLE_PROBE_MATRIX_OUTPUT_DIR"]) / "so101_model_bundle_probe_matrix_summary.json"
+          summary = json.loads(summary_path.read_text())
+          assert summary["ok"] is True, summary
+          assert summary["status"] == "ok", summary
+          assert summary["model_authority"] == "model_bundle_probe_matrix_not_authority", summary
+          assert summary["observed_evidence_is_physical_so101_authority"] is False, summary
+          assert summary["ready_for_policy_training"] is False, summary
+          assert summary["hardware_skipped"] is True, summary
+          assert summary["gui_skipped"] is True, summary
+          assert summary["openai_skipped"] is True, summary
+          assert summary["case_ids"] == [
+              "missing_model_probe_not_authority",
+              "placeholder_authority_provenance_rejected",
+              "valid_authority_provenance_still_draft_not_ready",
+          ], summary["case_ids"]
+          assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
+          by_case = {case["case_id"]: case for case in summary["cases"]}
+          missing_model = by_case["missing_model_probe_not_authority"]["observations"]
+          assert missing_model["status"] == "candidate_model_missing", missing_model
+          assert missing_model["model_request_status"] == "model_not_supplied", missing_model
+          assert missing_model["authority_empty"] is True, missing_model
+          assert missing_model["provenance_empty"] is True, missing_model
+          assert missing_model["authority_row_status"] == "action_required", missing_model
+          assert missing_model["provenance_row_status"] == "action_required", missing_model
+          assert "model_path" in missing_model["missing_inputs"], missing_model
+          assert "authority" in missing_model["missing_inputs"], missing_model
+          assert "provenance" in missing_model["missing_inputs"], missing_model
+          placeholder = by_case["placeholder_authority_provenance_rejected"]["observations"]
+          assert placeholder["status"] == "candidate_manifest_needs_review", placeholder
+          assert placeholder["model_request_status"] == "model_supplied", placeholder
+          assert placeholder["authority_empty"] is True, placeholder
+          assert placeholder["provenance_empty"] is True, placeholder
+          assert placeholder["authority_row_status"] == "action_required", placeholder
+          assert placeholder["provenance_row_status"] == "action_required", placeholder
+          assert placeholder["authority_placeholder_fields"] == [
+              "review_id",
+              "reviewed_at",
+              "reviewed_by",
+          ], placeholder
+          assert placeholder["provenance_placeholder_fields"] == [
+              "export_tool",
+              "license",
+              "source_url",
+          ], placeholder
+          assert "authority" in placeholder["missing_inputs"], placeholder
+          assert "provenance" in placeholder["missing_inputs"], placeholder
+          assert "record_reviewed_model_source_authority" in placeholder["next_required_action_ids"], placeholder
+          assert "record_model_provenance" in placeholder["next_required_action_ids"], placeholder
+          valid = by_case["valid_authority_provenance_still_draft_not_ready"]["observations"]
+          assert valid["status"] == "candidate_manifest_needs_review", valid
+          assert valid["model_request_status"] == "model_supplied", valid
+          assert valid["authority_empty"] is False, valid
+          assert valid["provenance_empty"] is False, valid
+          assert valid["authority_row_status"] == "ok", valid
+          assert valid["provenance_row_status"] == "ok", valid
+          assert valid["ready_for_model_backed_ik"] is False, valid
+          assert "authority" not in valid["missing_inputs"], valid
+          assert "provenance" not in valid["missing_inputs"], valid
+          assert "base_to_board_transform" in valid["missing_inputs"], valid
+          assert "joint_limits_deg" in valid["missing_inputs"], valid
+          assert "model_sha256" in valid["missing_inputs"], valid
+          assert "target_frame_authority" in valid["missing_inputs"], valid
+          assert "tcp_offset_m" in valid["missing_inputs"], valid
+          assert "record_reviewed_model_source_authority" not in valid["next_required_action_ids"], valid
+          assert "record_model_provenance" not in valid["next_required_action_ids"], valid
+          for relative_path in (
+              "so101_model_bundle_probe_matrix_summary.json",
+              "so101_model_bundle_probe_matrix_cases.csv",
               "README.md",
           ):
               assert (summary_path.parent / relative_path).is_file(), relative_path
@@ -4443,6 +4527,14 @@ jobs:
           summary_path = output_dir / "calibration_regression_summary.json"
           summary = json.loads(summary_path.read_text())
           model_bundle_manifest_matrix_dir = Path(os.environ["SO101_MODEL_BUNDLE_MANIFEST_MATRIX_OUTPUT_DIR"])
+          model_bundle_probe_matrix_dir = Path(os.environ["SO101_MODEL_BUNDLE_PROBE_MATRIX_OUTPUT_DIR"])
+          model_bundle_probe_matrix_summary_path = (
+              model_bundle_probe_matrix_dir
+              / "so101_model_bundle_probe_matrix_summary.json"
+          )
+          model_bundle_probe_matrix = json.loads(
+              model_bundle_probe_matrix_summary_path.read_text()
+          )
           model_bundle_manifest_matrix_summary_path = (
               model_bundle_manifest_matrix_dir
               / "so101_model_bundle_manifest_matrix_summary.json"
@@ -4495,6 +4587,27 @@ jobs:
               "README.md",
           ):
               assert (model_bundle_manifest_matrix_dir / relative_path).is_file(), relative_path
+          for relative_path in (
+              "so101_model_bundle_probe_matrix_summary.json",
+              "so101_model_bundle_probe_matrix_cases.csv",
+              "README.md",
+          ):
+              assert (model_bundle_probe_matrix_dir / relative_path).is_file(), relative_path
+          assert model_bundle_probe_matrix["ok"] is True, model_bundle_probe_matrix
+          assert model_bundle_probe_matrix["status"] == "ok", model_bundle_probe_matrix
+          assert model_bundle_probe_matrix["case_count"] == 3, model_bundle_probe_matrix
+          assert model_bundle_probe_matrix["failed_case_ids"] == [], model_bundle_probe_matrix
+          assert (
+              model_bundle_probe_matrix["model_authority"]
+              == "model_bundle_probe_matrix_not_authority"
+          ), model_bundle_probe_matrix
+          assert (
+              model_bundle_probe_matrix["observed_evidence_is_physical_so101_authority"]
+              is False
+          ), model_bundle_probe_matrix
+          assert model_bundle_probe_matrix["ready_for_policy_training"] is False, (
+              model_bundle_probe_matrix
+          )
           assert model_bundle_manifest_matrix["ok"] is True, model_bundle_manifest_matrix
           assert model_bundle_manifest_matrix["status"] == "ok", model_bundle_manifest_matrix
           assert model_bundle_manifest_matrix["case_count"] == 21, model_bundle_manifest_matrix
@@ -4533,6 +4646,9 @@ jobs:
               *[f"- `{path}`" for path in core_json_paths],
               "",
               "Focused sibling artifacts:",
+              "- `so101_model_bundle_probe_matrix/so101_model_bundle_probe_matrix_summary.json`",
+              "- `so101_model_bundle_probe_matrix/so101_model_bundle_probe_matrix_cases.csv`",
+              "- `so101_model_bundle_probe_matrix/README.md`",
               "- `so101_model_bundle_manifest_matrix/so101_model_bundle_manifest_matrix_summary.json`",
               "- `so101_model_bundle_manifest_matrix/so101_model_bundle_manifest_matrix_cases.csv`",
               "- `so101_model_bundle_manifest_matrix/README.md`",
@@ -4659,6 +4775,15 @@ jobs:
               f"- `ready_for_policy_training`: `{model_bundle_manifest_matrix['ready_for_policy_training']}`",
               "- This focused matrix exercises manifest-gate behavior only; synthetic ready cases do not close physical SO-101 model authority.",
               "",
+              "SO-101 model bundle probe matrix:",
+              f"- `status`: `{model_bundle_probe_matrix['status']}`",
+              f"- `case_count`: `{model_bundle_probe_matrix['case_count']}`",
+              f"- `failed_case_ids`: `{model_bundle_probe_matrix['failed_case_ids']}`",
+              f"- `model_authority`: `{model_bundle_probe_matrix['model_authority']}`",
+              f"- `observed_evidence_is_physical_so101_authority`: `{model_bundle_probe_matrix['observed_evidence_is_physical_so101_authority']}`",
+              f"- `ready_for_policy_training`: `{model_bundle_probe_matrix['ready_for_policy_training']}`",
+              "- This focused matrix keeps placeholder probe authority/provenance out of candidate manifests.",
+              "",
               "SO-101 reviewed MuJoCo bundle gate:",
               f"- `status`: `{summary['so101_reviewed_mujoco_bundle']['status']}`",
               f"- `model_authority`: `{summary['so101_reviewed_mujoco_bundle']['model_authority']}`",
@@ -4688,6 +4813,7 @@ jobs:
           path: |
             ${{ env.CALIBRATION_REGRESSION_OUTPUT_DIR }}
             ${{ env.SO101_SOURCE_AUTHORITY_MATRIX_OUTPUT_DIR }}
+            ${{ env.SO101_MODEL_BUNDLE_PROBE_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_MODEL_BUNDLE_MANIFEST_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_REVIEWED_AUTHORITY_GATE_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_REVIEWED_MUJOCO_BUNDLE_MATRIX_OUTPUT_DIR }}

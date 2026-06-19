@@ -46,6 +46,25 @@ AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS = (
     "provenance",
     "license",
 )
+PLACEHOLDER_REVIEW_EVIDENCE_VALUES = {
+    "na",
+    "n/a",
+    "none",
+    "not applicable",
+    "not supplied",
+    "null",
+    "required",
+    "review required",
+    "tbd",
+    "todo",
+    "unknown",
+}
+PLACEHOLDER_REVIEW_EVIDENCE_PREFIXES = (
+    "fixme",
+    "placeholder",
+    "tbd",
+    "todo",
+)
 
 CSV_FIELDNAMES = (
     "requirement_id",
@@ -188,6 +207,41 @@ def normalized_review_scope_ids(value: Any) -> list[str]:
             seen.add(scope)
             normalized.append(scope)
     return normalized
+
+
+def non_empty(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, tuple, dict)):
+        return bool(value)
+    return True
+
+
+def normalized_review_text(value: Any) -> str:
+    return " ".join(str(value).strip().lower().replace("_", " ").replace("-", " ").split())
+
+
+def placeholder_review_evidence(value: Any) -> bool:
+    if not non_empty(value) or not isinstance(value, str):
+        return False
+    stripped = value.strip()
+    if stripped.startswith("<") and stripped.endswith(">"):
+        return True
+    normalized = normalized_review_text(value)
+    return normalized in PLACEHOLDER_REVIEW_EVIDENCE_VALUES or any(
+        normalized.startswith(prefix) for prefix in PLACEHOLDER_REVIEW_EVIDENCE_PREFIXES
+    )
+
+
+def invalid_review_url(value: Any) -> bool:
+    if not non_empty(value):
+        return False
+    if not isinstance(value, str):
+        return True
+    parsed = urlparse(value.strip())
+    return parsed.scheme not in {"http", "https"} or not parsed.netloc
 
 
 def executable_arg(path: Path) -> str:
@@ -669,18 +723,33 @@ def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str,
         "review_url": args.authority_review_url,
         "review_scopes": supplied_review_scope_ids,
     }
+    supplied_review_fields = {
+        key: value
+        for key, value in supplied.items()
+        if key != "review_scopes" and non_empty(value)
+    }
+    placeholder_fields = sorted(
+        key
+        for key, value in supplied_review_fields.items()
+        if placeholder_review_evidence(value)
+    )
+    invalid_fields = sorted(
+        key
+        for key, value in supplied_review_fields.items()
+        if key not in placeholder_fields and key == "review_url" and invalid_review_url(value)
+    )
+    valid_review_fields = {
+        key: value
+        for key, value in supplied_review_fields.items()
+        if key not in placeholder_fields and key not in invalid_fields
+    }
     missing = []
-    if not args.authority_reviewed_by:
+    if "reviewed_by" not in valid_review_fields:
         missing.append("reviewed_by")
-    if not args.authority_review_id and not args.authority_review_url:
+    if "review_id" not in valid_review_fields and "review_url" not in valid_review_fields:
         missing.append("review_id_or_review_url")
     missing.extend(f"review_scope:{scope_id}" for scope_id in missing_review_scope_ids)
-    invalid_fields = []
-    if args.authority_review_url:
-        parsed_url = urlparse(args.authority_review_url.strip())
-        if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
-            invalid_fields.append("review_url")
-    if missing:
+    if missing or placeholder_fields:
         return {}, {
             "status": "TODO_authority_review_required",
             "required_fields": [
@@ -690,6 +759,7 @@ def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str,
             ],
             "optional_fields": ["reviewed_at"],
             "missing_fields": missing,
+            "placeholder_fields": placeholder_fields,
             "invalid_fields": invalid_fields,
             "supplied_fields": {key: value for key, value in supplied.items() if value},
             "required_review_scope_ids": list(AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS),
@@ -699,10 +769,11 @@ def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str,
             "reason": (
                 "The probe never infers reviewed model authority from a path or asset root; "
                 "reviewed authority needs reviewer identity, review_id or review_url, "
-                "and explicit model_identity/provenance/license review scopes."
+                "explicit model_identity/provenance/license review scopes, and no "
+                "placeholder review evidence."
             ),
         }
-    if invalid_fields and not args.authority_review_id:
+    if invalid_fields and "review_id" not in valid_review_fields:
         return {}, {
             "status": "TODO_authority_review_required",
             "required_fields": [
@@ -712,6 +783,7 @@ def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str,
             ],
             "optional_fields": ["reviewed_at"],
             "missing_fields": ["review_id_or_valid_review_url"],
+            "placeholder_fields": placeholder_fields,
             "invalid_fields": invalid_fields,
             "supplied_fields": {key: value for key, value in supplied.items() if value},
             "required_review_scope_ids": list(AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS),
@@ -733,6 +805,7 @@ def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str,
             ],
             "optional_fields": ["reviewed_at"],
             "missing_fields": [],
+            "placeholder_fields": placeholder_fields,
             "invalid_fields": invalid_fields,
             "supplied_fields": {key: value for key, value in supplied.items() if value},
             "required_review_scope_ids": list(AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS),
@@ -743,15 +816,15 @@ def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str,
         }
     authority = {
         "source_authority_status": "operator_reviewed",
-        "reviewed_by": args.authority_reviewed_by,
+        "reviewed_by": valid_review_fields["reviewed_by"],
         "review_scopes": supplied_review_scope_ids,
     }
-    if args.authority_reviewed_at:
-        authority["reviewed_at"] = args.authority_reviewed_at
-    if args.authority_review_id:
-        authority["review_id"] = args.authority_review_id
-    if args.authority_review_url:
-        authority["review_url"] = args.authority_review_url
+    if "reviewed_at" in valid_review_fields:
+        authority["reviewed_at"] = valid_review_fields["reviewed_at"]
+    if "review_id" in valid_review_fields:
+        authority["review_id"] = valid_review_fields["review_id"]
+    if "review_url" in valid_review_fields:
+        authority["review_url"] = valid_review_fields["review_url"]
     return authority, {
         "status": "operator_supplied",
         "required_fields": [
@@ -761,6 +834,7 @@ def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str,
         ],
         "optional_fields": ["reviewed_at"],
         "missing_fields": [],
+        "placeholder_fields": [],
         "invalid_fields": [],
         "required_review_scope_ids": list(AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS),
         "supplied_review_scope_ids": supplied_review_scope_ids,
@@ -775,31 +849,53 @@ def build_provenance(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str
         "export_tool": args.provenance_export_tool,
         "license": args.provenance_license,
     }
-    missing = [key for key, value in required.items() if not value]
-    if missing:
-        supplied = {key: value for key, value in required.items() if value}
-        if args.provenance_source_commit:
-            supplied["source_commit"] = args.provenance_source_commit
+    optional = {"source_commit": args.provenance_source_commit}
+    supplied_required = {key: value for key, value in required.items() if non_empty(value)}
+    supplied_optional = {key: value for key, value in optional.items() if non_empty(value)}
+    placeholder_fields = sorted(
+        [
+            key
+            for key, value in {
+                **supplied_required,
+                **supplied_optional,
+            }.items()
+            if placeholder_review_evidence(value)
+        ]
+    )
+    valid_required = {
+        key: value for key, value in supplied_required.items() if key not in placeholder_fields
+    }
+    valid_optional = {
+        key: value for key, value in supplied_optional.items() if key not in placeholder_fields
+    }
+    missing = [key for key in required if key not in valid_required]
+    if missing or placeholder_fields:
+        supplied = {**supplied_required, **supplied_optional}
         return {}, {
             "status": "TODO_provenance_review_required",
             "required_fields": sorted(required),
             "optional_fields": ["source_commit"],
             "missing_fields": missing,
+            "placeholder_fields": placeholder_fields,
             "supplied_fields": supplied,
-            "reason": "The probe records source provenance only when deterministic provenance inputs are supplied.",
+            "reason": (
+                "The probe records source provenance only when deterministic, "
+                "non-placeholder provenance inputs are supplied."
+            ),
         }
     provenance = {
-        "source_url": args.provenance_source_url,
-        "export_tool": args.provenance_export_tool,
-        "license": args.provenance_license,
+        "source_url": valid_required["source_url"],
+        "export_tool": valid_required["export_tool"],
+        "license": valid_required["license"],
     }
-    if args.provenance_source_commit:
-        provenance["source_commit"] = args.provenance_source_commit
+    if "source_commit" in valid_optional:
+        provenance["source_commit"] = valid_optional["source_commit"]
     return provenance, {
         "status": "operator_supplied",
         "required_fields": sorted(required),
         "optional_fields": ["source_commit"],
         "missing_fields": [],
+        "placeholder_fields": [],
     }
 
 
