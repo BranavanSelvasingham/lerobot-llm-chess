@@ -1689,6 +1689,23 @@ jobs:
               "development_mujoco_required_not_policy_ready",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
+          expected_controlled_joints = [
+              "shoulder_pan",
+              "shoulder_lift",
+              "elbow_flex",
+              "wrist_flex",
+              "wrist_roll",
+              "gripper",
+          ]
+          expected_observation_space_keys = sorted([
+              "joint_positions_deg",
+              "source_square_xyz_m",
+              "target_square_xyz_m",
+              "piece_square_index",
+              "holding_piece",
+              "phase_index",
+              "mujoco_active",
+          ])
           assert summary["development_scene"]["ok"] is True, summary["development_scene"]
           assert summary["development_scene"]["model_authority"] == "development_scaffold_not_reviewed", summary["development_scene"]
           assert summary["development_scene"]["ready_for_model_backed_ik"] is False, summary["development_scene"]
@@ -1745,6 +1762,26 @@ jobs:
           assert dev_mujoco["observations"]["ready_for_policy_training"] is False, dev_mujoco
           assert dev_mujoco["observations"]["training_authority_status"] == "development_mujoco_env_verified_not_policy_ready", dev_mujoco
           for case in summary["cases"]:
+              obs = case["observations"]
+              if case["case_id"] == "invalid_max_steps_rejected":
+                  assert obs["gymnasium_api_contract_ok"] is None, case
+                  assert obs["action_space_shape"] is None, case
+                  assert obs["controlled_joints"] is None, case
+                  assert obs["observation_space_keys"] is None, case
+                  assert obs["reset_observation_missing_keys"] is None, case
+                  assert obs["reset_observation_shape_mismatches"] is None, case
+                  assert obs["final_observation_missing_keys"] is None, case
+                  assert obs["final_observation_shape_mismatches"] is None, case
+              else:
+                  assert obs["gymnasium_api_contract_ok"] is True, case
+                  assert obs["action_space_shape"] == [6], case
+                  assert obs["action_space_dtype"] == "float32", case
+                  assert obs["controlled_joints"] == expected_controlled_joints, case
+                  assert obs["observation_space_keys"] == expected_observation_space_keys, case
+                  assert obs["reset_observation_missing_keys"] == [], case
+                  assert obs["reset_observation_shape_mismatches"] == [], case
+                  assert obs["final_observation_missing_keys"] == [], case
+                  assert obs["final_observation_shape_mismatches"] == [], case
               blockers = case["observations"]["training_authority_blockers"]
               assert "reviewed_so101_model_bundle" in blockers, case
           for relative_path in (
@@ -3341,6 +3378,23 @@ jobs:
               "gripper_fixed_finger_collision",
               "gripper_moving_finger_collision",
           ]
+          expected_env_controlled_joints = [
+              "shoulder_pan",
+              "shoulder_lift",
+              "elbow_flex",
+              "wrist_flex",
+              "wrist_roll",
+              "gripper",
+          ]
+          expected_env_observation_space_keys = sorted([
+              "joint_positions_deg",
+              "source_square_xyz_m",
+              "target_square_xyz_m",
+              "piece_square_index",
+              "holding_piece",
+              "phase_index",
+              "mujoco_active",
+          ])
           so101_mujoco_scene = summary["so101_mujoco_scene"]
           assert so101_mujoco_scene["ok"] is True, so101_mujoco_scene
           assert so101_mujoco_scene["status"] == "ok", so101_mujoco_scene
@@ -3393,6 +3447,16 @@ jobs:
           assert so101_chess_env["mujoco_backend_loaded"] is True, so101_chess_env
           assert so101_chess_env["joint_state_fallback_active"] is False, so101_chess_env
           assert so101_chess_env["gymnasium_task_wiring_status"] == "development_mujoco_env_scripted", so101_chess_env
+          env_api_contract = so101_chess_env["gymnasium_api_contract"]
+          assert env_api_contract["ok"] is True, env_api_contract
+          assert env_api_contract["action_space_shape"] == [6], env_api_contract
+          assert env_api_contract["action_space_dtype"] == "float32", env_api_contract
+          assert env_api_contract["controlled_joints"] == expected_env_controlled_joints, env_api_contract
+          assert env_api_contract["observation_space_keys"] == expected_env_observation_space_keys, env_api_contract
+          assert env_api_contract["reset_observation"]["missing_keys"] == [], env_api_contract
+          assert env_api_contract["reset_observation"]["shape_mismatches"] == [], env_api_contract
+          assert env_api_contract["final_observation"]["missing_keys"] == [], env_api_contract
+          assert env_api_contract["final_observation"]["shape_mismatches"] == [], env_api_contract
           assert so101_chess_env["training_authority_status"] == "development_mujoco_env_verified_not_policy_ready", so101_chess_env
           assert "reviewed_so101_model_bundle" in so101_chess_env["training_authority_blockers"], so101_chess_env
           assert so101_chess_env["sim_status"]["ok"] is True, so101_chess_env

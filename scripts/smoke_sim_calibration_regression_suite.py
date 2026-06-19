@@ -3458,6 +3458,7 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "mujoco_backend_loaded",
         "joint_state_fallback_active",
         "gymnasium_task_wiring_status",
+        "gymnasium_api_contract",
         "mujoco_scene_validity_status",
         "reviewed_mujoco_handoff_requested",
         "reviewed_mujoco_handoff_required",

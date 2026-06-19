@@ -19,6 +19,45 @@ SCENE_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_mujoco_scene.py"
 ENV_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_chess_env.py"
 ENV_SUMMARY_NAME = "so101_chess_env_summary.json"
 SCENE_SUMMARY_NAME = "so101_mujoco_scene_summary.json"
+EXPECTED_CONTROLLED_JOINTS: tuple[str, ...] = (
+    "shoulder_pan",
+    "shoulder_lift",
+    "elbow_flex",
+    "wrist_flex",
+    "wrist_roll",
+    "gripper",
+)
+EXPECTED_OBSERVATION_KEYS: tuple[str, ...] = (
+    "joint_positions_deg",
+    "source_square_xyz_m",
+    "target_square_xyz_m",
+    "piece_square_index",
+    "holding_piece",
+    "phase_index",
+    "mujoco_active",
+)
+GYM_API_CONTRACT_EXPECTATION: dict[str, Any] = {
+    "gymnasium_api_contract_ok": True,
+    "action_space_shape": [len(EXPECTED_CONTROLLED_JOINTS)],
+    "action_space_dtype": "float32",
+    "controlled_joints": list(EXPECTED_CONTROLLED_JOINTS),
+    "observation_space_keys": sorted(EXPECTED_OBSERVATION_KEYS),
+    "reset_observation_missing_keys": [],
+    "reset_observation_shape_mismatches": [],
+    "final_observation_missing_keys": [],
+    "final_observation_shape_mismatches": [],
+}
+NO_GYM_API_CONTRACT_EXPECTATION: dict[str, Any] = {
+    "gymnasium_api_contract_ok": None,
+    "action_space_shape": None,
+    "action_space_dtype": None,
+    "controlled_joints": None,
+    "observation_space_keys": None,
+    "reset_observation_missing_keys": None,
+    "reset_observation_shape_mismatches": None,
+    "final_observation_missing_keys": None,
+    "final_observation_shape_mismatches": None,
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -90,6 +129,15 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "sim_status_reason",
         "configuration_error",
         "gymnasium_task_wiring_status",
+        "gymnasium_api_contract_ok",
+        "action_space_shape",
+        "action_space_dtype",
+        "controlled_joints",
+        "observation_space_keys",
+        "reset_observation_missing_keys",
+        "reset_observation_shape_mismatches",
+        "final_observation_missing_keys",
+        "final_observation_shape_mismatches",
         "training_authority_status",
         "ready_for_model_backed_ik",
         "ready_for_policy_training",
@@ -175,6 +223,7 @@ def case_specs(development_model_path: str | None, invalid_model_path: str) -> l
                 "sim_status_ok": False,
                 "sim_fallback": "joint_state",
                 "gymnasium_task_wiring_status": "joint_state_fallback_env_scripted",
+                **GYM_API_CONTRACT_EXPECTATION,
                 "training_authority_status": "joint_state_fallback_env_verified_not_policy_ready",
                 "ready_for_model_backed_ik": False,
                 "ready_for_policy_training": False,
@@ -196,6 +245,7 @@ def case_specs(development_model_path: str | None, invalid_model_path: str) -> l
                 "sim_status_ok": False,
                 "sim_fallback": "joint_state",
                 "gymnasium_task_wiring_status": "joint_state_fallback_env_scripted",
+                **GYM_API_CONTRACT_EXPECTATION,
                 "training_authority_status": "joint_state_fallback_env_verified_not_policy_ready",
                 "ready_for_model_backed_ik": False,
                 "ready_for_policy_training": False,
@@ -217,6 +267,7 @@ def case_specs(development_model_path: str | None, invalid_model_path: str) -> l
                 "sim_status_ok": False,
                 "sim_fallback": "joint_state",
                 "gymnasium_task_wiring_status": "failed_requirements",
+                **GYM_API_CONTRACT_EXPECTATION,
                 "training_authority_status": "requirements_failed_not_policy_ready",
                 "ready_for_model_backed_ik": False,
                 "ready_for_policy_training": False,
@@ -245,6 +296,7 @@ def case_specs(development_model_path: str | None, invalid_model_path: str) -> l
                 "sim_fallback": "joint_state",
                 "sim_status_reason_contains": "MuJoCo model path does not exist",
                 "gymnasium_task_wiring_status": "failed_requirements",
+                **GYM_API_CONTRACT_EXPECTATION,
                 "training_authority_status": "requirements_failed_not_policy_ready",
                 "ready_for_model_backed_ik": False,
                 "ready_for_policy_training": False,
@@ -270,6 +322,7 @@ def case_specs(development_model_path: str | None, invalid_model_path: str) -> l
                 "sim_status_reason_contains": "max_steps must be positive",
                 "configuration_error_contains": "max_steps must be positive",
                 "gymnasium_task_wiring_status": "invalid_task_configuration",
+                **NO_GYM_API_CONTRACT_EXPECTATION,
                 "training_authority_status": "requirements_failed_not_policy_ready",
                 "ready_for_model_backed_ik": False,
                 "ready_for_policy_training": False,
@@ -293,6 +346,7 @@ def case_specs(development_model_path: str | None, invalid_model_path: str) -> l
                 "sim_status_ok": False,
                 "sim_fallback": "joint_state",
                 "gymnasium_task_wiring_status": "failed_requirements",
+                **GYM_API_CONTRACT_EXPECTATION,
                 "training_authority_status": "requirements_failed_not_policy_ready",
                 "ready_for_model_backed_ik": False,
                 "ready_for_policy_training": False,
@@ -321,6 +375,7 @@ def case_specs(development_model_path: str | None, invalid_model_path: str) -> l
                 "sim_status_ok": True,
                 "sim_fallback": None,
                 "gymnasium_task_wiring_status": "development_mujoco_env_scripted",
+                **GYM_API_CONTRACT_EXPECTATION,
                 "training_authority_status": "development_mujoco_env_verified_not_policy_ready",
                 "ready_for_model_backed_ik": False,
                 "ready_for_policy_training": False,
@@ -420,6 +475,21 @@ def summarize_case(
         if isinstance(summary.get("scripted_pick_place"), dict)
         else {}
     )
+    api_contract = (
+        summary.get("gymnasium_api_contract")
+        if isinstance(summary.get("gymnasium_api_contract"), dict)
+        else {}
+    )
+    reset_observation = (
+        api_contract.get("reset_observation")
+        if isinstance(api_contract.get("reset_observation"), dict)
+        else {}
+    )
+    final_observation = (
+        api_contract.get("final_observation")
+        if isinstance(api_contract.get("final_observation"), dict)
+        else {}
+    )
     observations = {
         "env_ok": summary.get("ok"),
         "status": summary.get("status"),
@@ -434,6 +504,19 @@ def summarize_case(
         "sim_status_reason": sim_status.get("reason"),
         "configuration_error": configuration_error,
         "gymnasium_task_wiring_status": summary.get("gymnasium_task_wiring_status"),
+        "gymnasium_api_contract_ok": api_contract.get("ok"),
+        "action_space_shape": api_contract.get("action_space_shape"),
+        "action_space_dtype": api_contract.get("action_space_dtype"),
+        "controlled_joints": api_contract.get("controlled_joints"),
+        "observation_space_keys": api_contract.get("observation_space_keys"),
+        "reset_observation_missing_keys": reset_observation.get("missing_keys"),
+        "reset_observation_shape_mismatches": reset_observation.get(
+            "shape_mismatches"
+        ),
+        "final_observation_missing_keys": final_observation.get("missing_keys"),
+        "final_observation_shape_mismatches": final_observation.get(
+            "shape_mismatches"
+        ),
         "training_authority_status": summary.get("training_authority_status"),
         "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
         "ready_for_policy_training": summary.get("ready_for_policy_training"),
@@ -546,6 +629,23 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "sim_status_reason": observations.get("sim_status_reason"),
         "configuration_error": observations.get("configuration_error"),
         "gymnasium_task_wiring_status": observations.get("gymnasium_task_wiring_status"),
+        "gymnasium_api_contract_ok": observations.get("gymnasium_api_contract_ok"),
+        "action_space_shape": observations.get("action_space_shape"),
+        "action_space_dtype": observations.get("action_space_dtype"),
+        "controlled_joints": observations.get("controlled_joints"),
+        "observation_space_keys": observations.get("observation_space_keys"),
+        "reset_observation_missing_keys": observations.get(
+            "reset_observation_missing_keys"
+        ),
+        "reset_observation_shape_mismatches": observations.get(
+            "reset_observation_shape_mismatches"
+        ),
+        "final_observation_missing_keys": observations.get(
+            "final_observation_missing_keys"
+        ),
+        "final_observation_shape_mismatches": observations.get(
+            "final_observation_shape_mismatches"
+        ),
         "training_authority_status": observations.get("training_authority_status"),
         "ready_for_model_backed_ik": observations.get("ready_for_model_backed_ik"),
         "ready_for_policy_training": observations.get("ready_for_policy_training"),

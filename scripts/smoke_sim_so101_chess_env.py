@@ -28,6 +28,24 @@ SO101_JOINTS: tuple[str, ...] = (
     "wrist_roll",
     "gripper",
 )
+EXPECTED_OBSERVATION_KEYS: tuple[str, ...] = (
+    "joint_positions_deg",
+    "source_square_xyz_m",
+    "target_square_xyz_m",
+    "piece_square_index",
+    "holding_piece",
+    "phase_index",
+    "mujoco_active",
+)
+EXPECTED_OBSERVATION_SHAPES: dict[str, tuple[int, ...]] = {
+    "joint_positions_deg": (len(SO101_JOINTS),),
+    "source_square_xyz_m": (3,),
+    "target_square_xyz_m": (3,),
+    "piece_square_index": (1,),
+    "holding_piece": (1,),
+    "phase_index": (1,),
+    "mujoco_active": (1,),
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -86,8 +104,117 @@ def waypoint_error_deg(current: dict[str, float], targets: dict[str, float]) -> 
     return total**0.5
 
 
+def shape_list(value: Any) -> list[int] | None:
+    shape = getattr(value, "shape", None)
+    if shape is None:
+        return None
+    return [int(item) for item in tuple(shape)]
+
+
+def dtype_name(value: Any) -> str | None:
+    dtype = getattr(value, "dtype", None)
+    return str(dtype) if dtype is not None else None
+
+
+def summarize_observation(obs: dict[str, Any]) -> dict[str, Any]:
+    keys = list(obs.keys())
+    expected = list(EXPECTED_OBSERVATION_KEYS)
+    shapes = {key: shape_list(obs.get(key)) for key in expected}
+    dtypes = {key: dtype_name(obs.get(key)) for key in expected}
+    return {
+        "keys": keys,
+        "expected_keys": expected,
+        "missing_keys": [key for key in expected if key not in obs],
+        "unexpected_keys": [key for key in keys if key not in expected],
+        "shapes": shapes,
+        "expected_shapes": {
+            key: list(shape) for key, shape in EXPECTED_OBSERVATION_SHAPES.items()
+        },
+        "shape_mismatches": [
+            key
+            for key, expected_shape in EXPECTED_OBSERVATION_SHAPES.items()
+            if shape_list(obs.get(key)) != list(expected_shape)
+        ],
+        "dtypes": dtypes,
+    }
+
+
+def space_bounds_all(space: Any, expected: float) -> bool | None:
+    values = getattr(space, "low" if expected < 0 else "high", None)
+    if values is None:
+        return None
+    try:
+        import numpy as np
+
+        return bool(np.all(np.asarray(values, dtype=float) == expected))
+    except Exception:
+        return None
+
+
+def summarize_gymnasium_api_contract(
+    env: Any,
+    *,
+    reset_obs: dict[str, Any],
+    final_obs: dict[str, Any],
+) -> dict[str, Any]:
+    action_space = getattr(env, "action_space", None)
+    observation_space = getattr(env, "observation_space", None)
+    observation_spaces = getattr(observation_space, "spaces", None)
+    observation_space_keys = (
+        sorted(str(key) for key in observation_spaces.keys())
+        if isinstance(observation_spaces, dict)
+        else []
+    )
+    action_shape = shape_list(action_space)
+    observation_space_missing_keys = [
+        key for key in EXPECTED_OBSERVATION_KEYS if key not in observation_space_keys
+    ]
+    observation_space_unexpected_keys = [
+        key for key in observation_space_keys if key not in EXPECTED_OBSERVATION_KEYS
+    ]
+    reset_summary = summarize_observation(reset_obs)
+    final_summary = summarize_observation(final_obs)
+    ok = (
+        action_shape == [len(SO101_JOINTS)]
+        and dtype_name(action_space) == "float32"
+        and space_bounds_all(action_space, -1.0) is True
+        and space_bounds_all(action_space, 1.0) is True
+        and observation_space_keys == sorted(EXPECTED_OBSERVATION_KEYS)
+        and not observation_space_missing_keys
+        and not observation_space_unexpected_keys
+        and reset_summary["missing_keys"] == []
+        and reset_summary["unexpected_keys"] == []
+        and reset_summary["shape_mismatches"] == []
+        and final_summary["missing_keys"] == []
+        and final_summary["unexpected_keys"] == []
+        and final_summary["shape_mismatches"] == []
+    )
+    return {
+        "ok": ok,
+        "action_space_present": action_space is not None,
+        "action_space_type": type(action_space).__name__ if action_space is not None else None,
+        "action_space_shape": action_shape,
+        "action_space_dtype": dtype_name(action_space),
+        "action_space_low_all_minus_one": space_bounds_all(action_space, -1.0),
+        "action_space_high_all_one": space_bounds_all(action_space, 1.0),
+        "controlled_joint_count": len(SO101_JOINTS),
+        "controlled_joints": list(SO101_JOINTS),
+        "observation_space_present": observation_space is not None,
+        "observation_space_type": type(observation_space).__name__
+        if observation_space is not None
+        else None,
+        "observation_space_keys": observation_space_keys,
+        "expected_observation_keys": list(EXPECTED_OBSERVATION_KEYS),
+        "observation_space_missing_keys": observation_space_missing_keys,
+        "observation_space_unexpected_keys": observation_space_unexpected_keys,
+        "reset_observation": reset_summary,
+        "final_observation": final_summary,
+    }
+
+
 def run_scripted_pick_place(env: Any, action_toward_targets: Any, *, max_steps: int) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     obs, info = env.reset()
+    reset_obs = obs
     rows: list[dict[str, Any]] = []
     total_reward = 0.0
     terminated = False
@@ -121,6 +248,7 @@ def run_scripted_pick_place(env: Any, action_toward_targets: Any, *, max_steps: 
         if terminated or truncated:
             break
 
+    final_obs = obs
     final_scene = info["scene_state"]
     result = {
         "terminated": bool(terminated),
@@ -136,6 +264,11 @@ def run_scripted_pick_place(env: Any, action_toward_targets: Any, *, max_steps: 
             and not final_scene["piece"]["held_by_gripper"]
         ),
         "final_info": info,
+        "gymnasium_api_contract": summarize_gymnasium_api_contract(
+            env,
+            reset_obs=reset_obs,
+            final_obs=final_obs,
+        ),
     }
     return result, rows
 
@@ -152,6 +285,7 @@ def write_readme(path: Path, summary: dict[str, Any], steps_path: Path) -> None:
         f"- Gymnasium available: `{summary['dependencies']['gymnasium']}`",
         f"- MuJoCo available: `{summary['dependencies']['mujoco']}`",
         f"- Gymnasium task wiring: `{summary.get('gymnasium_task_wiring_status')}`",
+        f"- Gymnasium API contract ok: `{summary.get('gymnasium_api_contract', {}).get('ok')}`",
         f"- MuJoCo backend ok: `{summary['sim_status'].get('ok')}`",
         f"- Joint-state fallback active: `{summary.get('joint_state_fallback_active')}`",
         f"- Contact model: `{summary['contact_model']}`",
@@ -344,6 +478,8 @@ def main() -> int:
         sim_status = scripted_result["final_info"]["sim_status"]
         if args.require_mujoco and not sim_status.get("ok"):
             hard_failures.append("mujoco_backend_required_but_not_loaded")
+        if not scripted_result["gymnasium_api_contract"].get("ok"):
+            hard_failures.append("gymnasium_api_contract_invalid")
         if not scripted_result.get("scripted_pick_place_complete"):
             hard_failures.append("scripted_pick_place_incomplete")
     finally:
@@ -395,6 +531,7 @@ def main() -> int:
         "mujoco_backend_loaded": mujoco_backend_loaded,
         "joint_state_fallback_active": joint_state_fallback_active,
         "gymnasium_task_wiring_status": gymnasium_task_wiring_status,
+        "gymnasium_api_contract": scripted_result["gymnasium_api_contract"],
         "training_authority_status": training_authority_status,
         "training_authority_blockers": training_authority_blockers,
         "contact_model": scene_state.get("contact_model"),

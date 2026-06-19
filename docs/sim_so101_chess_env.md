@@ -15,11 +15,16 @@ The script writes:
 
 The summary exposes `gymnasium_task_wiring_status`,
 `mujoco_backend_required`, `mujoco_backend_loaded`,
-`joint_state_fallback_active`, `ready_for_policy_training`, and
+`joint_state_fallback_active`, `gymnasium_api_contract`,
+`ready_for_policy_training`, and
 `training_authority_status` so fallback, development-MuJoCo, and failed required
 backend modes are distinguishable in CI. The smoke fails closed when the
 environment configuration is invalid or when the scripted pick/place episode
 does not complete inside the configured step budget.
+Runnable cases also record the Gymnasium-facing action and observation contract:
+a six-value `float32` action space for the SO-101 controlled joints,
+observation-space keys, reset/final observation keys, shapes, dtypes, and any
+missing or mismatched fields.
 
 By default the smoke accepts the existing joint-state fallback and records
 whether Gymnasium and MuJoCo are importable. To require a real MuJoCo backend,
@@ -65,7 +70,9 @@ instead of reporting a green env smoke, and a generated development MJCF can
 drive the Gymnasium task without becoming reviewed SO-101 truth. The matrix also
 checks the development scene fixture contract: no reviewed MuJoCo handoff is
 requested or consumed, physical SO-101 authority stays false, and policy/model
-readiness stays false.
+readiness stays false. All runnable matrix cases must keep the six-action
+Gymnasium API contract valid, while invalid task configuration remains
+fail-closed before an environment contract is created.
 
 This is the bridge between the existing calibration/model-readiness evidence
 and later policy training. It should become a hard MuJoCo gate after the SO-101
