@@ -4438,7 +4438,7 @@ jobs:
               assert (model_bundle_manifest_matrix_dir / relative_path).is_file(), relative_path
           assert model_bundle_manifest_matrix["ok"] is True, model_bundle_manifest_matrix
           assert model_bundle_manifest_matrix["status"] == "ok", model_bundle_manifest_matrix
-          assert model_bundle_manifest_matrix["case_count"] == 19, model_bundle_manifest_matrix
+          assert model_bundle_manifest_matrix["case_count"] == 20, model_bundle_manifest_matrix
           assert model_bundle_manifest_matrix["failed_case_ids"] == [], model_bundle_manifest_matrix
           assert (
               model_bundle_manifest_matrix["model_authority"]
