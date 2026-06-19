@@ -229,6 +229,7 @@ jobs:
               "candidate_unverified",
               "authoritative_missing_review_metadata",
               "authoritative_placeholder_review_metadata",
+              "authoritative_angle_bracket_placeholder_review_metadata",
               "authoritative_thin_review_metadata",
               "authoritative_invalid_review_url",
               "authoritative_placeholder_source_metadata",
@@ -247,6 +248,15 @@ jobs:
           assert "review_trace" in thin_review["observations"]["source_authority_review_evidence_missing_required_groups"], thin_review
           assert "review_artifact" in thin_review["observations"]["source_authority_review_evidence_missing_required_groups"], thin_review
           assert "record_source_authority_review_metadata" in thin_review["observations"]["next_required_action_ids"], thin_review
+          angle_bracket_placeholder_review = by_case["authoritative_angle_bracket_placeholder_review_metadata"]
+          assert angle_bracket_placeholder_review["observations"]["source_authority_gate_status"] == "source_authority_blocked_review_metadata", angle_bracket_placeholder_review
+          assert angle_bracket_placeholder_review["observations"]["source_authority_review_status"] == "review_metadata_missing", angle_bracket_placeholder_review
+          assert angle_bracket_placeholder_review["observations"]["source_authority_review_ready"] is False, angle_bracket_placeholder_review
+          angle_bracket_review = angle_bracket_placeholder_review["observations"]["source_authority_review"]
+          assert "authority_reviewed_by" in angle_bracket_review["review_evidence_placeholder_fields"], angle_bracket_placeholder_review
+          assert "authority_reviewed_at" in angle_bracket_review["review_evidence_placeholder_fields"], angle_bracket_placeholder_review
+          assert "authority_review_id" in angle_bracket_review["review_evidence_placeholder_fields"], angle_bracket_placeholder_review
+          assert "record_source_authority_review_metadata" in angle_bracket_placeholder_review["observations"]["next_required_action_ids"], angle_bracket_placeholder_review
           invalid_review_url = by_case["authoritative_invalid_review_url"]
           assert invalid_review_url["observations"]["source_authority_gate_status"] == "source_authority_blocked_review_metadata", invalid_review_url
           assert "authority_review_url" in invalid_review_url["observations"]["source_authority_review_evidence_invalid_fields"], invalid_review_url

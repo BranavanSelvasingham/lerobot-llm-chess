@@ -339,6 +339,9 @@ def normalized_review_text(value: Any) -> str:
 def placeholder_review_evidence(value: Any) -> bool:
     if not non_empty(value) or not isinstance(value, str):
         return False
+    stripped = value.strip()
+    if stripped.startswith("<") and stripped.endswith(">"):
+        return True
     normalized = normalized_review_text(value)
     return normalized in PLACEHOLDER_REVIEW_EVIDENCE_VALUES or any(
         normalized.startswith(prefix) for prefix in PLACEHOLDER_REVIEW_EVIDENCE_PREFIXES
@@ -880,7 +883,7 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
         ),
         "notes": [
             "This metadata describes the inventory-level source-authority review declaration only.",
-            "Placeholder review evidence, source references, or license bases such as TODO/TBD/unknown do not satisfy source-authority readiness.",
+            "Placeholder review evidence, source references, or license bases such as TODO/TBD/unknown or unedited <...> template tokens do not satisfy source-authority readiness.",
             "Source-authority review evidence requires reviewer identity plus a stable review artifact handle: authority_review_id or authority_review_url.",
             "Source-authority readiness also requires explicit review scopes for model identity, provenance, and license, plus a non-placeholder source reference and license basis.",
             "The bundle manifest still must declare reviewed provenance, mesh authority, joint limits, target frame, TCP offset, and base-to-board alignment before model-backed IK is trusted.",

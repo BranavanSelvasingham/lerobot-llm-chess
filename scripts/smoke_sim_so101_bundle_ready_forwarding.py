@@ -412,9 +412,9 @@ def placeholder_review_metadata_manifest_payload(model_filename: str) -> dict[st
         "tcp_offset_authority",
         "base_to_board_alignment_authority",
     ):
-        payload[review_field]["reviewed_by"] = "TODO"
-        payload[review_field]["reviewed_at"] = "TBD"
-        payload[review_field]["review_id"] = "TODO"
+        payload[review_field]["reviewed_by"] = "<reviewer-or-team>"
+        payload[review_field]["reviewed_at"] = "<review-date-YYYY-MM-DD>"
+        payload[review_field]["review_id"] = "<stable-review-ticket-commit-or-artifact-id>"
     return payload
 
 

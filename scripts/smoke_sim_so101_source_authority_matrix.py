@@ -251,6 +251,25 @@ def placeholder_review_args() -> list[str]:
     ]
 
 
+def angle_bracket_placeholder_review_args() -> list[str]:
+    return [
+        "--authority-license-basis",
+        "synthetic fixture license for hardware-free source-authority matrix only",
+        "--authority-review-scope",
+        "model_identity",
+        "--authority-review-scope",
+        "provenance",
+        "--authority-review-scope",
+        "license",
+        "--authority-reviewed-by",
+        "<reviewer-or-team>",
+        "--authority-reviewed-at",
+        "<review-date-YYYY-MM-DD>",
+        "--authority-review-id",
+        "<stable-review-ticket-commit-or-artifact-id>",
+    ]
+
+
 def thin_review_args() -> list[str]:
     return [
         "--authority-license-basis",
@@ -386,6 +405,37 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "--authoritative-path",
                 str(fixtures["single_model"]),
                 *placeholder_review_args(),
+            ],
+            "expect": {
+                "status": "authoritative_model_found",
+                "candidate_count": 1,
+                "authoritative_candidate_count": 1,
+                "source_authority_gate_status": "source_authority_blocked_review_metadata",
+                "source_authority_review_status": "review_metadata_missing",
+                "source_authority_review_ready": False,
+                "source_intake_status": "source_review_metadata_required",
+                "review_packet_status": "review_packet_source_authority_review_metadata_needed",
+                "blockers_contain": ["record_source_authority_review_metadata"],
+                "actions_contain": [
+                    "record_source_authority_review_metadata",
+                    "run_so101_model_bundle_probe",
+                    "supply_reviewed_so101_model_bundle_manifest",
+                ],
+                "placeholder_review_fields_contain": [
+                    "authority_reviewed_at",
+                    "authority_reviewed_by",
+                    "authority_review_id",
+                ],
+            },
+        },
+        {
+            "case_id": "authoritative_angle_bracket_placeholder_review_metadata",
+            "args": [
+                "--root",
+                str(fixtures["single_root"]),
+                "--authoritative-path",
+                str(fixtures["single_model"]),
+                *angle_bracket_placeholder_review_args(),
             ],
             "expect": {
                 "status": "authoritative_model_found",

@@ -620,6 +620,9 @@ def placeholder_review_evidence(value: Any) -> bool:
         return False
     if not isinstance(value, str):
         return False
+    stripped = value.strip()
+    if stripped.startswith("<") and stripped.endswith(">"):
+        return True
     normalized = normalized_review_text(value)
     return normalized in PLACEHOLDER_REVIEW_EVIDENCE_VALUES or any(
         normalized.startswith(prefix) for prefix in PLACEHOLDER_REVIEW_EVIDENCE_PREFIXES
@@ -1248,7 +1251,7 @@ def inspect_provenance(manifest: dict[str, Any] | None) -> dict[str, Any]:
         },
         "notes": (
             "Provenance requires source reference, export tool, and license basis fields. "
-            "Placeholder values such as TODO/TBD/unknown do not satisfy provenance readiness. "
+            "Placeholder values such as TODO/TBD/unknown or unedited <...> template tokens do not satisfy provenance readiness. "
             "Synthetic, test-only, smoke, or hardware-free provenance remains automation evidence only."
         ),
     }

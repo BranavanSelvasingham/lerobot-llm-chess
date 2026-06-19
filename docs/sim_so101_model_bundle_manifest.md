@@ -195,10 +195,10 @@ then rerun this checker; the template artifact itself is never reviewed
 physical SO-101 authority.
 
 Review evidence fields must be actual identifiers, dates, tickets, or URLs.
-Placeholder strings such as `TODO`, `TBD`, `unknown`, `placeholder`, or
-`review required` are reported as `review_evidence_placeholder` diagnostics and
-do not satisfy authority readiness, even when the review status itself is an
-accepted value.
+Placeholder strings such as `TODO`, `TBD`, `unknown`, `placeholder`,
+`review required`, or unedited template tokens like `<reviewer-or-team>` are
+reported as `review_evidence_placeholder` diagnostics and do not satisfy
+authority readiness, even when the review status itself is an accepted value.
 The same placeholder rule applies to provenance source, export-tool, and
 license-basis fields: a ready-shaped manifest with placeholder provenance stays
 `model_bundle_manifest_needs_follow_up` and remains diagnostic-only.
