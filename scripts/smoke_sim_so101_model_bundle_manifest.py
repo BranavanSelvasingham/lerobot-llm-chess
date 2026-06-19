@@ -2580,6 +2580,8 @@ def bundle_intake_status(summary: dict[str, Any]) -> str:
 def bundle_intake_manifest_fields(missing_input: str) -> list[str]:
     if missing_input == "--manifest-path":
         return ["--manifest-path"]
+    if missing_input == "non_blocking_contract_checker_result":
+        return ["model_path", "asset_roots", "target_frame"]
     return review_packet_manifest_fields({"requirement_id": missing_input})
 
 
@@ -2597,6 +2599,15 @@ def bundle_intake_required_inputs(missing_input: str) -> list[str]:
         "base_to_board_alignment_authority",
     }:
         fields.extend(["reviewed_by", "review_id|review_url", "review_scope"])
+    elif missing_input == "non_blocking_contract_checker_result":
+        fields.extend(
+            [
+                "contract checker non-blocking",
+                "SO-101 joints visible",
+                "target frame visible",
+                "mesh asset preflight non-blocking",
+            ]
+        )
     return unique_strings(fields)
 
 

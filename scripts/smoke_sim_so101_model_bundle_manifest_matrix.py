@@ -110,6 +110,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "review_requirements_url_fields",
         "bundle_intake_status",
         "bundle_intake_action_ids",
+        "contract_preflight_intake_manifest_fields",
+        "contract_preflight_intake_required_inputs",
         "synthetic_fixture_authority_fields",
         "expected_ready",
         "errors",
@@ -165,6 +167,16 @@ def review_requirement_by_id(
             and requirement.get("requirement_id") == requirement_id
         ):
             return requirement
+    return {}
+
+
+def bundle_intake_action_by_id(
+    bundle_intake: dict[str, Any],
+    action_id: str,
+) -> dict[str, Any]:
+    for action in bundle_intake.get("actions") or []:
+        if isinstance(action, dict) and action.get("action_id") == action_id:
+            return action
     return {}
 
 
@@ -599,6 +611,10 @@ def summarize_case(
     artifacts = artifacts if isinstance(artifacts, dict) else {}
     bundle_intake = summary.get("bundle_intake_checklist")
     bundle_intake = bundle_intake if isinstance(bundle_intake, dict) else {}
+    contract_preflight_intake = bundle_intake_action_by_id(
+        bundle_intake,
+        "clear_model_contract_and_asset_preflight",
+    )
     review_requirements = summary.get("review_requirements")
     review_requirements = review_requirements if isinstance(review_requirements, dict) else {}
     review_requirements_url_fields = assert_review_requirements_url_policy(
@@ -682,6 +698,27 @@ def summarize_case(
         next_required_action_ids,
         expect.get("next_actions", []),
     )
+    if (
+        "clear_model_contract_and_asset_preflight"
+        in (next_required_action_ids if isinstance(next_required_action_ids, list) else [])
+    ):
+        add_error(
+            errors,
+            f"{case_id}.contract_preflight_intake.manifest_fields",
+            contract_preflight_intake.get("manifest_fields"),
+            ["model_path", "asset_roots", "target_frame"],
+        )
+        expect_contains(
+            errors,
+            f"{case_id}.contract_preflight_intake.required_inputs",
+            contract_preflight_intake.get("required_inputs"),
+            [
+                "contract checker non-blocking",
+                "SO-101 joints visible",
+                "target frame visible",
+                "mesh asset preflight non-blocking",
+            ],
+        )
     expect_contains(
         errors,
         f"{case_id}.synthetic_fixture_authority_fields",
@@ -807,6 +844,12 @@ def summarize_case(
             "review_requirements_url_fields": review_requirements_url_fields,
             "bundle_intake_status": bundle_intake.get("status"),
             "bundle_intake_action_ids": bundle_intake.get("action_ids"),
+            "contract_preflight_intake_manifest_fields": (
+                contract_preflight_intake.get("manifest_fields")
+            ),
+            "contract_preflight_intake_required_inputs": (
+                contract_preflight_intake.get("required_inputs")
+            ),
             "synthetic_fixture_authority_fields": summary.get(
                 "synthetic_fixture_authority_fields"
             ),
@@ -883,6 +926,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "review_requirements_url_fields": obs.get("review_requirements_url_fields"),
         "bundle_intake_status": obs.get("bundle_intake_status"),
         "bundle_intake_action_ids": obs.get("bundle_intake_action_ids"),
+        "contract_preflight_intake_manifest_fields": obs.get(
+            "contract_preflight_intake_manifest_fields"
+        ),
+        "contract_preflight_intake_required_inputs": obs.get(
+            "contract_preflight_intake_required_inputs"
+        ),
         "synthetic_fixture_authority_fields": obs.get(
             "synthetic_fixture_authority_fields"
         ),
