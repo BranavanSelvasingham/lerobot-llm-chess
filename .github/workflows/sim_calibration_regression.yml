@@ -232,6 +232,7 @@ jobs:
               "authoritative_thin_review_metadata",
               "authoritative_invalid_review_url",
               "authoritative_placeholder_source_metadata",
+              "authoritative_non_so101_relevance_rejected",
               "authoritative_complete_source_review",
               "authoritative_single_root_complete_source_review",
               "authoritative_root_ambiguous",
@@ -258,6 +259,16 @@ jobs:
           assert "authority_source_reference" in placeholder_source_metadata["observations"]["source_authority_required_metadata_placeholder_fields"], placeholder_source_metadata
           assert "authority_license_basis" in placeholder_source_metadata["observations"]["source_authority_required_metadata_placeholder_fields"], placeholder_source_metadata
           assert "record_source_authority_review_metadata" in placeholder_source_metadata["observations"]["next_required_action_ids"], placeholder_source_metadata
+          non_so101 = by_case["authoritative_non_so101_relevance_rejected"]
+          assert non_so101["observations"]["inventory_status"] == "authoritative_model_not_so101_relevant", non_so101
+          assert non_so101["observations"]["source_authority_gate_status"] == "source_authority_blocked_candidate_not_so101_relevant", non_so101
+          assert non_so101["observations"]["source_authority_review_ready"] is True, non_so101
+          assert non_so101["observations"]["selected_authoritative_candidate_so101_relevance"] == "low", non_so101
+          assert non_so101["observations"]["selected_authoritative_candidate_so101_relevance_ready"] is False, non_so101
+          assert non_so101["observations"]["source_intake_status"] == "source_candidate_relevance_required", non_so101
+          assert non_so101["observations"]["review_packet_status"] == "review_packet_authoritative_candidate_not_so101_relevant", non_so101
+          assert "select_so101_relevant_authoritative_model_source" in non_so101["observations"]["next_required_action_ids"], non_so101
+          assert "run_so101_model_bundle_probe" not in non_so101["observations"]["next_required_action_ids"], non_so101
           assert by_case["authoritative_complete_source_review"]["observations"]["source_authority_gate_status"] == "source_authority_ready", by_case["authoritative_complete_source_review"]
           assert by_case["authoritative_complete_source_review"]["observations"]["source_intake_status"] == "source_authority_ready_waiting_for_bundle_manifest", by_case["authoritative_complete_source_review"]
           assert by_case["authoritative_single_root_complete_source_review"]["observations"]["source_authority_gate_status"] == "source_authority_ready", by_case["authoritative_single_root_complete_source_review"]
@@ -1845,6 +1856,7 @@ jobs:
           assert source_inventory["source_authority_gate_status"] in {
               "source_authority_blocked_missing_authoritative_model",
               "source_authority_blocked_ambiguous_authoritative_model",
+              "source_authority_blocked_candidate_not_so101_relevant",
               "source_authority_blocked_review_metadata",
               "source_authority_ready",
           }, source_inventory
@@ -1874,6 +1886,7 @@ jobs:
               "review_packet_waiting_for_model_source_root",
               "review_packet_source_candidates_need_authority_review",
               "review_packet_multiple_authoritative_candidates_need_selection",
+              "review_packet_authoritative_candidate_not_so101_relevant",
               "review_packet_source_authority_review_metadata_needed",
               "review_packet_source_authority_ready",
           }, source_inventory
@@ -1894,6 +1907,7 @@ jobs:
               "source_root_required",
               "source_authority_review_required",
               "single_source_selection_required",
+              "source_candidate_relevance_required",
               "source_review_metadata_required",
               "source_authority_ready_waiting_for_bundle_manifest",
           }, source_inventory
@@ -1972,7 +1986,21 @@ jobs:
               assert source_inventory["source_intake_status"] == "source_review_metadata_required", source_inventory
               assert "record_source_authority_review_metadata" in source_inventory["source_authority_blockers"], source_inventory
               assert "record_source_authority_review_metadata" in source_inventory["next_required_action_ids"], source_inventory
-          if source_inventory["authoritative_candidate_count"] == 1 and source_inventory["source_authority_review_ready"] is True:
+          if (
+              source_inventory["authoritative_candidate_count"] == 1
+              and source_inventory.get("selected_authoritative_candidate_so101_relevance_ready") is False
+          ):
+              assert source_inventory["source_authority_gate_status"] == "source_authority_blocked_candidate_not_so101_relevant", source_inventory
+              assert source_inventory["review_packet_status"] == "review_packet_authoritative_candidate_not_so101_relevant", source_inventory
+              assert source_inventory["source_intake_status"] == "source_candidate_relevance_required", source_inventory
+              assert "select_so101_relevant_authoritative_model_source" in source_inventory["source_authority_blockers"], source_inventory
+              assert "select_so101_relevant_authoritative_model_source" in source_inventory["next_required_action_ids"], source_inventory
+              assert "run_so101_model_bundle_probe" not in source_inventory["next_required_action_ids"], source_inventory
+          if (
+              source_inventory["authoritative_candidate_count"] == 1
+              and source_inventory["source_authority_review_ready"] is True
+              and source_inventory.get("selected_authoritative_candidate_so101_relevance_ready") is True
+          ):
               assert source_inventory["source_authority_gate_status"] == "source_authority_ready", source_inventory
               assert source_inventory["review_packet_status"] == "review_packet_source_authority_ready", source_inventory
               assert source_inventory["source_authority_blockers"] == [], source_inventory
@@ -2796,6 +2824,7 @@ jobs:
               assert metrics.get("source_authority_gate_status") in {
                   "source_authority_blocked_missing_authoritative_model",
                   "source_authority_blocked_ambiguous_authoritative_model",
+                  "source_authority_blocked_candidate_not_so101_relevant",
                   "source_authority_blocked_review_metadata",
                   "source_authority_ready",
               }, metrics
@@ -2826,6 +2855,7 @@ jobs:
                   "review_packet_waiting_for_model_source_root",
                   "review_packet_source_candidates_need_authority_review",
                   "review_packet_multiple_authoritative_candidates_need_selection",
+                  "review_packet_authoritative_candidate_not_so101_relevant",
                   "review_packet_source_authority_review_metadata_needed",
                   "review_packet_source_authority_ready",
               }, metrics
@@ -2841,6 +2871,7 @@ jobs:
                   "source_root_required",
                   "source_authority_review_required",
                   "single_source_selection_required",
+                  "source_candidate_relevance_required",
                   "source_review_metadata_required",
                   "source_authority_ready_waiting_for_bundle_manifest",
               }, metrics

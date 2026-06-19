@@ -392,13 +392,15 @@ The smoke creates synthetic URDF fixtures under the output directory, invokes
 `scripts/smoke_sim_so101_model_source_inventory.py` for missing-root,
 unverified-candidate, missing-review-metadata, placeholder-review-metadata,
 thin-review-metadata, placeholder-source/license-metadata,
-complete-source-review, single-authoritative-root review, and
-ambiguous-authoritative-root cases, and writes
+non-SO-101 authoritative-source rejection, complete-source-review,
+single-authoritative-root review, and ambiguous-authoritative-root cases, and writes
 `so101_source_authority_matrix_summary.json`,
 `so101_source_authority_matrix_cases.csv`, and `README.md`. The
 source-authority-ready fixture case proves only the inventory state transition
 to `source_authority_ready`, including that a narrowed authoritative root
 selects the same authoritative model path as an explicit authoritative path;
+the non-SO-101 authoritative fixture must stay blocked and must not queue bundle
+probing even when complete review metadata is supplied;
 every case keeps `source_intake_not_authority`,
 `review_packet_not_authority`, and false physical-authority flags.
 

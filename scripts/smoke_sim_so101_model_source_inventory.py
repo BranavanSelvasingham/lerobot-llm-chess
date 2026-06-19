@@ -151,6 +151,14 @@ SOURCE_INVENTORY_ACTIONS = {
             "--authoritative-root so it contains only the selected SO-101 model source."
         ),
     },
+    "select_so101_relevant_authoritative_model_source": {
+        "gate": "reviewed_model_authority",
+        "title": "Select an SO-101-relevant authoritative model source",
+        "detail": (
+            "Rerun with --authoritative-path pointing at a reviewed model file whose "
+            "filename, robot name, joints, or target frame match the SO-101 source contract."
+        ),
+    },
     "run_so101_model_bundle_probe": {
         "gate": "reviewed_model_authority",
         "title": "Generate a reviewed-bundle manifest draft",
@@ -170,6 +178,7 @@ def source_inventory_next_required(
     likely_candidate_count: int,
     direct_contract_candidate_count: int,
     authoritative_candidate_count: int,
+    selected_authoritative_candidate_so101_relevance_ready: bool,
     source_authority_review_ready: bool,
     recommended_contract_check: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
@@ -180,9 +189,14 @@ def source_inventory_next_required(
         action_ids.append("review_and_declare_authoritative_so101_model_source")
     elif authoritative_candidate_count > 1:
         action_ids.append("select_single_authoritative_so101_model_source")
+    elif not selected_authoritative_candidate_so101_relevance_ready:
+        action_ids.append("select_so101_relevant_authoritative_model_source")
     elif not source_authority_review_ready:
         action_ids.append("record_source_authority_review_metadata")
-    if authoritative_candidate_count <= 1:
+    if authoritative_candidate_count <= 1 and (
+        authoritative_candidate_count == 0
+        or selected_authoritative_candidate_so101_relevance_ready
+    ):
         if recommended_contract_check:
             action_ids.append("run_so101_model_bundle_probe")
         elif direct_contract_candidate_count > 0 or likely_candidate_count > 0:
@@ -213,12 +227,15 @@ def action_ids(actions: list[dict[str, Any]]) -> list[str]:
 def source_authority_gate_status(
     *,
     authoritative_candidate_count: int,
+    selected_authoritative_candidate_so101_relevance_ready: bool,
     source_authority_review_ready: bool,
 ) -> str:
     if authoritative_candidate_count <= 0:
         return "source_authority_blocked_missing_authoritative_model"
     if authoritative_candidate_count > 1:
         return "source_authority_blocked_ambiguous_authoritative_model"
+    if not selected_authoritative_candidate_so101_relevance_ready:
+        return "source_authority_blocked_candidate_not_so101_relevant"
     if not source_authority_review_ready:
         return "source_authority_blocked_review_metadata"
     return "source_authority_ready"
@@ -228,6 +245,7 @@ def source_authority_blockers(
     *,
     candidate_count: int,
     authoritative_candidate_count: int,
+    selected_authoritative_candidate_so101_relevance_ready: bool,
     source_authority_review_ready: bool,
 ) -> list[str]:
     blockers: list[str] = []
@@ -237,6 +255,8 @@ def source_authority_blockers(
         blockers.append("review_and_declare_authoritative_so101_model_source")
     elif authoritative_candidate_count > 1:
         blockers.append("select_single_authoritative_so101_model_source")
+    elif not selected_authoritative_candidate_so101_relevance_ready:
+        blockers.append("select_so101_relevant_authoritative_model_source")
     elif not source_authority_review_ready:
         blockers.append("record_source_authority_review_metadata")
     return blockers
@@ -246,6 +266,7 @@ def source_inventory_review_packet_status(
     *,
     candidate_count: int,
     authoritative_candidate_count: int,
+    selected_authoritative_candidate_so101_relevance_ready: bool,
     source_authority_review_ready: bool,
 ) -> str:
     if candidate_count <= 0:
@@ -254,6 +275,8 @@ def source_inventory_review_packet_status(
         return "review_packet_source_candidates_need_authority_review"
     if authoritative_candidate_count > 1:
         return "review_packet_multiple_authoritative_candidates_need_selection"
+    if not selected_authoritative_candidate_so101_relevance_ready:
+        return "review_packet_authoritative_candidate_not_so101_relevant"
     if not source_authority_review_ready:
         return "review_packet_source_authority_review_metadata_needed"
     return "review_packet_source_authority_ready"
@@ -270,6 +293,8 @@ def authoritative_source_selection_status(authoritative_candidate_count: int) ->
 def candidate_review_packet_status(candidate: dict[str, Any]) -> str:
     if not candidate.get("authoritative"):
         return "candidate_needs_source_authority_review"
+    if candidate.get("likely_so101_relevance") not in {"high", "medium"}:
+        return "authoritative_candidate_not_so101_relevant"
     if candidate.get("source_authority_review_status") != "review_metadata_supplied":
         return "authoritative_candidate_needs_review_metadata"
     return "source_authority_review_metadata_supplied"
@@ -621,10 +646,21 @@ def infer_model_format(path: Path, xml_info: dict[str, Any]) -> str:
     return "unknown"
 
 
-def relevance_for(path: Path, sample_text: str, xml_info: dict[str, Any]) -> tuple[str, int, list[str]]:
+def relevance_for(
+    path: Path,
+    sample_text: str,
+    xml_info: dict[str, Any],
+    source_root: Path | None = None,
+) -> tuple[str, int, list[str]]:
     score = 0
     reasons: list[str] = []
-    path_lower = str(path).lower()
+    try:
+        path_for_relevance = (
+            str(path.relative_to(source_root)) if source_root is not None else path.name
+        )
+    except ValueError:
+        path_for_relevance = path.name
+    path_lower = path_for_relevance.lower()
     sample_lower = sample_text.lower()
     root_name = str(xml_info.get("root_name") or "").lower()
 
@@ -943,7 +979,9 @@ def build_candidate(
         diagnostics.append("candidate_path_missing")
 
     model_format = infer_model_format(path, xml_info)
-    relevance, relevance_score, relevance_reasons = relevance_for(path, sample_text, xml_info)
+    relevance, relevance_score, relevance_reasons = relevance_for(
+        path, sample_text, xml_info, source_root
+    )
     provenance = provenance_for(path, sample_text, source_root) if exists else {
         "provenance_status": "unknown",
         "evidence": [],
@@ -1080,9 +1118,13 @@ def build_source_inventory_review_packet(summary: dict[str, Any]) -> dict[str, A
     authoritative_candidates = [
         candidate for candidate in candidates if candidate.get("authoritative")
     ]
+    selected_so101_relevance_ready = (
+        summary.get("selected_authoritative_candidate_so101_relevance_ready") is True
+    )
     packet_status = source_inventory_review_packet_status(
         candidate_count=int(summary.get("candidate_count") or 0),
         authoritative_candidate_count=int(summary.get("authoritative_candidate_count") or 0),
+        selected_authoritative_candidate_so101_relevance_ready=selected_so101_relevance_ready,
         source_authority_review_ready=summary.get("source_authority_review_ready") is True,
     )
     items: list[dict[str, Any]] = []
@@ -1207,6 +1249,21 @@ def build_source_inventory_review_packet(summary: dict[str, Any]) -> dict[str, A
         or candidate.get("direct_robot_kinematics_compatible") is True
     ]
     for candidate in review_candidates[:20]:
+        if (
+            candidate.get("authoritative")
+            and candidate.get("likely_so101_relevance") not in {"high", "medium"}
+        ):
+            next_action_id = "select_so101_relevant_authoritative_model_source"
+        elif (
+            candidate.get("authoritative")
+            and candidate.get("source_authority_review_status")
+            != "review_metadata_supplied"
+        ):
+            next_action_id = "record_source_authority_review_metadata"
+        elif not candidate.get("authoritative"):
+            next_action_id = "review_and_declare_authoritative_so101_model_source"
+        else:
+            next_action_id = "run_so101_model_bundle_probe"
         append_item(
             item_id=f"candidate:{candidate.get('candidate_id')}",
             item_type="candidate_source_evidence",
@@ -1218,14 +1275,7 @@ def build_source_inventory_review_packet(summary: dict[str, Any]) -> dict[str, A
             candidate_relevance=candidate.get("likely_so101_relevance"),
             source_authority_status=candidate.get("source_authority_status"),
             source_authority_review_status=candidate.get("source_authority_review_status"),
-            next_action_id=(
-                "record_source_authority_review_metadata"
-                if candidate.get("authoritative")
-                and candidate.get("source_authority_review_status") != "review_metadata_supplied"
-                else "review_and_declare_authoritative_so101_model_source"
-                if not candidate.get("authoritative")
-                else "run_so101_model_bundle_probe"
-            ),
+            next_action_id=next_action_id,
             evidence={
                 "model_format": candidate.get("model_format"),
                 "relevance_score": candidate.get("relevance_score"),
@@ -1270,6 +1320,7 @@ def build_source_inventory_review_packet(summary: dict[str, Any]) -> dict[str, A
             "needs_reviewed_bundle_manifest",
             "candidate_needs_source_authority_review",
             "authoritative_candidate_needs_review_metadata",
+            "authoritative_candidate_not_so101_relevant",
             "multiple_authoritative_candidates_need_selection",
             "pending",
         }
@@ -1331,6 +1382,8 @@ def source_intake_status(summary: dict[str, Any]) -> str:
         return "source_authority_review_required"
     if authoritative_candidate_count > 1:
         return "single_source_selection_required"
+    if summary.get("selected_authoritative_candidate_so101_relevance_ready") is not True:
+        return "source_candidate_relevance_required"
     if summary.get("source_authority_review_ready") is not True:
         return "source_review_metadata_required"
     return "source_authority_ready_waiting_for_bundle_manifest"
@@ -1350,6 +1403,7 @@ def source_intake_command_template(action_id: str) -> list[str]:
         "review_and_declare_authoritative_so101_model_source",
         "record_source_authority_review_metadata",
         "select_single_authoritative_so101_model_source",
+        "select_so101_relevant_authoritative_model_source",
     }:
         return [
             "python",
@@ -1517,6 +1571,11 @@ def build_summary(
     selected_authoritative_candidate = (
         authoritative_candidates[0] if len(authoritative_candidates) == 1 else None
     )
+    selected_authoritative_candidate_so101_relevance_ready = (
+        selected_authoritative_candidate is not None
+        and selected_authoritative_candidate.get("likely_so101_relevance")
+        in {"high", "medium"}
+    )
     direct_candidates = [
         candidate
         for candidate in candidates
@@ -1530,6 +1589,8 @@ def build_summary(
         status = "missing_authoritative_model"
     elif len(authoritative_candidates) > 1:
         status = "ambiguous_authoritative_model"
+    elif not selected_authoritative_candidate_so101_relevance_ready:
+        status = "authoritative_model_not_so101_relevant"
     else:
         status = "authoritative_model_found"
     selection_status = authoritative_source_selection_status(
@@ -1565,6 +1626,42 @@ def build_summary(
                 ),
             }
         )
+    elif not selected_authoritative_candidate_so101_relevance_ready:
+        diagnostics.append(
+            {
+                "diagnostic": "authoritative_model_not_so101_relevant",
+                "severity": "action_required",
+                "authoritative_candidate_count": len(authoritative_candidates),
+                "selected_authoritative_candidate_id": selected_authoritative_candidate.get(
+                    "candidate_id"
+                )
+                if selected_authoritative_candidate
+                else None,
+                "selected_authoritative_candidate_path": selected_authoritative_candidate.get(
+                    "path"
+                )
+                if selected_authoritative_candidate
+                else None,
+                "likely_so101_relevance": selected_authoritative_candidate.get(
+                    "likely_so101_relevance"
+                )
+                if selected_authoritative_candidate
+                else None,
+                "relevance_score": selected_authoritative_candidate.get("relevance_score")
+                if selected_authoritative_candidate
+                else None,
+                "relevance_reasons": selected_authoritative_candidate.get(
+                    "relevance_reasons"
+                )
+                if selected_authoritative_candidate
+                else [],
+                "reason": (
+                    "The selected authoritative file does not match the SO-101 "
+                    "source heuristic. Select a reviewed SO-101-relevant source "
+                    "before the source-authority gate can close."
+                ),
+            }
+        )
     elif not authority_review["ready"]:
         diagnostics.append(
             {
@@ -1587,7 +1684,11 @@ def build_summary(
         if not authoritative_candidates
         else None
     )
-    if contract_candidate and contract_candidate["direct_robot_kinematics_compatible"]:
+    if (
+        contract_candidate
+        and contract_candidate["direct_robot_kinematics_compatible"]
+        and contract_candidate["likely_so101_relevance"] in {"high", "medium"}
+    ):
         recommended_contract_check = {
             "command": [
                 sys.executable,
@@ -1607,12 +1708,18 @@ def build_summary(
         likely_candidate_count=len(likely_candidates),
         direct_contract_candidate_count=len(direct_candidates),
         authoritative_candidate_count=len(authoritative_candidates),
+        selected_authoritative_candidate_so101_relevance_ready=(
+            selected_authoritative_candidate_so101_relevance_ready
+        ),
         source_authority_review_ready=authority_review["ready"],
         recommended_contract_check=recommended_contract_check,
     )
     source_blockers = source_authority_blockers(
         candidate_count=len(candidates),
         authoritative_candidate_count=len(authoritative_candidates),
+        selected_authoritative_candidate_so101_relevance_ready=(
+            selected_authoritative_candidate_so101_relevance_ready
+        ),
         source_authority_review_ready=authority_review["ready"],
     )
 
@@ -1653,6 +1760,24 @@ def build_summary(
             if selected_authoritative_candidate
             else None
         ),
+        "selected_authoritative_candidate_so101_relevance": (
+            selected_authoritative_candidate.get("likely_so101_relevance")
+            if selected_authoritative_candidate
+            else None
+        ),
+        "selected_authoritative_candidate_so101_relevance_score": (
+            selected_authoritative_candidate.get("relevance_score")
+            if selected_authoritative_candidate
+            else None
+        ),
+        "selected_authoritative_candidate_so101_relevance_reasons": (
+            selected_authoritative_candidate.get("relevance_reasons")
+            if selected_authoritative_candidate
+            else []
+        ),
+        "selected_authoritative_candidate_so101_relevance_ready": (
+            selected_authoritative_candidate_so101_relevance_ready
+        ),
         "source_authority_review_status": authority_review["status"],
         "source_authority_review_ready": authority_review["ready"],
         "source_authority_review": authority_review,
@@ -1668,6 +1793,9 @@ def build_summary(
         ],
         "source_authority_gate_status": source_authority_gate_status(
             authoritative_candidate_count=len(authoritative_candidates),
+            selected_authoritative_candidate_so101_relevance_ready=(
+                selected_authoritative_candidate_so101_relevance_ready
+            ),
             source_authority_review_ready=authority_review["ready"],
         ),
         "source_authority_blockers": source_blockers,

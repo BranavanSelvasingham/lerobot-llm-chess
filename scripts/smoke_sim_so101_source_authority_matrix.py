@@ -86,6 +86,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "authoritative_candidate_count",
         "selected_authoritative_candidate_path",
         "selected_authoritative_candidate_sha256",
+        "selected_authoritative_candidate_so101_relevance",
+        "selected_authoritative_candidate_so101_relevance_ready",
         "source_authority_gate_status",
         "source_authority_review_status",
         "source_authority_review_ready",
@@ -160,22 +162,42 @@ def synthetic_urdf(robot_name: str) -> str:
 """
 
 
+def generic_non_so101_urdf(robot_name: str) -> str:
+    return f"""<?xml version="1.0"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Generic source-authority matrix fixture; deliberately not a target robot model. -->
+<robot name="{robot_name}">
+  <link name="base_link"/>
+  <link name="tool_link"/>
+  <joint name="tool_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="tool_link"/>
+  </joint>
+</robot>
+"""
+
+
 def create_fixtures(output_dir: Path) -> dict[str, Path]:
     fixture_dir = output_dir / "fixtures"
     single_root = fixture_dir / "single_source_root"
     ambiguous_root = fixture_dir / "ambiguous_source_root"
+    generic_root = fixture_dir / "generic_source_root"
     missing_root = fixture_dir / "missing_source_root"
     single_root.mkdir(parents=True, exist_ok=True)
     ambiguous_root.mkdir(parents=True, exist_ok=True)
+    generic_root.mkdir(parents=True, exist_ok=True)
     (single_root / "LICENSE").write_text("Synthetic fixture license for hardware-free smoke testing only.\n")
     (ambiguous_root / "LICENSE").write_text("Synthetic fixture license for hardware-free smoke testing only.\n")
+    (generic_root / "LICENSE").write_text("Synthetic fixture license for hardware-free smoke testing only.\n")
 
     single_model = single_root / "so101_synthetic_source.urdf"
     ambiguous_a = ambiguous_root / "so101_synthetic_source_a.urdf"
     ambiguous_b = ambiguous_root / "so101_synthetic_source_b.urdf"
+    generic_model = generic_root / "generic_robot_source.urdf"
     single_model.write_text(synthetic_urdf("so101_synthetic_source"))
     ambiguous_a.write_text(synthetic_urdf("so101_synthetic_source_a"))
     ambiguous_b.write_text(synthetic_urdf("so101_synthetic_source_b"))
+    generic_model.write_text(generic_non_so101_urdf("generic_robot_source"))
 
     return {
         "single_root": single_root,
@@ -183,6 +205,8 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "ambiguous_root": ambiguous_root,
         "ambiguous_model_a": ambiguous_a,
         "ambiguous_model_b": ambiguous_b,
+        "generic_root": generic_root,
+        "generic_model": generic_model,
         "missing_root": missing_root,
     }
 
@@ -500,6 +524,40 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "authoritative_non_so101_relevance_rejected",
+            "args": [
+                "--root",
+                str(fixtures["generic_root"]),
+                "--authoritative-path",
+                str(fixtures["generic_model"]),
+                *complete_review_args(),
+            ],
+            "expect": {
+                "status": "authoritative_model_not_so101_relevant",
+                "candidate_count": 1,
+                "authoritative_candidate_count": 1,
+                "source_authority_gate_status": "source_authority_blocked_candidate_not_so101_relevant",
+                "source_authority_review_status": "review_metadata_supplied",
+                "source_authority_review_ready": True,
+                "source_intake_status": "source_candidate_relevance_required",
+                "review_packet_status": "review_packet_authoritative_candidate_not_so101_relevant",
+                "selected_authoritative_candidate_path": str(
+                    normalize_path(fixtures["generic_model"])
+                ),
+                "selected_authoritative_candidate_so101_relevance": "low",
+                "selected_authoritative_candidate_so101_relevance_ready": False,
+                "blockers_contain": [
+                    "select_so101_relevant_authoritative_model_source"
+                ],
+                "actions_contain": [
+                    "select_so101_relevant_authoritative_model_source",
+                    "supply_reviewed_so101_model_bundle_manifest",
+                ],
+                "actions_absent": ["run_so101_model_bundle_probe"],
+                "missing_review_scope_ids": [],
+            },
+        },
+        {
             "case_id": "authoritative_complete_source_review",
             "args": [
                 "--root",
@@ -749,6 +807,7 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
         "review_and_declare_authoritative_so101_model_source",
         "record_source_authority_review_metadata",
         "select_single_authoritative_so101_model_source",
+        "select_so101_relevant_authoritative_model_source",
     }
     for action in source_intake.get("actions") or []:
         action_id = action.get("action_id")
@@ -859,6 +918,20 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
             inventory.get("selected_authoritative_candidate_sha256"),
             expect["selected_authoritative_candidate_sha256"],
         )
+    if "selected_authoritative_candidate_so101_relevance" in expect:
+        add_error(
+            errors,
+            f"{case_id}.selected_authoritative_candidate_so101_relevance",
+            inventory.get("selected_authoritative_candidate_so101_relevance"),
+            expect["selected_authoritative_candidate_so101_relevance"],
+        )
+    if "selected_authoritative_candidate_so101_relevance_ready" in expect:
+        add_error(
+            errors,
+            f"{case_id}.selected_authoritative_candidate_so101_relevance_ready",
+            inventory.get("selected_authoritative_candidate_so101_relevance_ready"),
+            expect["selected_authoritative_candidate_so101_relevance_ready"],
+        )
 
     return {
         "case_id": case_id,
@@ -882,6 +955,12 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
             ),
             "selected_authoritative_candidate_sha256": inventory.get(
                 "selected_authoritative_candidate_sha256"
+            ),
+            "selected_authoritative_candidate_so101_relevance": inventory.get(
+                "selected_authoritative_candidate_so101_relevance"
+            ),
+            "selected_authoritative_candidate_so101_relevance_ready": inventory.get(
+                "selected_authoritative_candidate_so101_relevance_ready"
             ),
             "source_authority_gate_status": inventory.get("source_authority_gate_status"),
             "source_authority_blockers": inventory.get("source_authority_blockers"),
@@ -933,6 +1012,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "authoritative_candidate_count": observations.get("authoritative_candidate_count"),
         "selected_authoritative_candidate_path": observations.get(
             "selected_authoritative_candidate_path"
+        ),
+        "selected_authoritative_candidate_so101_relevance": observations.get(
+            "selected_authoritative_candidate_so101_relevance"
+        ),
+        "selected_authoritative_candidate_so101_relevance_ready": observations.get(
+            "selected_authoritative_candidate_so101_relevance_ready"
         ),
         "source_authority_gate_status": observations.get("source_authority_gate_status"),
         "source_authority_review_status": observations.get("source_authority_review_status"),
@@ -1004,6 +1089,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "",
             "## Caveats",
             "",
+            "- Generic authoritative URDFs with complete review metadata still fail closed unless the selected candidate is SO-101-relevant.",
             "- Source-authority-ready fixture cases still report source-intake and review-packet artifacts as not authority.",
             "- Physical SO-101 model authority remains false in every case.",
             "- A reviewed bundle manifest with mesh roots, joint limits, target frame, TCP offset, and base-to-board alignment is still required before model-backed work is trusted.",

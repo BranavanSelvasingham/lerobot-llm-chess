@@ -66,14 +66,21 @@ inventory can report an authoritative candidate, but it also reports
 `source_authority_gate_status` as one of
 `source_authority_blocked_missing_authoritative_model`,
 `source_authority_blocked_ambiguous_authoritative_model`,
+`source_authority_blocked_candidate_not_so101_relevant`,
 `source_authority_blocked_review_metadata`, or `source_authority_ready`, and
 keeps `source_authority_blockers` empty only when exactly one authoritative
-candidate and non-placeholder source-authority review metadata are both present.
+candidate, SO-101-relevant candidate evidence, and non-placeholder
+source-authority review metadata are all present.
 If an authoritative root matches multiple model files, the inventory reports
 `status: "ambiguous_authoritative_model"`,
 `authoritative_source_selection_status: "multiple_authoritative_candidates"`,
 and queues `select_single_authoritative_so101_model_source` rather than
 implicitly choosing one.
+If an authoritative path/root resolves to a generic supported model file whose
+candidate relevance is below the high/medium SO-101 threshold, the inventory
+reports `status: "authoritative_model_not_so101_relevant"`, queues
+`select_so101_relevant_authoritative_model_source`, and does not queue
+`run_so101_model_bundle_probe`.
 
 Review evidence, source reference, and license basis must be non-placeholder
 metadata. Values such as `TODO`, `TBD`, `unknown`, `placeholder`, or `review
@@ -169,6 +176,9 @@ writes:
 The complete-source-review fixture must reach
 `source_authority_gate_status: "source_authority_ready"` and
 `source_intake_status: "source_authority_ready_waiting_for_bundle_manifest"`.
+The non-SO-101 authoritative fixture must remain blocked with
+`source_authority_blocked_candidate_not_so101_relevant` even when complete
+review metadata is supplied.
 The single-root ready fixture must resolve to the same
 `selected_authoritative_candidate_path` as the explicit authoritative-path
 fixture and expose the selected candidate SHA-256; those model identity fields
