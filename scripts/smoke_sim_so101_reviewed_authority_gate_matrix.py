@@ -18,6 +18,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 from smoke_sim_calibration_regression_suite import (  # noqa: E402
     so101_reviewed_model_authority_blocker_packet,
     so101_reviewed_model_authority_gate_section,
+    write_so101_reviewed_model_authority_gate_artifacts,
 )
 
 DEFAULT_OUTPUT_DIR = (
@@ -98,6 +99,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "blocker_packet_action_required_item_ids",
         "blocker_packet_blocked_by_prior_requirements_item_ids",
         "blocker_packet_next_action_ids",
+        "checklist_status_by_requirement_id",
+        "checklist_next_action_ids_by_requirement_id",
+        "checklist_blocked_by_prior_requirement_ids_by_requirement_id",
         "expected_gate_ready",
         "expected_consistency_status",
         "errors",
@@ -108,6 +112,21 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow({field: csv_cell(row.get(field)) for field in fieldnames})
+
+
+def read_csv(path: Path) -> list[dict[str, str]]:
+    with path.open(newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def csv_json_list(value: str | None) -> list[str]:
+    if not value:
+        return []
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return []
+    return [str(item) for item in parsed] if isinstance(parsed, list) else []
 
 
 def gate_action(action_id: str, gate: str, title: str, detail: str) -> dict[str, str]:
@@ -1565,6 +1584,52 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
     )
 
     case_dir.mkdir(parents=True, exist_ok=True)
+    gate_artifacts = write_so101_reviewed_model_authority_gate_artifacts(case_dir, gate)
+    checklist_path = Path(gate_artifacts["artifacts"]["checklist_csv"])
+    checklist_rows = read_csv(checklist_path)
+    checklist_by_requirement = {
+        row.get("requirement_id"): row
+        for row in checklist_rows
+        if row.get("requirement_id")
+    }
+    blocker_to_checklist_requirement = {
+        "source_authority_ready": "source_authority_ready",
+        "physical_bundle_authority_ready": "physical_bundle_authority_ready",
+        "source_bundle_consistency": "source_bundle_consistency",
+        "physical_reviewed_mujoco_motion_checked": (
+            "physical_reviewed_mujoco_motion_checked"
+        ),
+        "development_fixture_authority_boundary": "development_fixture_caveat",
+    }
+    for item in blocker_packet.get("items", []):
+        if not isinstance(item, dict):
+            continue
+        requirement_id = blocker_to_checklist_requirement.get(str(item.get("item_id")))
+        if requirement_id is None:
+            continue
+        checklist_row = checklist_by_requirement.get(requirement_id)
+        if checklist_row is None:
+            errors.append(f"checklist_missing_requirement:{requirement_id}")
+            continue
+        add_error(
+            errors,
+            f"checklist_status:{requirement_id}",
+            checklist_row.get("status"),
+            item.get("status"),
+        )
+        add_error(
+            errors,
+            f"checklist_next_action:{requirement_id}",
+            checklist_row.get("next_action_id") or None,
+            item.get("next_action_id"),
+        )
+        add_error(
+            errors,
+            f"checklist_blocked_prior:{requirement_id}",
+            csv_json_list(checklist_row.get("blocked_by_prior_requirement_ids")),
+            item.get("blocked_by_prior_requirement_ids") or [],
+        )
+
     write_json(gate_summary_path, gate)
     blocker_path = case_dir / "so101_reviewed_model_authority_blocker_packet.json"
     write_json(blocker_path, blocker_packet)
@@ -1577,8 +1642,24 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         "expected": expect,
         "summary_path": str(gate_summary_path),
         "blocker_packet_path": str(blocker_path),
+        "checklist_path": str(checklist_path),
         "gate": gate,
+        "gate_artifacts": gate_artifacts,
         "blocker_packet": blocker_packet,
+        "checklist_status_by_requirement_id": {
+            requirement_id: row.get("status")
+            for requirement_id, row in checklist_by_requirement.items()
+        },
+        "checklist_next_action_ids_by_requirement_id": {
+            requirement_id: row.get("next_action_id")
+            for requirement_id, row in checklist_by_requirement.items()
+            if row.get("next_action_id")
+        },
+        "checklist_blocked_by_prior_requirement_ids_by_requirement_id": {
+            requirement_id: csv_json_list(row.get("blocked_by_prior_requirement_ids"))
+            for requirement_id, row in checklist_by_requirement.items()
+            if row.get("blocked_by_prior_requirement_ids")
+        },
     }
 
 
@@ -1673,6 +1754,15 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
             "blocked_by_prior_requirements_item_ids"
         ),
         "blocker_packet_next_action_ids": blocker_packet.get("next_action_ids"),
+        "checklist_status_by_requirement_id": case.get(
+            "checklist_status_by_requirement_id"
+        ),
+        "checklist_next_action_ids_by_requirement_id": case.get(
+            "checklist_next_action_ids_by_requirement_id"
+        ),
+        "checklist_blocked_by_prior_requirement_ids_by_requirement_id": case.get(
+            "checklist_blocked_by_prior_requirement_ids_by_requirement_id"
+        ),
         "expected_gate_ready": case["expected"].get("ready"),
         "expected_consistency_status": case["expected"].get("consistency_status"),
         "errors": case["errors"],

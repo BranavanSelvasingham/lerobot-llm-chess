@@ -5023,13 +5023,52 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "blocker_packet_next_action_ids": blocker_packet["next_action_ids"],
         "blocker_packet": blocker_packet,
     }
+    blocker_items_by_id = {
+        item.get("item_id"): item
+        for item in blocker_packet.get("items", [])
+        if isinstance(item, dict) and item.get("item_id")
+    }
+
+    def checklist_priority(item_id: str) -> int | None:
+        item = blocker_items_by_id.get(item_id)
+        return item.get("priority") if isinstance(item, dict) else None
+
+    def checklist_status(item_id: str, fallback_status: str) -> str:
+        item = blocker_items_by_id.get(item_id)
+        status = item.get("status") if isinstance(item, dict) else None
+        return status if isinstance(status, str) and status else fallback_status
+
+    def checklist_next_action_id(item_id: str) -> str | None:
+        item = blocker_items_by_id.get(item_id)
+        action_id = item.get("next_action_id") if isinstance(item, dict) else None
+        return action_id if isinstance(action_id, str) and action_id else None
+
+    def checklist_blocked_by_prior_requirement_ids(item_id: str) -> list[str]:
+        item = blocker_items_by_id.get(item_id)
+        blocked = (
+            item.get("blocked_by_prior_requirement_ids")
+            if isinstance(item, dict)
+            else None
+        )
+        return [str(value) for value in blocked] if isinstance(blocked, list) else []
+
     checklist_rows = [
         {
             "requirement_id": "source_authority_ready",
             "category": "reviewed_model_authority",
-            "status": "ok" if gate.get("source_authority_ready") is True else "action_required",
+            "priority": checklist_priority("source_authority_ready"),
+            "status": checklist_status(
+                "source_authority_ready",
+                "ok"
+                if gate.get("source_authority_ready") is True
+                else "action_required",
+            ),
             "observed_value": markdown_bool(gate.get("source_authority_ready")),
             "expected_value": "true",
+            "blocked_by_prior_requirement_ids": checklist_blocked_by_prior_requirement_ids(
+                "source_authority_ready"
+            ),
+            "next_action_id": checklist_next_action_id("source_authority_ready"),
             "blockers": "; ".join(
                 blocker
                 for blocker in gate.get("blockers", [])
@@ -5040,27 +5079,45 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         {
             "requirement_id": "physical_bundle_authority_ready",
             "category": "reviewed_model_authority",
-            "status": "ok"
-            if gate.get("physical_so101_model_authority_ready") is True
-            else "action_required",
+            "priority": checklist_priority("physical_bundle_authority_ready"),
+            "status": checklist_status(
+                "physical_bundle_authority_ready",
+                "ok"
+                if gate.get("physical_so101_model_authority_ready") is True
+                else "action_required",
+            ),
             "observed_value": markdown_bool(gate.get("physical_so101_model_authority_ready")),
             "expected_value": "true",
+            "blocked_by_prior_requirement_ids": checklist_blocked_by_prior_requirement_ids(
+                "physical_bundle_authority_ready"
+            ),
+            "next_action_id": checklist_next_action_id(
+                "physical_bundle_authority_ready"
+            ),
             "blockers": "; ".join(gate.get("blockers", [])),
             "notes": "The bundle manifest must provide physical SO-101 authority, not only a development fixture.",
         },
         {
             "requirement_id": "source_bundle_consistency",
             "category": "reviewed_model_authority",
-            "status": (
-                "ok"
-                if gate.get("source_bundle_consistency_ready") is True
-                else "blocked_by_prior_requirements"
-                if gate.get("source_bundle_consistency_status")
-                == "not_checked_prerequisites_not_ready"
-                else "action_required"
+            "priority": checklist_priority("source_bundle_consistency"),
+            "status": checklist_status(
+                "source_bundle_consistency",
+                (
+                    "ok"
+                    if gate.get("source_bundle_consistency_ready") is True
+                    else "blocked_by_prior_requirements"
+                    if gate.get("source_bundle_consistency_status")
+                    == "not_checked_prerequisites_not_ready"
+                    else "action_required"
+                ),
             ),
             "observed_value": gate.get("source_bundle_consistency_status"),
             "expected_value": "source_bundle_model_path_and_digest_consistent",
+            "blocked_by_prior_requirement_ids": checklist_blocked_by_prior_requirement_ids(
+                "source_bundle_consistency"
+            ),
+            "next_action_id": checklist_next_action_id("source_bundle_consistency"),
             "blockers": "; ".join(
                 blocker
                 for blocker in gate.get("blockers", [])
@@ -5076,11 +5133,21 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         {
             "requirement_id": "physical_reviewed_mujoco_motion_checked",
             "category": "mujoco_scene_validity",
-            "status": "ok"
-            if gate.get("physical_reviewed_model_motion_checked") is True
-            else "action_required",
+            "priority": checklist_priority("physical_reviewed_mujoco_motion_checked"),
+            "status": checklist_status(
+                "physical_reviewed_mujoco_motion_checked",
+                "ok"
+                if gate.get("physical_reviewed_model_motion_checked") is True
+                else "action_required",
+            ),
             "observed_value": markdown_bool(gate.get("physical_reviewed_model_motion_checked")),
             "expected_value": "true",
+            "blocked_by_prior_requirement_ids": checklist_blocked_by_prior_requirement_ids(
+                "physical_reviewed_mujoco_motion_checked"
+            ),
+            "next_action_id": checklist_next_action_id(
+                "physical_reviewed_mujoco_motion_checked"
+            ),
             "blockers": "; ".join(
                 blocker
                 for blocker in gate.get("blockers", [])
@@ -5091,25 +5158,51 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         {
             "requirement_id": "development_fixture_caveat",
             "category": "authority_boundary",
-            "status": "ok"
-            if gate.get("development_fixture_evidence_not_physical_so101_truth") is True
-            else "review_required",
+            "priority": checklist_priority("development_fixture_authority_boundary"),
+            "status": checklist_status(
+                "development_fixture_authority_boundary",
+                "ok"
+                if gate.get("development_fixture_evidence_not_physical_so101_truth") is True
+                else "review_required",
+            ),
             "observed_value": markdown_bool(
                 gate.get("development_fixture_evidence_not_physical_so101_truth")
             ),
             "expected_value": "true while the gate is blocked or fixture-only evidence exists",
+            "blocked_by_prior_requirement_ids": checklist_blocked_by_prior_requirement_ids(
+                "development_fixture_authority_boundary"
+            ),
+            "next_action_id": checklist_next_action_id(
+                "development_fixture_authority_boundary"
+            ),
             "blockers": "; ".join(gate.get("blockers", [])),
             "notes": "Development fixture evidence remains automation coverage only.",
         },
     ]
+    payload["checklist_status_by_requirement_id"] = {
+        row["requirement_id"]: row["status"] for row in checklist_rows
+    }
+    payload["checklist_next_action_ids_by_requirement_id"] = {
+        row["requirement_id"]: row["next_action_id"]
+        for row in checklist_rows
+        if row.get("next_action_id")
+    }
+    payload["checklist_blocked_by_prior_requirement_ids_by_requirement_id"] = {
+        row["requirement_id"]: row["blocked_by_prior_requirement_ids"]
+        for row in checklist_rows
+        if row.get("blocked_by_prior_requirement_ids")
+    }
     gate_dir.mkdir(parents=True, exist_ok=True)
     write_json(summary_path, payload)
     fieldnames = (
+        "priority",
         "requirement_id",
         "category",
         "status",
         "observed_value",
         "expected_value",
+        "blocked_by_prior_requirement_ids",
+        "next_action_id",
         "blockers",
         "notes",
     )
@@ -5117,7 +5210,7 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         for row in checklist_rows:
-            writer.writerow(row)
+            writer.writerow({field: csv_cell(row.get(field)) for field in fieldnames})
     write_json(blocker_packet_path, blocker_packet)
     blocker_fieldnames = (
         "priority",

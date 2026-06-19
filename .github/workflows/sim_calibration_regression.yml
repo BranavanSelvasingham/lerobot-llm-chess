@@ -2294,6 +2294,50 @@ jobs:
                   key,
                   reviewed_authority_artifacts,
               )
+          authority_checklist_rows = list(
+              csv.DictReader(Path(reviewed_authority_artifacts["checklist_csv"]).open(newline=""))
+          )
+          authority_checklist_by_id = {
+              row["requirement_id"]: row for row in authority_checklist_rows
+          }
+          assert reviewed_model_authority_gate["checklist_status_by_requirement_id"] == {
+              row["requirement_id"]: row["status"] for row in authority_checklist_rows
+          }, reviewed_model_authority_gate
+          authority_blocker_items_by_id = {
+              item["item_id"]: item
+              for item in reviewed_model_authority_gate["blocker_packet"]["items"]
+          }
+          for item_id, requirement_id in {
+              "source_authority_ready": "source_authority_ready",
+              "physical_bundle_authority_ready": "physical_bundle_authority_ready",
+              "source_bundle_consistency": "source_bundle_consistency",
+              "physical_reviewed_mujoco_motion_checked": "physical_reviewed_mujoco_motion_checked",
+              "development_fixture_authority_boundary": "development_fixture_caveat",
+          }.items():
+              if item_id not in authority_blocker_items_by_id:
+                  continue
+              row = authority_checklist_by_id[requirement_id]
+              item = authority_blocker_items_by_id[item_id]
+              assert row["status"] == item["status"], (requirement_id, row, item)
+              assert (row["next_action_id"] or None) == item.get("next_action_id"), (
+                  requirement_id,
+                  row,
+                  item,
+              )
+              assert (
+                  json.loads(row["blocked_by_prior_requirement_ids"])
+                  if row["blocked_by_prior_requirement_ids"]
+                  else []
+              ) == (item.get("blocked_by_prior_requirement_ids") or []), (
+                  requirement_id,
+                  row,
+                  item,
+              )
+          if reviewed_model_authority_gate["physical_so101_model_authority_ready"] is False:
+              assert (
+                  authority_checklist_by_id["physical_reviewed_mujoco_motion_checked"]["status"]
+                  == "blocked_by_prior_requirements"
+              ), reviewed_model_authority_gate
           so101_contract = summary["so101_model_contract"]
           assert so101_contract["ok"] is True, so101_contract
           assert so101_contract["status"] in {
