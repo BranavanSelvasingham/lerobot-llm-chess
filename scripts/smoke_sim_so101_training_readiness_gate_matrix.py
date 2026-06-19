@@ -16,6 +16,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from smoke_sim_calibration_regression_suite import (  # noqa: E402
+    SO101_BOARD_PICK_REQUIRED_PHASE_IDS,
     REVIEWED_SO101_MODEL_AUTHORITY,
     SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_ITEM_IDS,
     SO101_TRAINING_PRIORITY_STAGE_IDS,
@@ -86,6 +87,14 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_model_backed_board_source_pick_place",
         "board_pick_reviewed_model_authority_ready",
         "board_pick_detailed_evidence_ready",
+        "board_pick_phase_evidence_ready",
+        "board_pick_phase_ids",
+        "board_pick_failed_phase_ids",
+        "board_pick_phase_count",
+        "board_pick_all_required_phases_verified",
+        "board_pick_final_place_z_error_m",
+        "board_pick_place_z_tolerance_m",
+        "board_pick_final_place_z_within_tolerance",
         "rollout_ready_for_policy_training",
         "rollout_status",
         "rollout_training_authority_status",
@@ -135,6 +144,19 @@ def reviewed_authority_blocked(summary_path: Path) -> dict[str, Any]:
     }
 
 
+def board_pick_phase_evidence(verified: bool = True) -> list[dict[str, Any]]:
+    return [
+        {
+            "phase_id": phase_id,
+            "stage": f"{phase_id}_contract_state_fixture",
+            "ok": verified,
+            "criteria": [f"{phase_id}_criterion_recorded"],
+            "metrics": {f"{phase_id}_metric": 1.0 if verified else 0.0},
+        }
+        for phase_id in SO101_BOARD_PICK_REQUIRED_PHASE_IDS
+    ]
+
+
 def board_pick_state(
     summary_path: Path,
     *,
@@ -146,6 +168,8 @@ def board_pick_state(
 ) -> dict[str, Any]:
     final_target_xy_error_m = 0.002 if verified else 0.05
     target_xy_tolerance_m = 0.01
+    final_place_z_error_m = 0.001 if verified else 0.02
+    place_z_tolerance_m = 0.005
     return {
         "status": (
             "reviewed_model_backed_board_source_pick_place_verified"
@@ -169,6 +193,13 @@ def board_pick_state(
         "final_board_contact_observed": verified,
         "final_target_xy_error_m": final_target_xy_error_m,
         "target_xy_tolerance_m": target_xy_tolerance_m,
+        "final_place_z_error_m": final_place_z_error_m,
+        "place_z_tolerance_m": place_z_tolerance_m,
+        "pick_place_phase_evidence": board_pick_phase_evidence(verified),
+        "pick_place_phase_ids": list(SO101_BOARD_PICK_REQUIRED_PHASE_IDS),
+        "pick_place_failed_phase_ids": [] if verified else list(SO101_BOARD_PICK_REQUIRED_PHASE_IDS),
+        "pick_place_phase_count": len(SO101_BOARD_PICK_REQUIRED_PHASE_IDS),
+        "pick_place_all_required_phases_verified": verified,
         "ready_for_model_backed_ik": ready_for_model_backed_ik,
         "model_authority": model_authority,
         "robot_pose_seeded_for_source_fixture": seeded_source_pose,
@@ -426,6 +457,36 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             seeded_source_pose=False,
         ),
         "final_target_xy_error_m": 0.05,
+    }
+    board_reviewed_missing_phase_evidence = {
+        **board_pick_state(
+            summaries / "board_reviewed_missing_phase_evidence.json",
+            model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+            ready_for_model_backed_ik=True,
+            seeded_source_pose=False,
+        ),
+        "pick_place_phase_evidence": [],
+        "pick_place_phase_ids": [],
+        "pick_place_phase_count": 0,
+        "pick_place_all_required_phases_verified": False,
+    }
+    board_reviewed_z_tolerance_missing = {
+        **board_pick_state(
+            summaries / "board_reviewed_z_tolerance_missing.json",
+            model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+            ready_for_model_backed_ik=True,
+            seeded_source_pose=False,
+        ),
+        "place_z_tolerance_m": None,
+    }
+    board_reviewed_z_outside_tolerance = {
+        **board_pick_state(
+            summaries / "board_reviewed_z_outside_tolerance.json",
+            model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+            ready_for_model_backed_ik=True,
+            seeded_source_pose=False,
+        ),
+        "final_place_z_error_m": 0.025,
     }
     rollout_dev_blocked = rollout_state(
         summaries / "rollout_dev_blocked.json",
@@ -1008,6 +1069,80 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "board_missing_phase_evidence_reviewed_authority_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed_missing_phase_evidence,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": False,
+                "board_authority": True,
+                "board_detail": False,
+                "board_phase_ready": False,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "blockers_contain": ["reviewed_model_backed_board_source_pick_place"],
+                "next_priority_gate": "scripted_contact_grasp_pick_place",
+            },
+        },
+        {
+            "case_id": "board_z_tolerance_missing_reviewed_authority_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed_z_tolerance_missing,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": False,
+                "board_authority": True,
+                "board_detail": False,
+                "board_phase_ready": True,
+                "board_place_z_within_tolerance": False,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "blockers_contain": ["reviewed_model_backed_board_source_pick_place"],
+                "next_priority_gate": "scripted_contact_grasp_pick_place",
+            },
+        },
+        {
+            "case_id": "board_z_tolerance_reviewed_authority_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed_z_outside_tolerance,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": False,
+                "board_authority": True,
+                "board_detail": False,
+                "board_phase_ready": True,
+                "board_place_z_within_tolerance": False,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "blockers_contain": ["reviewed_model_backed_board_source_pick_place"],
+                "next_priority_gate": "scripted_contact_grasp_pick_place",
+            },
+        },
+        {
             "case_id": "rollout_raw_ready_development_authority_rejected",
             "authority": authority_ready,
             "reviewed_mujoco_bundle": handoff_ready,
@@ -1361,6 +1496,57 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             gate.get("board_pick_detailed_evidence_ready"),
             expect["board_detail"],
         )
+        if expect["board_detail"] is True:
+            add_error(
+                errors,
+                "board_pick_phase_evidence_ready",
+                gate.get("board_pick_phase_evidence_ready"),
+                True,
+            )
+            add_error(
+                errors,
+                "board_pick_phase_ids",
+                gate.get("board_pick_phase_ids"),
+                list(SO101_BOARD_PICK_REQUIRED_PHASE_IDS),
+            )
+            add_error(
+                errors,
+                "board_pick_failed_phase_ids",
+                gate.get("board_pick_failed_phase_ids"),
+                [],
+            )
+            add_error(
+                errors,
+                "board_pick_phase_count",
+                gate.get("board_pick_phase_count"),
+                len(SO101_BOARD_PICK_REQUIRED_PHASE_IDS),
+            )
+            add_error(
+                errors,
+                "board_pick_all_required_phases_verified",
+                gate.get("board_pick_all_required_phases_verified"),
+                True,
+            )
+            add_error(
+                errors,
+                "board_pick_final_place_z_within_tolerance",
+                gate.get("board_pick_final_place_z_within_tolerance"),
+                True,
+            )
+    if "board_phase_ready" in expect:
+        add_error(
+            errors,
+            "board_pick_phase_evidence_ready",
+            gate.get("board_pick_phase_evidence_ready"),
+            expect["board_phase_ready"],
+        )
+    if "board_place_z_within_tolerance" in expect:
+        add_error(
+            errors,
+            "board_pick_final_place_z_within_tolerance",
+            gate.get("board_pick_final_place_z_within_tolerance"),
+            expect["board_place_z_within_tolerance"],
+        )
     if "rollout_raw" in expect:
         add_error(
             errors,
@@ -1551,6 +1737,18 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
             "board_pick_reviewed_model_authority_ready"
         ),
         "board_pick_detailed_evidence_ready": gate.get("board_pick_detailed_evidence_ready"),
+        "board_pick_phase_evidence_ready": gate.get("board_pick_phase_evidence_ready"),
+        "board_pick_phase_ids": gate.get("board_pick_phase_ids"),
+        "board_pick_failed_phase_ids": gate.get("board_pick_failed_phase_ids"),
+        "board_pick_phase_count": gate.get("board_pick_phase_count"),
+        "board_pick_all_required_phases_verified": gate.get(
+            "board_pick_all_required_phases_verified"
+        ),
+        "board_pick_final_place_z_error_m": gate.get("board_pick_final_place_z_error_m"),
+        "board_pick_place_z_tolerance_m": gate.get("board_pick_place_z_tolerance_m"),
+        "board_pick_final_place_z_within_tolerance": gate.get(
+            "board_pick_final_place_z_within_tolerance"
+        ),
         "rollout_ready_for_policy_training": gate.get("rollout_ready_for_policy_training"),
         "rollout_status": gate.get("rollout_status"),
         "rollout_training_authority_status": gate.get("rollout_training_authority_status"),

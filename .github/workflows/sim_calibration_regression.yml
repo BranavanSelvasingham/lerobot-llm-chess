@@ -3298,6 +3298,20 @@ jobs:
           ), training_readiness_gate
           assert isinstance(training_readiness_gate["board_pick_reviewed_model_authority_ready"], bool), training_readiness_gate
           assert isinstance(training_readiness_gate["board_pick_detailed_evidence_ready"], bool), training_readiness_gate
+          assert isinstance(training_readiness_gate["board_pick_phase_evidence_ready"], bool), training_readiness_gate
+          assert training_readiness_gate["board_pick_phase_ids"] == [
+              "source_reset",
+              "two_finger_grasp",
+              "lift_clearance",
+              "transfer_toward_target",
+              "release_place",
+          ], training_readiness_gate
+          assert training_readiness_gate["board_pick_failed_phase_ids"] == [], training_readiness_gate
+          assert training_readiness_gate["board_pick_phase_count"] == 5, training_readiness_gate
+          assert training_readiness_gate["board_pick_all_required_phases_verified"] is True, training_readiness_gate
+          assert training_readiness_gate["board_pick_phase_evidence_count"] == 5, training_readiness_gate
+          assert training_readiness_gate["board_pick_final_place_z_error_m"] <= training_readiness_gate["board_pick_place_z_tolerance_m"], training_readiness_gate
+          assert training_readiness_gate["board_pick_final_place_z_within_tolerance"] is True, training_readiness_gate
           assert isinstance(training_readiness_gate["rollout_policy_training_authority_ready"], bool), training_readiness_gate
           assert isinstance(training_readiness_gate["blockers"], list), training_readiness_gate
           assert training_readiness_gate["blocker_count"] == len(training_readiness_gate["blockers"]), training_readiness_gate
@@ -3318,6 +3332,7 @@ jobs:
               assert training_readiness_gate["rollout_ready_for_policy_training"] is False, training_readiness_gate
               assert training_readiness_gate["board_pick_reviewed_model_authority_ready"] is False, training_readiness_gate
               assert training_readiness_gate["board_pick_detailed_evidence_ready"] is True, training_readiness_gate
+              assert training_readiness_gate["board_pick_phase_evidence_ready"] is True, training_readiness_gate
               assert training_readiness_gate["rollout_policy_training_authority_ready"] is False, training_readiness_gate
           training_readiness_artifacts = training_readiness_gate["artifacts"]
           for key in ("summary_json", "checklist_csv", "readme_md"):

@@ -379,6 +379,11 @@ deterministic scripted rollout JSONL/CSV evidence only after the board-pick
 summary is supplied as a rollout prerequisite. The training-readiness gate
 aggregates reviewed model authority, reviewed model-backed board-source
 pick/place, and rollout authority into one explicit serious-training blocker.
+Its board-pick `detailed_evidence` predicate requires the ordered
+`source_reset`, `two_finger_grasp`, `lift_clearance`,
+`transfer_toward_target`, and `release_place` phase evidence rows, empty failed
+phase IDs, all-required-phases true, and final z placement within
+`place_z_tolerance_m`; legacy booleans alone cannot unblock serious training.
 It also emits `priority_gate_queue`, `priority_gate_order`,
 `next_priority_gate_id`, `next_priority_action_ids`, and
 `so101_training_readiness_gate_priority_queue.csv` so the missing work stays

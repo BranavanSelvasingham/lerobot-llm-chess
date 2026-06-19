@@ -155,6 +155,13 @@ SO101_TRAINING_PRIORITY_STAGE_IDS = (
     "scripted_contact_grasp_pick_place",
     "focused_training_rollouts",
 )
+SO101_BOARD_PICK_REQUIRED_PHASE_IDS = (
+    "source_reset",
+    "two_finger_grasp",
+    "lift_clearance",
+    "transfer_toward_target",
+    "release_place",
+)
 BASELINE_CORNERS = [[32, 338], [594, 340], [540, 20], [86, 12]]
 PERTURBED_CORNERS = [[34, 337], [592, 342], [538, 22], [88, 14]]
 
@@ -5626,13 +5633,52 @@ def _json_number(value: Any) -> float | None:
     return None
 
 
+def _json_string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if isinstance(item, (str, int, float))]
+
+
+def so101_board_pick_phase_evidence_ready(board_pick: dict[str, Any]) -> bool:
+    phase_ids = _json_string_list(board_pick.get("pick_place_phase_ids"))
+    failed_phase_ids = _json_string_list(board_pick.get("pick_place_failed_phase_ids"))
+    phase_count = board_pick.get("pick_place_phase_count")
+    phase_evidence = board_pick.get("pick_place_phase_evidence")
+    if (
+        phase_ids != list(SO101_BOARD_PICK_REQUIRED_PHASE_IDS)
+        or failed_phase_ids
+        or phase_count != len(SO101_BOARD_PICK_REQUIRED_PHASE_IDS)
+        or board_pick.get("pick_place_all_required_phases_verified") is not True
+        or not isinstance(phase_evidence, list)
+        or len(phase_evidence) != len(SO101_BOARD_PICK_REQUIRED_PHASE_IDS)
+    ):
+        return False
+    for expected_phase_id, row in zip(SO101_BOARD_PICK_REQUIRED_PHASE_IDS, phase_evidence):
+        if not isinstance(row, dict):
+            return False
+        if row.get("phase_id") != expected_phase_id or row.get("ok") is not True:
+            return False
+        if not isinstance(row.get("criteria"), list) or not row["criteria"]:
+            return False
+        if not isinstance(row.get("metrics"), dict) or not row["metrics"]:
+            return False
+    return True
+
+
 def so101_board_pick_detailed_evidence_ready(board_pick: dict[str, Any]) -> bool:
     final_target_xy_error_m = _json_number(board_pick.get("final_target_xy_error_m"))
     target_xy_tolerance_m = _json_number(board_pick.get("target_xy_tolerance_m"))
+    final_place_z_error_m = _json_number(board_pick.get("final_place_z_error_m"))
+    place_z_tolerance_m = _json_number(board_pick.get("place_z_tolerance_m"))
     final_target_within_tolerance = (
         final_target_xy_error_m is not None
         and target_xy_tolerance_m is not None
         and final_target_xy_error_m <= target_xy_tolerance_m
+    )
+    final_place_z_within_tolerance = (
+        final_place_z_error_m is not None
+        and place_z_tolerance_m is not None
+        and final_place_z_error_m <= place_z_tolerance_m
     )
     return (
         board_pick.get("board_source_pick_place_verified") is True
@@ -5645,6 +5691,8 @@ def so101_board_pick_detailed_evidence_ready(board_pick: dict[str, Any]) -> bool
         and board_pick.get("release_contact_cleared_after_retreat") is True
         and board_pick.get("final_board_contact_observed") is True
         and final_target_within_tolerance
+        and final_place_z_within_tolerance
+        and so101_board_pick_phase_evidence_ready(board_pick)
     )
 
 
@@ -6312,6 +6360,26 @@ def so101_training_readiness_gate_section(
         ),
         "board_pick_final_target_xy_error_m": board_pick.get("final_target_xy_error_m"),
         "board_pick_target_xy_tolerance_m": board_pick.get("target_xy_tolerance_m"),
+        "board_pick_final_place_z_error_m": board_pick.get("final_place_z_error_m"),
+        "board_pick_place_z_tolerance_m": board_pick.get("place_z_tolerance_m"),
+        "board_pick_final_place_z_within_tolerance": (
+            _json_number(board_pick.get("final_place_z_error_m")) is not None
+            and _json_number(board_pick.get("place_z_tolerance_m")) is not None
+            and _json_number(board_pick.get("final_place_z_error_m"))
+            <= _json_number(board_pick.get("place_z_tolerance_m"))
+        ),
+        "board_pick_phase_evidence_ready": so101_board_pick_phase_evidence_ready(
+            board_pick
+        ),
+        "board_pick_phase_ids": board_pick.get("pick_place_phase_ids"),
+        "board_pick_failed_phase_ids": board_pick.get("pick_place_failed_phase_ids"),
+        "board_pick_phase_count": board_pick.get("pick_place_phase_count"),
+        "board_pick_all_required_phases_verified": board_pick.get(
+            "pick_place_all_required_phases_verified"
+        ),
+        "board_pick_phase_evidence_count": len(board_pick.get("pick_place_phase_evidence"))
+        if isinstance(board_pick.get("pick_place_phase_evidence"), list)
+        else None,
         "board_pick_robot_pose_seeded_for_source_fixture": board_pick.get(
             "robot_pose_seeded_for_source_fixture"
         ),
@@ -6531,6 +6599,17 @@ def write_so101_training_readiness_gate_artifacts(
                 f"`{markdown_bool(gate.get('reviewed_model_backed_board_source_pick_place'))}`",
                 "- Board-pick reviewed model authority ready: "
                 f"`{markdown_bool(gate.get('board_pick_reviewed_model_authority_ready'))}`",
+                "- Board-pick detailed evidence ready: "
+                f"`{markdown_bool(gate.get('board_pick_detailed_evidence_ready'))}`",
+                "- Board-pick phase evidence ready: "
+                f"`{markdown_bool(gate.get('board_pick_phase_evidence_ready'))}`",
+                "- Board-pick phase IDs: "
+                f"`{markdown_list_value(gate.get('board_pick_phase_ids'))}`",
+                "- Board-pick failed phase IDs: "
+                f"`{markdown_list_value(gate.get('board_pick_failed_phase_ids'))}`",
+                "- Board-pick final z error/tolerance: "
+                f"`{gate.get('board_pick_final_place_z_error_m')}` / "
+                f"`{gate.get('board_pick_place_z_tolerance_m')}`",
                 "- Rollout ready for policy training: "
                 f"`{markdown_bool(gate.get('rollout_ready_for_policy_training'))}`",
                 "- Rollout policy-training authority ready: "
