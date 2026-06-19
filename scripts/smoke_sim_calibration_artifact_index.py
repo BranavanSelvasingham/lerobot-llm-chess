@@ -3085,6 +3085,21 @@ def collect_so101_training_readiness_gate_artifacts(
         "reviewed_model_physical_motion_checked": gate.get(
             "reviewed_model_physical_motion_checked"
         ),
+        "reviewed_mujoco_downstream_handoff_status": gate.get(
+            "reviewed_mujoco_downstream_handoff_status"
+        ),
+        "reviewed_mujoco_downstream_handoff_ready": gate.get(
+            "reviewed_mujoco_downstream_handoff_ready"
+        ),
+        "reviewed_mujoco_downstream_handoff_model_authority": gate.get(
+            "reviewed_mujoco_downstream_handoff_model_authority"
+        ),
+        "reviewed_mujoco_downstream_handoff_physical_truth_claimed": gate.get(
+            "reviewed_mujoco_downstream_handoff_physical_truth_claimed"
+        ),
+        "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority": gate.get(
+            "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority"
+        ),
         "reviewed_model_backed_board_source_pick_place": gate.get(
             "reviewed_model_backed_board_source_pick_place"
         ),
@@ -3128,6 +3143,9 @@ def collect_so101_training_readiness_gate_artifacts(
         "blocker_count": gate.get("blocker_count"),
         "reviewed_model_authority_gate_summary_path": gate.get(
             "reviewed_model_authority_gate_summary_path"
+        ),
+        "reviewed_mujoco_bundle_summary_path": gate.get(
+            "reviewed_mujoco_bundle_summary_path"
         ),
         "board_pick_summary_path": gate.get("board_pick_summary_path"),
         "training_rollouts_summary_path": gate.get("training_rollouts_summary_path"),

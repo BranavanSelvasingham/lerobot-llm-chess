@@ -1356,6 +1356,7 @@ jobs:
           assert summary["case_ids"] == [
               "all_development_evidence_blocked",
               "reviewed_authority_motion_not_checked_rejected",
+              "reviewed_authority_but_downstream_handoff_missing",
               "reviewed_authority_but_board_still_development",
               "reviewed_authority_but_scene_still_development",
               "reviewed_scene_but_gym_still_development",
@@ -1396,6 +1397,13 @@ jobs:
           assert motion_missing["reviewed_model_physical_motion_checked"] is False, motion_missing
           assert motion_missing["next_priority_gate_id"] == "mujoco_scene_validity", motion_missing
           assert "load_reviewed_model_in_mujoco" in motion_missing["next_priority_action_ids"], motion_missing
+          handoff_missing = by_case["reviewed_authority_but_downstream_handoff_missing"]["gate"]
+          assert handoff_missing["ready"] is False, handoff_missing
+          assert handoff_missing["reviewed_model_authority_ready"] is True, handoff_missing
+          assert handoff_missing["reviewed_mujoco_downstream_handoff_ready"] is False, handoff_missing
+          assert handoff_missing["reviewed_mujoco_downstream_handoff_physical_truth_claimed"] is False, handoff_missing
+          assert handoff_missing["next_priority_gate_id"] == "mujoco_scene_validity", handoff_missing
+          assert "make_reviewed_mujoco_downstream_handoff_ready" in handoff_missing["next_priority_action_ids"], handoff_missing
           draft = by_case["board_draft_authority_rejected"]["gate"]
           assert draft["ready"] is False, draft
           assert draft["board_pick_reviewed_model_authority_ready"] is False, draft
@@ -1464,6 +1472,8 @@ jobs:
           assert target_outside_tolerance["ready"] is False, target_outside_tolerance
           ready = by_case["all_ready_reviewed_contract_state"]["gate"]
           assert ready["ready"] is True, ready
+          assert ready["reviewed_mujoco_downstream_handoff_ready"] is True, ready
+          assert ready["reviewed_mujoco_downstream_handoff_physical_truth_claimed"] is False, ready
           assert ready["board_pick_detailed_evidence_ready"] is True, ready
           assert ready["rollout_status"] == "ok", ready
           assert ready["rollout_training_authority_status"] == "reviewed_policy_training_rollouts_ready", ready
@@ -2658,6 +2668,15 @@ jobs:
           assert training_readiness_gate["reviewed_model_physical_motion_checked"] == (
               reviewed_model_authority_gate["physical_reviewed_model_motion_checked"] is True
           ), training_readiness_gate
+          assert training_readiness_gate["reviewed_mujoco_downstream_handoff_ready"] == (
+              reviewed_mujoco_bundle["downstream_handoff_ready"] is True
+          ), training_readiness_gate
+          assert training_readiness_gate["reviewed_mujoco_downstream_handoff_status"] == reviewed_mujoco_bundle["downstream_handoff_status"], training_readiness_gate
+          assert training_readiness_gate["reviewed_mujoco_downstream_handoff_model_authority"] == reviewed_mujoco_bundle["downstream_handoff_model_authority"], training_readiness_gate
+          assert training_readiness_gate["reviewed_mujoco_downstream_handoff_physical_truth_claimed"] is False, training_readiness_gate
+          assert training_readiness_gate["reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority"] == (
+              reviewed_mujoco_bundle["fixture_handoff_ready_not_physical_so101_authority"] is True
+          ), training_readiness_gate
           assert isinstance(training_readiness_gate["board_pick_reviewed_model_authority_ready"], bool), training_readiness_gate
           assert isinstance(training_readiness_gate["board_pick_detailed_evidence_ready"], bool), training_readiness_gate
           assert isinstance(training_readiness_gate["rollout_policy_training_authority_ready"], bool), training_readiness_gate
@@ -2675,6 +2694,7 @@ jobs:
               assert training_readiness_gate["blockers"], training_readiness_gate
               assert training_readiness_gate["ready"] is False, training_readiness_gate
               assert training_readiness_gate["development_fixture_evidence_not_policy_training_truth"] is True, training_readiness_gate
+              assert training_readiness_gate["reviewed_mujoco_downstream_handoff_physical_truth_claimed"] is False, training_readiness_gate
               assert "reviewed_model_backed_board_source_pick_place" in training_readiness_gate["blockers"], training_readiness_gate
               assert training_readiness_gate["rollout_ready_for_policy_training"] is False, training_readiness_gate
               assert training_readiness_gate["board_pick_reviewed_model_authority_ready"] is False, training_readiness_gate
@@ -3635,6 +3655,10 @@ jobs:
               metrics = row.get("metrics", {})
               assert metrics.get("ready") in {True, False}, metrics
               assert metrics.get("reviewed_model_authority_ready") in {True, False, None}, metrics
+              assert metrics.get("reviewed_mujoco_downstream_handoff_ready") in {True, False, None}, metrics
+              assert metrics.get("reviewed_mujoco_downstream_handoff_physical_truth_claimed") in {False, None}, metrics
+              if metrics.get("reviewed_mujoco_downstream_handoff_ready") is True:
+                  assert metrics.get("reviewed_mujoco_downstream_handoff_model_authority") == "downstream_handoff_not_authority", metrics
               assert metrics.get("reviewed_model_backed_board_source_pick_place") in {True, False, None}, metrics
               assert metrics.get("board_pick_reviewed_model_authority_ready") in {True, False, None}, metrics
               assert metrics.get("board_pick_detailed_evidence_ready") in {True, False, None}, metrics

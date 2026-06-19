@@ -5432,11 +5432,15 @@ def so101_training_priority_gate_queue(
     board_pick: dict[str, Any],
     training_rollouts: dict[str, Any],
     *,
+    reviewed_mujoco_bundle: dict[str, Any] | None = None,
     mujoco_scene: dict[str, Any] | None = None,
     chess_env: dict[str, Any] | None = None,
     contact_probe: dict[str, Any] | None = None,
     grasp_probe: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    reviewed_mujoco_bundle = (
+        reviewed_mujoco_bundle if isinstance(reviewed_mujoco_bundle, dict) else {}
+    )
     mujoco_scene = mujoco_scene if isinstance(mujoco_scene, dict) else {}
     chess_env = chess_env if isinstance(chess_env, dict) else {}
     contact_probe = contact_probe if isinstance(contact_probe, dict) else {}
@@ -5446,10 +5450,18 @@ def so101_training_priority_gate_queue(
     reviewed_motion_ready = (
         reviewed_authority_gate.get("physical_reviewed_model_motion_checked") is True
     )
+    reviewed_downstream_handoff_ready = (
+        reviewed_mujoco_bundle.get("downstream_handoff_ready") is True
+    )
+    fixture_downstream_handoff_ready = (
+        reviewed_mujoco_bundle.get("fixture_handoff_ready_not_physical_so101_authority")
+        is True
+    )
     mujoco_scene_automation_ready = mujoco_scene.get("status") == "ok"
     mujoco_scene_training_ready = (
         reviewed_authority_ready
         and reviewed_motion_ready
+        and reviewed_downstream_handoff_ready
         and mujoco_scene_automation_ready
         and mujoco_scene.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
     )
@@ -5527,16 +5539,21 @@ def so101_training_priority_gate_queue(
         },
         {
             "gate_id": "mujoco_scene_validity",
-            "title": "MuJoCo scene validity with reviewed motion",
-            "required_state": "physical_reviewed_model_motion_checked",
+            "title": "MuJoCo scene validity with reviewed handoff",
+            "required_state": "reviewed_mujoco_downstream_handoff_ready",
             "training_ready": mujoco_scene_training_ready,
-            "automation_evidence_ready": mujoco_scene_automation_ready,
+            "automation_evidence_ready": (
+                mujoco_scene_automation_ready
+                or fixture_downstream_handoff_ready
+            ),
             "next_action_ids": [
+                "make_reviewed_mujoco_downstream_handoff_ready",
                 "load_reviewed_model_in_mujoco",
                 "prove_physical_reviewed_model_motion",
             ],
             "evidence_artifact_paths": [
                 _summary_path(reviewed_authority_gate),
+                _summary_path(reviewed_mujoco_bundle),
                 _summary_path(mujoco_scene),
             ],
         },
@@ -5655,14 +5672,29 @@ def so101_training_readiness_gate_section(
     board_pick: dict[str, Any],
     training_rollouts: dict[str, Any],
     *,
+    reviewed_mujoco_bundle: dict[str, Any] | None = None,
     mujoco_scene: dict[str, Any] | None = None,
     chess_env: dict[str, Any] | None = None,
     contact_probe: dict[str, Any] | None = None,
     grasp_probe: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    reviewed_mujoco_bundle = (
+        reviewed_mujoco_bundle if isinstance(reviewed_mujoco_bundle, dict) else {}
+    )
     reviewed_authority_ready = reviewed_authority_gate.get("ready") is True
     reviewed_model_physical_motion_checked = (
         reviewed_authority_gate.get("physical_reviewed_model_motion_checked") is True
+    )
+    reviewed_mujoco_downstream_handoff_ready = (
+        reviewed_mujoco_bundle.get("downstream_handoff_ready") is True
+    )
+    reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority = (
+        reviewed_mujoco_bundle.get("fixture_handoff_ready_not_physical_so101_authority")
+        is True
+    )
+    reviewed_mujoco_downstream_handoff_physical_truth_claimed = (
+        reviewed_mujoco_bundle.get("downstream_handoff_physical_so101_truth_claimed")
+        is True
     )
     board_pick_reviewed_model_authority_ready = (
         board_pick.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
@@ -5696,6 +5728,7 @@ def so101_training_readiness_gate_section(
         reviewed_authority_gate,
         board_pick,
         training_rollouts,
+        reviewed_mujoco_bundle=reviewed_mujoco_bundle,
         mujoco_scene=mujoco_scene,
         chess_env=chess_env,
         contact_probe=contact_probe,
@@ -5744,6 +5777,21 @@ def so101_training_readiness_gate_section(
         "reviewed_model_authority_ready": reviewed_authority_ready,
         "reviewed_model_authority_status": reviewed_authority_gate.get("status"),
         "reviewed_model_physical_motion_checked": reviewed_model_physical_motion_checked,
+        "reviewed_mujoco_downstream_handoff_status": reviewed_mujoco_bundle.get(
+            "downstream_handoff_status"
+        ),
+        "reviewed_mujoco_downstream_handoff_ready": (
+            reviewed_mujoco_downstream_handoff_ready
+        ),
+        "reviewed_mujoco_downstream_handoff_model_authority": (
+            reviewed_mujoco_bundle.get("downstream_handoff_model_authority")
+        ),
+        "reviewed_mujoco_downstream_handoff_physical_truth_claimed": (
+            reviewed_mujoco_downstream_handoff_physical_truth_claimed
+        ),
+        "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority": (
+            reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority
+        ),
         "reviewed_model_backed_board_source_pick_place": reviewed_model_backed_board_pick_place,
         "board_pick_status": board_pick.get("status"),
         "board_pick_model_authority": board_pick.get("model_authority"),
@@ -5805,11 +5853,14 @@ def so101_training_readiness_gate_section(
         "reviewed_model_authority_gate_summary_path": reviewed_authority_gate.get(
             "summary_path"
         ),
+        "reviewed_mujoco_bundle_summary_path": reviewed_mujoco_bundle.get(
+            "summary_path"
+        ),
         "board_pick_summary_path": board_pick.get("summary_path"),
         "training_rollouts_summary_path": training_rollouts.get("summary_path"),
         "notes": [
-            "This gate is false until the reviewed model-authority gate is ready, board-source pick/place is repeated with reviewed model-backed IK, and policy rollout evidence is no longer development-scaffold-only.",
-            "priority_gate_queue preserves the MuJoCo-first gate order: reviewed model authority, MuJoCo scene validity, Gymnasium wiring, scripted contact/grasp/pick/place, then focused training rollouts.",
+            "This gate is false until the reviewed model-authority gate is ready, the reviewed MuJoCo downstream handoff is ready, board-source pick/place is repeated with reviewed model-backed IK, and policy rollout evidence is no longer development-scaffold-only.",
+            "priority_gate_queue preserves the MuJoCo-first gate order: reviewed model authority, reviewed MuJoCo handoff and scene validity, Gymnasium wiring, scripted contact/grasp/pick/place, then focused training rollouts.",
             "Development rollout JSONL remains useful for debugging and narrow imitation-curriculum tests, not serious policy training truth.",
         ],
     }
@@ -5849,6 +5900,19 @@ def write_so101_training_readiness_gate_artifacts(
             "expected_value": "true",
             "blockers": "; ".join(gate.get("blockers", [])),
             "notes": "Serious policy training must wait for reviewed SO-101 model authority.",
+        },
+        {
+            "requirement_id": "reviewed_mujoco_downstream_handoff_ready",
+            "category": "mujoco_scene_validity",
+            "status": "ok"
+            if gate.get("reviewed_mujoco_downstream_handoff_ready") is True
+            else "action_required",
+            "observed_value": markdown_bool(
+                gate.get("reviewed_mujoco_downstream_handoff_ready")
+            ),
+            "expected_value": "true",
+            "blockers": "; ".join(gate.get("blockers", [])),
+            "notes": "Scene, Gymnasium, pick/place, and rollout gates must consume a reviewed MuJoCo handoff, not a fixture handoff.",
         },
         {
             "requirement_id": "reviewed_model_backed_board_pick_place",
@@ -5958,6 +6022,12 @@ def write_so101_training_readiness_gate_artifacts(
                 f"- Ready: `{markdown_bool(gate.get('ready'))}`",
                 "- Reviewed model authority ready: "
                 f"`{markdown_bool(gate.get('reviewed_model_authority_ready'))}`",
+                "- Reviewed MuJoCo downstream handoff status: "
+                f"`{gate.get('reviewed_mujoco_downstream_handoff_status')}`",
+                "- Reviewed MuJoCo downstream handoff ready: "
+                f"`{markdown_bool(gate.get('reviewed_mujoco_downstream_handoff_ready'))}`",
+                "- Fixture MuJoCo handoff is not physical SO-101 authority: "
+                f"`{markdown_bool(gate.get('reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority'))}`",
                 "- Reviewed model-backed board-source pick/place: "
                 f"`{markdown_bool(gate.get('reviewed_model_backed_board_source_pick_place'))}`",
                 "- Board-pick reviewed model authority ready: "
@@ -5983,6 +6053,7 @@ def write_so101_training_readiness_gate_artifacts(
                 "## Evidence Sources",
                 "",
                 f"- Reviewed model authority gate: `{gate.get('reviewed_model_authority_gate_summary_path')}`",
+                f"- Reviewed MuJoCo downstream handoff: `{gate.get('reviewed_mujoco_bundle_summary_path')}`",
                 f"- Board-source pick/place: `{gate.get('board_pick_summary_path')}`",
                 f"- Training rollouts: `{gate.get('training_rollouts_summary_path')}`",
                 "",
@@ -6918,6 +6989,7 @@ def main() -> int:
         so101_reviewed_authority_gate,
         so101_mujoco_board_pick_probe_section,
         so101_training_rollouts_section,
+        reviewed_mujoco_bundle=so101_reviewed_mujoco_bundle_section,
         mujoco_scene=so101_mujoco_scene_section,
         chess_env=so101_chess_env_section,
         contact_probe=so101_mujoco_contact_probe_section,

@@ -67,6 +67,11 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "gate_ready",
         "reviewed_model_authority_ready",
         "reviewed_model_physical_motion_checked",
+        "reviewed_mujoco_downstream_handoff_ready",
+        "reviewed_mujoco_downstream_handoff_status",
+        "reviewed_mujoco_downstream_handoff_model_authority",
+        "reviewed_mujoco_downstream_handoff_physical_truth_claimed",
+        "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority",
         "reviewed_model_backed_board_source_pick_place",
         "board_pick_reviewed_model_authority_ready",
         "board_pick_detailed_evidence_ready",
@@ -261,6 +266,38 @@ def grasp_probe_state(summary_path: Path, *, verified: bool = True) -> dict[str,
     }
 
 
+def reviewed_mujoco_bundle_state(
+    summary_path: Path,
+    *,
+    handoff_ready: bool,
+    fixture_handoff_ready: bool = False,
+    status: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "status": (
+            "reviewed_mujoco_bundle_motion_checked"
+            if handoff_ready or fixture_handoff_ready
+            else "reviewed_mujoco_bundle_not_ready"
+        ),
+        "downstream_handoff_status": (
+            status
+            if status is not None
+            else "physical_reviewed_mujoco_handoff_ready"
+            if handoff_ready
+            else "fixture_mujoco_handoff_ready_not_physical_authority"
+            if fixture_handoff_ready
+            else "waiting_for_reviewed_bundle_authority"
+        ),
+        "downstream_handoff_ready": handoff_ready,
+        "downstream_handoff_model_authority": "downstream_handoff_not_authority",
+        "downstream_handoff_observed_evidence_is_authority": False,
+        "downstream_handoff_physical_so101_truth_claimed": False,
+        "downstream_handoff_development_fixture_evidence_not_physical_so101_truth": True,
+        "fixture_handoff_ready_not_physical_so101_authority": fixture_handoff_ready,
+        "summary_path": str(summary_path),
+    }
+
+
 def case_specs(output_dir: Path) -> list[dict[str, Any]]:
     summaries = output_dir / "input_summaries"
     authority_ready = reviewed_authority_ready(summaries / "authority_ready.json")
@@ -341,10 +378,19 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
     )
     contact_ready = contact_probe_state(summaries / "contact_ready.json")
     grasp_ready = grasp_probe_state(summaries / "grasp_ready.json")
+    handoff_missing = reviewed_mujoco_bundle_state(
+        summaries / "reviewed_mujoco_bundle_missing.json",
+        handoff_ready=False,
+    )
+    handoff_ready = reviewed_mujoco_bundle_state(
+        summaries / "reviewed_mujoco_bundle_ready.json",
+        handoff_ready=True,
+    )
     return [
         {
             "case_id": "all_development_evidence_blocked",
             "authority": authority_blocked,
+            "reviewed_mujoco_bundle": handoff_missing,
             "mujoco_scene": scene_dev,
             "chess_env": env_dev,
             "contact": contact_ready,
@@ -369,6 +415,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "reviewed_authority_motion_not_checked_rejected",
             "authority": authority_motion_not_checked,
+            "reviewed_mujoco_bundle": handoff_missing,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -390,8 +437,33 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "reviewed_authority_but_downstream_handoff_missing",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_missing,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "reviewed_downstream_handoff": False,
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "blockers_contain": ["make_reviewed_mujoco_downstream_handoff_ready"],
+                "next_priority_gate": "mujoco_scene_validity",
+            },
+        },
+        {
             "case_id": "reviewed_authority_but_board_still_development",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -414,6 +486,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "reviewed_authority_but_scene_still_development",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_dev,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -436,6 +509,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "reviewed_scene_but_gym_still_development",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_dev,
             "contact": contact_ready,
@@ -458,6 +532,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "board_draft_authority_rejected",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -485,6 +560,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "board_seeded_reviewed_authority_rejected",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -512,6 +588,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "board_manual_reset_pose_reviewed_authority_rejected",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -540,6 +617,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "board_missing_release_detail_reviewed_authority_rejected",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -562,6 +640,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "board_missing_final_contact_reviewed_authority_rejected",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -584,6 +663,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "board_target_tolerance_reviewed_authority_rejected",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -606,6 +686,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "rollout_raw_ready_development_authority_rejected",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -633,6 +714,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "rollout_reviewed_authority_not_ready",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -660,6 +742,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "rollout_reviewed_ready_failed_status_rejected",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -688,6 +771,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "rollout_reviewed_ready_wrong_authority_status_rejected",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -716,6 +800,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "rollout_reviewed_ready_debug_use_rejected",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -744,6 +829,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "rollout_reviewed_ready_missing_policy_authority_flag_rejected",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -772,6 +858,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "rollout_reviewed_ready_nonempty_blockers_rejected",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -799,6 +886,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         {
             "case_id": "all_ready_reviewed_contract_state",
             "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
             "mujoco_scene": scene_reviewed,
             "chess_env": env_reviewed,
             "contact": contact_ready,
@@ -838,6 +926,7 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         spec["authority"],
         spec["board"],
         spec["rollouts"],
+        reviewed_mujoco_bundle=spec["reviewed_mujoco_bundle"],
         mujoco_scene=spec["mujoco_scene"],
         chess_env=spec["chess_env"],
         contact_probe=spec["contact"],
@@ -865,6 +954,19 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             gate.get("reviewed_model_physical_motion_checked"),
             expect["reviewed_motion"],
         )
+    if "reviewed_downstream_handoff" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_downstream_handoff_ready",
+            gate.get("reviewed_mujoco_downstream_handoff_ready"),
+            expect["reviewed_downstream_handoff"],
+        )
+    add_error(
+        errors,
+        "reviewed_mujoco_downstream_handoff_physical_truth_claimed",
+        gate.get("reviewed_mujoco_downstream_handoff_physical_truth_claimed"),
+        False,
+    )
     add_error(
         errors,
         "reviewed_model_backed_board_source_pick_place",
@@ -1016,6 +1118,21 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "reviewed_model_physical_motion_checked": gate.get(
             "reviewed_model_physical_motion_checked"
         ),
+        "reviewed_mujoco_downstream_handoff_ready": gate.get(
+            "reviewed_mujoco_downstream_handoff_ready"
+        ),
+        "reviewed_mujoco_downstream_handoff_status": gate.get(
+            "reviewed_mujoco_downstream_handoff_status"
+        ),
+        "reviewed_mujoco_downstream_handoff_model_authority": gate.get(
+            "reviewed_mujoco_downstream_handoff_model_authority"
+        ),
+        "reviewed_mujoco_downstream_handoff_physical_truth_claimed": gate.get(
+            "reviewed_mujoco_downstream_handoff_physical_truth_claimed"
+        ),
+        "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority": gate.get(
+            "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority"
+        ),
         "reviewed_model_backed_board_source_pick_place": gate.get(
             "reviewed_model_backed_board_source_pick_place"
         ),
@@ -1060,17 +1177,18 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         "",
         "## Cases",
         "",
-        "| Case | Status | Ready | Next Gate | Board Pick | Rollout Authority | Fixture Caveat | Blockers |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Case | Status | Ready | Next Gate | Handoff | Board Pick | Rollout Authority | Fixture Caveat | Blockers |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for case in summary["cases"]:
         gate = case["gate"]
         lines.append(
-            "| `{case_id}` | `{status}` | `{ready}` | `{next_gate}` | `{board}` | `{rollout}` | `{fixture}` | `{blockers}` |".format(
+            "| `{case_id}` | `{status}` | `{ready}` | `{next_gate}` | `{handoff}` | `{board}` | `{rollout}` | `{fixture}` | `{blockers}` |".format(
                 case_id=case["case_id"],
                 status=case["status"],
                 ready=gate.get("ready"),
                 next_gate=gate.get("next_priority_gate_id") or "none",
+                handoff=gate.get("reviewed_mujoco_downstream_handoff_ready"),
                 board=gate.get("reviewed_model_backed_board_source_pick_place"),
                 rollout=gate.get("rollout_policy_training_authority_ready"),
                 fixture=gate.get("development_fixture_evidence_not_policy_training_truth"),
@@ -1083,7 +1201,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "## Authority Boundary",
             "",
             "- `all_ready_reviewed_contract_state` exercises the ready branch only; its injected dictionaries are not reviewed robot evidence.",
-            "- `priority_gate_queue` preserves reviewed authority, MuJoCo scene, Gymnasium task wiring, scripted pick/place, then training rollout order.",
+            "- `priority_gate_queue` preserves reviewed authority, reviewed MuJoCo handoff and scene validity, Gymnasium task wiring, scripted pick/place, then training rollout order.",
             "- Each case writes `so101_training_readiness_gate_priority_queue.csv` so the prioritized missing-gate order is reviewable without parsing nested JSON.",
             "- Draft, development, and fixture-only model-authority labels are rejected even when raw readiness booleans are true.",
             "- Board-pick readiness requires detailed source-start, contact, lift, transfer, place, release, final-board-contact, and target-tolerance evidence.",
