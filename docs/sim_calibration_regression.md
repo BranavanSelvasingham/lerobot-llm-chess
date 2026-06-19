@@ -545,9 +545,9 @@ base-to-board transforms stay not ready, and ready synthetic fixture motion rema
 across center, corner, back-rank, and edge placements with 64 square geoms,
 target marker/site presence, SimRobot joint sync, and Gymnasium scripted
 completion while remaining non-authoritative. The same matrix requires invalid
-scene requests, such as invalid chess squares or identical source/target
-squares, to fail closed with summary/CSV/README artifacts and no generated model
-XML or manifest. It also runs the focused
+scene requests, such as invalid chess squares, identical source/target squares,
+or a non-positive step budget, to fail closed with summary/CSV/README artifacts
+and no generated model XML or manifest. It also runs the focused
 `so101_chess_env_matrix` smoke to prove Gymnasium task wiring can run in
 explicit fallback mode, `--require-mujoco` fails closed without a model path, and
 the generated development MJCF path remains
@@ -685,7 +685,9 @@ The standalone MuJoCo scene matrix writes
 It covers multiple valid source/target board placements and verifies each child
 scene remains `development_scaffold_not_reviewed` with 64 square geoms, target
 frame site presence, target marker presence, model load, SimRobot sync, and
-scripted environment completion.
+scripted environment completion. It also covers invalid-square,
+same-source/target, and non-positive max-step requests that must fail closed
+without writing a model XML or manifest.
 
 The standalone chess-env matrix writes `so101_chess_env_matrix_summary.json`,
 `.csv`, and `README.md`. It reports
@@ -856,8 +858,8 @@ A passing summary should show:
 - `ik_reachability_drill.status: "ok_model_backed"` or `"model_unavailable_fallback_complete"` with `row_count > 0`, populated `counts_by_feasibility`, and summary/CSV/heatmap artifact paths populated
 - `ik_reachability_drill.configured_model_path` populated when `--ik-model-path` is supplied, otherwise `null`
 - `ik_reachability_drill.configured_model_request` mirrored from the child diagnostic when `--ik-model-path` is supplied
-- `so101_mujoco_scene.status: "ok"` with `model_authority: "development_scaffold_not_reviewed"`, `observed_evidence_is_physical_so101_authority: false`, `ready_for_model_backed_ik: false`, `ready_for_policy_training: false`, `mujoco_scene_validity_status: "development_scene_validated_not_physical_authority"`, source/target squares recorded, `square_geom_count: 64`, target-frame site and target marker present, MuJoCo load/sync checks passing, and summary/model/manifest/CSV/README artifact paths populated
-- `so101_mujoco_scene_matrix` includes invalid-square and same-source/target cases that must report `status: "invalid_task_configuration"`, keep authority/readiness flags false, write summary/CSV/README artifacts, and leave model XML and manifest paths absent
+- `so101_mujoco_scene.status: "ok"` with `model_authority: "development_scaffold_not_reviewed"`, `observed_evidence_is_physical_so101_authority: false`, `ready_for_model_backed_ik: false`, `ready_for_policy_training: false`, `mujoco_scene_validity_status: "development_scene_validated_not_physical_authority"`, source/target squares and max-step budget recorded, `square_geom_count: 64`, target-frame site and target marker present, MuJoCo load/sync checks passing, and summary/model/manifest/CSV/README artifact paths populated
+- `so101_mujoco_scene_matrix` includes invalid-square, same-source/target, and non-positive max-step cases that must report `status: "invalid_task_configuration"`, keep authority/readiness flags false, write summary/CSV/README artifacts, and leave model XML and manifest paths absent
 - `so101_chess_env.status: "ok"` with `model_authority: "development_scaffold_not_reviewed"` when the generated MuJoCo model is loaded, `ready_for_model_backed_ik: false`, `ready_for_policy_training: false`, strict Gymnasium/MuJoCo dependencies available, `mujoco_backend_required: true`, `mujoco_backend_loaded: true`, `joint_state_fallback_active: false`, `gymnasium_task_wiring_status: "development_mujoco_env_scripted"`, `training_authority_status: "development_mujoco_env_verified_not_policy_ready"`, serious-training blockers including `reviewed_so101_model_bundle`, symbolic contact model recorded, scripted pick/place complete, and summary/CSV/README artifact paths populated
 - `so101_env_resets.status: "ok"` with `all_resets_ok: true`, `all_mujoco_fallback_free: true`, reset count populated, and summary/CSV/model/manifest/README artifact paths populated
 - `so101_mujoco_contact_probe.status: "ok"` with `all_piece_resets_ok: true`, `all_board_contacts_observed: true`, probe count populated, and summary/CSV/model/manifest/README artifact paths populated

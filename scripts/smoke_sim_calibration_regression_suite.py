@@ -3311,6 +3311,7 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "joint_state_fallback_active",
         "gymnasium_task_wiring_status",
         "mujoco_scene_validity_status",
+        "max_steps",
         "square_geom_count",
         "target_frame_site_present",
         "target_marker_present",

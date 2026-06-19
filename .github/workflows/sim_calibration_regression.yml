@@ -873,12 +873,18 @@ jobs:
               "edge_to_center_scene_h2_d5",
               "invalid_source_square_rejected",
               "same_source_target_rejected",
+              "invalid_max_steps_rejected",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
           negative_case_ids = {
               "invalid_source_square_rejected",
               "same_source_target_rejected",
+              "invalid_max_steps_rejected",
           }
+          by_case = {case["case_id"]: case for case in summary["cases"]}
+          invalid_steps = by_case["invalid_max_steps_rejected"]["observations"]
+          assert invalid_steps["max_steps"] == 0, invalid_steps
+          assert "max_steps must be positive" in invalid_steps["configuration_error"]["message"], invalid_steps
           for case in summary["cases"]:
               obs = case["observations"]
               assert obs["model_authority"] == "development_scaffold_not_reviewed", case

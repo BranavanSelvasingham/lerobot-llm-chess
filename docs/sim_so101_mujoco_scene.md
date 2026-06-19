@@ -55,8 +55,8 @@ python scripts/smoke_sim_so101_mujoco_scene_matrix.py --output-dir /private/tmp/
 The matrix writes `so101_mujoco_scene_matrix_summary.json`,
 `so101_mujoco_scene_matrix_cases.csv`, and `README.md`. It validates generated
 development scenes across center, corner, back-rank, and edge placements, plus
-fail-closed invalid-square and same-source/target cases, while keeping every
-case labeled as non-authoritative development scaffolding.
+fail-closed invalid-square, same-source/target, and non-positive max-step cases,
+while keeping every case labeled as non-authoritative development scaffolding.
 
 This scene is intentionally not an authoritative model bundle. It is generated
 from approximate repo-local dimensions and exists to validate MuJoCo loading,

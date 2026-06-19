@@ -267,6 +267,7 @@ def invalid_task_summary(
         "mujoco_scene_validity_status": "invalid_task_configuration",
         "source_square": args.source_square,
         "target_square": args.target_square,
+        "max_steps": args.max_steps,
         "configuration_error": {
             "type": "ValueError",
             "message": message,
@@ -397,6 +398,7 @@ def main() -> int:
         "mujoco_scene_validity_status": "development_scene_validated_not_physical_authority",
         "source_square": args.source_square,
         "target_square": args.target_square,
+        "max_steps": args.max_steps,
         "square_geom_count": model_load.get("square_geom_count"),
         "target_frame_site_present": not bool(model_load.get("missing_required_sites")),
         "target_marker_present": "target_square_marker" not in set(model_load.get("missing_required_geoms") or []),

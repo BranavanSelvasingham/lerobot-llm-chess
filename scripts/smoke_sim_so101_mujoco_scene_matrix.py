@@ -80,6 +80,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "model_authority",
         "source_square",
         "target_square",
+        "max_steps",
         "square_geom_count",
         "target_frame_site_present",
         "target_marker_present",
@@ -142,6 +143,14 @@ def case_specs() -> list[dict[str, Any]]:
             "expect_ok": False,
             "expected_error_contains": "piece_square and target_square must differ",
         },
+        {
+            "case_id": "invalid_max_steps_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "max_steps": 0,
+            "expect_ok": False,
+            "expected_error_contains": "max_steps must be positive",
+        },
     ]
 
 
@@ -174,7 +183,7 @@ def add_error(errors: list[str], label: str, actual: Any, expected: Any) -> None
 
 def summarize_case(
     *,
-    spec: dict[str, str],
+    spec: dict[str, Any],
     record: dict[str, Any],
     summary: dict[str, Any],
 ) -> dict[str, Any]:
@@ -218,6 +227,7 @@ def summarize_case(
         "model_authority": summary.get("model_authority"),
         "source_square": summary.get("source_square"),
         "target_square": summary.get("target_square"),
+        "max_steps": summary.get("max_steps"),
         "square_geom_count": summary.get("square_geom_count"),
         "target_frame_site_present": summary.get("target_frame_site_present"),
         "target_marker_present": summary.get("target_marker_present"),
@@ -246,6 +256,7 @@ def summarize_case(
     )
     add_error(errors, f"{case_id}.source_square", observations["source_square"], spec["source_square"])
     add_error(errors, f"{case_id}.target_square", observations["target_square"], spec["target_square"])
+    add_error(errors, f"{case_id}.max_steps", observations["max_steps"], spec.get("max_steps", 96))
     if expect_ok:
         add_error(errors, f"{case_id}.square_geom_count", observations["square_geom_count"], 64)
         add_error(errors, f"{case_id}.target_frame_site_present", observations["target_frame_site_present"], True)
@@ -333,7 +344,7 @@ def run_case(
     *,
     output_dir: Path,
     python_path: Path,
-    spec: dict[str, str],
+    spec: dict[str, Any],
 ) -> dict[str, Any]:
     case_id = spec["case_id"]
     case_dir = output_dir / "cases" / case_id
@@ -346,6 +357,8 @@ def run_case(
         spec["source_square"],
         "--target-square",
         spec["target_square"],
+        "--max-steps",
+        str(spec.get("max_steps", 96)),
     ]
     record, summary = run_child(
         case_dir=case_dir,
@@ -368,6 +381,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "model_authority": observations.get("model_authority"),
         "source_square": observations.get("source_square"),
         "target_square": observations.get("target_square"),
+        "max_steps": observations.get("max_steps"),
         "square_geom_count": observations.get("square_geom_count"),
         "target_frame_site_present": observations.get("target_frame_site_present"),
         "target_marker_present": observations.get("target_marker_present"),
