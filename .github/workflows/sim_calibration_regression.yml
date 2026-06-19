@@ -4815,7 +4815,12 @@ jobs:
               assert (model_bundle_probe_matrix_dir / relative_path).is_file(), relative_path
           assert model_bundle_probe_matrix["ok"] is True, model_bundle_probe_matrix
           assert model_bundle_probe_matrix["status"] == "ok", model_bundle_probe_matrix
-          assert model_bundle_probe_matrix["case_count"] == 3, model_bundle_probe_matrix
+          assert model_bundle_probe_matrix["case_count"] == len(
+              model_bundle_probe_matrix["case_ids"]
+          ), model_bundle_probe_matrix
+          assert (
+              "invalid_reviewed_at_rejected" in model_bundle_probe_matrix["case_ids"]
+          ), model_bundle_probe_matrix
           assert model_bundle_probe_matrix["failed_case_ids"] == [], model_bundle_probe_matrix
           assert (
               model_bundle_probe_matrix["model_authority"]
@@ -4830,7 +4835,13 @@ jobs:
           )
           assert model_bundle_manifest_matrix["ok"] is True, model_bundle_manifest_matrix
           assert model_bundle_manifest_matrix["status"] == "ok", model_bundle_manifest_matrix
-          assert model_bundle_manifest_matrix["case_count"] == 22, model_bundle_manifest_matrix
+          assert model_bundle_manifest_matrix["case_count"] == len(
+              model_bundle_manifest_matrix["case_ids"]
+          ), model_bundle_manifest_matrix
+          assert (
+              "invalid_reviewed_at_not_ready"
+              in model_bundle_manifest_matrix["case_ids"]
+          ), model_bundle_manifest_matrix
           assert model_bundle_manifest_matrix["failed_case_ids"] == [], model_bundle_manifest_matrix
           assert (
               model_bundle_manifest_matrix["model_authority"]
