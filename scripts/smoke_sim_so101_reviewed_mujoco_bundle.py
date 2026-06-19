@@ -18,10 +18,13 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 SCHEMA = "lerobot.sim.so101_reviewed_mujoco_bundle.v1"
+DOWNSTREAM_HANDOFF_SCHEMA = "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1"
 DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "so101_reviewed_mujoco_bundle"
 SUMMARY_NAME = "so101_reviewed_mujoco_bundle_summary.json"
 CHECKLIST_NAME = "so101_reviewed_mujoco_bundle_checklist.csv"
 MOTION_CHECKS_NAME = "so101_reviewed_mujoco_bundle_motion_checks.csv"
+DOWNSTREAM_HANDOFF_NAME = "so101_reviewed_mujoco_bundle_downstream_handoff.json"
+DOWNSTREAM_HANDOFF_CSV_NAME = "so101_reviewed_mujoco_bundle_downstream_handoff.csv"
 README_NAME = "README.md"
 MANIFEST_CHECKER_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_bundle_manifest.py"
 SO101_BODY_JOINTS: tuple[str, ...] = (
@@ -164,6 +167,25 @@ def write_motion_checks_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "physical_reviewed_model_motion_checked",
         "hardware_free_fixture_motion_checked",
         "motion_evidence_not_physical_so101_authority",
+    )
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: csv_value(row.get(field)) for field in fieldnames})
+
+
+def write_downstream_handoff_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = (
+        "priority",
+        "handoff_key",
+        "status",
+        "ready_for_downstream",
+        "source",
+        "observed_value",
+        "authority_status",
+        "caveat",
     )
     with path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -744,6 +766,221 @@ def motion_check_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+def handoff_status(summary: dict[str, Any]) -> str:
+    if summary.get("physical_reviewed_model_motion_checked") is True:
+        return "physical_reviewed_mujoco_handoff_ready"
+    if summary.get("hardware_free_fixture_motion_checked") is True:
+        return "fixture_mujoco_handoff_ready_not_physical_authority"
+    if summary.get("ready_for_model_backed_ik") is True:
+        return "manifest_ready_motion_handoff_blocked"
+    return "waiting_for_reviewed_bundle_authority"
+
+
+def handoff_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
+    physical_ready = summary.get("physical_reviewed_model_motion_checked") is True
+    caveat = (
+        "This downstream handoff is a snapshot for later MuJoCo scene, Gymnasium, "
+        "and pick/place gates. It is not physical SO-101 authority by itself."
+    )
+    rows = [
+        {
+            "handoff_key": "model_authority",
+            "status": summary.get("model_authority"),
+            "source": "manifest_checker",
+            "observed_value": {
+                "physical_so101_model_authority_ready": summary.get(
+                    "physical_so101_model_authority_ready"
+                ),
+                "hardware_free_regression_fixture_ready": summary.get(
+                    "hardware_free_regression_fixture_ready"
+                ),
+            },
+            "authority_status": summary.get("model_authority"),
+        },
+        {
+            "handoff_key": "model_identity",
+            "status": (summary.get("model_identity") or {}).get("status"),
+            "source": "manifest.model_path|model_sha256",
+            "observed_value": {
+                "model_path": (summary.get("model_path") or {}).get("path"),
+                "declared_sha256": (summary.get("model_identity") or {}).get(
+                    "declared_sha256"
+                ),
+                "observed_sha256": (summary.get("model_identity") or {}).get(
+                    "observed_sha256"
+                ),
+                "matches": (summary.get("model_identity") or {}).get("matches"),
+            },
+            "authority_status": (summary.get("model_identity") or {}).get("status"),
+        },
+        {
+            "handoff_key": "target_frame",
+            "status": (summary.get("target_frame") or {}).get("status"),
+            "source": "manifest.target_frame",
+            "observed_value": summary.get("target_frame"),
+            "authority_status": (summary.get("target_frame") or {}).get(
+                "review_status"
+            ),
+        },
+        {
+            "handoff_key": "tcp_offset_m",
+            "status": (summary.get("tcp_offset") or {}).get("status"),
+            "source": "manifest.tcp_offset_m",
+            "observed_value": summary.get("tcp_offset"),
+            "authority_status": (summary.get("tcp_offset") or {}).get(
+                "review_status"
+            ),
+        },
+        {
+            "handoff_key": "base_to_board_alignment",
+            "status": (summary.get("base_to_board_alignment") or {}).get("status"),
+            "source": "manifest.base_to_board_transform",
+            "observed_value": summary.get("base_to_board_alignment"),
+            "authority_status": (summary.get("base_to_board_alignment") or {}).get(
+                "review_status"
+            ),
+        },
+        {
+            "handoff_key": "joint_limits",
+            "status": (summary.get("joint_limits") or {}).get("status"),
+            "source": "manifest.joint_limits_deg",
+            "observed_value": summary.get("joint_limits"),
+            "authority_status": (summary.get("joint_limits") or {}).get(
+                "review_status"
+            ),
+        },
+        {
+            "handoff_key": "mesh_assets",
+            "status": (summary.get("mesh_assets") or {}).get("status"),
+            "source": "manifest.asset_roots|contract_checker.model_asset_preflight",
+            "observed_value": summary.get("mesh_assets"),
+            "authority_status": (summary.get("mesh_assets") or {}).get(
+                "review_status"
+            ),
+        },
+        {
+            "handoff_key": "mujoco_motion",
+            "status": summary.get("motion_authority_status"),
+            "source": "SimRobot.send_action|mujoco.MjModel",
+            "observed_value": {
+                "reviewed_model_motion_checked": summary.get(
+                    "reviewed_model_motion_checked"
+                ),
+                "physical_reviewed_model_motion_checked": summary.get(
+                    "physical_reviewed_model_motion_checked"
+                ),
+                "hardware_free_fixture_motion_checked": summary.get(
+                    "hardware_free_fixture_motion_checked"
+                ),
+                "motion_evidence_not_physical_so101_authority": summary.get(
+                    "motion_evidence_not_physical_so101_authority"
+                ),
+            },
+            "authority_status": summary.get("motion_authority_status"),
+        },
+        {
+            "handoff_key": "downstream_gate_handoff",
+            "status": handoff_status(summary),
+            "source": "reviewed_mujoco_bundle_gate",
+            "observed_value": {
+                "gates_unblocked_when_physical_handoff_ready": [
+                    "mujoco_scene_validity",
+                    "gymnasium_task_wiring",
+                    "reviewed_model_backed_contact_grasp_pick_place",
+                ],
+                "next_required_for_goal": summary.get("next_required_for_goal"),
+            },
+            "authority_status": "physical_handoff_ready" if physical_ready else "blocked",
+        },
+    ]
+    return [
+        {
+            "priority": index,
+            "ready_for_downstream": physical_ready,
+            "caveat": caveat,
+            **row,
+        }
+        for index, row in enumerate(rows, start=1)
+    ]
+
+
+def build_downstream_handoff(summary: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    rows = handoff_rows(summary)
+    physical_ready = summary.get("physical_reviewed_model_motion_checked") is True
+    fixture_ready = summary.get("hardware_free_fixture_motion_checked") is True
+    handoff = {
+        "schema": DOWNSTREAM_HANDOFF_SCHEMA,
+        "ok": True,
+        "status": handoff_status(summary),
+        "model_authority": "downstream_handoff_not_authority",
+        "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
+        "reviewed_model_motion_checked": summary.get("reviewed_model_motion_checked"),
+        "physical_reviewed_model_motion_checked": summary.get(
+            "physical_reviewed_model_motion_checked"
+        ),
+        "hardware_free_fixture_motion_checked": summary.get(
+            "hardware_free_fixture_motion_checked"
+        ),
+        "motion_evidence_not_physical_so101_authority": summary.get(
+            "motion_evidence_not_physical_so101_authority"
+        ),
+        "motion_authority_status": summary.get("motion_authority_status"),
+        "physical_so101_model_authority_ready": summary.get(
+            "physical_so101_model_authority_ready"
+        ),
+        "hardware_free_regression_fixture_ready": summary.get(
+            "hardware_free_regression_fixture_ready"
+        ),
+        "downstream_handoff_ready": physical_ready,
+        "fixture_handoff_ready_not_physical_so101_authority": fixture_ready,
+        "observed_evidence_is_authority": False,
+        "physical_so101_truth_claimed": False,
+        "development_fixture_evidence_not_physical_so101_truth": True,
+        "gates_unblocked_when_physical_handoff_ready": [
+            "mujoco_scene_validity",
+            "gymnasium_task_wiring",
+            "reviewed_model_backed_contact_grasp_pick_place",
+        ],
+        "blocked_gates_until_physical_handoff_ready": []
+        if physical_ready
+        else [
+            "mujoco_scene_validity",
+            "gymnasium_task_wiring",
+            "reviewed_model_backed_contact_grasp_pick_place",
+        ],
+        "calibration_inputs": {
+            "manifest_status": summary.get("manifest_status"),
+            "model_path": summary.get("model_path"),
+            "model_identity": summary.get("model_identity"),
+            "asset_roots": summary.get("asset_roots"),
+            "target_frame": summary.get("target_frame"),
+            "tcp_offset": summary.get("tcp_offset"),
+            "base_to_board_alignment": summary.get("base_to_board_alignment"),
+            "joint_limits": summary.get("joint_limits"),
+            "mesh_assets": summary.get("mesh_assets"),
+        },
+        "mujoco_motion_inputs": {
+            "mujoco_model_load": summary.get("mujoco_model_load"),
+            "joint_limit_model_consistency": summary.get(
+                "joint_limit_model_consistency"
+            ),
+            "sim_robot_mujoco_sync": summary.get("sim_robot_mujoco_sync"),
+        },
+        "missing_inputs": summary.get("missing_inputs") or [],
+        "next_required_for_goal": summary.get("next_required_for_goal") or [],
+        "handoff_item_count": len(rows),
+        "handoff_item_ids": [row["handoff_key"] for row in rows],
+        "handoff_items": rows,
+        "caveats": [
+            "This handoff is a machine-readable snapshot for downstream gates.",
+            "It is not reviewed physical SO-101 authority and never claims physical truth by itself.",
+            "Only downstream_handoff_ready true should allow reviewed-model-backed scene/env/pick-place evidence to be treated as physical-model-backed evidence.",
+            "Fixture handoffs keep development automation runnable but remain non-physical SO-101 truth.",
+        ],
+    }
+    return handoff, rows
+
+
 def build_not_ready_summary(
     *,
     args: argparse.Namespace,
@@ -1058,6 +1295,10 @@ def write_readme(path: Path, summary: dict[str, Any], rows: list[dict[str, Any]]
         f"- `physical_reviewed_model_motion_checked`: `{str(summary.get('physical_reviewed_model_motion_checked')).lower()}`",
         f"- `hardware_free_fixture_motion_checked`: `{str(summary.get('hardware_free_fixture_motion_checked')).lower()}`",
         f"- `motion_evidence_not_physical_so101_authority`: `{str(summary.get('motion_evidence_not_physical_so101_authority')).lower()}`",
+        f"- `downstream_handoff_status`: `{summary.get('downstream_handoff_status')}`",
+        f"- `downstream_handoff_ready`: `{str(summary.get('downstream_handoff_ready')).lower()}`",
+        f"- `downstream_handoff_json`: `{summary['artifacts'].get('downstream_handoff_json')}`",
+        f"- `downstream_handoff_csv`: `{summary['artifacts'].get('downstream_handoff_csv')}`",
         f"- `model_path`: `{summary.get('model_path', {}).get('path') if isinstance(summary.get('model_path'), dict) else None}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `checklist_csv`: `{summary['artifacts']['checklist_csv']}`",
@@ -1080,6 +1321,11 @@ def write_readme(path: Path, summary: dict[str, Any], rows: list[dict[str, Any]]
     lines.extend(
         [
             "",
+            "## Downstream Handoff",
+            "",
+            "The downstream handoff JSON/CSV snapshots the reviewed bundle fields that later MuJoCo scene, Gymnasium, and reviewed-model-backed pick/place gates must consume.",
+            "It is not physical SO-101 authority by itself; `downstream_handoff_ready` is true only when physical reviewed model authority and MuJoCo/SimRobot motion are both true.",
+            "",
             "## Scope",
             "",
             "This gate is the automation bridge from reviewed model-bundle readiness to MuJoCo motion.",
@@ -1096,11 +1342,15 @@ def main() -> int:
     summary_path = output_dir / SUMMARY_NAME
     csv_path = output_dir / CHECKLIST_NAME
     motion_csv_path = output_dir / MOTION_CHECKS_NAME
+    downstream_handoff_path = output_dir / DOWNSTREAM_HANDOFF_NAME
+    downstream_handoff_csv_path = output_dir / DOWNSTREAM_HANDOFF_CSV_NAME
     readme_path = output_dir / README_NAME
     artifacts = {
         "summary_json": str(summary_path),
         "checklist_csv": str(csv_path),
         "motion_checks_csv": str(motion_csv_path),
+        "downstream_handoff_json": str(downstream_handoff_path),
+        "downstream_handoff_csv": str(downstream_handoff_csv_path),
         "readme": str(readme_path),
     }
 
@@ -1121,9 +1371,46 @@ def main() -> int:
             artifacts=artifacts,
         )
 
+    downstream_handoff, downstream_handoff_rows = build_downstream_handoff(summary)
+    summary.update(
+        {
+            "downstream_handoff_status": downstream_handoff["status"],
+            "downstream_handoff_model_authority": downstream_handoff[
+                "model_authority"
+            ],
+            "downstream_handoff_ready": downstream_handoff[
+                "downstream_handoff_ready"
+            ],
+            "fixture_handoff_ready_not_physical_so101_authority": (
+                downstream_handoff[
+                    "fixture_handoff_ready_not_physical_so101_authority"
+                ]
+            ),
+            "downstream_handoff_observed_evidence_is_authority": (
+                downstream_handoff["observed_evidence_is_authority"]
+            ),
+            "downstream_handoff_physical_so101_truth_claimed": (
+                downstream_handoff["physical_so101_truth_claimed"]
+            ),
+            "downstream_handoff_development_fixture_evidence_not_physical_so101_truth": (
+                downstream_handoff[
+                    "development_fixture_evidence_not_physical_so101_truth"
+                ]
+            ),
+            "downstream_handoff_item_count": downstream_handoff[
+                "handoff_item_count"
+            ],
+            "downstream_handoff_item_ids": downstream_handoff["handoff_item_ids"],
+            "downstream_handoff_json_path": artifacts["downstream_handoff_json"],
+            "downstream_handoff_csv_path": artifacts["downstream_handoff_csv"],
+            "downstream_handoff": downstream_handoff,
+        }
+    )
     write_json(summary_path, summary)
     write_csv(csv_path, rows)
     write_motion_checks_csv(motion_csv_path, motion_check_rows(summary))
+    write_json(downstream_handoff_path, downstream_handoff)
+    write_downstream_handoff_csv(downstream_handoff_csv_path, downstream_handoff_rows)
     write_readme(readme_path, summary, rows)
     print(
         json.dumps(
@@ -1140,6 +1427,11 @@ def main() -> int:
                 "hardware_free_fixture_motion_checked": summary["hardware_free_fixture_motion_checked"],
                 "motion_evidence_not_physical_so101_authority": summary[
                     "motion_evidence_not_physical_so101_authority"
+                ],
+                "downstream_handoff_status": summary["downstream_handoff_status"],
+                "downstream_handoff_ready": summary["downstream_handoff_ready"],
+                "fixture_handoff_ready_not_physical_so101_authority": summary[
+                    "fixture_handoff_ready_not_physical_so101_authority"
                 ],
                 "summary_json": str(summary_path),
             },

@@ -642,10 +642,15 @@ jobs:
               assert observations["motion_checks_csv_exists"] is True, case
               assert Path(observations["motion_checks_csv_path"]).is_file(), case
               assert observations["motion_checks_csv_joint_names"] == expected_motion_check_joints, case
+              assert observations["downstream_handoff_csv_exists"] is True, case
+              assert Path(observations["downstream_handoff_csv_path"]).is_file(), case
+              assert "downstream_gate_handoff" in observations["downstream_handoff_csv_item_ids"], case
               if observations["ready_for_model_backed_ik"] is False:
                   assert sorted(set(observations["motion_checks_csv_statuses"])) == [
                       "not_attempted_manifest_not_ready"
                   ], case
+                  assert observations["downstream_handoff_status"] == "waiting_for_reviewed_bundle_authority", case
+                  assert observations["downstream_handoff_ready"] is False, case
           missing = by_case["missing_manifest_nonfailing"]
           assert missing["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", missing
           assert missing["observations"]["motion_authority_status"] == "not_checked_manifest_not_ready", missing
@@ -895,6 +900,9 @@ jobs:
           assert ready_fixture["observations"]["physical_reviewed_model_motion_checked"] is False, ready_fixture
           assert ready_fixture["observations"]["hardware_free_fixture_motion_checked"] is True, ready_fixture
           assert ready_fixture["observations"]["motion_evidence_not_physical_so101_authority"] is True, ready_fixture
+          assert ready_fixture["observations"]["downstream_handoff_status"] == "fixture_mujoco_handoff_ready_not_physical_authority", ready_fixture
+          assert ready_fixture["observations"]["downstream_handoff_ready"] is False, ready_fixture
+          assert ready_fixture["observations"]["fixture_handoff_ready_not_physical_so101_authority"] is True, ready_fixture
           assert sorted(set(ready_fixture["observations"]["motion_checks_csv_statuses"])) == [
               "motion_checked"
           ], ready_fixture
@@ -1911,6 +1919,19 @@ jobs:
           assert isinstance(reviewed_mujoco_bundle["hardware_free_fixture_motion_checked"], bool), reviewed_mujoco_bundle
           assert isinstance(reviewed_mujoco_bundle["motion_evidence_not_physical_so101_authority"], bool), reviewed_mujoco_bundle
           assert isinstance(reviewed_mujoco_bundle["motion_authority"], dict), reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["downstream_handoff_status"] in {
+              "waiting_for_reviewed_bundle_authority",
+              "manifest_ready_motion_handoff_blocked",
+              "fixture_mujoco_handoff_ready_not_physical_authority",
+              "physical_reviewed_mujoco_handoff_ready",
+          }, reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["downstream_handoff_model_authority"] == "downstream_handoff_not_authority", reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["downstream_handoff_observed_evidence_is_authority"] is False, reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["downstream_handoff_physical_so101_truth_claimed"] is False, reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["downstream_handoff_development_fixture_evidence_not_physical_so101_truth"] is True, reviewed_mujoco_bundle
+          assert isinstance(reviewed_mujoco_bundle["downstream_handoff_item_count"], int), reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["downstream_handoff_item_count"] >= 8, reviewed_mujoco_bundle
+          assert "downstream_gate_handoff" in reviewed_mujoco_bundle["downstream_handoff_item_ids"], reviewed_mujoco_bundle
           if bundle_manifest["ready_for_model_backed_ik"] is True:
               assert reviewed_mujoco_bundle["reviewed_model_motion_checked"] is True, reviewed_mujoco_bundle
               assert reviewed_mujoco_bundle["status"] == "reviewed_mujoco_bundle_motion_checked", reviewed_mujoco_bundle
@@ -1923,6 +1944,12 @@ jobs:
               assert reviewed_mujoco_bundle["motion_evidence_not_physical_so101_authority"] == (
                   reviewed_mujoco_bundle["physical_so101_model_authority_ready"] is False
               ), reviewed_mujoco_bundle
+              assert reviewed_mujoco_bundle["downstream_handoff_ready"] == (
+                  reviewed_mujoco_bundle["physical_reviewed_model_motion_checked"] is True
+              ), reviewed_mujoco_bundle
+              assert reviewed_mujoco_bundle["fixture_handoff_ready_not_physical_so101_authority"] == (
+                  reviewed_mujoco_bundle["hardware_free_fixture_motion_checked"] is True
+              ), reviewed_mujoco_bundle
           else:
               assert reviewed_mujoco_bundle["reviewed_model_motion_checked"] is False, reviewed_mujoco_bundle
               assert reviewed_mujoco_bundle["status"] == "reviewed_mujoco_bundle_not_ready", reviewed_mujoco_bundle
@@ -1930,12 +1957,34 @@ jobs:
               assert reviewed_mujoco_bundle["physical_reviewed_model_motion_checked"] is False, reviewed_mujoco_bundle
               assert reviewed_mujoco_bundle["hardware_free_fixture_motion_checked"] is False, reviewed_mujoco_bundle
               assert reviewed_mujoco_bundle["motion_evidence_not_physical_so101_authority"] is False, reviewed_mujoco_bundle
+              assert reviewed_mujoco_bundle["downstream_handoff_status"] == "waiting_for_reviewed_bundle_authority", reviewed_mujoco_bundle
+              assert reviewed_mujoco_bundle["downstream_handoff_ready"] is False, reviewed_mujoco_bundle
+              assert reviewed_mujoco_bundle["fixture_handoff_ready_not_physical_so101_authority"] is False, reviewed_mujoco_bundle
           reviewed_mujoco_artifacts = reviewed_mujoco_bundle["artifacts"]
-          for key in ("summary_json", "checklist_csv", "motion_checks_csv", "readme"):
+          for key in (
+              "summary_json",
+              "checklist_csv",
+              "motion_checks_csv",
+              "downstream_handoff_json",
+              "downstream_handoff_csv",
+              "readme",
+          ):
               assert isinstance(reviewed_mujoco_artifacts.get(key), str) and Path(reviewed_mujoco_artifacts[key]).is_file(), (
                   key,
                   reviewed_mujoco_artifacts,
               )
+          handoff = json.loads(Path(reviewed_mujoco_artifacts["downstream_handoff_json"]).read_text())
+          assert handoff["model_authority"] == "downstream_handoff_not_authority", handoff
+          assert handoff["status"] == reviewed_mujoco_bundle["downstream_handoff_status"], handoff
+          assert handoff["downstream_handoff_ready"] == reviewed_mujoco_bundle["downstream_handoff_ready"], handoff
+          assert handoff["observed_evidence_is_authority"] is False, handoff
+          assert handoff["physical_so101_truth_claimed"] is False, handoff
+          assert handoff["development_fixture_evidence_not_physical_so101_truth"] is True, handoff
+          assert "downstream_gate_handoff" in handoff["handoff_item_ids"], handoff
+          with Path(reviewed_mujoco_artifacts["downstream_handoff_csv"]).open(newline="") as handle:
+              handoff_rows = list(csv.DictReader(handle))
+          assert len(handoff_rows) == handoff["handoff_item_count"], handoff_rows
+          assert "downstream_gate_handoff" in {row["handoff_key"] for row in handoff_rows}, handoff_rows
           with Path(reviewed_mujoco_artifacts["motion_checks_csv"]).open(newline="") as handle:
               reviewed_mujoco_motion_rows = list(csv.DictReader(handle))
           assert sorted(row["joint"] for row in reviewed_mujoco_motion_rows) == [
@@ -3429,6 +3478,18 @@ jobs:
               for row in artifacts_by_category["so101_reviewed_mujoco_bundle"]
           ), artifacts_by_category["so101_reviewed_mujoco_bundle"]
           assert any(
+              row.get("label") == "so101_reviewed_mujoco_bundle:downstream_handoff_json"
+              and row.get("kind") == "json"
+              and row.get("exists") is True
+              for row in artifacts_by_category["so101_reviewed_mujoco_bundle"]
+          ), artifacts_by_category["so101_reviewed_mujoco_bundle"]
+          assert any(
+              row.get("label") == "so101_reviewed_mujoco_bundle:downstream_handoff_csv"
+              and row.get("kind") == "csv"
+              and row.get("exists") is True
+              for row in artifacts_by_category["so101_reviewed_mujoco_bundle"]
+          ), artifacts_by_category["so101_reviewed_mujoco_bundle"]
+          assert any(
               row.get("label") == "so101_reviewed_mujoco_bundle:readme" and row.get("exists") is True
               for row in artifacts_by_category["so101_reviewed_mujoco_bundle"]
           ), artifacts_by_category["so101_reviewed_mujoco_bundle"]
@@ -3455,6 +3516,22 @@ jobs:
               assert metrics.get("physical_reviewed_model_motion_checked") in {True, False, None}, metrics
               assert metrics.get("hardware_free_fixture_motion_checked") in {True, False, None}, metrics
               assert metrics.get("motion_evidence_not_physical_so101_authority") in {True, False, None}, metrics
+              assert metrics.get("downstream_handoff_status") in {
+                  "waiting_for_reviewed_bundle_authority",
+                  "manifest_ready_motion_handoff_blocked",
+                  "fixture_mujoco_handoff_ready_not_physical_authority",
+                  "physical_reviewed_mujoco_handoff_ready",
+                  None,
+              }, metrics
+              assert metrics.get("downstream_handoff_model_authority") in {
+                  "downstream_handoff_not_authority",
+                  None,
+              }, metrics
+              assert metrics.get("downstream_handoff_ready") in {True, False, None}, metrics
+              assert metrics.get("fixture_handoff_ready_not_physical_so101_authority") in {True, False, None}, metrics
+              assert metrics.get("downstream_handoff_observed_evidence_is_authority") in {False, None}, metrics
+              assert metrics.get("downstream_handoff_physical_so101_truth_claimed") in {False, None}, metrics
+              assert metrics.get("downstream_handoff_development_fixture_evidence_not_physical_so101_truth") in {True, None}, metrics
               if metrics.get("ready_for_model_backed_ik") is True and metrics.get("reviewed_model_motion_checked") is True:
                   assert metrics.get("physical_reviewed_model_motion_checked") == (
                       metrics.get("physical_so101_model_authority_ready") is True
@@ -3683,6 +3760,8 @@ jobs:
           assert "`so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_checklist.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_motion_checks.csv`" in entrypoint_text, entrypoint_text
+          assert "`so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_downstream_handoff.json`" in entrypoint_text, entrypoint_text
+          assert "`so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_downstream_handoff.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_inventory_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_candidates.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_inventory_review_packet.json`" in entrypoint_text, entrypoint_text
@@ -3890,6 +3969,8 @@ jobs:
               "so101_reviewed_model_authority_gate/so101_reviewed_model_authority_blocker_packet.csv",
               "so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_summary.json",
               "so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_motion_checks.csv",
+              "so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_downstream_handoff.json",
+              "so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_downstream_handoff.csv",
               "so101_model_source_inventory/so101_model_source_inventory_summary.json",
               "so101_model_source_inventory/so101_model_source_inventory_review_packet.json",
               "so101_model_source_inventory/so101_model_source_inventory_review_packet.csv",

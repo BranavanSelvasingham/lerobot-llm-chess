@@ -108,6 +108,12 @@ SO101_REVIEWED_MUJOCO_BUNDLE_SUMMARY_NAME = "so101_reviewed_mujoco_bundle_summar
 SO101_REVIEWED_MUJOCO_BUNDLE_MOTION_CHECKS_NAME = (
     "so101_reviewed_mujoco_bundle_motion_checks.csv"
 )
+SO101_REVIEWED_MUJOCO_BUNDLE_DOWNSTREAM_HANDOFF_NAME = (
+    "so101_reviewed_mujoco_bundle_downstream_handoff.json"
+)
+SO101_REVIEWED_MUJOCO_BUNDLE_DOWNSTREAM_HANDOFF_CSV_NAME = (
+    "so101_reviewed_mujoco_bundle_downstream_handoff.csv"
+)
 SO101_MUJOCO_SCENE_DIR_NAME = "so101_mujoco_scene"
 SO101_MUJOCO_SCENE_SUMMARY_NAME = "so101_mujoco_scene_summary.json"
 SO101_CHESS_ENV_DIR_NAME = "so101_chess_env"
@@ -1673,6 +1679,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/{SO101_REVIEWED_MUJOCO_BUNDLE_SUMMARY_NAME}`",
         f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/so101_reviewed_mujoco_bundle_checklist.csv`",
         f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/{SO101_REVIEWED_MUJOCO_BUNDLE_MOTION_CHECKS_NAME}`",
+        f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/{SO101_REVIEWED_MUJOCO_BUNDLE_DOWNSTREAM_HANDOFF_NAME}`",
+        f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/{SO101_REVIEWED_MUJOCO_BUNDLE_DOWNSTREAM_HANDOFF_CSV_NAME}`",
         f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/README.md`",
         "- `so101_model_source_inventory/so101_model_source_inventory_summary.json`",
         "- `so101_model_source_inventory/so101_model_source_candidates.csv`",
@@ -3364,6 +3372,15 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "hardware_free_fixture_motion_checked",
         "motion_evidence_not_physical_so101_authority",
         "motion_authority",
+        "downstream_handoff_status",
+        "downstream_handoff_model_authority",
+        "downstream_handoff_ready",
+        "fixture_handoff_ready_not_physical_so101_authority",
+        "downstream_handoff_observed_evidence_is_authority",
+        "downstream_handoff_physical_so101_truth_claimed",
+        "downstream_handoff_development_fixture_evidence_not_physical_so101_truth",
+        "downstream_handoff_item_count",
+        "downstream_handoff_item_ids",
         "require_ready_reviewed_model",
         "missing_inputs",
     ):

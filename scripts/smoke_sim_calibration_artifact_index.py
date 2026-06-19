@@ -2223,6 +2223,25 @@ def collect_so101_mujoco_smoke_artifacts(
         "hardware_free_fixture_motion_checked": smoke.get("hardware_free_fixture_motion_checked"),
         "motion_evidence_not_physical_so101_authority": smoke.get("motion_evidence_not_physical_so101_authority"),
         "motion_authority": smoke.get("motion_authority"),
+        "downstream_handoff_status": smoke.get("downstream_handoff_status"),
+        "downstream_handoff_model_authority": smoke.get("downstream_handoff_model_authority"),
+        "downstream_handoff_ready": smoke.get("downstream_handoff_ready"),
+        "fixture_handoff_ready_not_physical_so101_authority": smoke.get(
+            "fixture_handoff_ready_not_physical_so101_authority"
+        ),
+        "downstream_handoff_observed_evidence_is_authority": smoke.get(
+            "downstream_handoff_observed_evidence_is_authority"
+        ),
+        "downstream_handoff_physical_so101_truth_claimed": smoke.get(
+            "downstream_handoff_physical_so101_truth_claimed"
+        ),
+        "downstream_handoff_development_fixture_evidence_not_physical_so101_truth": (
+            smoke.get(
+                "downstream_handoff_development_fixture_evidence_not_physical_so101_truth"
+            )
+        ),
+        "downstream_handoff_item_count": smoke.get("downstream_handoff_item_count"),
+        "downstream_handoff_item_ids": smoke.get("downstream_handoff_item_ids"),
         "manifest_status": smoke.get("manifest_status"),
         "missing_inputs": smoke.get("missing_inputs"),
         "gymnasium_available": dependencies.get("gymnasium"),

@@ -279,6 +279,11 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "physical_reviewed_model_motion_checked",
         "hardware_free_fixture_motion_checked",
         "motion_evidence_not_physical_so101_authority",
+        "downstream_handoff_status",
+        "downstream_handoff_ready",
+        "fixture_handoff_ready_not_physical_so101_authority",
+        "downstream_handoff_csv_exists",
+        "downstream_handoff_csv_item_ids",
         "missing_inputs",
         "tcp_offset_status",
         "alignment_status",
@@ -1100,6 +1105,16 @@ def read_motion_checks_csv(path: Path) -> tuple[list[dict[str, str]], str | None
         return [], f"{type(exc).__name__}: {exc}"
 
 
+def expected_downstream_handoff_status(summary: dict[str, Any]) -> str:
+    if summary.get("physical_reviewed_model_motion_checked") is True:
+        return "physical_reviewed_mujoco_handoff_ready"
+    if summary.get("hardware_free_fixture_motion_checked") is True:
+        return "fixture_mujoco_handoff_ready_not_physical_authority"
+    if summary.get("ready_for_model_backed_ik") is True:
+        return "manifest_ready_motion_handoff_blocked"
+    return "waiting_for_reviewed_bundle_authority"
+
+
 def summarize_case(
     *,
     record: dict[str, Any],
@@ -1355,6 +1370,117 @@ def summarize_case(
                 ["motion_not_attempted_ready_manifest"],
             )
 
+    downstream_handoff_json_path_raw = artifacts.get("downstream_handoff_json")
+    downstream_handoff_json_path = (
+        Path(downstream_handoff_json_path_raw)
+        if isinstance(downstream_handoff_json_path_raw, str)
+        and downstream_handoff_json_path_raw
+        else None
+    )
+    downstream_handoff_csv_path_raw = artifacts.get("downstream_handoff_csv")
+    downstream_handoff_csv_path = (
+        Path(downstream_handoff_csv_path_raw)
+        if isinstance(downstream_handoff_csv_path_raw, str)
+        and downstream_handoff_csv_path_raw
+        else None
+    )
+    downstream_handoff_csv_rows: list[dict[str, str]] = []
+    downstream_handoff_csv_error: str | None = None
+    downstream_handoff = {}
+    if downstream_handoff_json_path is None or not downstream_handoff_json_path.is_file():
+        errors.append(
+            f"{case_id}.downstream_handoff_json: expected file at {downstream_handoff_json_path_raw!r}"
+        )
+    else:
+        try:
+            downstream_handoff = json.loads(downstream_handoff_json_path.read_text())
+        except Exception as exc:
+            errors.append(f"{case_id}.downstream_handoff_json: {type(exc).__name__}: {exc}")
+            downstream_handoff = {}
+    downstream_handoff_csv_exists = (
+        downstream_handoff_csv_path is not None and downstream_handoff_csv_path.is_file()
+    )
+    if not downstream_handoff_csv_exists:
+        errors.append(
+            f"{case_id}.downstream_handoff_csv: expected file at {downstream_handoff_csv_path_raw!r}"
+        )
+    else:
+        downstream_handoff_csv_rows, downstream_handoff_csv_error = read_motion_checks_csv(
+            downstream_handoff_csv_path
+        )
+        if downstream_handoff_csv_error is not None:
+            errors.append(
+                f"{case_id}.downstream_handoff_csv: {downstream_handoff_csv_error}"
+            )
+    expected_handoff_status = expected_downstream_handoff_status(summary)
+    add_error(
+        errors,
+        f"{case_id}.downstream_handoff_status",
+        summary.get("downstream_handoff_status"),
+        expected_handoff_status,
+    )
+    add_error(
+        errors,
+        f"{case_id}.downstream_handoff_ready",
+        summary.get("downstream_handoff_ready"),
+        summary.get("physical_reviewed_model_motion_checked") is True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.fixture_handoff_ready_not_physical_so101_authority",
+        summary.get("fixture_handoff_ready_not_physical_so101_authority"),
+        summary.get("hardware_free_fixture_motion_checked") is True,
+    )
+    if downstream_handoff:
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.status",
+            downstream_handoff.get("status"),
+            expected_handoff_status,
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.model_authority",
+            downstream_handoff.get("model_authority"),
+            "downstream_handoff_not_authority",
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.physical_so101_truth_claimed",
+            downstream_handoff.get("physical_so101_truth_claimed"),
+            False,
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.observed_evidence_is_authority",
+            downstream_handoff.get("observed_evidence_is_authority"),
+            False,
+        )
+        if "downstream_gate_handoff" not in set(
+            downstream_handoff.get("handoff_item_ids") or []
+        ):
+            errors.append(
+                f"{case_id}.downstream_handoff_json.handoff_item_ids: missing downstream_gate_handoff"
+            )
+        if downstream_handoff_csv_rows:
+            add_error(
+                errors,
+                f"{case_id}.downstream_handoff_csv_count",
+                len(downstream_handoff_csv_rows),
+                downstream_handoff.get("handoff_item_count"),
+            )
+    downstream_handoff_csv_item_ids = sorted(
+        row.get("handoff_key", "")
+        for row in downstream_handoff_csv_rows
+        if row.get("handoff_key")
+    )
+    if downstream_handoff_csv_rows and "downstream_gate_handoff" not in set(
+        downstream_handoff_csv_item_ids
+    ):
+        errors.append(
+            f"{case_id}.downstream_handoff_csv: missing downstream_gate_handoff row"
+        )
+
     return {
         "case_id": case_id,
         "ok": not errors,
@@ -1413,6 +1539,16 @@ def summarize_case(
             "motion_evidence_not_physical_so101_authority": summary.get(
                 "motion_evidence_not_physical_so101_authority"
             ),
+            "downstream_handoff_status": summary.get("downstream_handoff_status"),
+            "downstream_handoff_ready": summary.get("downstream_handoff_ready"),
+            "fixture_handoff_ready_not_physical_so101_authority": summary.get(
+                "fixture_handoff_ready_not_physical_so101_authority"
+            ),
+            "downstream_handoff_csv_exists": downstream_handoff_csv_exists,
+            "downstream_handoff_csv_path": str(downstream_handoff_csv_path)
+            if downstream_handoff_csv_path is not None
+            else None,
+            "downstream_handoff_csv_item_ids": downstream_handoff_csv_item_ids,
             "missing_inputs": summary.get("missing_inputs"),
             "tcp_offset_status": (summary.get("tcp_offset") or {}).get("status"),
             "tcp_offset_diagnostics": (summary.get("tcp_offset") or {}).get("diagnostics"),
@@ -1475,6 +1611,17 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "motion_evidence_not_physical_so101_authority": observations.get(
             "motion_evidence_not_physical_so101_authority"
+        ),
+        "downstream_handoff_status": observations.get("downstream_handoff_status"),
+        "downstream_handoff_ready": observations.get("downstream_handoff_ready"),
+        "fixture_handoff_ready_not_physical_so101_authority": observations.get(
+            "fixture_handoff_ready_not_physical_so101_authority"
+        ),
+        "downstream_handoff_csv_exists": observations.get(
+            "downstream_handoff_csv_exists"
+        ),
+        "downstream_handoff_csv_item_ids": observations.get(
+            "downstream_handoff_csv_item_ids"
         ),
         "missing_inputs": observations.get("missing_inputs"),
         "tcp_offset_status": observations.get("tcp_offset_status"),

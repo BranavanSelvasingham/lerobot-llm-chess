@@ -14,6 +14,8 @@ It writes:
 - `so101_reviewed_mujoco_bundle_summary.json`
 - `so101_reviewed_mujoco_bundle_checklist.csv`
 - `so101_reviewed_mujoco_bundle_motion_checks.csv`
+- `so101_reviewed_mujoco_bundle_downstream_handoff.json`
+- `so101_reviewed_mujoco_bundle_downstream_handoff.csv`
 - `README.md`
 
 The summary carries the manifest checker's `model_authority`,
@@ -79,6 +81,18 @@ with one row per SO-101 joint. Rows preserve target, qpos, movement, range, and
 authority fields from the SimRobot/MuJoCo check; fixture-only ready cases remain
 machine-labeled as hardware-free evidence and not reviewed physical SO-101
 truth.
+
+Every run also writes `so101_reviewed_mujoco_bundle_downstream_handoff.json`
+and `.csv`. The handoff snapshots the exact model identity, target frame, TCP
+offset, base-to-board transform, joint limits, mesh evidence, and MuJoCo motion
+authority that later scene, Gymnasium, and reviewed-model-backed pick/place
+gates must consume. It always reports
+`model_authority: "downstream_handoff_not_authority"`,
+`observed_evidence_is_authority: false`, and
+`physical_so101_truth_claimed: false`. Its `downstream_handoff_ready` flag is
+true only when physical reviewed model authority and MuJoCo/SimRobot motion are
+both true; fixture-positive runs instead report
+`fixture_handoff_ready_not_physical_so101_authority: true`.
 
 The joint-limit comparison converts manifest body-joint limits from degrees to
 MuJoCo radians and covers `shoulder_pan`, `shoulder_lift`, `elbow_flex`,
