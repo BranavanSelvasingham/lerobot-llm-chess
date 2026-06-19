@@ -4201,6 +4201,14 @@ jobs:
           artifact_name = os.environ["CALIBRATION_REGRESSION_ARTIFACT_NAME"]
           summary_path = output_dir / "calibration_regression_summary.json"
           summary = json.loads(summary_path.read_text())
+          model_bundle_manifest_matrix_dir = Path(os.environ["SO101_MODEL_BUNDLE_MANIFEST_MATRIX_OUTPUT_DIR"])
+          model_bundle_manifest_matrix_summary_path = (
+              model_bundle_manifest_matrix_dir
+              / "so101_model_bundle_manifest_matrix_summary.json"
+          )
+          model_bundle_manifest_matrix = json.loads(
+              model_bundle_manifest_matrix_summary_path.read_text()
+          )
 
           core_json_paths = [
               "calibration_regression_summary.json",
@@ -4240,6 +4248,27 @@ jobs:
           ]
           for relative_path in ["README.md", "artifact_index_report.md", *core_json_paths]:
               assert (output_dir / relative_path).is_file(), relative_path
+          for relative_path in (
+              "so101_model_bundle_manifest_matrix_summary.json",
+              "so101_model_bundle_manifest_matrix_cases.csv",
+              "README.md",
+          ):
+              assert (model_bundle_manifest_matrix_dir / relative_path).is_file(), relative_path
+          assert model_bundle_manifest_matrix["ok"] is True, model_bundle_manifest_matrix
+          assert model_bundle_manifest_matrix["status"] == "ok", model_bundle_manifest_matrix
+          assert model_bundle_manifest_matrix["case_count"] == 19, model_bundle_manifest_matrix
+          assert model_bundle_manifest_matrix["failed_case_ids"] == [], model_bundle_manifest_matrix
+          assert (
+              model_bundle_manifest_matrix["model_authority"]
+              == "model_bundle_manifest_matrix_not_authority"
+          ), model_bundle_manifest_matrix
+          assert (
+              model_bundle_manifest_matrix["observed_evidence_is_physical_so101_authority"]
+              is False
+          ), model_bundle_manifest_matrix
+          assert model_bundle_manifest_matrix["ready_for_policy_training"] is False, (
+              model_bundle_manifest_matrix
+          )
 
           def markdown_bool(value):
               if isinstance(value, bool):
@@ -4261,6 +4290,11 @@ jobs:
               "",
               "Core JSON summaries:",
               *[f"- `{path}`" for path in core_json_paths],
+              "",
+              "Focused sibling artifacts:",
+              "- `so101_model_bundle_manifest_matrix/so101_model_bundle_manifest_matrix_summary.json`",
+              "- `so101_model_bundle_manifest_matrix/so101_model_bundle_manifest_matrix_cases.csv`",
+              "- `so101_model_bundle_manifest_matrix/README.md`",
               "",
               "Review markers:",
               f"- `hardware_skipped`: `{markdown_bool(summary['hardware_skipped'])}`",
@@ -4374,6 +4408,15 @@ jobs:
               f"- `asset_roots`: `{summary['so101_model_bundle_manifest']['asset_roots']['asset_roots']}`",
               f"- `diagnostic_only`: `{summary['so101_model_bundle_manifest']['forwarding']['diagnostic_only']}`",
               f"- `diagnostic_only_reason`: `{summary['so101_model_bundle_manifest']['forwarding']['diagnostic_only_reason']}`",
+              "",
+              "SO-101 model bundle manifest matrix:",
+              f"- `status`: `{model_bundle_manifest_matrix['status']}`",
+              f"- `case_count`: `{model_bundle_manifest_matrix['case_count']}`",
+              f"- `failed_case_ids`: `{model_bundle_manifest_matrix['failed_case_ids']}`",
+              f"- `model_authority`: `{model_bundle_manifest_matrix['model_authority']}`",
+              f"- `observed_evidence_is_physical_so101_authority`: `{model_bundle_manifest_matrix['observed_evidence_is_physical_so101_authority']}`",
+              f"- `ready_for_policy_training`: `{model_bundle_manifest_matrix['ready_for_policy_training']}`",
+              "- This focused matrix exercises manifest-gate behavior only; synthetic ready cases do not close physical SO-101 model authority.",
               "",
               "SO-101 reviewed MuJoCo bundle gate:",
               f"- `status`: `{summary['so101_reviewed_mujoco_bundle']['status']}`",
