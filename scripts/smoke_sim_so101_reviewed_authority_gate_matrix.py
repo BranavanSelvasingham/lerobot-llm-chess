@@ -838,6 +838,68 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "source_ready_physical_bundle_motion_model_path_missing",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready(summary_dir / "motion_model_path_missing.json"),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_bundle_model_path_and_digest_consistent",
+                "consistency_ready": True,
+                "motion_bundle_consistency_status": (
+                    "reviewed_mujoco_motion_model_path_missing"
+                ),
+                "motion_bundle_consistency_ready": False,
+                "development_fixture": True,
+                "motion_child_ready": True,
+                "motion_path_matches_bundle": False,
+                "motion_digest_matches_bundle": True,
+                "blockers_contain": [
+                    "rerun_reviewed_mujoco_motion_with_bundle_model_path"
+                ],
+                "actions_contain": [
+                    "rerun_reviewed_mujoco_motion_with_bundle_model_path"
+                ],
+                "action_required_contains": ["physical_reviewed_mujoco_motion_checked"],
+                "blocker_packet_next_actions_contain": [
+                    "rerun_reviewed_mujoco_motion_with_bundle_model_path"
+                ],
+            },
+        },
+        {
+            "case_id": "source_ready_physical_bundle_motion_model_digest_missing",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready(
+                summary_dir / "motion_model_digest_missing.json",
+                model_path=source_model,
+                sha256=None,
+            ),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_bundle_model_path_and_digest_consistent",
+                "consistency_ready": True,
+                "motion_bundle_consistency_status": (
+                    "reviewed_mujoco_motion_model_digest_missing"
+                ),
+                "motion_bundle_consistency_ready": False,
+                "development_fixture": True,
+                "motion_child_ready": True,
+                "motion_path_matches_bundle": True,
+                "motion_digest_matches_bundle": False,
+                "blockers_contain": [
+                    "record_reviewed_mujoco_motion_model_sha256"
+                ],
+                "actions_contain": [
+                    "record_reviewed_mujoco_motion_model_sha256"
+                ],
+                "action_required_contains": ["physical_reviewed_mujoco_motion_checked"],
+                "blocker_packet_next_actions_contain": [
+                    "record_reviewed_mujoco_motion_model_sha256"
+                ],
+            },
+        },
+        {
             "case_id": "source_ready_physical_bundle_motion_model_path_mismatch",
             "source": source_ready(summary_dir / "source_ready.json", source_model),
             "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),

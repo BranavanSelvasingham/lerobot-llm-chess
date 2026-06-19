@@ -652,9 +652,9 @@ bundle exists. It also includes an inconsistent-motion negative case: even when
 the injected physical motion boolean is true, the top-level authority gate stays
 blocked unless the reviewed-MuJoCo child status and motion-authority status also
 match physical reviewed motion. The matrix also includes physical-motion child
-ready states with mismatched reviewed model path and mismatched reviewed model
-digest; both stay blocked and point operators back to aligning the motion
-evidence with the reviewed bundle identity.
+ready states with missing or mismatched reviewed model path and missing or
+mismatched reviewed model digest; all stay blocked and point operators back to
+regenerating or aligning the motion evidence with the reviewed bundle identity.
 
 The standalone reviewed-MuJoCo bundle matrix writes
 `so101_reviewed_mujoco_bundle_matrix_summary.json`, `.csv`, and `README.md`.
