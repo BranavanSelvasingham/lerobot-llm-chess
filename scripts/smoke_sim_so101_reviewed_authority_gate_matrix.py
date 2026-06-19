@@ -16,6 +16,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from smoke_sim_calibration_regression_suite import (  # noqa: E402
+    markdown_mapping_value,
     so101_reviewed_model_authority_blocker_packet,
     so101_reviewed_model_authority_gate_section,
     write_so101_reviewed_model_authority_gate_artifacts,
@@ -2083,6 +2084,20 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
     case_dir.mkdir(parents=True, exist_ok=True)
     gate_artifacts = write_so101_reviewed_model_authority_gate_artifacts(case_dir, gate)
     checklist_path = Path(gate_artifacts["artifacts"]["checklist_csv"])
+    readme_path = Path(gate_artifacts["artifacts"]["readme_md"])
+    readme_text = readme_path.read_text()
+    readme_prior_statuses = gate_artifacts.get(
+        "checklist_blocked_by_prior_requirement_statuses_by_requirement_id"
+    )
+    expected_readme_prior_status_line = (
+        "- Blocked prior requirement statuses: "
+        f"`{markdown_mapping_value(readme_prior_statuses)}`"
+    )
+    if expected_readme_prior_status_line not in readme_text:
+        errors.append(
+            "readme_blocked_prior_statuses: expected "
+            f"{expected_readme_prior_status_line!r}"
+        )
     checklist_rows = read_csv(checklist_path)
     checklist_by_requirement = {
         row.get("requirement_id"): row

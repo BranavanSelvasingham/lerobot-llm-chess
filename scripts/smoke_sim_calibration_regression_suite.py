@@ -378,6 +378,30 @@ def markdown_list_value(values: Any) -> str:
     return "; ".join(str(value) for value in values)
 
 
+def markdown_compact_value(value: Any) -> str:
+    if isinstance(value, dict):
+        if not value:
+            return "{}"
+        return "{" + ", ".join(
+            f"{key}={markdown_compact_value(mapped)}"
+            for key, mapped in sorted(value.items(), key=lambda item: str(item[0]))
+        ) + "}"
+    if isinstance(value, list):
+        return "[" + ", ".join(markdown_compact_value(item) for item in value) + "]"
+    if value is None:
+        return "none"
+    return markdown_bool(value) if isinstance(value, bool) else str(value)
+
+
+def markdown_mapping_value(values: Any) -> str:
+    if not isinstance(values, dict) or not values:
+        return "none"
+    return "; ".join(
+        f"{key}={markdown_compact_value(value)}"
+        for key, value in sorted(values.items(), key=lambda item: str(item[0]))
+    )
+
+
 def unique_string_values(values: list[Any]) -> list[str]:
     seen: set[str] = set()
     unique: list[str] = []
@@ -5724,6 +5748,8 @@ def write_so101_reviewed_model_authority_gate_artifacts(
                 f"`{markdown_list_value(gate.get('next_required_action_ids'))}`",
                 "- Blocked by prior requirement items: "
                 f"`{markdown_list_value(payload.get('blocker_packet_blocked_by_prior_requirements_item_ids'))}`",
+                "- Blocked prior requirement statuses: "
+                f"`{markdown_mapping_value(payload.get('checklist_blocked_by_prior_requirement_statuses_by_requirement_id'))}`",
                 f"- Blocker packet: `{blocker_packet_path}`",
                 f"- Blocker packet rows: `{blocker_packet_csv_path}`",
                 "",
