@@ -235,6 +235,7 @@ jobs:
               "authoritative_angle_bracket_placeholder_review_metadata",
               "authoritative_thin_review_metadata",
               "authoritative_invalid_review_url",
+              "authoritative_invalid_reviewed_at",
               "authoritative_placeholder_source_metadata",
               "authoritative_non_so101_relevance_rejected",
               "authoritative_complete_source_review",
@@ -274,6 +275,14 @@ jobs:
           assert invalid_review_url["observations"]["source_authority_gate_status"] == "source_authority_blocked_review_metadata", invalid_review_url
           assert "authority_review_url" in invalid_review_url["observations"]["source_authority_review_evidence_invalid_fields"], invalid_review_url
           assert "review_artifact" in invalid_review_url["observations"]["source_authority_review_evidence_missing_required_groups"], invalid_review_url
+          invalid_reviewed_at = by_case["authoritative_invalid_reviewed_at"]
+          assert invalid_reviewed_at["observations"]["source_authority_gate_status"] == "source_authority_blocked_review_metadata", invalid_reviewed_at
+          assert invalid_reviewed_at["observations"]["source_authority_review_status"] == "review_metadata_missing", invalid_reviewed_at
+          assert invalid_reviewed_at["observations"]["source_authority_review_ready"] is False, invalid_reviewed_at
+          assert "authority_reviewed_at" in invalid_reviewed_at["observations"]["source_authority_review_evidence_invalid_fields"], invalid_reviewed_at
+          assert "authority_reviewed_by" in invalid_reviewed_at["observations"]["source_authority_review_evidence_valid_fields"], invalid_reviewed_at
+          assert "authority_review_id" in invalid_reviewed_at["observations"]["source_authority_review_evidence_valid_fields"], invalid_reviewed_at
+          assert "record_source_authority_review_metadata" in invalid_reviewed_at["observations"]["next_required_action_ids"], invalid_reviewed_at
           placeholder_source_metadata = by_case["authoritative_placeholder_source_metadata"]
           assert placeholder_source_metadata["observations"]["source_authority_gate_status"] == "source_authority_blocked_review_metadata", placeholder_source_metadata
           assert placeholder_source_metadata["observations"]["source_authority_review_status"] == "review_metadata_missing", placeholder_source_metadata

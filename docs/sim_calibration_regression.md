@@ -432,6 +432,8 @@ single-authoritative-root review, and ambiguous-authoritative-root cases, and wr
 source-authority-ready fixture case proves only the inventory state transition
 to `source_authority_ready`, including that a narrowed authoritative root
 selects the same authoritative model path as an explicit authoritative path;
+malformed `authority_reviewed_at` metadata must stay blocked as invalid review
+evidence;
 the non-SO-101 authoritative fixture must stay blocked and must not queue bundle
 probing even when complete review metadata is supplied;
 every case keeps `source_intake_not_authority`,
