@@ -33,6 +33,7 @@ CONTACT_FIXTURE_FRICTION = (2.0, 0.4, 0.02)
 CONTACT_FIXTURE_GRIPPER_MIN_CLOSURE_M = -0.012
 CONTACT_FIXTURE_GRIPPER_CLOSE_M = -0.008
 CONTACT_FIXTURE_GRIPPER_KP = 200.0
+DEVELOPMENT_MODEL_AUTHORITY = "development_scaffold_not_reviewed"
 SOURCE_PAN_RAD = -0.1
 TARGET_PAN_RAD = 0.07
 LIFT_Z_THRESHOLD_M = 0.02
@@ -91,6 +92,23 @@ def parse_args() -> argparse.Namespace:
 
 def module_available(name: str) -> bool:
     return importlib.util.find_spec(name) is not None
+
+
+def validate_square(square: str) -> None:
+    value = square.strip().lower()
+    if len(value) != 2 or not ("a" <= value[0] <= "h") or not ("1" <= value[1] <= "8"):
+        raise ValueError(f"Invalid chess square: {square!r}")
+
+
+def task_configuration_error(args: argparse.Namespace) -> str | None:
+    try:
+        validate_square(args.source_square)
+        validate_square(args.target_square)
+    except ValueError as exc:
+        return str(exc)
+    if args.source_square.strip().lower() == args.target_square.strip().lower():
+        return "piece_square and target_square must differ."
+    return None
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -359,6 +377,75 @@ def missing_dependency_summary(args: argparse.Namespace, deps: dict[str, bool], 
     }
 
 
+def invalid_task_summary(
+    *,
+    args: argparse.Namespace,
+    deps: dict[str, bool],
+    summary_path: Path,
+    rows_path: Path,
+    model_path: Path,
+    manifest_path: Path,
+    readme_path: Path,
+    message: str,
+) -> dict[str, Any]:
+    return {
+        "schema": SCHEMA,
+        "ok": False,
+        "status": "invalid_task_configuration",
+        "dependencies": deps,
+        "probe_count": 0,
+        "model_authority": DEVELOPMENT_MODEL_AUTHORITY,
+        "observed_evidence_is_physical_so101_authority": False,
+        "observed_evidence_is_policy_training_authority": False,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "source_square": args.source_square,
+        "target_square": args.target_square,
+        "configuration_error": {
+            "type": "ValueError",
+            "message": message,
+        },
+        "source_pick_started_at_source": False,
+        "close_two_finger_contact_observed": False,
+        "lift_verified": False,
+        "board_contact_cleared_during_lift": False,
+        "transfer_verified": False,
+        "place_without_manual_piece_pose_verified": False,
+        "board_source_pick_place_verified": False,
+        "release_contact_cleared_after_retreat": False,
+        "final_board_contact_observed": False,
+        "manual_piece_pose_used_after_reset": False,
+        "robot_pose_seeded_for_source_fixture": False,
+        "final_target_xy_error_m": None,
+        "target_xy_tolerance_m": TARGET_XY_TOLERANCE_M,
+        "piece_reset_to_source_before_run": False,
+        "artifacts": {
+            "summary_json": str(summary_path),
+            "rows_csv": str(rows_path),
+            "model_xml": str(model_path),
+            "manifest_json": str(manifest_path),
+            "readme": str(readme_path),
+        },
+        "limitations": [
+            "Invalid board-pick task configuration is recorded as a fail-closed probe artifact.",
+            "No MuJoCo model generation, contact probe, grasp, lift, transfer, or release is attempted.",
+            "This failure is hardware-free and does not claim physical SO-101 evidence.",
+        ],
+        "next_required_for_goal": [
+            {
+                "priority": 1,
+                "missing_input": "valid_board_pick_task_configuration",
+                "action_id": "provide_valid_distinct_source_and_target_squares",
+                "gate": "scripted_contact_grasp_pick_place",
+                "title": "Provide valid distinct source and target board squares",
+                "detail": "Use valid, distinct chess squares before generating the development board-pick probe.",
+            }
+        ],
+        "next_required_action_ids": ["provide_valid_distinct_source_and_target_squares"],
+        "next_required_action_count": 1,
+    }
+
+
 def main() -> int:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -373,6 +460,23 @@ def main() -> int:
     manifest_path = args.output_dir / MANIFEST_NAME
     readme_path = args.output_dir / README_NAME
     missing = [name for name, available in deps.items() if not available]
+    configuration_error = task_configuration_error(args)
+    if configuration_error is not None:
+        summary = invalid_task_summary(
+            args=args,
+            deps=deps,
+            summary_path=summary_path,
+            rows_path=rows_path,
+            model_path=model_path,
+            manifest_path=manifest_path,
+            readme_path=readme_path,
+            message=configuration_error,
+        )
+        write_json(summary_path, summary)
+        write_rows(rows_path, [])
+        write_readme(readme_path, summary)
+        print(json.dumps({"ok": False, "status": summary["status"], "summary_json": str(summary_path)}, indent=2))
+        return 1
     if missing:
         summary = missing_dependency_summary(args, deps, missing)
         write_json(summary_path, summary)

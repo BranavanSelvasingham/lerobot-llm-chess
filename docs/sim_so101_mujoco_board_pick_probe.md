@@ -26,7 +26,10 @@ The matrix writes `so101_mujoco_board_pick_probe_matrix_summary.json`,
 the current seeded `e4 -> e5` fixture to pass and alternate target/source
 placements to record place/pick gaps. Those gap cases are intentional: they
 show that direct seeded source pose is not generalized reviewed model-backed
-IK. The matrix explicitly exports and checks the contact path booleans for
+IK. It also expects malformed board-pick requests, such as invalid source
+squares or identical source/target squares, to fail closed with summary, CSV,
+and README artifacts while leaving model XML and manifest files ungenerated.
+The matrix explicitly exports and checks the contact path booleans for
 board-contact clearance during lift, release-contact clearance after retreat,
 final board contact, and final target XY tolerance so downstream rollout gates
 do not have to infer those conditions from one aggregate pick/place flag.

@@ -1049,6 +1049,8 @@ jobs:
               "alternate_target_e4_d5_records_place_gap",
               "alternate_source_d4_e5_records_pick_gap",
               "reversed_source_e5_e4_records_pick_gap",
+              "invalid_source_square_rejected",
+              "same_source_target_rejected",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
           assert summary["verified_pick_place_case_ids"] == [
@@ -1059,6 +1061,10 @@ jobs:
               "alternate_source_d4_e5_records_pick_gap",
               "reversed_source_e5_e4_records_pick_gap",
           ], summary["expected_gap_case_ids"]
+          assert summary["invalid_task_case_ids"] == [
+              "invalid_source_square_rejected",
+              "same_source_target_rejected",
+          ], summary["invalid_task_case_ids"]
           by_case = {case["case_id"]: case for case in summary["cases"]}
           verified = by_case["seeded_fixture_e4_e5_pick_place_verified"]
           assert verified["observations"]["status"] == "development_board_source_pick_place_verified", verified
@@ -1091,12 +1097,39 @@ jobs:
           for case in summary["cases"]:
               obs = case["observations"]
               assert obs["model_authority"] == "development_scaffold_not_reviewed", case
-              assert obs["source_pick_started_at_source"] is True, case
-              assert obs["manual_piece_pose_used_after_reset"] is False, case
-              assert obs["robot_pose_seeded_for_source_fixture"] is True, case
               assert obs["ready_for_model_backed_ik"] is False, case
               assert obs["ready_for_policy_training"] is False, case
               assert obs["physical_authority"] is False, case
+          for case_id in (
+              "seeded_fixture_e4_e5_pick_place_verified",
+              "alternate_target_e4_d5_records_place_gap",
+              "alternate_source_d4_e5_records_pick_gap",
+              "reversed_source_e5_e4_records_pick_gap",
+          ):
+              obs = by_case[case_id]["observations"]
+              assert obs["source_pick_started_at_source"] is True, by_case[case_id]
+              assert obs["manual_piece_pose_used_after_reset"] is False, by_case[case_id]
+              assert obs["robot_pose_seeded_for_source_fixture"] is True, by_case[case_id]
+              assert obs["model_xml_exists"] is True, by_case[case_id]
+              assert obs["manifest_json_exists"] is True, by_case[case_id]
+          invalid_source = by_case["invalid_source_square_rejected"]
+          assert invalid_source["observations"]["status"] == "invalid_task_configuration", invalid_source
+          assert invalid_source["observations"]["ok"] is False, invalid_source
+          assert invalid_source["observations"]["return_code"] == 1, invalid_source
+          assert "Invalid chess square" in invalid_source["observations"]["configuration_error"]["message"], invalid_source
+          same_square = by_case["same_source_target_rejected"]
+          assert same_square["observations"]["status"] == "invalid_task_configuration", same_square
+          assert same_square["observations"]["ok"] is False, same_square
+          assert same_square["observations"]["return_code"] == 1, same_square
+          assert "piece_square and target_square must differ" in same_square["observations"]["configuration_error"]["message"], same_square
+          for case_id in ("invalid_source_square_rejected", "same_source_target_rejected"):
+              obs = by_case[case_id]["observations"]
+              assert obs["source_pick_started_at_source"] is False, by_case[case_id]
+              assert obs["board_source_pick_place_verified"] is False, by_case[case_id]
+              assert obs["manual_piece_pose_used_after_reset"] is False, by_case[case_id]
+              assert obs["robot_pose_seeded_for_source_fixture"] is False, by_case[case_id]
+              assert obs["model_xml_exists"] is False, by_case[case_id]
+              assert obs["manifest_json_exists"] is False, by_case[case_id]
           for relative_path in (
               "so101_mujoco_board_pick_probe_matrix_summary.json",
               "so101_mujoco_board_pick_probe_matrix_cases.csv",

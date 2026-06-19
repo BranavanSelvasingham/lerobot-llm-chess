@@ -556,9 +556,11 @@ episodes fail closed, and the generated development MJCF path remains
 It also runs the focused
 `so101_mujoco_board_pick_probe_matrix` smoke to prove the current seeded
 development fixture performs `e4 -> e5` board-source pick/place while recording
-expected place/pick gaps for alternate target/source squares. These gap cases
-are required evidence that the fixture is not generalized reviewed
-model-backed IK, and every case remains non-authoritative and not policy-ready.
+expected place/pick gaps for alternate target/source squares and fail-closed
+invalid source/target task requests without generating model XML or manifests.
+These gap and invalid-task cases are required evidence that the fixture is not
+generalized reviewed model-backed IK, and every case remains non-authoritative
+and not policy-ready.
 It also runs the focused
 `so101_training_rollouts_matrix` smoke to prove valid development prerequisites
 allow debug imitation rollouts while missing/failed board-pick prerequisites,
@@ -708,8 +710,10 @@ It reports
 `observed_evidence_is_physical_so101_authority: false`,
 `ready_for_model_backed_ik: false`, and `ready_for_policy_training: false`.
 It covers the current seeded `e4 -> e5` board-source pick/place fixture plus
-alternate target/source cases that must record expected place/pick gaps. Those
-gap cases make the fixture boundary explicit before reviewed model-backed IK is
+alternate target/source cases that must record expected place/pick gaps, plus
+invalid source/target task cases that must write fail-closed summary/CSV/README
+artifacts without generating model XML or manifests. Those gap and invalid
+cases make the fixture boundary explicit before reviewed model-backed IK is
 available. The matrix also exports and asserts the detailed contact path:
 source-start, two-finger contact, board-contact clearance during lift, transfer,
 placement without manual piece-pose edits, release-contact clearance, final
