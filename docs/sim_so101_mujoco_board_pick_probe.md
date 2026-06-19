@@ -44,6 +44,12 @@ It also checks the machine-readable phase contract:
 each case records `phase_evidence_contract_errors`; these checks require the
 phase row `ok` values, failed-phase IDs, aggregate all-required flag, and
 top-level pick/place booleans to agree.
+The probe and matrix also expose a stage-sequence contract:
+`required_stage_sequence`, `observed_stage_sequence`, `stage_sequence_order_ok`,
+`stage_sequence_contract_ok`, `stage_sequence_contract_errors`, and
+`manual_piece_pose_after_reset_stage_ids`. Valid cases must record the expected
+reset/lower/close/lift/transfer/lower/release/retreat row order, and invalid
+cases must fail closed without generated model artifacts.
 
 The smoke resets the free piece onto source square `e4`, seeds the development
 robot at a source-pick pose, closes on the board piece, lifts it off the board,

@@ -83,6 +83,17 @@ PICK_PLACE_PHASE_IDS = (
     "transfer_toward_target",
     "release_place",
 )
+REQUIRED_STAGE_SEQUENCE = (
+    "source_reset_piece_on_board",
+    "lower_open_at_source",
+    "close_on_source_piece_forward",
+    "close_on_source_piece_after_settle",
+    "lift_from_source_without_manual_piece_pose",
+    "transfer_to_target_without_manual_piece_pose",
+    "lower_to_target_without_manual_piece_pose",
+    "release_on_target_without_manual_piece_pose",
+    "retreat_after_release_without_manual_piece_pose",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -316,6 +327,34 @@ def row_by_stage(rows: list[dict[str, Any]], stage: str) -> dict[str, Any]:
     raise AssertionError(f"Missing row for stage {stage!r}.")
 
 
+def stage_sequence_contract(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    observed = [str(row.get("stage")) for row in rows if row.get("stage") is not None]
+    manual_pose_after_reset = [
+        str(row.get("stage"))
+        for row in rows[1:]
+        if bool(row.get("manual_piece_pose_set", False))
+    ]
+    errors: list[str] = []
+    if observed != list(REQUIRED_STAGE_SEQUENCE):
+        errors.append("observed_stage_sequence_mismatch")
+    if manual_pose_after_reset:
+        errors.append("manual_piece_pose_after_reset_detected")
+    return {
+        "required_stage_sequence": list(REQUIRED_STAGE_SEQUENCE),
+        "observed_stage_sequence": observed,
+        "missing_stage_ids": [
+            stage for stage in REQUIRED_STAGE_SEQUENCE if stage not in observed
+        ],
+        "unexpected_stage_ids": [
+            stage for stage in observed if stage not in REQUIRED_STAGE_SEQUENCE
+        ],
+        "stage_sequence_order_ok": observed == list(REQUIRED_STAGE_SEQUENCE),
+        "manual_piece_pose_after_reset_stage_ids": manual_pose_after_reset,
+        "stage_sequence_contract_ok": not errors,
+        "stage_sequence_contract_errors": errors,
+    }
+
+
 def phase_evidence_row(
     *,
     phase_id: str,
@@ -350,6 +389,8 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- Place verified: `{summary.get('place_without_manual_piece_pose_verified')}`",
         f"- All required phases verified: `{summary.get('pick_place_all_required_phases_verified')}`",
         f"- Failed phase IDs: `{summary.get('pick_place_failed_phase_ids')}`",
+        f"- Stage sequence contract OK: `{summary.get('stage_sequence_contract_ok')}`",
+        f"- Manual pose after reset stage IDs: `{summary.get('manual_piece_pose_after_reset_stage_ids')}`",
         f"- Release contact cleared after retreat: `{summary.get('release_contact_cleared_after_retreat')}`",
         f"- Final target XY error m: `{summary.get('final_target_xy_error_m')}`",
         f"- Rows CSV: `{summary['artifacts']['rows_csv']}`",
@@ -401,6 +442,14 @@ def missing_dependency_summary(args: argparse.Namespace, deps: dict[str, bool], 
         "pick_place_failed_phase_ids": [],
         "pick_place_phase_count": 0,
         "pick_place_all_required_phases_verified": False,
+        "required_stage_sequence": list(REQUIRED_STAGE_SEQUENCE),
+        "observed_stage_sequence": [],
+        "missing_stage_ids": list(REQUIRED_STAGE_SEQUENCE),
+        "unexpected_stage_ids": [],
+        "stage_sequence_order_ok": False,
+        "manual_piece_pose_after_reset_stage_ids": [],
+        "stage_sequence_contract_ok": False,
+        "stage_sequence_contract_errors": ["not_run_missing_runtime_dependencies"],
         "artifacts": {
             "summary_json": str(summary_path),
             "rows_csv": str(rows_path),
@@ -460,6 +509,14 @@ def invalid_task_summary(
         "pick_place_failed_phase_ids": [],
         "pick_place_phase_count": 0,
         "pick_place_all_required_phases_verified": False,
+        "required_stage_sequence": list(REQUIRED_STAGE_SEQUENCE),
+        "observed_stage_sequence": [],
+        "missing_stage_ids": list(REQUIRED_STAGE_SEQUENCE),
+        "unexpected_stage_ids": [],
+        "stage_sequence_order_ok": False,
+        "manual_piece_pose_after_reset_stage_ids": [],
+        "stage_sequence_contract_ok": False,
+        "stage_sequence_contract_errors": ["not_run_invalid_task_configuration"],
         "artifacts": {
             "summary_json": str(summary_path),
             "rows_csv": str(rows_path),
@@ -863,6 +920,7 @@ def main() -> int:
         phase["phase_id"] for phase in pick_place_phase_evidence if not phase["ok"]
     ]
     pick_place_all_required_phases_verified = not pick_place_failed_phase_ids
+    stage_sequence = stage_sequence_contract(rows)
     board_source_pick_place_verified = bool(
         source_pick_started_at_source
         and close_two_finger_contact_observed
@@ -870,6 +928,7 @@ def main() -> int:
         and transfer_verified
         and place_without_manual_piece_pose_verified
         and pick_place_all_required_phases_verified
+        and stage_sequence["stage_sequence_contract_ok"]
     )
     if board_source_pick_place_verified:
         status = "development_board_source_pick_place_verified"
@@ -939,9 +998,12 @@ def main() -> int:
         "pick_place_failed_phase_ids": pick_place_failed_phase_ids,
         "pick_place_phase_count": len(pick_place_phase_evidence),
         "pick_place_all_required_phases_verified": pick_place_all_required_phases_verified,
+        **stage_sequence,
         "source_to_target_progress_m": final["source_to_target_progress_m"],
         "piece_reset_to_source_before_run": True,
-        "manual_piece_pose_used_after_reset": False,
+        "manual_piece_pose_used_after_reset": bool(
+            stage_sequence["manual_piece_pose_after_reset_stage_ids"]
+        ),
         "robot_pose_seeded_for_source_fixture": True,
         "robot_motion_mode": "seed_source_pose_position_actuator_close_lift_transfer_lower_release_retreat",
         "source_pose_joint_qpos_rad": {

@@ -24,6 +24,17 @@ EXPECTED_PHASE_IDS = [
     "transfer_toward_target",
     "release_place",
 ]
+EXPECTED_STAGE_SEQUENCE = [
+    "source_reset_piece_on_board",
+    "lower_open_at_source",
+    "close_on_source_piece_forward",
+    "close_on_source_piece_after_settle",
+    "lift_from_source_without_manual_piece_pose",
+    "transfer_to_target_without_manual_piece_pose",
+    "lower_to_target_without_manual_piece_pose",
+    "release_on_target_without_manual_piece_pose",
+    "retreat_after_release_without_manual_piece_pose",
+]
 PHASE_OBSERVATION_KEYS = {
     "source_reset": "source_pick_started_at_source",
     "two_finger_grasp": "close_two_finger_contact_observed",
@@ -115,6 +126,12 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "pick_place_all_required_phases_verified",
         "phase_evidence_contract_ok",
         "phase_evidence_contract_errors",
+        "stage_sequence_probe_contract_ok",
+        "stage_sequence_probe_contract_errors",
+        "stage_sequence_contract_ok",
+        "stage_sequence_contract_errors",
+        "observed_stage_sequence",
+        "manual_piece_pose_after_reset_stage_ids",
         "ready_for_model_backed_ik",
         "ready_for_policy_training",
         "physical_authority",
@@ -374,6 +391,71 @@ def phase_evidence_contract_errors(
     return errors
 
 
+def stage_sequence_contract_errors(
+    *,
+    case_id: str,
+    observations: dict[str, Any],
+    expect_ok: bool,
+) -> list[str]:
+    errors: list[str] = []
+    required_stage_sequence = observations["required_stage_sequence"]
+    observed_stage_sequence = observations["observed_stage_sequence"]
+    missing_stage_ids = observations["missing_stage_ids"]
+    unexpected_stage_ids = observations["unexpected_stage_ids"]
+    stage_sequence_order_ok = observations["stage_sequence_order_ok"]
+    manual_pose_after_reset = observations["manual_piece_pose_after_reset_stage_ids"]
+    probe_contract_ok = observations["stage_sequence_probe_contract_ok"]
+    probe_contract_errors = observations["stage_sequence_probe_contract_errors"]
+
+    if required_stage_sequence != EXPECTED_STAGE_SEQUENCE:
+        errors.append(
+            f"{case_id}.stage_sequence.required: expected {EXPECTED_STAGE_SEQUENCE!r}, got {required_stage_sequence!r}"
+        )
+    if not isinstance(probe_contract_errors, list):
+        errors.append(f"{case_id}.stage_sequence.probe_errors: expected list")
+
+    if expect_ok:
+        expected_values = (
+            ("observed", observed_stage_sequence, EXPECTED_STAGE_SEQUENCE),
+            ("missing", missing_stage_ids, []),
+            ("unexpected", unexpected_stage_ids, []),
+            ("manual_pose_after_reset", manual_pose_after_reset, []),
+        )
+        for name, observed, expected in expected_values:
+            if observed != expected:
+                errors.append(
+                    f"{case_id}.stage_sequence.{name}: expected {expected!r}, got {observed!r}"
+                )
+        if stage_sequence_order_ok is not True:
+            errors.append(f"{case_id}.stage_sequence.order_ok: expected True")
+        if probe_contract_ok is not True:
+            errors.append(f"{case_id}.stage_sequence.probe_contract_ok: expected True")
+        if probe_contract_errors != []:
+            errors.append(
+                f"{case_id}.stage_sequence.probe_errors: expected [], got {probe_contract_errors!r}"
+            )
+        return errors
+
+    expected_invalid_values = (
+        ("observed", observed_stage_sequence, []),
+        ("missing", missing_stage_ids, EXPECTED_STAGE_SEQUENCE),
+        ("unexpected", unexpected_stage_ids, []),
+        ("manual_pose_after_reset", manual_pose_after_reset, []),
+    )
+    for name, observed, expected in expected_invalid_values:
+        if observed != expected:
+            errors.append(
+                f"{case_id}.stage_sequence.{name}: expected {expected!r}, got {observed!r}"
+            )
+    if stage_sequence_order_ok is not False:
+        errors.append(f"{case_id}.stage_sequence.order_ok: expected False")
+    if probe_contract_ok is not False:
+        errors.append(f"{case_id}.stage_sequence.probe_contract_ok: expected False")
+    if not probe_contract_errors:
+        errors.append(f"{case_id}.stage_sequence.probe_errors: expected fail-closed marker")
+    return errors
+
+
 def summarize_case(
     *,
     spec: dict[str, Any],
@@ -425,6 +507,18 @@ def summarize_case(
         "pick_place_all_required_phases_verified": summary.get(
             "pick_place_all_required_phases_verified"
         ),
+        "required_stage_sequence": summary.get("required_stage_sequence"),
+        "observed_stage_sequence": summary.get("observed_stage_sequence"),
+        "missing_stage_ids": summary.get("missing_stage_ids"),
+        "unexpected_stage_ids": summary.get("unexpected_stage_ids"),
+        "stage_sequence_order_ok": summary.get("stage_sequence_order_ok"),
+        "manual_piece_pose_after_reset_stage_ids": summary.get(
+            "manual_piece_pose_after_reset_stage_ids"
+        ),
+        "stage_sequence_probe_contract_ok": summary.get("stage_sequence_contract_ok"),
+        "stage_sequence_probe_contract_errors": summary.get(
+            "stage_sequence_contract_errors"
+        ),
         "manual_piece_pose_used_after_reset": summary.get("manual_piece_pose_used_after_reset"),
         "robot_pose_seeded_for_source_fixture": summary.get("robot_pose_seeded_for_source_fixture"),
         "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
@@ -445,11 +539,19 @@ def summarize_case(
     )
     observations["phase_evidence_contract_errors"] = phase_contract_errors
     observations["phase_evidence_contract_ok"] = not phase_contract_errors
+    stage_contract_errors = stage_sequence_contract_errors(
+        case_id=case_id,
+        observations=observations,
+        expect_ok=expect_ok,
+    )
+    observations["stage_sequence_contract_errors"] = stage_contract_errors
+    observations["stage_sequence_contract_ok"] = not stage_contract_errors
 
     add_error(errors, f"{case_id}.return_code", record.get("return_code"), expected_return_code)
     add_error(errors, f"{case_id}.ok", observations["ok"], expect_ok)
     add_error(errors, f"{case_id}.status", observations["status"], spec["expected_status"])
     errors.extend(phase_contract_errors)
+    errors.extend(stage_contract_errors)
     add_error(
         errors,
         f"{case_id}.model_authority",
@@ -753,6 +855,18 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "phase_evidence_contract_ok": observations.get("phase_evidence_contract_ok"),
         "phase_evidence_contract_errors": observations.get("phase_evidence_contract_errors"),
+        "stage_sequence_probe_contract_ok": observations.get(
+            "stage_sequence_probe_contract_ok"
+        ),
+        "stage_sequence_probe_contract_errors": observations.get(
+            "stage_sequence_probe_contract_errors"
+        ),
+        "stage_sequence_contract_ok": observations.get("stage_sequence_contract_ok"),
+        "stage_sequence_contract_errors": observations.get("stage_sequence_contract_errors"),
+        "observed_stage_sequence": observations.get("observed_stage_sequence"),
+        "manual_piece_pose_after_reset_stage_ids": observations.get(
+            "manual_piece_pose_after_reset_stage_ids"
+        ),
         "ready_for_model_backed_ik": observations.get("ready_for_model_backed_ik"),
         "ready_for_policy_training": observations.get("ready_for_policy_training"),
         "physical_authority": observations.get("physical_authority"),
@@ -841,6 +955,10 @@ def main() -> int:
         len(case["observations"].get("phase_evidence_contract_errors") or [])
         for case in cases
     )
+    stage_contract_error_count = sum(
+        len(case["observations"].get("stage_sequence_contract_errors") or [])
+        for case in cases
+    )
     summary_path = output_dir / "so101_mujoco_board_pick_probe_matrix_summary.json"
     csv_path = output_dir / "so101_mujoco_board_pick_probe_matrix_cases.csv"
     readme_path = output_dir / "README.md"
@@ -863,6 +981,9 @@ def main() -> int:
         "invalid_task_case_count": len(invalid_task_cases),
         "phase_evidence_contract_ok": phase_contract_error_count == 0,
         "phase_evidence_contract_error_count": phase_contract_error_count,
+        "expected_stage_sequence": EXPECTED_STAGE_SEQUENCE,
+        "stage_sequence_contract_ok": stage_contract_error_count == 0,
+        "stage_sequence_contract_error_count": stage_contract_error_count,
         "case_ids": [case["case_id"] for case in cases],
         "failed_case_ids": [case["case_id"] for case in cases if not case["ok"]],
         "verified_pick_place_case_ids": [case["case_id"] for case in verified_cases],

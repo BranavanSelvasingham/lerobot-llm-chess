@@ -1815,6 +1815,20 @@ jobs:
           assert summary["openai_skipped"] is True, summary
           assert summary["phase_evidence_contract_ok"] is True, summary
           assert summary["phase_evidence_contract_error_count"] == 0, summary
+          expected_stage_sequence = [
+              "source_reset_piece_on_board",
+              "lower_open_at_source",
+              "close_on_source_piece_forward",
+              "close_on_source_piece_after_settle",
+              "lift_from_source_without_manual_piece_pose",
+              "transfer_to_target_without_manual_piece_pose",
+              "lower_to_target_without_manual_piece_pose",
+              "release_on_target_without_manual_piece_pose",
+              "retreat_after_release_without_manual_piece_pose",
+          ]
+          assert summary["expected_stage_sequence"] == expected_stage_sequence, summary
+          assert summary["stage_sequence_contract_ok"] is True, summary
+          assert summary["stage_sequence_contract_error_count"] == 0, summary
           assert summary["case_ids"] == [
               "seeded_fixture_e4_e5_pick_place_verified",
               "alternate_target_e4_d5_records_place_gap",
@@ -1842,6 +1856,8 @@ jobs:
           for case in summary["cases"]:
               assert case["observations"]["phase_evidence_contract_ok"] is True, case
               assert case["observations"]["phase_evidence_contract_errors"] == [], case
+              assert case["observations"]["stage_sequence_contract_ok"] is True, case
+              assert case["observations"]["stage_sequence_contract_errors"] == [], case
           verified = by_case["seeded_fixture_e4_e5_pick_place_verified"]
           assert verified["observations"]["status"] == "development_board_source_pick_place_verified", verified
           assert verified["observations"]["board_source_pick_place_verified"] is True, verified
@@ -1885,6 +1901,10 @@ jobs:
               obs = by_case[case_id]["observations"]
               assert obs["source_pick_started_at_source"] is True, by_case[case_id]
               assert obs["manual_piece_pose_used_after_reset"] is False, by_case[case_id]
+              assert obs["stage_sequence_probe_contract_ok"] is True, by_case[case_id]
+              assert obs["stage_sequence_probe_contract_errors"] == [], by_case[case_id]
+              assert obs["observed_stage_sequence"] == expected_stage_sequence, by_case[case_id]
+              assert obs["manual_piece_pose_after_reset_stage_ids"] == [], by_case[case_id]
               assert obs["robot_pose_seeded_for_source_fixture"] is True, by_case[case_id]
               assert obs["model_xml_exists"] is True, by_case[case_id]
               assert obs["manifest_json_exists"] is True, by_case[case_id]
@@ -1912,6 +1932,9 @@ jobs:
               assert obs["source_pick_started_at_source"] is False, by_case[case_id]
               assert obs["board_source_pick_place_verified"] is False, by_case[case_id]
               assert obs["manual_piece_pose_used_after_reset"] is False, by_case[case_id]
+              assert obs["stage_sequence_probe_contract_ok"] is False, by_case[case_id]
+              assert obs["observed_stage_sequence"] == [], by_case[case_id]
+              assert obs["manual_piece_pose_after_reset_stage_ids"] == [], by_case[case_id]
               assert obs["robot_pose_seeded_for_source_fixture"] is False, by_case[case_id]
               assert obs["model_xml_exists"] is False, by_case[case_id]
               assert obs["manifest_json_exists"] is False, by_case[case_id]
@@ -3544,6 +3567,25 @@ jobs:
           assert so101_mujoco_board_pick_probe["pick_place_failed_phase_ids"] == [], so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["pick_place_all_required_phases_verified"] is True, so101_mujoco_board_pick_probe
           assert len(so101_mujoco_board_pick_probe["pick_place_phase_evidence"]) == 5, so101_mujoco_board_pick_probe
+          board_pick_expected_stage_sequence = [
+              "source_reset_piece_on_board",
+              "lower_open_at_source",
+              "close_on_source_piece_forward",
+              "close_on_source_piece_after_settle",
+              "lift_from_source_without_manual_piece_pose",
+              "transfer_to_target_without_manual_piece_pose",
+              "lower_to_target_without_manual_piece_pose",
+              "release_on_target_without_manual_piece_pose",
+              "retreat_after_release_without_manual_piece_pose",
+          ]
+          assert so101_mujoco_board_pick_probe["required_stage_sequence"] == board_pick_expected_stage_sequence, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["observed_stage_sequence"] == board_pick_expected_stage_sequence, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["missing_stage_ids"] == [], so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["unexpected_stage_ids"] == [], so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["stage_sequence_order_ok"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["stage_sequence_contract_ok"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["stage_sequence_contract_errors"] == [], so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["manual_piece_pose_after_reset_stage_ids"] == [], so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["manual_piece_pose_used_after_reset"] is False, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["robot_pose_seeded_for_source_fixture"] is True, so101_mujoco_board_pick_probe
           assert isinstance(so101_mujoco_board_pick_probe["probe_count"], int) and so101_mujoco_board_pick_probe["probe_count"] > 0, so101_mujoco_board_pick_probe
