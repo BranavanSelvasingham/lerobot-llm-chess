@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 
 SCHEMA = "lerobot.sim.so101_model_bundle_manifest.v1"
 REVIEW_PACKET_SCHEMA = "lerobot.sim.so101_model_bundle_manifest_review_packet.v1"
+BUNDLE_INTAKE_SCHEMA = "lerobot.sim.so101_model_bundle_manifest_intake_checklist.v1"
 DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "so101_model_bundle_manifest"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_CHECKER_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_contract.py"
@@ -457,6 +458,18 @@ REVIEW_PACKET_FIELDNAMES = (
     "observed_evidence",
     "caveat",
 )
+BUNDLE_INTAKE_FIELDNAMES = (
+    "priority",
+    "action_id",
+    "status",
+    "gate",
+    "title",
+    "detail",
+    "missing_input",
+    "manifest_fields",
+    "command",
+    "required_inputs",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -513,6 +526,17 @@ def csv_value(value: Any) -> str:
     return str(value)
 
 
+def unique_strings(values: list[str]) -> list[str]:
+    unique: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        unique.append(value)
+    return unique
+
+
 def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as handle:
@@ -530,6 +554,17 @@ def write_review_packet_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         for row in rows:
             writer.writerow(
                 {field: csv_value(row.get(field)) for field in REVIEW_PACKET_FIELDNAMES}
+            )
+
+
+def write_bundle_intake_csv(path: Path, bundle_intake: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=BUNDLE_INTAKE_FIELDNAMES)
+        writer.writeheader()
+        for action in bundle_intake.get("actions") or []:
+            writer.writerow(
+                {field: csv_value(action.get(field)) for field in BUNDLE_INTAKE_FIELDNAMES}
             )
 
 
@@ -2421,6 +2456,118 @@ def build_review_packet(
     return packet, packet_rows
 
 
+def bundle_intake_status(summary: dict[str, Any]) -> str:
+    if summary.get("physical_so101_model_authority_ready") is True:
+        return "physical_bundle_authority_ready"
+    if summary.get("hardware_free_regression_fixture_ready") is True:
+        return "fixture_bundle_ready_not_physical_authority"
+    manifest_request = summary.get("manifest_request")
+    manifest_request = manifest_request if isinstance(manifest_request, dict) else {}
+    if manifest_request.get("status") != "model_bundle_manifest_loaded":
+        return "manifest_required"
+    return "bundle_review_required"
+
+
+def bundle_intake_manifest_fields(missing_input: str) -> list[str]:
+    if missing_input == "--manifest-path":
+        return ["--manifest-path"]
+    return review_packet_manifest_fields({"requirement_id": missing_input})
+
+
+def bundle_intake_required_inputs(missing_input: str) -> list[str]:
+    fields = bundle_intake_manifest_fields(missing_input)
+    if missing_input == "authority":
+        fields.extend(["authority.reviewed_by", "authority.review_id|authority.review_url"])
+    elif missing_input == "provenance":
+        fields.extend(["provenance.source_reference", "provenance.license_basis"])
+    elif missing_input in {
+        "joint_limit_authority",
+        "mesh_asset_authority",
+        "target_frame_authority",
+        "tcp_offset_authority",
+        "base_to_board_alignment_authority",
+    }:
+        fields.extend(["reviewed_by", "review_id|review_url", "review_scope"])
+    return unique_strings(fields)
+
+
+def bundle_intake_command_template(action_id: str) -> list[str]:
+    output_dir = DEFAULT_OUTPUT_DIR.parent / "so101_model_bundle_manifest_reviewed"
+    return [
+        sys.executable,
+        "scripts/smoke_sim_so101_model_bundle_manifest.py",
+        "--manifest-path",
+        "<reviewed-so101-model-bundle.json>",
+        "--output-dir",
+        str(output_dir),
+    ]
+
+
+def build_bundle_manifest_intake_checklist(summary: dict[str, Any]) -> dict[str, Any]:
+    actions: list[dict[str, Any]] = []
+    for action in summary.get("next_required_for_goal") or []:
+        if not isinstance(action, dict):
+            continue
+        action_id = action.get("action_id")
+        missing_input = action.get("missing_input")
+        if not isinstance(action_id, str) or not action_id:
+            continue
+        missing_input = str(missing_input) if missing_input else ""
+        actions.append(
+            {
+                "priority": len(actions) + 1,
+                "action_id": action_id,
+                "status": "pending",
+                "gate": action.get("gate"),
+                "title": action.get("title"),
+                "detail": action.get("detail"),
+                "missing_input": missing_input,
+                "manifest_fields": bundle_intake_manifest_fields(missing_input),
+                "command": bundle_intake_command_template(action_id),
+                "required_inputs": bundle_intake_required_inputs(missing_input),
+            }
+        )
+    return {
+        "schema": BUNDLE_INTAKE_SCHEMA,
+        "ok": True,
+        "status": bundle_intake_status(summary),
+        "model_authority": "bundle_manifest_intake_not_authority",
+        "manifest_status": summary.get("status"),
+        "manifest_request_status": (
+            summary.get("manifest_request", {}).get("status")
+            if isinstance(summary.get("manifest_request"), dict)
+            else None
+        ),
+        "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
+        "physical_so101_model_authority_ready": summary.get(
+            "physical_so101_model_authority_ready"
+        ),
+        "physical_authority_gate_status": summary.get("physical_authority_gate_status"),
+        "physical_authority_blockers": summary.get("physical_authority_blockers") or [],
+        "hardware_free_regression_fixture_ready": summary.get(
+            "hardware_free_regression_fixture_ready"
+        ),
+        "synthetic_fixture_authority_fields": summary.get(
+            "synthetic_fixture_authority_fields"
+        )
+        or [],
+        "missing_inputs": summary.get("missing_inputs") or [],
+        "next_required_for_goal": summary.get("next_required_for_goal") or [],
+        "next_required_action_ids": summary.get("next_required_action_ids") or [],
+        "action_count": len(actions),
+        "actions": actions,
+        "observed_evidence_is_authority": False,
+        "physical_so101_truth_claimed": False,
+        "development_fixture_evidence_not_physical_so101_truth": True,
+        "artifacts": summary.get("artifacts"),
+        "caveats": [
+            "This bundle-manifest intake checklist is operator guidance, not reviewed physical SO-101 authority.",
+            "Command templates rerun the manifest checker after a reviewed manifest is supplied or updated; they do not create authority by themselves.",
+            "Fixture-only readiness remains explicitly non-physical SO-101 truth until physical bundle authority and reviewed MuJoCo motion are both proven.",
+        ],
+    }
+
+
 def build_checklist_rows(
     manifest_request: dict[str, Any],
     model_path: dict[str, Any],
@@ -2658,6 +2805,11 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         f"- `review_packet_item_count`: `{summary.get('review_packet_item_count')}`",
         f"- `review_packet_json`: `{summary['artifacts'].get('review_packet_json')}`",
         f"- `review_packet_csv`: `{summary['artifacts'].get('review_packet_csv')}`",
+        f"- `bundle_intake_status`: `{summary.get('bundle_intake_status')}`",
+        f"- `bundle_intake_model_authority`: `{summary.get('bundle_intake_model_authority')}`",
+        f"- `bundle_intake_action_ids`: `{', '.join(summary.get('bundle_intake_action_ids') or []) if summary.get('bundle_intake_action_ids') else 'none'}`",
+        f"- `bundle_intake_checklist_json`: `{summary['artifacts'].get('bundle_intake_checklist_json')}`",
+        f"- `bundle_intake_checklist_csv`: `{summary['artifacts'].get('bundle_intake_checklist_csv')}`",
         f"- `contract_summary_json`: `{contract.get('artifacts', {}).get('summary_json')}`",
         "",
         "## Missing Inputs",
@@ -2683,6 +2835,35 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
             lines.append(f"  - {action['detail']}")
     else:
         lines.append("- none")
+
+    lines.extend(
+        [
+            "",
+            "## Bundle Manifest Intake Checklist",
+            "",
+            (
+                "This checklist converts the current missing reviewed-bundle fields into "
+                "rerun command templates. It is operator guidance only, not reviewed "
+                "physical SO-101 authority."
+            ),
+            "",
+            "| Priority | Action | Status | Missing Input | Command |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
+    for action in summary["bundle_intake_checklist"].get("actions") or []:
+        command = " ".join(str(part) for part in action.get("command") or []) or "n/a"
+        lines.append(
+            "| `{priority}` | `{action_id}` | `{status}` | `{missing_input}` | `{command}` |".format(
+                priority=action.get("priority"),
+                action_id=action.get("action_id"),
+                status=action.get("status"),
+                missing_input=action.get("missing_input") or "n/a",
+                command=command.replace("|", "/"),
+            )
+        )
+    if not summary["bundle_intake_checklist"].get("actions"):
+        lines.append("| none | none | n/a | none | n/a |")
 
     lines.extend(
         [
@@ -2834,12 +3015,18 @@ def main() -> int:
     readme_path = output_dir / "README.md"
     review_packet_path = output_dir / "so101_model_bundle_manifest_review_packet.json"
     review_packet_csv_path = output_dir / "so101_model_bundle_manifest_review_packet.csv"
+    bundle_intake_path = output_dir / "so101_model_bundle_manifest_intake_checklist.json"
+    bundle_intake_csv_path = (
+        output_dir / "so101_model_bundle_manifest_intake_checklist.csv"
+    )
     artifacts = {
         "summary_json": str(summary_path),
         "checklist_csv": str(csv_path),
         "readme_md": str(readme_path),
         "review_packet_json": str(review_packet_path),
         "review_packet_csv": str(review_packet_csv_path),
+        "bundle_intake_checklist_json": str(bundle_intake_path),
+        "bundle_intake_checklist_csv": str(bundle_intake_csv_path),
     }
 
     manifest, manifest_request = load_manifest(args.manifest_path)
@@ -2871,11 +3058,45 @@ def main() -> int:
             "review_packet": review_packet,
         }
     )
+    bundle_intake_checklist = build_bundle_manifest_intake_checklist(summary)
+    summary.update(
+        {
+            "bundle_intake_status": bundle_intake_checklist["status"],
+            "bundle_intake_model_authority": bundle_intake_checklist[
+                "model_authority"
+            ],
+            "bundle_intake_action_count": bundle_intake_checklist["action_count"],
+            "bundle_intake_action_ids": [
+                action["action_id"]
+                for action in bundle_intake_checklist.get("actions") or []
+            ],
+            "bundle_intake_observed_evidence_is_authority": (
+                bundle_intake_checklist["observed_evidence_is_authority"]
+            ),
+            "bundle_intake_physical_so101_truth_claimed": bundle_intake_checklist[
+                "physical_so101_truth_claimed"
+            ],
+            "bundle_intake_development_fixture_evidence_not_physical_so101_truth": (
+                bundle_intake_checklist[
+                    "development_fixture_evidence_not_physical_so101_truth"
+                ]
+            ),
+            "bundle_intake_checklist_json_path": artifacts.get(
+                "bundle_intake_checklist_json"
+            ),
+            "bundle_intake_checklist_csv_path": artifacts.get(
+                "bundle_intake_checklist_csv"
+            ),
+            "bundle_intake_checklist": bundle_intake_checklist,
+        }
+    )
 
     write_json(summary_path, summary)
     write_csv(csv_path, rows)
     write_json(review_packet_path, review_packet)
     write_review_packet_csv(review_packet_csv_path, review_packet_rows)
+    write_json(bundle_intake_path, bundle_intake_checklist)
+    write_bundle_intake_csv(bundle_intake_csv_path, bundle_intake_checklist)
     write_markdown(readme_path, summary, rows)
 
     print(
@@ -2894,6 +3115,8 @@ def main() -> int:
                 "review_packet_status": summary["review_packet_status"],
                 "review_packet_item_count": summary["review_packet_item_count"],
                 "review_packet_action_ids": summary["review_packet_action_ids"],
+                "bundle_intake_status": summary["bundle_intake_status"],
+                "bundle_intake_action_ids": summary["bundle_intake_action_ids"],
                 "manifest_path": summary["manifest_request"]["path"],
                 "model_path": summary["model_path"]["path"],
                 "asset_roots": summary["asset_roots"]["asset_roots"],
@@ -2906,6 +3129,8 @@ def main() -> int:
                 "checklist_csv": str(csv_path),
                 "review_packet_json": str(review_packet_path),
                 "review_packet_csv": str(review_packet_csv_path),
+                "bundle_intake_checklist_json": str(bundle_intake_path),
+                "bundle_intake_checklist_csv": str(bundle_intake_csv_path),
                 "readme_md": str(readme_path),
             },
             sort_keys=True,

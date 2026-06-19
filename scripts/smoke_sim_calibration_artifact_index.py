@@ -2421,6 +2421,19 @@ def collect_so101_model_bundle_manifest_artifacts(
         "review_packet_development_fixture_evidence_not_physical_so101_truth": bundle.get(
             "review_packet_development_fixture_evidence_not_physical_so101_truth"
         ),
+        "bundle_intake_status": bundle.get("bundle_intake_status"),
+        "bundle_intake_model_authority": bundle.get("bundle_intake_model_authority"),
+        "bundle_intake_action_count": bundle.get("bundle_intake_action_count"),
+        "bundle_intake_action_ids": bundle.get("bundle_intake_action_ids") or [],
+        "bundle_intake_observed_evidence_is_authority": bundle.get(
+            "bundle_intake_observed_evidence_is_authority"
+        ),
+        "bundle_intake_physical_so101_truth_claimed": bundle.get(
+            "bundle_intake_physical_so101_truth_claimed"
+        ),
+        "bundle_intake_development_fixture_evidence_not_physical_so101_truth": bundle.get(
+            "bundle_intake_development_fixture_evidence_not_physical_so101_truth"
+        ),
         "authority_review_evidence_invalid_fields": bundle.get(
             "authority_review_evidence_invalid_fields"
         ),
@@ -2475,6 +2488,8 @@ def collect_so101_model_bundle_manifest_artifacts(
         ("checklist_csv", "checklist"),
         ("review_packet_json", "review_packet"),
         ("review_packet_csv", "review_packet_rows"),
+        ("bundle_intake_checklist_json", "bundle_intake"),
+        ("bundle_intake_checklist_csv", "bundle_intake_rows"),
         ("readme_md", "readme"),
     ):
         add_path(
@@ -2530,6 +2545,12 @@ def collect_so101_model_bundle_manifest_artifacts(
         "checklist_csv_path": artifact_paths.get("checklist_csv"),
         "review_packet_json_path": artifact_paths.get("review_packet_json"),
         "review_packet_csv_path": artifact_paths.get("review_packet_csv"),
+        "bundle_intake_checklist_json_path": artifact_paths.get(
+            "bundle_intake_checklist_json"
+        ),
+        "bundle_intake_checklist_csv_path": artifact_paths.get(
+            "bundle_intake_checklist_csv"
+        ),
         "readme_md_path": artifact_paths.get("readme_md"),
         "manifest_request": manifest_request,
         "ready_for_model_backed_ik": bundle.get("ready_for_model_backed_ik"),
