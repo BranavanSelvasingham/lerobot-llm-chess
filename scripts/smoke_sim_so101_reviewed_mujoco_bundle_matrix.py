@@ -127,6 +127,11 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
     nonfinite_joint_limits_path = fixture_dir / "so101_model_bundle.nonfinite_joint_limits.json"
     write_json(nonfinite_joint_limits_path, nonfinite_joint_limits)
 
+    invalid_asset_roots = json_clone(ready_payload)
+    invalid_asset_roots["asset_roots"] = "assets"
+    invalid_asset_roots_path = fixture_dir / "so101_model_bundle.invalid_asset_roots.json"
+    write_json(invalid_asset_roots_path, invalid_asset_roots)
+
     missing_mesh_dir = output_dir / "fixtures" / "missing_mesh_bundle"
     missing_mesh_model_dir = missing_mesh_dir / "model"
     missing_mesh_model_dir.mkdir(parents=True, exist_ok=True)
@@ -177,6 +182,7 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
         "tiny_gripper_range_manifest_path": tiny_gripper_manifest_path,
         "tiny_gripper_range_model_path": tiny_gripper_model_path,
         "nonfinite_joint_limits_manifest_path": nonfinite_joint_limits_path,
+        "invalid_asset_roots_manifest_path": invalid_asset_roots_path,
         "missing_mesh_manifest_path": missing_mesh_manifest_path,
         "reversed_joint_limits_manifest_path": reversed_joint_limits_path,
         "nonfinite_tcp_manifest_path": nonfinite_tcp_path,
@@ -207,6 +213,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "model_identity_status",
         "authority_status",
         "provenance_status",
+        "asset_roots_status",
         "joint_limits_status",
         "mesh_assets_status",
         "target_frame_status",
@@ -672,6 +679,25 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "invalid_asset_roots_not_ready",
+            "manifest_path": fixtures["invalid_asset_roots_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "asset_roots_status": "invalid",
+                "missing_inputs_contains": ["asset_roots"],
+                "asset_roots_diagnostics_contains": ["asset_roots_not_list"],
+            },
+        },
+        {
             "case_id": "invalid_reversed_joint_limits_not_ready",
             "manifest_path": fixtures["reversed_joint_limits_manifest_path"],
             "require_ready": False,
@@ -979,6 +1005,7 @@ def summarize_case(
         ("model_identity_status", "model_identity"),
         ("authority_status", "authority"),
         ("provenance_status", "provenance"),
+        ("asset_roots_status", "asset_roots"),
         ("joint_limits_status", "joint_limits"),
         ("mesh_assets_status", "mesh_assets"),
         ("target_frame_status", "target_frame"),
@@ -1009,6 +1036,7 @@ def summarize_case(
         ("model_identity_diagnostics_contains", "model_identity"),
         ("authority_diagnostics_contains", "authority"),
         ("provenance_diagnostics_contains", "provenance"),
+        ("asset_roots_diagnostics_contains", "asset_roots"),
         ("joint_limits_diagnostics_contains", "joint_limits"),
         ("mesh_assets_diagnostics_contains", "mesh_assets"),
         ("target_frame_diagnostics_contains", "target_frame"),
@@ -1101,6 +1129,8 @@ def summarize_case(
             "model_identity_diagnostics": (summary.get("model_identity") or {}).get("diagnostics"),
             "authority_status": (summary.get("authority") or {}).get("status"),
             "provenance_status": (summary.get("provenance") or {}).get("status"),
+            "asset_roots_status": (summary.get("asset_roots") or {}).get("status"),
+            "asset_roots_diagnostics": (summary.get("asset_roots") or {}).get("diagnostics"),
             "joint_limits_status": (summary.get("joint_limits") or {}).get("status"),
             "joint_limits_diagnostics": (summary.get("joint_limits") or {}).get("diagnostics"),
             "mesh_assets_status": (summary.get("mesh_assets") or {}).get("status"),
@@ -1161,6 +1191,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "model_identity_status": observations.get("model_identity_status"),
         "authority_status": observations.get("authority_status"),
         "provenance_status": observations.get("provenance_status"),
+        "asset_roots_status": observations.get("asset_roots_status"),
         "joint_limits_status": observations.get("joint_limits_status"),
         "mesh_assets_status": observations.get("mesh_assets_status"),
         "target_frame_status": observations.get("target_frame_status"),
