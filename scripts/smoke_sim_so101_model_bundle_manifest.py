@@ -115,6 +115,7 @@ AUTHORITY_REVIEW_FIELDS = (
 REVIEW_EVIDENCE_REQUIRED_GROUPS = (
     ("review_actor", ("reviewed_by",)),
     ("review_trace", ("reviewed_at", "review_id", "review_url")),
+    ("review_artifact", ("review_id", "review_url")),
 )
 PLACEHOLDER_REVIEW_EVIDENCE_VALUES = {
     "na",
@@ -323,7 +324,7 @@ NEXT_ACTIONS = {
         "action_id": "record_reviewed_model_source_authority",
         "gate": "reviewed_model_authority",
         "title": "Record reviewed model source authority",
-        "detail": "Fill authority with an accepted review status, reviewer identity, and at least one trace field: reviewed_at, review_id, or review_url.",
+        "detail": "Fill authority with an accepted review status, reviewer identity, and a stable review artifact handle: review_id or review_url.",
     },
     "provenance": {
         "action_id": "record_model_provenance",
@@ -996,7 +997,7 @@ def inspect_authority(manifest: dict[str, Any] | None) -> dict[str, Any]:
             "Synthetic fixture authority is accepted only for hardware-free forwarding regression fixtures; "
             "it is not physical SO-101 source authority."
             if is_synthetic_fixture
-            else "Authority requires an accepted reviewed status, reviewer identity, and at least one trace field: reviewed_at, review_id, or review_url."
+            else "Authority requires an accepted reviewed status, reviewer identity, and a stable review artifact handle: review_id or review_url."
         ),
     }
 
@@ -1212,7 +1213,7 @@ def inspect_joint_limit_review(
             "Synthetic fixture joint-limit authority is accepted only for hardware-free forwarding regression fixtures; "
             "it is not physical SO-101 joint-limit truth."
             if is_synthetic_fixture
-            else "Joint-limit readiness requires accepted review status, reviewer identity, and at least one trace field: reviewed_at, review_id, or review_url."
+            else "Joint-limit readiness requires accepted review status, reviewer identity, and a stable review artifact handle: review_id or review_url."
         ),
     }
 
@@ -1425,7 +1426,7 @@ def inspect_tcp_offset_review(
             "Synthetic fixture TCP offset authority is accepted only for hardware-free forwarding regression fixtures; "
             "it is not physical SO-101 TCP truth."
         ),
-        review_note="TCP offset readiness requires accepted review status, reviewer identity, and at least one trace field: reviewed_at, review_id, or review_url.",
+        review_note="TCP offset readiness requires accepted review status, reviewer identity, and a stable review artifact handle: review_id or review_url.",
     )
 
 
@@ -1448,7 +1449,7 @@ def inspect_target_frame_review(
             "Synthetic fixture target-frame authority is accepted only for hardware-free forwarding regression fixtures; "
             "it is not physical SO-101 TCP-frame truth."
         ),
-        review_note="Target-frame readiness requires accepted review status, reviewer identity, and at least one trace field: reviewed_at, review_id, or review_url.",
+        review_note="Target-frame readiness requires accepted review status, reviewer identity, and a stable review artifact handle: review_id or review_url.",
     )
     return {
         **review,
@@ -1553,7 +1554,7 @@ def inspect_alignment_review(
             "Synthetic fixture base-to-board alignment authority is accepted only for hardware-free forwarding regression fixtures; "
             "it is not physical SO-101 board-alignment truth."
         ),
-        review_note="Base-to-board alignment readiness requires accepted review status, reviewer identity, and at least one trace field: reviewed_at, review_id, or review_url.",
+        review_note="Base-to-board alignment readiness requires accepted review status, reviewer identity, and a stable review artifact handle: review_id or review_url.",
     )
 
 
@@ -1832,7 +1833,7 @@ def inspect_mesh_asset_review(manifest: dict[str, Any] | None) -> dict[str, Any]
             "Synthetic fixture mesh-asset authority is accepted only for hardware-free forwarding regression fixtures; "
             "it is not physical SO-101 mesh truth."
             if is_synthetic_fixture
-            else "Mesh readiness requires accepted review status, reviewer identity, and at least one trace field: reviewed_at, review_id, or review_url."
+            else "Mesh readiness requires accepted review status, reviewer identity, and a stable review artifact handle: review_id or review_url."
         ),
     }
 

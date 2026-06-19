@@ -221,6 +221,8 @@ def placeholder_review_args() -> list[str]:
         "TODO",
         "--authority-reviewed-at",
         "TBD",
+        "--authority-review-id",
+        "TODO",
     ]
 
 
@@ -359,6 +361,7 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "placeholder_review_fields_contain": [
                     "authority_reviewed_at",
                     "authority_reviewed_by",
+                    "authority_review_id",
                 ],
             },
         },
@@ -388,8 +391,14 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 ],
                 "review_evidence_valid_fields_contain": ["authority_reviewed_by"],
                 "review_evidence_satisfied_required_groups_contain": ["review_actor"],
-                "review_evidence_missing_required_groups_contain": ["review_trace"],
-                "missing_required_fields_contain": ["authority_review_evidence:review_trace"],
+                "review_evidence_missing_required_groups_contain": [
+                    "review_trace",
+                    "review_artifact",
+                ],
+                "missing_required_fields_contain": [
+                    "authority_review_evidence:review_trace",
+                    "authority_review_evidence:review_artifact",
+                ],
             },
         },
         {
@@ -699,16 +708,9 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
                 errors.append(
                     f"{case_id}.{action_id}.source_intake_command: missing {flag}"
                 )
-        if not any(
-            flag in command
-            for flag in (
-                "--authority-reviewed-at",
-                "--authority-review-id",
-                "--authority-review-url",
-            )
-        ):
+        if not any(flag in command for flag in ("--authority-review-id", "--authority-review-url")):
             errors.append(
-                f"{case_id}.{action_id}.source_intake_command: missing review trace flag"
+                f"{case_id}.{action_id}.source_intake_command: missing review artifact flag"
             )
 
     expect_contains(

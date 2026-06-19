@@ -137,14 +137,14 @@ reviewed. Pair authoritative declarations with
 `--so101-source-authority-source-reference`,
 `--so101-source-authority-license-basis`, all three
 `--so101-source-authority-review-scope` values (`model_identity`, `provenance`,
-and `license`), `--so101-source-authority-reviewed-by`, and at least one
-trace field: `--so101-source-authority-reviewed-at`,
-`--so101-source-authority-review-id`, or
+and `license`), `--so101-source-authority-reviewed-by`, and a stable artifact
+handle: `--so101-source-authority-review-id` or
 `--so101-source-authority-review-url`. The review-evidence groups are recorded
 as `source_authority_review.review_evidence_required_groups`,
 `review_evidence_satisfied_required_groups`, and
-`review_evidence_missing_required_groups`; a reviewer identity without a trace
-field is still blocked as `authority_review_evidence:review_trace`. Placeholder
+`review_evidence_missing_required_groups`; a reviewer identity without an
+artifact handle is still blocked as `authority_review_evidence:review_trace`
+and `authority_review_evidence:review_artifact`. Placeholder
 source references or license bases are recorded as
 `required_metadata_placeholder_fields` and do not satisfy source-authority
 readiness. The scope fields are recorded as
@@ -414,8 +414,8 @@ requires a ready-shaped manifest with mismatched `model_sha256` to remain not
 ready and not forward, requires incomplete placeholder-alignment,
 placeholder-review, thin-review, and placeholder-provenance manifests to remain
 not ready and not forward, requires accepted review metadata to include reviewer
-identity plus at least one trace field (`reviewed_at`, `review_id`, or
-`review_url`), requires the current simulator-contract target frame
+identity plus a stable artifact handle (`review_id` or `review_url`), requires
+the current simulator-contract target frame
 `gripper_frame_link` to be declared and visible in the actual model before
 forwarding, requires malformed TCP-offset and base-to-board transform payloads
 to remain diagnostic-only instead of forwarding to downstream contract/IK
@@ -819,9 +819,9 @@ A passing summary should show:
 - `calibration_session.selected_candidate` populated with the rank-1 candidate
 - `perception_fixture.status: "ok"` and fixture artifact paths populated
 - `sim_camera_pose_fixture.status: "ok"` with deterministic nominal and perturbed case IDs, frame paths, annotated-frame paths, and metadata paths populated
-- `so101_model_bundle_manifest.status: "model_bundle_manifest_not_supplied"`, `"model_bundle_manifest_unavailable"`, `"model_bundle_manifest_parse_error"`, `"model_bundle_manifest_schema_error"`, `"model_bundle_manifest_needs_follow_up"`, or `"model_bundle_manifest_ready_for_model_backed_ik"` with readiness, physical-authority gate status/blockers, model path, asset roots, joint limits, mesh evidence, target frame, TCP offset, base-to-board alignment, ordered `next_required_for_goal` actions, matching ordered `next_required_action_ids` and `review_packet_action_ids`, forwarding reason, and summary/CSV/review-packet/README artifact paths populated. Accepted review metadata must provide reviewer identity plus at least one trace field (`reviewed_at`, `review_id`, or `review_url`); a lone non-placeholder reviewer string is insufficient for reviewed physical authority or fixture forwarding.
+- `so101_model_bundle_manifest.status: "model_bundle_manifest_not_supplied"`, `"model_bundle_manifest_unavailable"`, `"model_bundle_manifest_parse_error"`, `"model_bundle_manifest_schema_error"`, `"model_bundle_manifest_needs_follow_up"`, or `"model_bundle_manifest_ready_for_model_backed_ik"` with readiness, physical-authority gate status/blockers, model path, asset roots, joint limits, mesh evidence, target frame, TCP offset, base-to-board alignment, ordered `next_required_for_goal` actions, matching ordered `next_required_action_ids` and `review_packet_action_ids`, forwarding reason, and summary/CSV/review-packet/README artifact paths populated. Accepted review metadata must provide reviewer identity plus a stable artifact handle (`review_id` or `review_url`); a lone non-placeholder reviewer string or date-only trace is insufficient for reviewed physical authority or fixture forwarding.
 - `so101_reviewed_mujoco_bundle.status: "reviewed_mujoco_bundle_not_ready"` in default CI or `"reviewed_mujoco_bundle_motion_checked"` when a ready manifest is supplied, with `reviewed_model_motion_checked`, `motion_authority_status`, physical-reviewed motion, fixture-motion, and non-physical motion-evidence fields recorded and summary/CSV/README artifact paths populated
-- `so101_model_source_inventory.status: "missing_authoritative_model"`, `"ambiguous_authoritative_model"`, or `"authoritative_model_found"` with candidate counts, authoritative candidate count, authoritative source-selection status, selected authoritative path and SHA-256 digest when exactly one candidate is selected, source-authority review scope readiness/missing scope IDs, source-authority review evidence required/satisfied/missing groups, source-authority gate status/blockers, review-packet status/model-authority/item count/action IDs, false observed-evidence-as-authority and physical-authority-ready flags, recommended contract-check path when present, and summary/CSV/review-packet/README artifact paths populated. Accepted source-authority review evidence must provide reviewer identity plus at least one trace field (`reviewed_at`, `review_id`, or `review_url`); a lone non-placeholder reviewer string is insufficient for source authority.
+- `so101_model_source_inventory.status: "missing_authoritative_model"`, `"ambiguous_authoritative_model"`, or `"authoritative_model_found"` with candidate counts, authoritative candidate count, authoritative source-selection status, selected authoritative path and SHA-256 digest when exactly one candidate is selected, source-authority review scope readiness/missing scope IDs, source-authority review evidence required/satisfied/missing groups, source-authority gate status/blockers, review-packet status/model-authority/item count/action IDs, false observed-evidence-as-authority and physical-authority-ready flags, recommended contract-check path when present, and summary/CSV/review-packet/README artifact paths populated. Accepted source-authority review evidence must provide reviewer identity plus a stable artifact handle (`review_id` or `review_url`); a lone non-placeholder reviewer string or date-only trace is insufficient for source authority.
 - `so101_model_bundle_probe.status: "candidate_model_missing"`, `"candidate_model_unavailable"`, `"candidate_manifest_needs_review"`, or `"candidate_manifest_ready_for_model_backed_ik"` with `model_authority: "draft_candidate_not_reviewed"`, selected model path, model request status, observed source/joint/mesh hints, manifest status, review-packet status/item count, `missing_inputs`, `next_required_action_ids`, and summary/candidate-manifest/review-packet/checklist/README plus child contract/manifest-check artifacts populated; default CI must keep `ready_for_model_backed_ik: false`
 - `so101_reviewed_model_authority_gate.status: "reviewed_model_authority_blocked"` until source authority, physical bundle authority, source-to-bundle model path/digest consistency, and physical-reviewed MuJoCo motion are all true; the gate must expose `ready`, `blockers`, `blocker_count`, ordered `next_required_for_goal`/`next_required_action_ids`, source/bundle/consistency/motion readiness booleans, blocker-packet status/model-authority/item count/action-required IDs/blocked-by-prior IDs, `development_fixture_evidence_not_physical_so101_truth`, and summary/checklist/blocker-packet/README artifact paths
 - `so101_model_source_inventory.source_configuration.scan_mode: "default_repo_roots"` in the default run or `"explicit_roots"` when `--so101-model-source-root` is supplied, with configured roots/authority lists preserved

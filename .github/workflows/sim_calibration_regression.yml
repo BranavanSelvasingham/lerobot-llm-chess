@@ -243,6 +243,7 @@ jobs:
           assert thin_review["observations"]["source_authority_review_ready"] is False, thin_review
           assert "authority_reviewed_by" in thin_review["observations"]["source_authority_review_evidence_valid_fields"], thin_review
           assert "review_trace" in thin_review["observations"]["source_authority_review_evidence_missing_required_groups"], thin_review
+          assert "review_artifact" in thin_review["observations"]["source_authority_review_evidence_missing_required_groups"], thin_review
           assert "record_source_authority_review_metadata" in thin_review["observations"]["next_required_action_ids"], thin_review
           placeholder_source_metadata = by_case["authoritative_placeholder_source_metadata"]
           assert placeholder_source_metadata["observations"]["source_authority_gate_status"] == "source_authority_blocked_review_metadata", placeholder_source_metadata

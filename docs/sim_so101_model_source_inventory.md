@@ -85,8 +85,9 @@ readiness. A non-placeholder reviewer identity alone is also insufficient; the
 inventory reports `review_evidence_required_groups`,
 `review_evidence_satisfied_required_groups`, and
 `review_evidence_missing_required_groups`, and blocks thin metadata as
-`authority_review_evidence:review_trace` until `reviewed_at`, `review_id`, or
-`review_url` is supplied. The inventory also reports
+`authority_review_evidence:review_trace` and
+`authority_review_evidence:review_artifact` until a stable artifact handle
+(`review_id` or `review_url`) is supplied. The inventory also reports
 `source_authority_review_scope_ready`,
 `source_authority_required_review_scope_ids`,
 `source_authority_supplied_review_scope_ids`, and
@@ -134,10 +135,10 @@ Use `--authoritative-path` or `--authoritative-root` only after the model source
 license, and authority have been reviewed. Pair them with
 `--authority-source-reference`, `--authority-license-basis`, all three required
 `--authority-review-scope` values (`model_identity`, `provenance`, and `license`),
-`--authority-reviewed-by`, and at least one trace field:
-`--authority-reviewed-at`, `--authority-review-id`, or
-`--authority-review-url` so the artifact distinguishes a bare
-authoritative-path declaration from a reviewed source-authority declaration.
+`--authority-reviewed-by`, and a stable artifact handle:
+`--authority-review-id` or `--authority-review-url` so the artifact
+distinguishes a bare authoritative-path declaration from a reviewed
+source-authority declaration.
 Without authoritative flags, a SO-101-looking file remains
 `source_authority_status: "unverified"` and does not count as authoritative.
 Without complete review metadata and scope coverage, an authoritative candidate

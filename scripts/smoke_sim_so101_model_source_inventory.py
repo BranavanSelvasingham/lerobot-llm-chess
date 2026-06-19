@@ -113,6 +113,7 @@ SOURCE_AUTHORITY_REVIEW_EVIDENCE_REQUIRED_GROUPS = (
         "review_trace",
         ("authority_reviewed_at", "authority_review_id", "authority_review_url"),
     ),
+    ("review_artifact", ("authority_review_id", "authority_review_url")),
 )
 SOURCE_AUTHORITY_REVIEW_SCOPE_DESCRIPTIONS = {
     "model_identity": "Selected model path, digest, and SO-101 joint/frame identity were reviewed.",
@@ -136,8 +137,8 @@ SOURCE_INVENTORY_ACTIONS = {
         "title": "Record source-authority review metadata",
         "detail": (
             "Rerun with --authority-license-basis, all required --authority-review-scope values, "
-            "--authority-reviewed-by, and at least one trace field: --authority-reviewed-at, "
-            "--authority-review-id, or --authority-review-url."
+            "--authority-reviewed-by, and a stable review artifact handle: "
+            "--authority-review-id or --authority-review-url."
         ),
     },
     "select_single_authoritative_so101_model_source": {
@@ -415,7 +416,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--authority-reviewed-at",
         default=None,
-        help="Deterministic review date/string for an explicit authoritative source declaration.",
+        help=(
+            "Deterministic review date/string for an explicit authoritative source declaration. "
+            "A date alone is not enough; also provide --authority-review-id or --authority-review-url."
+        ),
     )
     parser.add_argument(
         "--authority-review-id",
@@ -814,7 +818,7 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
         "notes": [
             "This metadata describes the inventory-level source-authority review declaration only.",
             "Placeholder review evidence, source references, or license bases such as TODO/TBD/unknown do not satisfy source-authority readiness.",
-            "Source-authority review evidence requires reviewer identity plus at least one trace field: authority_reviewed_at, authority_review_id, or authority_review_url.",
+            "Source-authority review evidence requires reviewer identity plus a stable review artifact handle: authority_review_id or authority_review_url.",
             "Source-authority readiness also requires explicit review scopes for model identity, provenance, and license, plus a non-placeholder source reference and license basis.",
             "The bundle manifest still must declare reviewed provenance, mesh authority, joint limits, target frame, TCP offset, and base-to-board alignment before model-backed IK is trusted.",
         ],
@@ -1337,6 +1341,8 @@ def source_intake_command_template(action_id: str) -> list[str]:
             "<reviewer-or-review-system>",
             "--authority-reviewed-at",
             "<YYYY-MM-DD>",
+            "--authority-review-id",
+            "<review-ticket-commit-or-checklist-id>",
             "--output-dir",
             "/private/tmp/lerobot_sim/so101_model_source_inventory_reviewed",
         ]

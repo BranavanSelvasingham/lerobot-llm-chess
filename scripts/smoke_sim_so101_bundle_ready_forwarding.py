@@ -286,6 +286,7 @@ def manifest_payload(*, ready: bool, model_filename: str = "synthetic_so101.urdf
             "source_authority_status": "synthetic_fixture_reviewed_for_automation_only",
             "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
             "reviewed_at": "2026-06-16",
+            "review_id": "bundle-ready-forwarding:source-authority",
             "scope": "hardware-free forwarding regression only",
         },
         "provenance": {
@@ -299,6 +300,7 @@ def manifest_payload(*, ready: bool, model_filename: str = "synthetic_so101.urdf
             "target_frame_authority_status": "synthetic_fixture_reviewed_for_automation_only",
             "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
             "reviewed_at": "2026-06-18",
+            "review_id": "bundle-ready-forwarding:target-frame",
             "scope": "hardware-free forwarding regression only",
         },
         "joint_limits_deg": {
@@ -313,24 +315,28 @@ def manifest_payload(*, ready: bool, model_filename: str = "synthetic_so101.urdf
             "joint_limit_authority_status": "synthetic_fixture_reviewed_for_automation_only",
             "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
             "reviewed_at": "2026-06-18",
+            "review_id": "bundle-ready-forwarding:joint-limits",
             "scope": "hardware-free forwarding regression only",
         },
         "mesh_asset_authority": {
             "mesh_asset_authority_status": "synthetic_fixture_reviewed_for_automation_only",
             "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
             "reviewed_at": "2026-06-18",
+            "review_id": "bundle-ready-forwarding:mesh-assets",
             "scope": "hardware-free forwarding regression only",
         },
         "tcp_offset_authority": {
             "tcp_offset_authority_status": "synthetic_fixture_reviewed_for_automation_only",
             "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
             "reviewed_at": "2026-06-18",
+            "review_id": "bundle-ready-forwarding:tcp-offset",
             "scope": "hardware-free forwarding regression only",
         },
         "base_to_board_alignment_authority": {
             "base_to_board_alignment_authority_status": "synthetic_fixture_reviewed_for_automation_only",
             "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
             "reviewed_at": "2026-06-18",
+            "review_id": "bundle-ready-forwarding:base-to-board",
             "scope": "hardware-free forwarding regression only",
         },
         "tcp_offset_m": {"x": 0.0, "y": 0.0, "z": 0.075},
@@ -402,6 +408,7 @@ def placeholder_review_metadata_manifest_payload(model_filename: str) -> dict[st
     ):
         payload[review_field]["reviewed_by"] = "TODO"
         payload[review_field]["reviewed_at"] = "TBD"
+        payload[review_field]["review_id"] = "TODO"
     return payload
 
 
@@ -856,7 +863,7 @@ def assert_traceable_review_evidence(
         errors,
         f"{label}.review_evidence_required_groups",
         review_group_names(review, "review_evidence_required_groups"),
-        ["review_actor", "review_trace"],
+        ["review_actor", "review_trace", "review_artifact"],
     )
     assert_contains_all(
         errors,
@@ -1293,6 +1300,8 @@ def summarize_case(
         ):
             if not any("review_evidence_missing_required_group:review_trace" in str(item) for item in (diagnostics or [])):
                 errors.append(f"{case_id}.{label}_review_trace_diagnostic_missing:{diagnostics!r}")
+            if not any("review_evidence_missing_required_group:review_artifact" in str(item) for item in (diagnostics or [])):
+                errors.append(f"{case_id}.{label}_review_artifact_diagnostic_missing:{diagnostics!r}")
         manifest_summary = load_json_object(
             get_nested(bundle, ("artifact_paths", "summary_json"))
             or get_nested(bundle, ("artifacts", "summary_json"))
@@ -1312,7 +1321,7 @@ def summarize_case(
                 errors,
                 f"{case_id}.{label}",
                 review,
-                expected_missing_groups=["review_trace"],
+                expected_missing_groups=["review_trace", "review_artifact"],
             )
     elif expectation == "weak_review_not_forwarded":
         assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))

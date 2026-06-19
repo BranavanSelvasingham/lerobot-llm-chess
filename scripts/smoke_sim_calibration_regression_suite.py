@@ -473,6 +473,7 @@ SOURCE_AUTHORITY_REVIEW_EVIDENCE_REQUIRED_GROUPS = (
         "review_trace",
         ("authority_reviewed_at", "authority_review_id", "authority_review_url"),
     ),
+    ("review_artifact", ("authority_review_id", "authority_review_url")),
 )
 
 
@@ -635,7 +636,7 @@ def so101_source_authority_review_forwarding(
         "notes": [
             "These values are forwarded only to the SO-101 model-source inventory.",
             "Placeholder review evidence, source references, or license bases such as TODO/TBD/unknown do not satisfy source-authority readiness.",
-            "Source-authority review evidence requires reviewer identity plus at least one trace field: authority_reviewed_at, authority_review_id, or authority_review_url.",
+            "Source-authority review evidence requires reviewer identity plus a stable artifact handle: authority_review_id or authority_review_url.",
             "Source-authority readiness also requires explicit review scopes for model identity, provenance, and license, plus a non-placeholder source reference and license basis.",
             "They do not replace the bundle manifest's reviewed authority/provenance/readiness gate.",
         ],
