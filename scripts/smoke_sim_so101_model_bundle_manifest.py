@@ -492,6 +492,9 @@ BUNDLE_INTAKE_FIELDNAMES = (
     "manifest_fields",
     "command",
     "required_inputs",
+    "related_requirement_ids",
+    "field_check_diagnostics",
+    "field_check_context",
 )
 REVIEW_REQUIREMENTS_FIELDNAMES = (
     "priority",
@@ -2611,6 +2614,57 @@ def bundle_intake_required_inputs(missing_input: str) -> list[str]:
     return unique_strings(fields)
 
 
+def bundle_intake_field_check_context(
+    summary: dict[str, Any],
+    missing_input: str,
+) -> list[dict[str, Any]]:
+    context: list[dict[str, Any]] = []
+    for check in summary.get("field_checks") or []:
+        if not isinstance(check, dict):
+            continue
+        missing_inputs = check.get("missing_inputs")
+        missing_inputs = missing_inputs if isinstance(missing_inputs, list) else []
+        if missing_input not in missing_inputs:
+            continue
+        context.append(
+            {
+                "requirement_id": check.get("requirement_id"),
+                "ok": check.get("ok"),
+                "missing_inputs": missing_inputs,
+                "diagnostics": check.get("diagnostics") or [],
+            }
+        )
+    return context
+
+
+def bundle_intake_related_requirement_ids(
+    field_check_context: list[dict[str, Any]],
+) -> list[str]:
+    return unique_strings(
+        [
+            str(check["requirement_id"])
+            for check in field_check_context
+            if isinstance(check.get("requirement_id"), str)
+            and check["requirement_id"]
+        ]
+    )
+
+
+def bundle_intake_field_check_diagnostics(
+    field_check_context: list[dict[str, Any]],
+) -> list[Any]:
+    diagnostics: list[Any] = []
+    seen: set[str] = set()
+    for check in field_check_context:
+        for diagnostic in check.get("diagnostics") or []:
+            key = json.dumps(diagnostic, sort_keys=True, default=str)
+            if key in seen:
+                continue
+            seen.add(key)
+            diagnostics.append(diagnostic)
+    return diagnostics
+
+
 def bundle_intake_command_template(action_id: str) -> list[str]:
     output_dir = DEFAULT_OUTPUT_DIR.parent / "so101_model_bundle_manifest_reviewed"
     return [
@@ -3011,6 +3065,10 @@ def build_bundle_manifest_intake_checklist(summary: dict[str, Any]) -> dict[str,
         if not isinstance(action_id, str) or not action_id:
             continue
         missing_input = str(missing_input) if missing_input else ""
+        field_check_context = bundle_intake_field_check_context(
+            summary,
+            missing_input,
+        )
         actions.append(
             {
                 "priority": len(actions) + 1,
@@ -3023,6 +3081,13 @@ def build_bundle_manifest_intake_checklist(summary: dict[str, Any]) -> dict[str,
                 "manifest_fields": bundle_intake_manifest_fields(missing_input),
                 "command": bundle_intake_command_template(action_id),
                 "required_inputs": bundle_intake_required_inputs(missing_input),
+                "related_requirement_ids": bundle_intake_related_requirement_ids(
+                    field_check_context
+                ),
+                "field_check_diagnostics": bundle_intake_field_check_diagnostics(
+                    field_check_context
+                ),
+                "field_check_context": field_check_context,
             }
         )
     return {

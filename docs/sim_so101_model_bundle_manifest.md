@@ -196,6 +196,15 @@ copy of the nested template, replace every placeholder with reviewed inputs,
 then rerun this checker; the template artifact itself is never reviewed
 physical SO-101 authority.
 
+Each `so101_model_bundle_manifest_intake_checklist` action also carries
+field-check context for the missing input that triggered it:
+`related_requirement_ids`, `field_check_diagnostics`, and
+`field_check_context`. These fields make the operator queue auditable by
+linking an action such as `record_tcp_offset_authority` or
+`clear_model_contract_and_asset_preflight` back to the failing manifest
+requirement and exact diagnostics. They remain checklist context only and do
+not make observed manifest data reviewed physical SO-101 truth.
+
 The checker also writes `so101_model_bundle_manifest_review_requirements.json`
 and `.csv`. These files are a machine-readable review map for the manifest
 authority gate: required review sections, manifest fields, accepted review

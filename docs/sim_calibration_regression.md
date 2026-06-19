@@ -27,6 +27,12 @@ The suite also runs the deterministic hardware-free SO-101 model bundle manifest
 
 The bundle manifest checker also preserves `so101_model_bundle_manifest_intake_checklist.json`, `so101_model_bundle_manifest_intake_checklist.csv`, and `so101_model_bundle_manifest_template.json`. The intake files turn the current missing reviewed-bundle fields into rerun command templates and must stay labeled `bundle_manifest_intake_not_authority` with false observed-evidence and physical-truth flags. The template artifact is a copyable reviewed-manifest scaffold only; it stays labeled `reviewed_manifest_template_not_authority` and cannot close physical SO-101 authority without reviewed inputs and a passing rerun.
 
+Each bundle-manifest intake action now includes `related_requirement_ids`,
+`field_check_diagnostics`, and `field_check_context`, linking the operator
+action back to the exact failing manifest field checks that produced it. This
+improves reviewed-bundle triage only; it does not upgrade checklist or fixture
+evidence into reviewed physical SO-101 truth.
+
 The bundle manifest checker now also records `model_identity`: the declared
 `model_sha256`, the observed SHA-256 of the resolved `model_path`, match status,
 and digest diagnostics. A missing, malformed, or mismatched digest keeps

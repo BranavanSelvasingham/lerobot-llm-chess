@@ -110,6 +110,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "review_requirements_url_fields",
         "bundle_intake_status",
         "bundle_intake_action_ids",
+        "bundle_intake_related_requirement_ids_by_action_id",
+        "bundle_intake_field_check_diagnostics_by_action_id",
         "contract_preflight_intake_manifest_fields",
         "contract_preflight_intake_required_inputs",
         "synthetic_fixture_authority_fields",
@@ -698,6 +700,21 @@ def summarize_case(
         next_required_action_ids,
         expect.get("next_actions", []),
     )
+    if isinstance(next_required_action_ids, list) and next_required_action_ids:
+        for action_id in next_required_action_ids:
+            action = bundle_intake_action_by_id(bundle_intake, str(action_id))
+            if not isinstance(action.get("related_requirement_ids"), list) or not action.get(
+                "related_requirement_ids"
+            ):
+                errors.append(
+                    f"{case_id}.bundle_intake.{action_id}.related_requirement_ids: expected non-empty list"
+                )
+            if not isinstance(action.get("field_check_context"), list) or not action.get(
+                "field_check_context"
+            ):
+                errors.append(
+                    f"{case_id}.bundle_intake.{action_id}.field_check_context: expected non-empty list"
+                )
     if (
         "clear_model_contract_and_asset_preflight"
         in (next_required_action_ids if isinstance(next_required_action_ids, list) else [])
@@ -844,6 +861,16 @@ def summarize_case(
             "review_requirements_url_fields": review_requirements_url_fields,
             "bundle_intake_status": bundle_intake.get("status"),
             "bundle_intake_action_ids": bundle_intake.get("action_ids"),
+            "bundle_intake_related_requirement_ids_by_action_id": {
+                action.get("action_id"): action.get("related_requirement_ids")
+                for action in bundle_intake.get("actions") or []
+                if isinstance(action, dict) and isinstance(action.get("action_id"), str)
+            },
+            "bundle_intake_field_check_diagnostics_by_action_id": {
+                action.get("action_id"): action.get("field_check_diagnostics")
+                for action in bundle_intake.get("actions") or []
+                if isinstance(action, dict) and isinstance(action.get("action_id"), str)
+            },
             "contract_preflight_intake_manifest_fields": (
                 contract_preflight_intake.get("manifest_fields")
             ),
@@ -926,6 +953,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "review_requirements_url_fields": obs.get("review_requirements_url_fields"),
         "bundle_intake_status": obs.get("bundle_intake_status"),
         "bundle_intake_action_ids": obs.get("bundle_intake_action_ids"),
+        "bundle_intake_related_requirement_ids_by_action_id": obs.get(
+            "bundle_intake_related_requirement_ids_by_action_id"
+        ),
+        "bundle_intake_field_check_diagnostics_by_action_id": obs.get(
+            "bundle_intake_field_check_diagnostics_by_action_id"
+        ),
         "contract_preflight_intake_manifest_fields": obs.get(
             "contract_preflight_intake_manifest_fields"
         ),
