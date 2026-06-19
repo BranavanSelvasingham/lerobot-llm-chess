@@ -22,9 +22,9 @@ clear the holding flag, keep MuJoCo active with no fallback, and accept a first
 expert action after reset.
 
 The smoke also rejects invalid reset requests for malformed tasks, invalid
-chess squares, identical source/target squares, and sampled resets without a
-task pool. Each rejected case must record the `ValueError` and then prove the
-environment can recover with a valid reset.
+source squares, invalid target squares, identical source/target squares, and
+sampled resets without a task pool. Each rejected case must record the
+`ValueError` and then prove the environment can recover with a valid reset.
 
 The generated MJCF remains `development_scaffold_not_reviewed` and
 `ready_for_model_backed_ik: false`. This smoke proves training-style reset

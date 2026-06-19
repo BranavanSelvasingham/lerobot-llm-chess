@@ -3138,11 +3138,12 @@ jobs:
           assert isinstance(so101_env_resets["reset_count"], int) and so101_env_resets["reset_count"] > 0, so101_env_resets
           assert so101_env_resets["invalid_reset_case_ids"] == [
               "invalid_source_square_rejected",
+              "invalid_target_square_rejected",
               "identical_source_target_rejected",
               "malformed_task_option_rejected",
               "sample_without_task_pool_rejected",
           ], so101_env_resets
-          assert so101_env_resets["invalid_reset_count"] == 4, so101_env_resets
+          assert so101_env_resets["invalid_reset_count"] == 5, so101_env_resets
           assert so101_env_resets["invalid_reset_failed_case_ids"] == [], so101_env_resets
           assert so101_env_resets["all_invalid_resets_rejected"] is True, so101_env_resets
           assert so101_env_resets["recovery_after_invalid_resets_ok"] is True, so101_env_resets
