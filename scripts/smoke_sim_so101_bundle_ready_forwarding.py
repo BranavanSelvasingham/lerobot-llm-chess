@@ -46,6 +46,15 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Do not delete an existing output directory before running.",
     )
+    parser.add_argument(
+        "--case-id",
+        action="append",
+        default=[],
+        help=(
+            "Run only the named case id. Repeat for multiple cases. "
+            "By default all forwarding cases run."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -1004,6 +1013,29 @@ def assert_missing_review_scopes(
     assert_equal(errors, f"{label}.review_scope_ready", review.get("review_scope_ready"), False)
 
 
+def assert_review_open_work_fields(
+    errors: list[str],
+    label: str,
+    review: Any,
+    *,
+    expected_open_work_fields: list[str],
+) -> None:
+    if not isinstance(review, dict):
+        errors.append(f"{label}: expected review dict, got {review!r}")
+        return
+    assert_equal(
+        errors,
+        f"{label}.review_evidence_open_work_fields",
+        review.get("review_evidence_open_work_fields"),
+        expected_open_work_fields,
+    )
+    assert_true(
+        errors,
+        f"{label}.review_evidence_ready_has_open_work",
+        review.get("review_evidence_ready_has_open_work"),
+    )
+
+
 def assert_not_ready_motion_authority(
     errors: list[str],
     case_id: str,
@@ -1574,6 +1606,90 @@ def summarize_case(
                 f"{case_id}.{label}",
                 review,
                 expected_missing_scopes=missing_scopes,
+            )
+    elif expectation == "pending_review_metadata_not_forwarded":
+        assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_not_ready",
+        )
+        assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
+        assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
+        assert_equal(
+            errors,
+            f"{case_id}.diagnostic_reason",
+            forwarding.get("diagnostic_only_reason"),
+            "bundle_not_ready_for_model_backed_ik:model_bundle_manifest_needs_follow_up",
+        )
+        assert_false(errors, f"{case_id}.used_for_downstream_contract", forwarding.get("used_for_downstream_contract"))
+        missing_inputs = set(bundle.get("missing_inputs") or [])
+        expected_missing = {
+            "authority",
+            "joint_limit_authority",
+            "mesh_asset_authority",
+            "target_frame_authority",
+            "tcp_offset_authority",
+            "base_to_board_alignment_authority",
+        }
+        if not expected_missing.issubset(missing_inputs):
+            errors.append(
+                f"{case_id}.missing_inputs: expected {sorted(expected_missing)!r} subset, got {sorted(missing_inputs)!r}"
+            )
+        assert_equal(errors, f"{case_id}.authority_status", bundle.get("authority_status"), "needs_review")
+        assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "needs_review")
+        assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "needs_review")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "needs_review")
+        assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "needs_review")
+        assert_equal(
+            errors,
+            f"{case_id}.alignment_status",
+            get_nested(bundle, ("base_to_board_alignment", "status")),
+            "needs_review",
+        )
+        manifest_summary = load_json_object(
+            get_nested(bundle, ("artifact_paths", "summary_json"))
+            or get_nested(bundle, ("artifacts", "summary_json"))
+        )
+        for label, review, expected_open_work_fields in (
+            (
+                "authority",
+                get_nested(manifest_summary, ("authority",), {}),
+                ["missing_inputs", "next_required_action_ids"],
+            ),
+            (
+                "joint_limits",
+                get_nested(manifest_summary, ("joint_limits", "review"), {}),
+                ["next_required_action_ids"],
+            ),
+            (
+                "mesh_assets",
+                get_nested(manifest_summary, ("mesh_assets", "review"), {}),
+                ["next_required_action_ids"],
+            ),
+            (
+                "target_frame",
+                get_nested(manifest_summary, ("target_frame", "review"), {}),
+                ["next_required_action_ids"],
+            ),
+            (
+                "tcp_offset",
+                get_nested(manifest_summary, ("tcp_offset", "review"), {}),
+                ["next_required_action_ids"],
+            ),
+            (
+                "alignment",
+                get_nested(manifest_summary, ("base_to_board_alignment", "review"), {}),
+                ["next_required_action_ids"],
+            ),
+        ):
+            assert_review_open_work_fields(
+                errors,
+                f"{case_id}.{label}",
+                review,
+                expected_open_work_fields=expected_open_work_fields,
             )
     elif expectation == "weak_review_not_forwarded":
         assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
@@ -2175,6 +2291,12 @@ def main() -> int:
             "expectation": "generic_review_scope_not_forwarded",
         },
         {
+            "case_id": "pending_review_metadata_not_forwarded",
+            "manifest_path": fixtures["pending_review_metadata_manifest_path"],
+            "explicit_model_path": None,
+            "expectation": "pending_review_metadata_not_forwarded",
+        },
+        {
             "case_id": "weak_review_manifest_not_forwarded",
             "manifest_path": fixtures["weak_review_manifest_path"],
             "explicit_model_path": None,
@@ -2249,6 +2371,13 @@ def main() -> int:
             "expectation": "invalid_alignment_transform_not_forwarded",
         },
     ]
+    if args.case_id:
+        selected_case_ids = set(args.case_id)
+        known_case_ids = {case["case_id"] for case in case_specs}
+        unknown_case_ids = sorted(selected_case_ids - known_case_ids)
+        if unknown_case_ids:
+            raise SystemExit(f"unknown --case-id value(s): {', '.join(unknown_case_ids)}")
+        case_specs = [case for case in case_specs if case["case_id"] in selected_case_ids]
 
     cases: list[dict[str, Any]] = []
     for spec in case_specs:

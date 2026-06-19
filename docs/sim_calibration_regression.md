@@ -423,7 +423,10 @@ mesh fixtures under the output directory, invokes
 `scripts/smoke_sim_calibration_regression_suite.py` as the system under test,
 and writes
 `so101_bundle_ready_forwarding_summary.json`,
-`so101_bundle_ready_forwarding_cases.csv`, and `README.md`. It requires a ready
+`so101_bundle_ready_forwarding_cases.csv`, and `README.md`. For focused local
+iteration, pass
+`--case-id pending_review_metadata_not_forwarded` or another case id to run one
+forwarding fixture instead of the full matrix. The full smoke requires a ready
 manifest to forward the manifest-derived model path and mesh asset root when no
 explicit `--ik-model-path` is supplied, requires the reviewed MuJoCo bundle
 gate to report `reviewed_mujoco_bundle_motion_checked` for the ready MJCF
@@ -432,10 +435,11 @@ SO-101 authority, requires explicit `--ik-model-path` to take precedence and
 leave the ready manifest diagnostic-only for downstream IK/contract forwarding,
 requires a ready-shaped manifest with mismatched `model_sha256` to remain not
 ready and not forward, requires incomplete placeholder-alignment,
-placeholder-review, thin-review, invalid-review-URL, and placeholder-provenance
-manifests to remain not ready and not forward, requires accepted review metadata
-to include reviewer identity plus a stable artifact handle (`review_id` or
-HTTP(S) `review_url`), requires
+placeholder-review, thin-review, invalid-review-URL, generic-review-scope,
+pending-review-metadata, and placeholder-provenance manifests to remain not
+ready and not forward, requires accepted review metadata to include reviewer
+identity plus a stable artifact handle (`review_id` or HTTP(S) `review_url`),
+requires
 the current simulator-contract target frame
 `gripper_frame_link` to be declared and visible in the actual model before
 forwarding, requires malformed TCP-offset and base-to-board transform payloads

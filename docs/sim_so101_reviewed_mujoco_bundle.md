@@ -130,6 +130,10 @@ integrated suite forwards it, and requires this gate to report
 automation coverage and must also report
 `physical_so101_model_authority_ready: false`; it is not physical SO-101 model
 authority.
+Ready-shaped manifests whose authority sections still carry pending review
+actions or missing review inputs are negative forwarding cases in the same
+smoke: they must remain diagnostic-only and must not feed downstream contract,
+IK, or reviewed-MuJoCo motion checks.
 
 The reviewed MuJoCo bundle matrix also includes generic-review-scope and
 per-field weak-authority fixtures. It also includes a ready-shaped manifest
