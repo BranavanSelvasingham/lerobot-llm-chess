@@ -870,11 +870,17 @@ jobs:
           verified = by_case["seeded_fixture_e4_e5_pick_place_verified"]
           assert verified["observations"]["status"] == "development_board_source_pick_place_verified", verified
           assert verified["observations"]["board_source_pick_place_verified"] is True, verified
+          assert verified["observations"]["board_contact_cleared_during_lift"] is True, verified
+          assert verified["observations"]["release_contact_cleared_after_retreat"] is True, verified
+          assert verified["observations"]["final_board_contact_observed"] is True, verified
           assert verified["observations"]["final_target_within_tolerance"] is True, verified
           place_gap = by_case["alternate_target_e4_d5_records_place_gap"]
           assert place_gap["observations"]["status"] == "development_board_source_lift_verified_place_gap_recorded", place_gap
           assert place_gap["observations"]["lift_verified"] is True, place_gap
+          assert place_gap["observations"]["board_contact_cleared_during_lift"] is True, place_gap
           assert place_gap["observations"]["place_without_manual_piece_pose_verified"] is False, place_gap
+          assert place_gap["observations"]["release_contact_cleared_after_retreat"] is True, place_gap
+          assert place_gap["observations"]["final_board_contact_observed"] is True, place_gap
           assert place_gap["observations"]["final_target_within_tolerance"] is False, place_gap
           for case_id in (
               "alternate_source_d4_e5_records_pick_gap",
@@ -884,7 +890,11 @@ jobs:
               assert case["observations"]["status"] == "development_board_source_pick_gap_recorded", case
               assert case["observations"]["close_two_finger_contact_observed"] is False, case
               assert case["observations"]["lift_verified"] is False, case
+              assert case["observations"]["board_contact_cleared_during_lift"] is False, case
               assert case["observations"]["board_source_pick_place_verified"] is False, case
+              assert case["observations"]["release_contact_cleared_after_retreat"] is True, case
+              assert case["observations"]["final_board_contact_observed"] is True, case
+              assert case["observations"]["final_target_within_tolerance"] is False, case
           for case in summary["cases"]:
               obs = case["observations"]
               assert obs["model_authority"] == "development_scaffold_not_reviewed", case

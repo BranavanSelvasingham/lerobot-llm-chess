@@ -83,9 +83,12 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "source_pick_started_at_source",
         "close_two_finger_contact_observed",
         "lift_verified",
+        "board_contact_cleared_during_lift",
         "transfer_verified",
         "place_without_manual_piece_pose_verified",
         "board_source_pick_place_verified",
+        "release_contact_cleared_after_retreat",
+        "final_board_contact_observed",
         "final_target_within_tolerance",
         "final_target_xy_error_m",
         "target_xy_tolerance_m",
@@ -131,9 +134,12 @@ def case_specs() -> list[dict[str, Any]]:
             "expected_status": "development_board_source_pick_place_verified",
             "expect_close_two_finger_contact": True,
             "expect_lift": True,
+            "expect_board_contact_cleared_during_lift": True,
             "expect_transfer": True,
             "expect_place": True,
             "expect_board_pick_place": True,
+            "expect_release_contact_cleared_after_retreat": True,
+            "expect_final_board_contact": True,
             "expect_final_target_within_tolerance": True,
         },
         {
@@ -143,9 +149,12 @@ def case_specs() -> list[dict[str, Any]]:
             "expected_status": "development_board_source_lift_verified_place_gap_recorded",
             "expect_close_two_finger_contact": True,
             "expect_lift": True,
+            "expect_board_contact_cleared_during_lift": True,
             "expect_transfer": True,
             "expect_place": False,
             "expect_board_pick_place": False,
+            "expect_release_contact_cleared_after_retreat": True,
+            "expect_final_board_contact": True,
             "expect_final_target_within_tolerance": False,
         },
         {
@@ -155,9 +164,12 @@ def case_specs() -> list[dict[str, Any]]:
             "expected_status": "development_board_source_pick_gap_recorded",
             "expect_close_two_finger_contact": False,
             "expect_lift": False,
+            "expect_board_contact_cleared_during_lift": False,
             "expect_transfer": False,
             "expect_place": False,
             "expect_board_pick_place": False,
+            "expect_release_contact_cleared_after_retreat": True,
+            "expect_final_board_contact": True,
             "expect_final_target_within_tolerance": False,
         },
         {
@@ -167,9 +179,12 @@ def case_specs() -> list[dict[str, Any]]:
             "expected_status": "development_board_source_pick_gap_recorded",
             "expect_close_two_finger_contact": False,
             "expect_lift": False,
+            "expect_board_contact_cleared_during_lift": False,
             "expect_transfer": False,
             "expect_place": False,
             "expect_board_pick_place": False,
+            "expect_release_contact_cleared_after_retreat": True,
+            "expect_final_board_contact": True,
             "expect_final_target_within_tolerance": False,
         },
     ]
@@ -284,6 +299,12 @@ def summarize_case(
     add_error(errors, f"{case_id}.lift_verified", observations["lift_verified"], spec["expect_lift"])
     add_error(
         errors,
+        f"{case_id}.board_contact_cleared_during_lift",
+        observations["board_contact_cleared_during_lift"],
+        spec["expect_board_contact_cleared_during_lift"],
+    )
+    add_error(
+        errors,
         f"{case_id}.transfer_verified",
         observations["transfer_verified"],
         spec["expect_transfer"],
@@ -299,6 +320,18 @@ def summarize_case(
         f"{case_id}.board_source_pick_place_verified",
         observations["board_source_pick_place_verified"],
         spec["expect_board_pick_place"],
+    )
+    add_error(
+        errors,
+        f"{case_id}.release_contact_cleared_after_retreat",
+        observations["release_contact_cleared_after_retreat"],
+        spec["expect_release_contact_cleared_after_retreat"],
+    )
+    add_error(
+        errors,
+        f"{case_id}.final_board_contact_observed",
+        observations["final_board_contact_observed"],
+        spec["expect_final_board_contact"],
     )
     add_error(
         errors,
@@ -416,11 +449,14 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "source_pick_started_at_source": observations.get("source_pick_started_at_source"),
         "close_two_finger_contact_observed": observations.get("close_two_finger_contact_observed"),
         "lift_verified": observations.get("lift_verified"),
+        "board_contact_cleared_during_lift": observations.get("board_contact_cleared_during_lift"),
         "transfer_verified": observations.get("transfer_verified"),
         "place_without_manual_piece_pose_verified": observations.get(
             "place_without_manual_piece_pose_verified"
         ),
         "board_source_pick_place_verified": observations.get("board_source_pick_place_verified"),
+        "release_contact_cleared_after_retreat": observations.get("release_contact_cleared_after_retreat"),
+        "final_board_contact_observed": observations.get("final_board_contact_observed"),
         "final_target_within_tolerance": observations.get("final_target_within_tolerance"),
         "final_target_xy_error_m": observations.get("final_target_xy_error_m"),
         "target_xy_tolerance_m": observations.get("target_xy_tolerance_m"),

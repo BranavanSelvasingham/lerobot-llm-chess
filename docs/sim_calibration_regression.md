@@ -697,7 +697,10 @@ It reports
 It covers the current seeded `e4 -> e5` board-source pick/place fixture plus
 alternate target/source cases that must record expected place/pick gaps. Those
 gap cases make the fixture boundary explicit before reviewed model-backed IK is
-available.
+available. The matrix also exports and asserts the detailed contact path:
+source-start, two-finger contact, board-contact clearance during lift, transfer,
+placement without manual piece-pose edits, release-contact clearance, final
+board contact, and final target XY tolerance.
 
 The standalone training-rollouts matrix writes
 `so101_training_rollouts_matrix_summary.json`, `.csv`, and `README.md`. It

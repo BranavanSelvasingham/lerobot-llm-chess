@@ -26,7 +26,10 @@ The matrix writes `so101_mujoco_board_pick_probe_matrix_summary.json`,
 the current seeded `e4 -> e5` fixture to pass and alternate target/source
 placements to record place/pick gaps. Those gap cases are intentional: they
 show that direct seeded source pose is not generalized reviewed model-backed
-IK.
+IK. The matrix explicitly exports and checks the contact path booleans for
+board-contact clearance during lift, release-contact clearance after retreat,
+final board contact, and final target XY tolerance so downstream rollout gates
+do not have to infer those conditions from one aggregate pick/place flag.
 
 The smoke resets the free piece onto source square `e4`, seeds the development
 robot at a source-pick pose, closes on the board piece, lifts it off the board,
@@ -37,8 +40,8 @@ Expected current status is
 `development_board_source_pick_place_verified`: the source pick starts at the
 source square, two-finger contact is visible after close/settle, the piece
 lifts while board contact clears, the transfer moves toward the target, the
-piece lands within the target XY tolerance, and gripper contact clears after
-retreat.
+piece lands back on the board within the target XY tolerance, and gripper
+contact clears after retreat.
 
 This is still development evidence, not physical SO-101 grasp truth. It uses
 the generated `development_scaffold_not_reviewed` MJCF, an enlarged/lightened
