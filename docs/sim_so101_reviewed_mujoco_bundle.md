@@ -97,7 +97,13 @@ Downstream consumers must also reject any raw-ready or fixture-ready handoff
 that still carries non-empty `missing_inputs`, `next_required_for_goal`, or
 `next_required_action_ids`. A ready-shaped handoff with open work is
 contradictory and cannot unblock scene, Gymnasium, pick/place, or training
-readiness gates.
+readiness gates. The producer gate now fails that contradiction directly with
+`status: "reviewed_mujoco_bundle_handoff_blocked_open_work"`,
+`downstream_handoff_status: "handoff_blocked_open_work"`,
+`ready_handoff_has_open_work: true`,
+`ready_handoff_open_work_missing_inputs`,
+`ready_handoff_open_work_pending_action_ids`, and
+`ready_handoff_open_work_blockers` populated.
 
 The joint-limit comparison converts manifest body-joint limits from degrees to
 MuJoCo radians and covers `shoulder_pan`, `shoulder_lift`, `elbow_flex`,
@@ -155,7 +161,12 @@ negative fixture whose MuJoCo
 `gripper` joint has an effectively immobile qpos range. That case must keep
 `ready_for_model_backed_ik: true` from the manifest checker, but the motion gate
 must fail with `simrobot_mujoco_joint_motion` because the gripper's before/after
-qpos delta is below the required motion threshold.
+qpos delta is below the required motion threshold. A separate ready-summary
+fixture proves that even when MuJoCo and SimRobot motion succeed, non-empty
+handoff missing inputs or pending action IDs force
+`reviewed_mujoco_bundle_handoff_blocked_open_work` and keep
+`downstream_handoff_ready` and
+`fixture_handoff_ready_not_physical_so101_authority` false.
 
 Passing this gate is still not full physical readiness. It proves reviewed-model
 handoff into MuJoCo and SimRobot joint motion. Contact-validated gripper

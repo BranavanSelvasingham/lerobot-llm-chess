@@ -25,6 +25,7 @@ DEFAULT_OUTPUT_DIR = (
 )
 SCHEMA = "lerobot.sim.so101_reviewed_mujoco_bundle_matrix.v1"
 REVIEWED_MUJOCO_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_reviewed_mujoco_bundle.py"
+MANIFEST_CHECKER_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_model_bundle_manifest.py"
 EXPECTED_MOTION_CHECK_JOINTS = (
     "elbow_flex",
     "gripper",
@@ -241,6 +242,66 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
     }
 
 
+def create_open_work_summary_fixture(
+    output_dir: Path,
+    fixtures: dict[str, Path],
+    python_path: Path,
+) -> dict[str, Path]:
+    fixture_dir = output_dir / "fixtures" / "ready_summary_open_work"
+    checker_dir = fixture_dir / "manifest_check"
+    checker_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = checker_dir / "so101_model_bundle_manifest_summary.json"
+    python_executable = executable_arg(python_path)
+    result = subprocess.run(
+        [
+            python_executable,
+            str(MANIFEST_CHECKER_SCRIPT),
+            "--manifest-path",
+            str(fixtures["ready_manifest_path"]),
+            "--output-dir",
+            str(checker_dir),
+            "--python",
+            python_executable,
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            "failed_to_build_ready_manifest_summary_fixture:"
+            f" returncode={result.returncode} stderr={result.stderr.strip()}"
+        )
+    payload = json.loads(summary_path.read_text())
+    payload["missing_inputs"] = [
+        "stale_reviewed_mujoco_handoff_missing_input_should_fail_closed",
+    ]
+    payload["next_required_action_ids"] = [
+        "rerun_reviewed_mujoco_handoff_evidence",
+    ]
+    payload["next_required_for_goal"] = [
+        {
+            "priority": 1,
+            "missing_input": "stale_reviewed_mujoco_handoff_missing_input_should_fail_closed",
+            "action_id": "rerun_reviewed_mujoco_handoff_evidence",
+            "gate": "reviewed_mujoco_downstream_handoff",
+            "title": "Rerun reviewed MuJoCo handoff evidence",
+            "detail": (
+                "Synthetic regression fixture: ready-shaped reviewed MuJoCo "
+                "handoffs with open work must fail closed before downstream gates."
+            ),
+        }
+    ]
+    open_work_summary_path = (
+        fixture_dir / "so101_model_bundle_manifest.ready_with_open_handoff_work.summary.json"
+    )
+    write_json(open_work_summary_path, payload)
+    return {
+        "ready_summary_open_work_manifest_summary_path": open_work_summary_path,
+    }
+
+
 def csv_cell(value: Any) -> str:
     if isinstance(value, (dict, list, tuple)):
         return json.dumps(value, sort_keys=True)
@@ -279,6 +340,11 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "physical_reviewed_model_motion_checked",
         "hardware_free_fixture_motion_checked",
         "motion_evidence_not_physical_so101_authority",
+        "ready_handoff_has_open_work",
+        "ready_handoff_open_work_missing_inputs",
+        "ready_handoff_open_work_pending_action_ids",
+        "ready_handoff_open_work_blockers",
+        "next_required_action_ids",
         "downstream_handoff_status",
         "downstream_handoff_ready",
         "fixture_handoff_ready_not_physical_so101_authority",
@@ -1056,6 +1122,60 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "ready_summary_open_handoff_work_blocked",
+            "manifest_summary_path": fixtures[
+                "ready_summary_open_work_manifest_summary_path"
+            ],
+            "require_ready": False,
+            "expect": {
+                "return_code": 1,
+                "gate_ok": False,
+                "status": "reviewed_mujoco_bundle_handoff_blocked_open_work",
+                "ready_for_model_backed_ik": True,
+                "model_authority": (
+                    "hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_so101_model_authority_ready": False,
+                "hardware_free_regression_fixture_ready": True,
+                "reviewed_model_motion_checked": True,
+                "simrobot_sync_ok": True,
+                "all_so101_joints_motion_checked": True,
+                "motion_check_joint_names": list(EXPECTED_MOTION_CHECK_JOINTS),
+                "gripper_motion_check": {
+                    "ok": True,
+                    "target_ok": True,
+                    "moved": True,
+                    "range_ok": True,
+                },
+                "motion_authority_status": (
+                    "hardware_free_fixture_motion_checked_not_physical_so101_authority"
+                ),
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": True,
+                "motion_evidence_not_physical_so101_authority": True,
+                "downstream_handoff_status": "handoff_blocked_open_work",
+                "downstream_handoff_ready": False,
+                "fixture_handoff_ready_not_physical_so101_authority": False,
+                "ready_handoff_has_open_work": True,
+                "ready_handoff_open_work_missing_inputs": [
+                    "stale_reviewed_mujoco_handoff_missing_input_should_fail_closed"
+                ],
+                "ready_handoff_open_work_pending_action_ids": [
+                    "rerun_reviewed_mujoco_handoff_evidence"
+                ],
+                "ready_handoff_open_work_blockers_contains": [
+                    "resolve_ready_reviewed_mujoco_handoff_missing_inputs",
+                    "resolve_ready_reviewed_mujoco_handoff_pending_actions",
+                ],
+                "missing_inputs_contains": [
+                    "stale_reviewed_mujoco_handoff_missing_input_should_fail_closed"
+                ],
+                "next_required_action_ids_contains": [
+                    "rerun_reviewed_mujoco_handoff_evidence"
+                ],
+            },
+        },
+        {
             "case_id": "ready_synthetic_fixture_motion_not_physical",
             "manifest_path": fixtures["ready_manifest_path"],
             "require_ready": False,
@@ -1109,7 +1229,10 @@ def run_case(
         python_executable,
     ]
     manifest_path = spec.get("manifest_path")
-    if isinstance(manifest_path, Path):
+    manifest_summary_path = spec.get("manifest_summary_path")
+    if isinstance(manifest_summary_path, Path):
+        command.extend(["--manifest-summary-path", str(manifest_summary_path)])
+    elif isinstance(manifest_path, Path):
         command.extend(["--manifest-path", str(manifest_path)])
     if spec.get("require_ready") is True:
         command.append("--require-ready-reviewed-model")
@@ -1155,6 +1278,11 @@ def read_motion_checks_csv(path: Path) -> tuple[list[dict[str, str]], str | None
 
 
 def expected_downstream_handoff_status(summary: dict[str, Any]) -> str:
+    if (
+        summary.get("physical_reviewed_model_motion_checked") is True
+        or summary.get("hardware_free_fixture_motion_checked") is True
+    ) and summary.get("ready_handoff_has_open_work") is True:
+        return "handoff_blocked_open_work"
     if summary.get("physical_reviewed_model_motion_checked") is True:
         return "physical_reviewed_mujoco_handoff_ready"
     if summary.get("hardware_free_fixture_motion_checked") is True:
@@ -1186,6 +1314,10 @@ def summarize_case(
         "physical_reviewed_model_motion_checked",
         "hardware_free_fixture_motion_checked",
         "motion_evidence_not_physical_so101_authority",
+        "ready_handoff_has_open_work",
+        "downstream_handoff_status",
+        "downstream_handoff_ready",
+        "fixture_handoff_ready_not_physical_so101_authority",
     ):
         if key in expect:
             add_error(errors, f"{case_id}.{key}", summary.get(key), expect[key])
@@ -1222,6 +1354,41 @@ def summarize_case(
                 if expected_input not in missing_inputs:
                     errors.append(
                         f"{case_id}.missing_inputs: missing {expected_input!r} in {missing_inputs!r}"
+                    )
+    if "next_required_action_ids_contains" in expect:
+        action_ids = summary.get("next_required_action_ids")
+        if not isinstance(action_ids, list):
+            errors.append(
+                f"{case_id}.next_required_action_ids: expected list, got {action_ids!r}"
+            )
+        else:
+            for expected_action_id in expect["next_required_action_ids_contains"]:
+                if expected_action_id not in action_ids:
+                    errors.append(
+                        f"{case_id}.next_required_action_ids: missing {expected_action_id!r} in {action_ids!r}"
+                    )
+    for expected_list_key in (
+        "ready_handoff_open_work_missing_inputs",
+        "ready_handoff_open_work_pending_action_ids",
+    ):
+        if expected_list_key in expect:
+            add_error(
+                errors,
+                f"{case_id}.{expected_list_key}",
+                summary.get(expected_list_key),
+                expect[expected_list_key],
+            )
+    if "ready_handoff_open_work_blockers_contains" in expect:
+        blockers = summary.get("ready_handoff_open_work_blockers")
+        if not isinstance(blockers, list):
+            errors.append(
+                f"{case_id}.ready_handoff_open_work_blockers: expected list, got {blockers!r}"
+            )
+        else:
+            for expected_blocker in expect["ready_handoff_open_work_blockers_contains"]:
+                if expected_blocker not in blockers:
+                    errors.append(
+                        f"{case_id}.ready_handoff_open_work_blockers: missing {expected_blocker!r} in {blockers!r}"
                     )
     for expect_key, summary_key in (
         ("model_path_status", "model_path"),
@@ -1472,13 +1639,15 @@ def summarize_case(
         errors,
         f"{case_id}.downstream_handoff_ready",
         summary.get("downstream_handoff_ready"),
-        summary.get("physical_reviewed_model_motion_checked") is True,
+        summary.get("physical_reviewed_model_motion_checked") is True
+        and summary.get("ready_handoff_has_open_work") is not True,
     )
     add_error(
         errors,
         f"{case_id}.fixture_handoff_ready_not_physical_so101_authority",
         summary.get("fixture_handoff_ready_not_physical_so101_authority"),
-        summary.get("hardware_free_fixture_motion_checked") is True,
+        summary.get("hardware_free_fixture_motion_checked") is True
+        and summary.get("ready_handoff_has_open_work") is not True,
     )
     if downstream_handoff:
         add_error(
@@ -1511,6 +1680,18 @@ def summarize_case(
             errors.append(
                 f"{case_id}.downstream_handoff_json.handoff_item_ids: missing downstream_gate_handoff"
             )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.ready_handoff_has_open_work",
+            downstream_handoff.get("ready_handoff_has_open_work"),
+            summary.get("ready_handoff_has_open_work"),
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.handoff_pending_action_ids",
+            downstream_handoff.get("handoff_pending_action_ids"),
+            summary.get("ready_handoff_open_work_pending_action_ids") or [],
+        )
         if downstream_handoff_csv_rows:
             add_error(
                 errors,
@@ -1588,6 +1769,17 @@ def summarize_case(
             "motion_evidence_not_physical_so101_authority": summary.get(
                 "motion_evidence_not_physical_so101_authority"
             ),
+            "ready_handoff_has_open_work": summary.get("ready_handoff_has_open_work"),
+            "ready_handoff_open_work_missing_inputs": summary.get(
+                "ready_handoff_open_work_missing_inputs"
+            ),
+            "ready_handoff_open_work_pending_action_ids": summary.get(
+                "ready_handoff_open_work_pending_action_ids"
+            ),
+            "ready_handoff_open_work_blockers": summary.get(
+                "ready_handoff_open_work_blockers"
+            ),
+            "next_required_action_ids": summary.get("next_required_action_ids"),
             "downstream_handoff_status": summary.get("downstream_handoff_status"),
             "downstream_handoff_ready": summary.get("downstream_handoff_ready"),
             "fixture_handoff_ready_not_physical_so101_authority": summary.get(
@@ -1661,6 +1853,17 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "motion_evidence_not_physical_so101_authority": observations.get(
             "motion_evidence_not_physical_so101_authority"
         ),
+        "ready_handoff_has_open_work": observations.get("ready_handoff_has_open_work"),
+        "ready_handoff_open_work_missing_inputs": observations.get(
+            "ready_handoff_open_work_missing_inputs"
+        ),
+        "ready_handoff_open_work_pending_action_ids": observations.get(
+            "ready_handoff_open_work_pending_action_ids"
+        ),
+        "ready_handoff_open_work_blockers": observations.get(
+            "ready_handoff_open_work_blockers"
+        ),
+        "next_required_action_ids": observations.get("next_required_action_ids"),
         "downstream_handoff_status": observations.get("downstream_handoff_status"),
         "downstream_handoff_ready": observations.get("downstream_handoff_ready"),
         "fixture_handoff_ready_not_physical_so101_authority": observations.get(
@@ -1725,6 +1928,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "- Generic or missing field-specific review scopes must keep the manifest not-ready before MuJoCo motion.",
             "- The `--require-ready-reviewed-model` case must fail closed when no ready manifest exists.",
             "- The tiny-gripper-range fixture must reach manifest readiness but fail the SimRobot motion gate on `simrobot_mujoco_joint_motion`.",
+            "- The ready-summary open-work fixture must prove MuJoCo/SimRobot motion while keeping the downstream handoff blocked until missing inputs and pending actions are resolved.",
             "- Ready synthetic fixture motion must remain `hardware_free_fixture_motion_checked_not_physical_so101_authority`.",
         ]
     )
@@ -1741,6 +1945,7 @@ def main() -> int:
 
     fixtures = create_fixtures(output_dir)
     fixtures.update(create_invalid_numeric_fixtures(output_dir, fixtures))
+    fixtures.update(create_open_work_summary_fixture(output_dir, fixtures, args.python))
     cases: list[dict[str, Any]] = []
     for spec in case_specs(fixtures):
         record, summary = run_case(

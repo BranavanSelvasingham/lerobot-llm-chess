@@ -967,6 +967,7 @@ jobs:
               "mismatched_model_sha_not_ready",
               "ready_manifest_mismatched_mujoco_joint_limits",
               "ready_manifest_gripper_range_not_moving",
+              "ready_summary_open_handoff_work_blocked",
               "ready_synthetic_fixture_motion_not_physical",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -1257,6 +1258,29 @@ jobs:
               "motion_check_failed",
               "motion_checked",
           ], tiny_gripper_range
+          open_handoff_work = by_case["ready_summary_open_handoff_work_blocked"]
+          assert open_handoff_work["record"]["return_code"] == 1, open_handoff_work
+          assert open_handoff_work["observations"]["status"] == "reviewed_mujoco_bundle_handoff_blocked_open_work", open_handoff_work
+          assert open_handoff_work["observations"]["ready_for_model_backed_ik"] is True, open_handoff_work
+          assert open_handoff_work["observations"]["reviewed_model_motion_checked"] is True, open_handoff_work
+          assert open_handoff_work["observations"]["simrobot_sync_ok"] is True, open_handoff_work
+          assert open_handoff_work["observations"]["motion_authority_status"] == "hardware_free_fixture_motion_checked_not_physical_so101_authority", open_handoff_work
+          assert open_handoff_work["observations"]["hardware_free_fixture_motion_checked"] is True, open_handoff_work
+          assert open_handoff_work["observations"]["ready_handoff_has_open_work"] is True, open_handoff_work
+          assert open_handoff_work["observations"]["ready_handoff_open_work_missing_inputs"] == [
+              "stale_reviewed_mujoco_handoff_missing_input_should_fail_closed"
+          ], open_handoff_work
+          assert open_handoff_work["observations"]["ready_handoff_open_work_pending_action_ids"] == [
+              "rerun_reviewed_mujoco_handoff_evidence"
+          ], open_handoff_work
+          assert "resolve_ready_reviewed_mujoco_handoff_missing_inputs" in open_handoff_work["observations"]["ready_handoff_open_work_blockers"], open_handoff_work
+          assert "resolve_ready_reviewed_mujoco_handoff_pending_actions" in open_handoff_work["observations"]["ready_handoff_open_work_blockers"], open_handoff_work
+          assert open_handoff_work["observations"]["downstream_handoff_status"] == "handoff_blocked_open_work", open_handoff_work
+          assert open_handoff_work["observations"]["downstream_handoff_ready"] is False, open_handoff_work
+          assert open_handoff_work["observations"]["fixture_handoff_ready_not_physical_so101_authority"] is False, open_handoff_work
+          assert sorted(set(open_handoff_work["observations"]["motion_checks_csv_statuses"])) == [
+              "motion_checked"
+          ], open_handoff_work
           ready_fixture = by_case["ready_synthetic_fixture_motion_not_physical"]
           assert ready_fixture["observations"]["status"] == "reviewed_mujoco_bundle_motion_checked", ready_fixture
           assert ready_fixture["observations"]["reviewed_model_motion_checked"] is True, ready_fixture
@@ -2460,6 +2484,7 @@ jobs:
           assert reviewed_mujoco_bundle["ok"] is True, reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["status"] in {
               "reviewed_mujoco_bundle_not_ready",
+              "reviewed_mujoco_bundle_handoff_blocked_open_work",
               "reviewed_mujoco_bundle_motion_checked",
           }, reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["ready_for_model_backed_ik"] in {True, False}, reviewed_mujoco_bundle
@@ -2481,6 +2506,7 @@ jobs:
           assert isinstance(reviewed_mujoco_bundle["motion_authority"], dict), reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["downstream_handoff_status"] in {
               "waiting_for_reviewed_bundle_authority",
+              "handoff_blocked_open_work",
               "manifest_ready_motion_handoff_blocked",
               "fixture_mujoco_handoff_ready_not_physical_authority",
               "physical_reviewed_mujoco_handoff_ready",
@@ -4064,6 +4090,7 @@ jobs:
               and row.get("exists") is True
               and row.get("metrics", {}).get("status") in {
                   "reviewed_mujoco_bundle_not_ready",
+                  "reviewed_mujoco_bundle_handoff_blocked_open_work",
                   "reviewed_mujoco_bundle_motion_checked",
               }
               for row in artifacts_by_category["so101_reviewed_mujoco_bundle"]
@@ -4119,6 +4146,7 @@ jobs:
               assert metrics.get("motion_evidence_not_physical_so101_authority") in {True, False, None}, metrics
               assert metrics.get("downstream_handoff_status") in {
                   "waiting_for_reviewed_bundle_authority",
+                  "handoff_blocked_open_work",
                   "manifest_ready_motion_handoff_blocked",
                   "fixture_mujoco_handoff_ready_not_physical_authority",
                   "physical_reviewed_mujoco_handoff_ready",

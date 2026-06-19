@@ -652,6 +652,59 @@ def manifest_value(summary: dict[str, Any], key: str) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def unique_string_values(values: Any) -> list[str]:
+    source = values if isinstance(values, list) else []
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in source:
+        text = str(value)
+        if text and text not in seen:
+            result.append(text)
+            seen.add(text)
+    return result
+
+
+def action_ids_from_next_required(values: Any) -> list[str]:
+    source = values if isinstance(values, list) else []
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in source:
+        if isinstance(value, dict):
+            raw = value.get("action_id")
+        else:
+            raw = value
+        text = str(raw) if raw else ""
+        if text and text not in seen:
+            result.append(text)
+            seen.add(text)
+    return result
+
+
+def pending_action_ids(summary: dict[str, Any]) -> list[str]:
+    return unique_string_values(
+        [
+            *unique_string_values(summary.get("next_required_action_ids")),
+            *action_ids_from_next_required(summary.get("next_required_for_goal")),
+        ]
+    )
+
+
+def handoff_open_work(summary: dict[str, Any]) -> dict[str, Any]:
+    missing_inputs = unique_string_values(summary.get("missing_inputs"))
+    action_ids = pending_action_ids(summary)
+    blockers = []
+    if missing_inputs:
+        blockers.append("resolve_ready_reviewed_mujoco_handoff_missing_inputs")
+    if action_ids:
+        blockers.append("resolve_ready_reviewed_mujoco_handoff_pending_actions")
+    return {
+        "has_open_work": bool(missing_inputs or action_ids),
+        "missing_inputs": missing_inputs,
+        "pending_action_ids": action_ids,
+        "blockers": blockers,
+    }
+
+
 def motion_authority(
     *,
     motion_checked: bool,
@@ -767,6 +820,12 @@ def motion_check_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def handoff_status(summary: dict[str, Any]) -> str:
+    open_work = handoff_open_work(summary)
+    if (
+        summary.get("physical_reviewed_model_motion_checked") is True
+        or summary.get("hardware_free_fixture_motion_checked") is True
+    ) and open_work["has_open_work"]:
+        return "handoff_blocked_open_work"
     if summary.get("physical_reviewed_model_motion_checked") is True:
         return "physical_reviewed_mujoco_handoff_ready"
     if summary.get("hardware_free_fixture_motion_checked") is True:
@@ -777,7 +836,11 @@ def handoff_status(summary: dict[str, Any]) -> str:
 
 
 def handoff_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
-    physical_ready = summary.get("physical_reviewed_model_motion_checked") is True
+    open_work = handoff_open_work(summary)
+    physical_ready = (
+        summary.get("physical_reviewed_model_motion_checked") is True
+        and not open_work["has_open_work"]
+    )
     caveat = (
         "This downstream handoff is a snapshot for later MuJoCo scene, Gymnasium, "
         "and pick/place gates. It is not physical SO-101 authority by itself."
@@ -905,9 +968,21 @@ def handoff_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def build_downstream_handoff(summary: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    open_work = handoff_open_work(summary)
+    motion_checked = (
+        summary.get("physical_reviewed_model_motion_checked") is True
+        or summary.get("hardware_free_fixture_motion_checked") is True
+    )
+    ready_handoff_has_open_work = motion_checked and open_work["has_open_work"]
     rows = handoff_rows(summary)
-    physical_ready = summary.get("physical_reviewed_model_motion_checked") is True
-    fixture_ready = summary.get("hardware_free_fixture_motion_checked") is True
+    physical_ready = (
+        summary.get("physical_reviewed_model_motion_checked") is True
+        and not open_work["has_open_work"]
+    )
+    fixture_ready = (
+        summary.get("hardware_free_fixture_motion_checked") is True
+        and not open_work["has_open_work"]
+    )
     handoff = {
         "schema": DOWNSTREAM_HANDOFF_SCHEMA,
         "ok": True,
@@ -933,6 +1008,10 @@ def build_downstream_handoff(summary: dict[str, Any]) -> tuple[dict[str, Any], l
         ),
         "downstream_handoff_ready": physical_ready,
         "fixture_handoff_ready_not_physical_so101_authority": fixture_ready,
+        "ready_handoff_has_open_work": ready_handoff_has_open_work,
+        "handoff_missing_inputs": open_work["missing_inputs"],
+        "handoff_pending_action_ids": open_work["pending_action_ids"],
+        "handoff_blockers": open_work["blockers"],
         "observed_evidence_is_authority": False,
         "physical_so101_truth_claimed": False,
         "development_fixture_evidence_not_physical_so101_truth": True,
@@ -968,6 +1047,7 @@ def build_downstream_handoff(summary: dict[str, Any]) -> tuple[dict[str, Any], l
         },
         "missing_inputs": summary.get("missing_inputs") or [],
         "next_required_for_goal": summary.get("next_required_for_goal") or [],
+        "next_required_action_ids": pending_action_ids(summary),
         "handoff_item_count": len(rows),
         "handoff_item_ids": [row["handoff_key"] for row in rows],
         "handoff_items": rows,
@@ -1002,6 +1082,16 @@ def build_not_ready_summary(
     )
     missing_inputs = manifest_summary.get("missing_inputs")
     missing_inputs = missing_inputs if isinstance(missing_inputs, list) else ["ready_reviewed_model_bundle"]
+    next_required_for_goal = manifest_summary.get("next_required_for_goal") or [
+        {
+            "priority": 1,
+            "missing_input": "ready_reviewed_model_bundle",
+            "action_id": "make_reviewed_manifest_ready",
+            "gate": "reviewed_model_authority",
+            "title": "Make the reviewed SO-101 manifest ready",
+            "detail": "Make the manifest checker report ready_for_model_backed_ik true, then rerun the reviewed MuJoCo bundle gate.",
+        }
+    ]
     ok = not args.require_ready_reviewed_model
     status = "reviewed_mujoco_bundle_ready_unchecked" if ready else "reviewed_mujoco_bundle_not_ready"
     if not ok:
@@ -1060,16 +1150,13 @@ def build_not_ready_summary(
             "When no ready reviewed manifest exists, the gate records the missing inputs without inventing model authority.",
             "MuJoCo motion is attempted only after the bundle manifest reports ready_for_model_backed_ik true.",
         ],
-        "next_required_for_goal": manifest_summary.get("next_required_for_goal") or [
-            {
-                "priority": 1,
-                "missing_input": "ready_reviewed_model_bundle",
-                "action_id": "make_reviewed_manifest_ready",
-                "gate": "reviewed_model_authority",
-                "title": "Make the reviewed SO-101 manifest ready",
-                "detail": "Make the manifest checker report ready_for_model_backed_ik true, then rerun the reviewed MuJoCo bundle gate.",
-            }
-        ],
+        "next_required_for_goal": next_required_for_goal,
+        "next_required_action_ids": unique_string_values(
+            [
+                *unique_string_values(manifest_summary.get("next_required_action_ids")),
+                *action_ids_from_next_required(next_required_for_goal),
+            ]
+        ),
     }
     rows = [
         checklist_row(
@@ -1149,11 +1236,58 @@ def build_ready_summary(
         missing_inputs.append("simrobot_mujoco_joint_motion")
     if not joint_limit_consistency.get("ok"):
         missing_inputs.append("joint_limit_model_consistency")
+    manifest_open_work = handoff_open_work(manifest_summary)
+    missing_inputs = unique_string_values(
+        [*missing_inputs, *manifest_open_work["missing_inputs"]]
+    )
+    manifest_next_required = manifest_summary.get("next_required_for_goal")
+    manifest_next_required = (
+        manifest_next_required if isinstance(manifest_next_required, list) else []
+    )
+    next_required_action_ids = unique_string_values(
+        [
+            *unique_string_values(manifest_summary.get("next_required_action_ids")),
+            *action_ids_from_next_required(manifest_next_required),
+        ]
+    )
+    handoff_open_work_blocks_ready = bool(
+        manifest_open_work["missing_inputs"] or next_required_action_ids
+    )
+    if handoff_open_work_blocks_ready and not manifest_next_required:
+        manifest_next_required = [
+            {
+                "priority": 1,
+                "missing_input": (
+                    manifest_open_work["missing_inputs"][0]
+                    if manifest_open_work["missing_inputs"]
+                    else "reviewed_mujoco_handoff_pending_action"
+                ),
+                "action_id": (
+                    next_required_action_ids[0]
+                    if next_required_action_ids
+                    else "resolve_reviewed_mujoco_handoff_open_work"
+                ),
+                "gate": "reviewed_mujoco_downstream_handoff",
+                "title": "Resolve reviewed MuJoCo handoff open work",
+                "detail": (
+                    "A ready-shaped reviewed MuJoCo motion result cannot unblock "
+                    "downstream scene, Gymnasium, pick/place, or training gates "
+                    "while missing inputs or pending actions remain attached."
+                ),
+            }
+        ]
+    gate_ok = motion_ok and not handoff_open_work_blocks_ready
+    if motion_ok and handoff_open_work_blocks_ready:
+        status = "reviewed_mujoco_bundle_handoff_blocked_open_work"
+    elif motion_ok:
+        status = "reviewed_mujoco_bundle_motion_checked"
+    else:
+        status = "reviewed_mujoco_bundle_motion_failed"
 
     summary = {
         "schema": SCHEMA,
-        "ok": motion_ok,
-        "status": "reviewed_mujoco_bundle_motion_checked" if motion_ok else "reviewed_mujoco_bundle_motion_failed",
+        "ok": gate_ok,
+        "status": status,
         "hardware_skipped": True,
         "gui_skipped": True,
         "openai_skipped": True,
@@ -1198,15 +1332,24 @@ def build_ready_summary(
         "joint_limit_model_consistency": joint_limit_consistency,
         "sim_robot_mujoco_sync": simrobot_motion,
         "missing_inputs": sorted(set(missing_inputs)),
+        "ready_handoff_has_open_work": handoff_open_work_blocks_ready,
+        "ready_handoff_open_work_missing_inputs": manifest_open_work["missing_inputs"],
+        "ready_handoff_open_work_pending_action_ids": next_required_action_ids,
+        "ready_handoff_open_work_blockers": manifest_open_work["blockers"],
         "artifacts": artifacts,
         "limitations": [
             "This gate proves hardware-free MuJoCo load and SimRobot joint-state motion for the reviewed bundle; it does not prove physical calibration by itself.",
             "Contact-valid grasp/lift/place still needs separate gripper collision and task probes after TCP/base-to-board alignment are reviewed.",
         ],
-        "next_required_for_goal": [] if motion_ok else [
+        "next_required_for_goal": (
+            manifest_next_required
+            if handoff_open_work_blocks_ready
+            else [] if motion_ok else [
             "Fix reviewed model loading or joint naming until every SO-101 joint maps in MuJoCo.",
             "Re-run the suite before trusting model-backed IK or training rollouts.",
-        ],
+            ]
+        ),
+        "next_required_action_ids": next_required_action_ids,
     }
     rows = [
         checklist_row(
@@ -1297,6 +1440,7 @@ def write_readme(path: Path, summary: dict[str, Any], rows: list[dict[str, Any]]
         f"- `motion_evidence_not_physical_so101_authority`: `{str(summary.get('motion_evidence_not_physical_so101_authority')).lower()}`",
         f"- `downstream_handoff_status`: `{summary.get('downstream_handoff_status')}`",
         f"- `downstream_handoff_ready`: `{str(summary.get('downstream_handoff_ready')).lower()}`",
+        f"- `ready_handoff_has_open_work`: `{str(summary.get('ready_handoff_has_open_work')).lower()}`",
         f"- `downstream_handoff_json`: `{summary['artifacts'].get('downstream_handoff_json')}`",
         f"- `downstream_handoff_csv`: `{summary['artifacts'].get('downstream_handoff_csv')}`",
         f"- `model_path`: `{summary.get('model_path', {}).get('path') if isinstance(summary.get('model_path'), dict) else None}`",
@@ -1324,7 +1468,7 @@ def write_readme(path: Path, summary: dict[str, Any], rows: list[dict[str, Any]]
             "## Downstream Handoff",
             "",
             "The downstream handoff JSON/CSV snapshots the reviewed bundle fields that later MuJoCo scene, Gymnasium, and reviewed-model-backed pick/place gates must consume.",
-            "It is not physical SO-101 authority by itself; `downstream_handoff_ready` is true only when physical reviewed model authority and MuJoCo/SimRobot motion are both true.",
+            "It is not physical SO-101 authority by itself; `downstream_handoff_ready` is true only when physical reviewed model authority, MuJoCo/SimRobot motion, and zero open handoff work are all true.",
             "",
             "## Scope",
             "",
@@ -1386,6 +1530,18 @@ def main() -> int:
                     "fixture_handoff_ready_not_physical_so101_authority"
                 ]
             ),
+            "ready_handoff_has_open_work": downstream_handoff[
+                "ready_handoff_has_open_work"
+            ],
+            "ready_handoff_open_work_missing_inputs": downstream_handoff[
+                "handoff_missing_inputs"
+            ],
+            "ready_handoff_open_work_pending_action_ids": downstream_handoff[
+                "handoff_pending_action_ids"
+            ],
+            "ready_handoff_open_work_blockers": downstream_handoff[
+                "handoff_blockers"
+            ],
             "downstream_handoff_observed_evidence_is_authority": (
                 downstream_handoff["observed_evidence_is_authority"]
             ),
