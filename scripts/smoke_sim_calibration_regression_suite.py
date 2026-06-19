@@ -4342,8 +4342,40 @@ def so101_reviewed_model_authority_gate_section(
     bundle_manifest: dict[str, Any],
     reviewed_mujoco_bundle: dict[str, Any],
 ) -> dict[str, Any]:
-    source_authority_ready = (
+    source_authority_status_ready = (
         source_inventory.get("source_authority_gate_status") == "source_authority_ready"
+    )
+    source_authority_blockers = unique_string_values(
+        source_inventory.get("source_authority_blockers") or []
+    )
+    source_next_required = source_inventory.get("next_required_action_ids")
+    source_next_required_action_ids = unique_string_values(
+        source_next_required if isinstance(source_next_required, list) else []
+    )
+    source_next_required_for_goal = source_inventory.get("next_required_for_goal")
+    source_next_required_for_goal_action_ids = unique_string_values(
+        [
+            action.get("action_id")
+            for action in source_next_required_for_goal
+            if isinstance(action, dict)
+        ]
+        if isinstance(source_next_required_for_goal, list)
+        else []
+    )
+    source_authority_pending_action_ids = unique_string_values(
+        [
+            *source_next_required_action_ids,
+            *source_next_required_for_goal_action_ids,
+        ]
+    )
+    source_authority_contradictory_ready_state = bool(
+        source_authority_status_ready
+        and (source_authority_blockers or source_authority_pending_action_ids)
+    )
+    source_authority_ready = (
+        source_authority_status_ready
+        and not source_authority_blockers
+        and not source_authority_pending_action_ids
     )
     physical_authority_ready = bundle_manifest.get("physical_so101_model_authority_ready") is True
     bundle_fixture_ready = bundle_manifest.get("hardware_free_regression_fixture_ready") is True
@@ -4398,6 +4430,11 @@ def so101_reviewed_model_authority_gate_section(
     blockers = unique_string_values(
         [
             *(source_inventory.get("source_authority_blockers") or []),
+            *(
+                ["resolve_contradictory_source_authority_gate_state"]
+                if source_authority_contradictory_ready_state
+                else []
+            ),
             *(bundle_manifest.get("physical_authority_blockers") or []),
             *(
                 []
@@ -4622,6 +4659,22 @@ def so101_reviewed_model_authority_gate_section(
         ]
     else:
         motion_consistency_actions = []
+    source_authority_contradiction_actions = (
+        [
+            {
+                "action_id": "resolve_contradictory_source_authority_gate_state",
+                "gate": "reviewed_model_authority",
+                "title": "Resolve contradictory source-authority state",
+                "detail": (
+                    "Rerun or inspect the SO-101 model-source inventory because it "
+                    "reports source_authority_ready while still carrying source "
+                    "blockers or pending source-authority actions."
+                ),
+            }
+        ]
+        if source_authority_contradictory_ready_state
+        else []
+    )
     motion_actions = (
         [
             {
@@ -4667,6 +4720,7 @@ def so101_reviewed_model_authority_gate_section(
     )
     next_required_for_goal = prioritized_gate_actions(
         source_inventory.get("next_required_for_goal"),
+        source_authority_contradiction_actions,
         bundle_manifest.get("next_required_for_goal"),
         reviewed_mujoco_bundle.get("next_required_for_goal"),
         consistency_actions,
@@ -4674,12 +4728,8 @@ def so101_reviewed_model_authority_gate_section(
         fixture_boundary_actions,
         motion_actions,
     )
-    source_next_required = source_inventory.get("next_required_action_ids")
     bundle_next_required = bundle_manifest.get("next_required_action_ids")
     reviewed_mujoco_next_required = reviewed_mujoco_bundle.get("next_required_for_goal")
-    source_next_required_action_ids = unique_string_values(
-        source_next_required if isinstance(source_next_required, list) else []
-    )
     physical_bundle_next_required_action_ids = unique_string_values(
         bundle_next_required if isinstance(bundle_next_required, list) else []
     )
@@ -4699,7 +4749,13 @@ def so101_reviewed_model_authority_gate_section(
         "ready": ready,
         "reviewed_model_authority_ready": ready,
         "source_authority_ready": source_authority_ready,
+        "source_authority_status_ready": source_authority_status_ready,
         "source_authority_gate_status": source_inventory.get("source_authority_gate_status"),
+        "source_authority_blockers": source_authority_blockers,
+        "source_authority_pending_action_ids": source_authority_pending_action_ids,
+        "source_authority_contradictory_ready_state": (
+            source_authority_contradictory_ready_state
+        ),
         "physical_so101_model_authority_ready": physical_authority_ready,
         "hardware_free_regression_fixture_ready": bundle_fixture_ready,
         "physical_authority_gate_status": bundle_manifest.get("physical_authority_gate_status"),
@@ -4839,11 +4895,12 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
         if isinstance(bundle_next_required_action_ids, list)
         else []
     )
-    source_next_action_id = (
-        source_next_required_action_ids[0]
-        if source_next_required_action_ids
-        else "review_and_declare_authoritative_so101_model_source"
-    )
+    if source_next_required_action_ids:
+        source_next_action_id = source_next_required_action_ids[0]
+    elif gate.get("source_authority_contradictory_ready_state") is True:
+        source_next_action_id = "resolve_contradictory_source_authority_gate_state"
+    else:
+        source_next_action_id = "review_and_declare_authoritative_so101_model_source"
     bundle_next_action_id = (
         bundle_next_required_action_ids[0]
         if bundle_next_required_action_ids

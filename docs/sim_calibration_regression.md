@@ -623,7 +623,12 @@ selected authoritative source model path is absent, the consistency status is
 `source_authoritative_model_path_missing` and the blocker points back to
 selecting the reviewed source model path. An authoritative root alone is not
 enough to authorize a different model file in the same tree, and a path match
-with a digest mismatch is also blocked. The reviewed-authority matrix includes
+with a digest mismatch is also blocked. The gate also fails closed when a source
+inventory reports `source_authority_ready` while still carrying source blockers
+or pending source-authority actions; those contradictory states must be resolved
+before source/bundle identity consistency is checked. The reviewed-authority
+matrix includes
+ready-source-with-stale-blocker and ready-source-with-pending-action cases,
 missing selected source path, unconfigured selected source authority,
 selected-source/outside-authority mismatch, same-root unselected-model,
 source-digest-missing, malformed selected-source digest,

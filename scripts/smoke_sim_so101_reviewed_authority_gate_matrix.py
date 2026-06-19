@@ -72,6 +72,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "gate_ready",
         "reviewed_model_authority_ready",
         "source_authority_ready",
+        "source_authority_status_ready",
+        "source_authority_contradictory_ready_state",
+        "source_authority_blockers",
+        "source_authority_pending_action_ids",
         "physical_bundle_ready",
         "source_bundle_consistency_status",
         "source_bundle_consistency_ready",
@@ -194,6 +198,33 @@ def source_ready(
         },
         "summary_path": str(summary_path),
     }
+
+
+def source_ready_with_stale_blocker(
+    summary_path: Path,
+    model_path: Path,
+) -> dict[str, Any]:
+    payload = source_ready(summary_path, model_path)
+    payload["source_authority_blockers"] = [
+        "stale_source_authority_blocker_should_fail_closed"
+    ]
+    return payload
+
+
+def source_ready_with_pending_action(
+    summary_path: Path,
+    model_path: Path,
+) -> dict[str, Any]:
+    payload = source_ready(summary_path, model_path)
+    action = gate_action(
+        "record_source_authority_review_metadata",
+        "reviewed_model_authority",
+        "Record source-authority review metadata",
+        "Pending source-authority action must fail closed even with ready status.",
+    )
+    payload["next_required_for_goal"] = [action]
+    payload["next_required_action_ids"] = [action["action_id"]]
+    return payload
 
 
 def source_ready_missing_selected_path(summary_path: Path, model_path: Path) -> dict[str, Any]:
@@ -506,6 +537,78 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "actions_contain": [
                     "scan_or_supply_so101_model_source_root",
                     "load_reviewed_model_in_mujoco",
+                ],
+                "blocked_prior_contains": [
+                    "source_bundle_consistency",
+                    "physical_reviewed_mujoco_motion_checked",
+                ],
+            },
+        },
+        {
+            "case_id": "source_ready_with_stale_blocker_physical_bundle_ready",
+            "source": source_ready_with_stale_blocker(
+                summary_dir / "source_ready_stale_blocker.json",
+                source_model,
+            ),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
+            "expect": {
+                "ready": False,
+                "source_status_ready": True,
+                "source_authority_ready": False,
+                "source_contradictory": True,
+                "source_blockers": [
+                    "stale_source_authority_blocker_should_fail_closed"
+                ],
+                "source_pending_actions": [],
+                "consistency_status": "not_checked_prerequisites_not_ready",
+                "consistency_ready": False,
+                "development_fixture": True,
+                "blockers_contain": [
+                    "stale_source_authority_blocker_should_fail_closed",
+                    "resolve_contradictory_source_authority_gate_state",
+                ],
+                "actions_contain": [
+                    "resolve_contradictory_source_authority_gate_state"
+                ],
+                "action_required_contains": ["source_authority_ready"],
+                "blocker_packet_next_actions_contain": [
+                    "resolve_contradictory_source_authority_gate_state"
+                ],
+                "blocked_prior_contains": [
+                    "source_bundle_consistency",
+                    "physical_reviewed_mujoco_motion_checked",
+                ],
+            },
+        },
+        {
+            "case_id": "source_ready_with_pending_action_physical_bundle_ready",
+            "source": source_ready_with_pending_action(
+                summary_dir / "source_ready_pending_action.json",
+                source_model,
+            ),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
+            "expect": {
+                "ready": False,
+                "source_status_ready": True,
+                "source_authority_ready": False,
+                "source_contradictory": True,
+                "source_blockers": [],
+                "source_pending_actions": ["record_source_authority_review_metadata"],
+                "consistency_status": "not_checked_prerequisites_not_ready",
+                "consistency_ready": False,
+                "development_fixture": True,
+                "blockers_contain": [
+                    "resolve_contradictory_source_authority_gate_state"
+                ],
+                "actions_contain": [
+                    "record_source_authority_review_metadata",
+                    "resolve_contradictory_source_authority_gate_state",
+                ],
+                "action_required_contains": ["source_authority_ready"],
+                "blocker_packet_next_actions_contain": [
+                    "record_source_authority_review_metadata"
                 ],
                 "blocked_prior_contains": [
                     "source_bundle_consistency",
@@ -1308,6 +1411,42 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
     )
     add_error(errors, "blocker_packet_ready", blocker_packet.get("ready"), expect["ready"])
 
+    if "source_status_ready" in expect:
+        add_error(
+            errors,
+            "source_authority_status_ready",
+            gate.get("source_authority_status_ready"),
+            expect["source_status_ready"],
+        )
+    if "source_authority_ready" in expect:
+        add_error(
+            errors,
+            "source_authority_ready",
+            gate.get("source_authority_ready"),
+            expect["source_authority_ready"],
+        )
+    if "source_contradictory" in expect:
+        add_error(
+            errors,
+            "source_authority_contradictory_ready_state",
+            gate.get("source_authority_contradictory_ready_state"),
+            expect["source_contradictory"],
+        )
+    if "source_blockers" in expect:
+        add_error(
+            errors,
+            "source_authority_blockers",
+            gate.get("source_authority_blockers"),
+            expect["source_blockers"],
+        )
+    if "source_pending_actions" in expect:
+        add_error(
+            errors,
+            "source_authority_pending_action_ids",
+            gate.get("source_authority_pending_action_ids"),
+            expect["source_pending_actions"],
+        )
+
     source_bundle_consistency = gate.get("source_bundle_consistency")
     if not isinstance(source_bundle_consistency, dict):
         errors.append("source_bundle_consistency: expected dict")
@@ -1679,6 +1818,14 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "gate_ready": gate.get("ready"),
         "reviewed_model_authority_ready": gate.get("reviewed_model_authority_ready"),
         "source_authority_ready": gate.get("source_authority_ready"),
+        "source_authority_status_ready": gate.get("source_authority_status_ready"),
+        "source_authority_contradictory_ready_state": gate.get(
+            "source_authority_contradictory_ready_state"
+        ),
+        "source_authority_blockers": gate.get("source_authority_blockers"),
+        "source_authority_pending_action_ids": gate.get(
+            "source_authority_pending_action_ids"
+        ),
         "physical_bundle_ready": gate.get("physical_so101_model_authority_ready"),
         "source_bundle_consistency_status": gate.get("source_bundle_consistency_status"),
         "source_bundle_consistency_ready": gate.get("source_bundle_consistency_ready"),

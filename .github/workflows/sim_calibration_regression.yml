@@ -436,6 +436,8 @@ jobs:
               "source_missing_bundle_missing_motion_missing",
               "source_ready_bundle_missing",
               "source_missing_physical_bundle_ready",
+              "source_ready_with_stale_blocker_physical_bundle_ready",
+              "source_ready_with_pending_action_physical_bundle_ready",
               "source_ready_missing_selected_path_physical_bundle_ready",
               "source_ready_unconfigured_selection_physical_bundle_ready",
               "source_ready_selection_outside_authority_physical_bundle_ready",
@@ -464,6 +466,31 @@ jobs:
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
           by_case = {case["case_id"]: case for case in summary["cases"]}
+          stale_source_case = by_case["source_ready_with_stale_blocker_physical_bundle_ready"]
+          stale_source = stale_source_case["gate"]
+          assert stale_source["ready"] is False, stale_source
+          assert stale_source["source_authority_status_ready"] is True, stale_source
+          assert stale_source["source_authority_ready"] is False, stale_source
+          assert stale_source["source_authority_contradictory_ready_state"] is True, stale_source
+          assert stale_source["source_authority_blockers"] == ["stale_source_authority_blocker_should_fail_closed"], stale_source
+          assert stale_source["source_authority_pending_action_ids"] == [], stale_source
+          assert stale_source["source_bundle_consistency_status"] == "not_checked_prerequisites_not_ready", stale_source
+          assert "resolve_contradictory_source_authority_gate_state" in stale_source["next_required_action_ids"], stale_source
+          assert "source_authority_ready" in stale_source_case["blocker_packet"]["action_required_item_ids"], stale_source_case
+          assert "resolve_contradictory_source_authority_gate_state" in stale_source_case["blocker_packet"]["next_action_ids"], stale_source_case
+          pending_source_case = by_case["source_ready_with_pending_action_physical_bundle_ready"]
+          pending_source = pending_source_case["gate"]
+          assert pending_source["ready"] is False, pending_source
+          assert pending_source["source_authority_status_ready"] is True, pending_source
+          assert pending_source["source_authority_ready"] is False, pending_source
+          assert pending_source["source_authority_contradictory_ready_state"] is True, pending_source
+          assert pending_source["source_authority_blockers"] == [], pending_source
+          assert pending_source["source_authority_pending_action_ids"] == ["record_source_authority_review_metadata"], pending_source
+          assert pending_source["source_bundle_consistency_status"] == "not_checked_prerequisites_not_ready", pending_source
+          assert "record_source_authority_review_metadata" in pending_source["next_required_action_ids"], pending_source
+          assert "resolve_contradictory_source_authority_gate_state" in pending_source["next_required_action_ids"], pending_source
+          assert "source_authority_ready" in pending_source_case["blocker_packet"]["action_required_item_ids"], pending_source_case
+          assert "record_source_authority_review_metadata" in pending_source_case["blocker_packet"]["next_action_ids"], pending_source_case
           source_selected_missing_case = by_case["source_ready_missing_selected_path_physical_bundle_ready"]
           source_selected_missing = source_selected_missing_case["gate"]
           assert source_selected_missing["ready"] is False, source_selected_missing
