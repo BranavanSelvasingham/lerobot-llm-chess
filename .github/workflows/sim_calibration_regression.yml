@@ -548,6 +548,7 @@ jobs:
               "weak_tcp_offset_authority_not_ready",
               "weak_alignment_authority_not_ready",
               "nonstandard_json_constant_parse_error",
+              "unavailable_model_path_not_ready",
               "invalid_tcp_offset_shape_not_ready",
               "invalid_nonfinite_joint_limits_not_ready",
               "missing_mesh_assets_not_ready",
@@ -661,6 +662,17 @@ jobs:
           assert nonstandard_json["observations"]["ready_for_model_backed_ik"] is False, nonstandard_json
           assert "--manifest-path" in nonstandard_json["observations"]["missing_inputs"], nonstandard_json
           assert nonstandard_json["observations"]["reviewed_model_motion_checked"] is False, nonstandard_json
+          unavailable_model_path = by_case["unavailable_model_path_not_ready"]
+          assert unavailable_model_path["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", unavailable_model_path
+          assert unavailable_model_path["observations"]["ready_for_model_backed_ik"] is False, unavailable_model_path
+          assert unavailable_model_path["observations"]["model_path_status"] == "unavailable", unavailable_model_path
+          assert unavailable_model_path["observations"]["model_identity_status"] == "invalid", unavailable_model_path
+          assert "model_path" in unavailable_model_path["observations"]["missing_inputs"], unavailable_model_path
+          assert "model_sha256" in unavailable_model_path["observations"]["missing_inputs"], unavailable_model_path
+          assert "model_path_unavailable" in unavailable_model_path["observations"]["model_path_diagnostics"], unavailable_model_path
+          assert "model_sha256_observed_unavailable" in unavailable_model_path["observations"]["model_identity_diagnostics"], unavailable_model_path
+          assert unavailable_model_path["observations"]["motion_authority_status"] == "not_checked_manifest_not_ready", unavailable_model_path
+          assert unavailable_model_path["observations"]["reviewed_model_motion_checked"] is False, unavailable_model_path
           invalid_tcp = by_case["invalid_tcp_offset_shape_not_ready"]
           assert invalid_tcp["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", invalid_tcp
           assert invalid_tcp["observations"]["ready_for_model_backed_ik"] is False, invalid_tcp

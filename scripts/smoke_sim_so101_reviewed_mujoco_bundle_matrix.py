@@ -122,6 +122,15 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
     tiny_gripper_manifest_path = tiny_gripper_dir / "so101_model_bundle.tiny_gripper_range.json"
     write_json(tiny_gripper_manifest_path, tiny_gripper_payload)
 
+    unavailable_model_path = json_clone(ready_payload)
+    unavailable_model_path["model_path"] = str(
+        normalize_path(fixture_dir / "missing_reviewed_so101.xml")
+    )
+    unavailable_model_path_manifest_path = (
+        fixture_dir / "so101_model_bundle.unavailable_model_path.json"
+    )
+    write_json(unavailable_model_path_manifest_path, unavailable_model_path)
+
     nonfinite_joint_limits = json_clone(ready_payload)
     nonfinite_joint_limits["joint_limits_deg"]["shoulder_pan"] = ["NaN", 110.0]
     nonfinite_joint_limits_path = fixture_dir / "so101_model_bundle.nonfinite_joint_limits.json"
@@ -199,6 +208,7 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
     return {
         "tiny_gripper_range_manifest_path": tiny_gripper_manifest_path,
         "tiny_gripper_range_model_path": tiny_gripper_model_path,
+        "unavailable_model_path_manifest_path": unavailable_model_path_manifest_path,
         "nonfinite_joint_limits_manifest_path": nonfinite_joint_limits_path,
         "invalid_asset_roots_manifest_path": invalid_asset_roots_path,
         "unavailable_asset_root_manifest_path": unavailable_asset_root_path,
@@ -230,6 +240,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "gate_ok",
         "status",
         "manifest_status",
+        "model_path_status",
         "model_identity_status",
         "authority_status",
         "provenance_status",
@@ -637,6 +648,29 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "hardware_free_fixture_motion_checked": False,
                 "motion_evidence_not_physical_so101_authority": False,
                 "missing_inputs_contains": ["--manifest-path"],
+            },
+        },
+        {
+            "case_id": "unavailable_model_path_not_ready",
+            "manifest_path": fixtures["unavailable_model_path_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "model_path_status": "unavailable",
+                "model_identity_status": "invalid",
+                "missing_inputs_contains": ["model_path", "model_sha256"],
+                "model_path_diagnostics_contains": ["model_path_unavailable"],
+                "model_identity_diagnostics_contains": [
+                    "model_sha256_observed_unavailable"
+                ],
             },
         },
         {
@@ -1060,6 +1094,7 @@ def summarize_case(
                         f"{case_id}.missing_inputs: missing {expected_input!r} in {missing_inputs!r}"
                     )
     for expect_key, summary_key in (
+        ("model_path_status", "model_path"),
         ("model_identity_status", "model_identity"),
         ("authority_status", "authority"),
         ("provenance_status", "provenance"),
@@ -1091,6 +1126,7 @@ def summarize_case(
             expect["alignment_status"],
         )
     for diagnostics_key, summary_key in (
+        ("model_path_diagnostics_contains", "model_path"),
         ("model_identity_diagnostics_contains", "model_identity"),
         ("authority_diagnostics_contains", "authority"),
         ("provenance_diagnostics_contains", "provenance"),
@@ -1183,6 +1219,8 @@ def summarize_case(
             "gate_ok": summary.get("ok"),
             "status": summary.get("status"),
             "manifest_status": summary.get("manifest_status"),
+            "model_path_status": (summary.get("model_path") or {}).get("status"),
+            "model_path_diagnostics": (summary.get("model_path") or {}).get("diagnostics"),
             "model_identity_status": (summary.get("model_identity") or {}).get("status"),
             "model_identity_diagnostics": (summary.get("model_identity") or {}).get("diagnostics"),
             "authority_status": (summary.get("authority") or {}).get("status"),
@@ -1246,6 +1284,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "gate_ok": observations.get("gate_ok"),
         "status": observations.get("status"),
         "manifest_status": observations.get("manifest_status"),
+        "model_path_status": observations.get("model_path_status"),
         "model_identity_status": observations.get("model_identity_status"),
         "authority_status": observations.get("authority_status"),
         "provenance_status": observations.get("provenance_status"),

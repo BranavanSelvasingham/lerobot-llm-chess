@@ -107,9 +107,10 @@ per-field weak-authority fixtures. Those cases must stay
 `reviewed_mujoco_bundle_not_ready`, report the missing review inputs, and avoid
 MuJoCo motion. The matrix also covers a manifest target-frame mismatch and a
 model file that lacks the manifest target-frame site; both must stay diagnostic
-only before motion authority is attempted. It covers invalid joint-limit payloads
-such as non-finite values and lower bounds that are not below upper bounds, and
-those must stay not-ready before motion authority is attempted. It also covers
+only before motion authority is attempted. It covers a ready-looking manifest
+whose declared model path is unavailable, invalid joint-limit payloads such as
+non-finite values and lower bounds that are not below upper bounds, and those
+must stay not-ready before motion authority is attempted. It also covers
 malformed, unavailable, or non-directory `asset_roots` metadata and a
 ready-looking manifest whose model still references a mesh that cannot be
 resolved from the model directory or declared asset roots; those cases must
