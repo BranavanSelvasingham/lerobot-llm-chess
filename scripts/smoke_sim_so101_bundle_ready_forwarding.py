@@ -141,6 +141,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         "",
         f"- `status`: `{summary['status']}`",
         f"- `ready_manifest`: `{summary['fixtures']['ready_manifest_path']}`",
+        f"- `missing_model_file_manifest`: `{summary['fixtures']['missing_model_file_manifest_path']}`",
         f"- `mismatched_model_sha_manifest`: `{summary['fixtures']['mismatched_model_sha_manifest_path']}`",
         f"- `placeholder_manifest`: `{summary['fixtures']['placeholder_manifest_path']}`",
         f"- `placeholder_review_manifest`: `{summary['fixtures']['placeholder_review_manifest_path']}`",
@@ -547,6 +548,7 @@ def invalid_alignment_transform_manifest_payload(model_filename: str) -> dict[st
 def create_fixtures(output_dir: Path) -> dict[str, Path]:
     fixture_dir = output_dir / "fixtures"
     bundle_dir = fixture_dir / "ready_bundle"
+    missing_model_file_dir = fixture_dir / "missing_model_file_bundle"
     mismatched_model_sha_dir = fixture_dir / "mismatched_model_sha_bundle"
     placeholder_dir = fixture_dir / "placeholder_bundle"
     placeholder_review_dir = fixture_dir / "placeholder_review_bundle"
@@ -572,6 +574,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
 
     for root in (
         bundle_dir,
+        missing_model_file_dir,
         mismatched_model_sha_dir,
         placeholder_dir,
         placeholder_review_dir,
@@ -656,6 +659,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     placeholder_model_path = placeholder_dir / "model" / "synthetic_so101.urdf"
 
     ready_manifest_path = bundle_dir / "so101_model_bundle.ready.json"
+    missing_model_file_manifest_path = (
+        missing_model_file_dir / "so101_model_bundle.missing_model_file.json"
+    )
     mismatched_model_sha_manifest_path = (
         mismatched_model_sha_dir / "so101_model_bundle.mismatched_model_sha.json"
     )
@@ -691,6 +697,12 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         manifest_payload(ready=True, model_filename=ready_model_path.name),
         ready_model_path,
     )
+    missing_model_file_payload = manifest_payload(
+        ready=True,
+        model_filename="synthetic_so101_mujoco_missing.xml",
+    )
+    missing_model_file_payload["model_sha256"] = "1" * 64
+    write_json(missing_model_file_manifest_path, missing_model_file_payload)
     write_json(
         mismatched_model_sha_manifest_path,
         mismatched_model_sha_manifest_payload(
@@ -792,6 +804,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
 
     return {
         "ready_manifest_path": ready_manifest_path,
+        "missing_model_file_manifest_path": missing_model_file_manifest_path,
         "mismatched_model_sha_manifest_path": mismatched_model_sha_manifest_path,
         "placeholder_manifest_path": placeholder_manifest_path,
         "placeholder_review_manifest_path": placeholder_review_manifest_path,

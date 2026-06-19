@@ -86,6 +86,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "physical_so101_model_authority_ready",
         "hardware_free_regression_fixture_ready",
         "physical_authority_gate_status",
+        "model_path_status",
         "model_identity_status",
         "authority_status",
         "provenance_status",
@@ -191,6 +192,34 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                     "target_frame",
                     "tcp_offset",
                     "base_to_board_alignment",
+                ],
+            },
+        },
+        {
+            "case_id": "missing_model_file_not_ready",
+            "manifest_path": fixtures["missing_model_file_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_authority": (
+                    "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": False,
+                "model_path_status": "unavailable",
+                "model_identity_status": "invalid",
+                "mesh_assets_status": "missing",
+                "missing_inputs": [
+                    "model_path",
+                    "model_sha256",
+                    "mesh_assets",
+                    "non_blocking_contract_checker_result",
+                ],
+                "next_actions": [
+                    "select_reviewed_so101_model_path",
+                    "record_reviewed_so101_model_file_sha256",
+                    "resolve_so101_mesh_assets",
+                    "clear_model_contract_and_asset_preflight",
                 ],
             },
         },
@@ -539,6 +568,7 @@ def summarize_case(
         )
 
     for key, summary_key in (
+        ("model_path_status", ("model_path",)),
         ("model_identity_status", ("model_identity",)),
         ("authority_status", ("authority",)),
         ("provenance_status", ("provenance",)),
@@ -663,6 +693,7 @@ def summarize_case(
             "physical_authority_gate_status": summary.get(
                 "physical_authority_gate_status"
             ),
+            "model_path_status": nested_status(summary, "model_path"),
             "model_identity_status": nested_status(summary, "model_identity"),
             "authority_status": nested_status(summary, "authority"),
             "provenance_status": nested_status(summary, "provenance"),
@@ -739,6 +770,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
             "hardware_free_regression_fixture_ready"
         ),
         "physical_authority_gate_status": obs.get("physical_authority_gate_status"),
+        "model_path_status": obs.get("model_path_status"),
         "model_identity_status": obs.get("model_identity_status"),
         "authority_status": obs.get("authority_status"),
         "provenance_status": obs.get("provenance_status"),
