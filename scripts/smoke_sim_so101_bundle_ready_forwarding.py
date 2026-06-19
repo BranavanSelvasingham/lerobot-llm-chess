@@ -115,6 +115,14 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "diagnostic_only_reason",
         "ik_model_path_source",
         "ik_model_asset_root_source",
+        "source_inventory_used_bundle",
+        "source_inventory_diagnostic_only_reason",
+        "source_inventory_requires_physical_authority",
+        "source_inventory_physical_authority_ready",
+        "source_inventory_fixture_ready",
+        "source_inventory_model_source_root_source",
+        "source_inventory_authoritative_model_path_source",
+        "source_authority_review_source",
         "effective_ik_model_path",
         "effective_ik_model_asset_roots",
         "artifact_index_missing_count",
@@ -1116,6 +1124,9 @@ def summarize_case(
     errors: list[str] = []
     case_id = str(record["case_id"])
     forwarding = get_nested(suite_summary, ("so101_model_bundle_manifest", "forwarding"), {})
+    source_config = get_nested(suite_summary, ("so101_model_source_inventory_config",), {})
+    source_inventory_forwarding = get_nested(source_config, ("bundle_manifest",), {})
+    source_authority_review = get_nested(source_config, ("source_authority_review",), {})
     bundle = get_nested(suite_summary, ("so101_model_bundle_manifest",), {})
     contract = get_nested(suite_summary, ("so101_model_contract",), {})
     contract_preflight = get_nested(suite_summary, ("so101_model_contract", "model_asset_preflight"), {})
@@ -1220,9 +1231,68 @@ def summarize_case(
             reviewed_mujoco.get("motion_evidence_not_physical_so101_authority"),
         )
         assert_false(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
+        assert_false(
+            errors,
+            f"{case_id}.forwarding_physical_so101_model_authority_ready",
+            forwarding.get("physical_so101_model_authority_ready"),
+        )
+        assert_true(
+            errors,
+            f"{case_id}.forwarding_hardware_free_regression_fixture_ready",
+            forwarding.get("hardware_free_regression_fixture_ready"),
+        )
         assert_true(errors, f"{case_id}.used_for_downstream_contract", forwarding.get("used_for_downstream_contract"))
         assert_equal(errors, f"{case_id}.ik_model_path_source", forwarding.get("ik_model_path_source"), "so101_model_bundle_manifest")
         assert_equal(errors, f"{case_id}.ik_model_asset_root_source", forwarding.get("ik_model_asset_root_source"), "so101_model_bundle_manifest")
+        assert_false(
+            errors,
+            f"{case_id}.source_inventory_used_bundle",
+            source_inventory_forwarding.get("used_for_source_inventory"),
+        )
+        assert_true(
+            errors,
+            f"{case_id}.source_inventory_diagnostic_only",
+            source_inventory_forwarding.get("diagnostic_only"),
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.source_inventory_diagnostic_only_reason",
+            source_inventory_forwarding.get("diagnostic_only_reason"),
+            "bundle_ready_fixture_not_physical_source_authority",
+        )
+        assert_true(
+            errors,
+            f"{case_id}.source_inventory_requires_physical_so101_model_authority",
+            source_inventory_forwarding.get("requires_physical_so101_model_authority"),
+        )
+        assert_false(
+            errors,
+            f"{case_id}.source_inventory_physical_so101_model_authority_ready",
+            source_inventory_forwarding.get("physical_so101_model_authority_ready"),
+        )
+        assert_true(
+            errors,
+            f"{case_id}.source_inventory_hardware_free_regression_fixture_ready",
+            source_inventory_forwarding.get("hardware_free_regression_fixture_ready"),
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.source_inventory_model_source_root_source",
+            source_inventory_forwarding.get("model_source_root_source"),
+            "default_repo_roots",
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.source_inventory_authoritative_model_path_source",
+            source_inventory_forwarding.get("authoritative_model_path_source"),
+            "not_supplied",
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.source_authority_review_source",
+            source_authority_review.get("source"),
+            "not_supplied",
+        )
         assert_equal(errors, f"{case_id}.effective_ik_model_path", forwarding.get("effective_ik_model_path"), str(ready_model_path))
         assert_equal(
             errors,
@@ -1313,6 +1383,17 @@ def summarize_case(
         )
         assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
         assert_equal(errors, f"{case_id}.diagnostic_reason", forwarding.get("diagnostic_only_reason"), "explicit_ik_model_path_supplied")
+        assert_false(
+            errors,
+            f"{case_id}.source_inventory_used_bundle",
+            source_inventory_forwarding.get("used_for_source_inventory"),
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.source_inventory_diagnostic_only_reason",
+            source_inventory_forwarding.get("diagnostic_only_reason"),
+            "bundle_ready_fixture_not_physical_source_authority",
+        )
         assert_false(errors, f"{case_id}.used_for_downstream_contract", forwarding.get("used_for_downstream_contract"))
         assert_equal(errors, f"{case_id}.ik_model_path_source", forwarding.get("ik_model_path_source"), "explicit_cli")
         assert_equal(errors, f"{case_id}.effective_ik_model_path", forwarding.get("effective_ik_model_path"), str(explicit_model_path))
@@ -1881,11 +1962,11 @@ def summarize_case(
             errors,
             f"{case_id}.provenance_fixture_only_fields",
             bundle.get("provenance_fixture_only_fields"),
-            ["source_url", "export_tool", "license"],
+            ["source_path", "export_tool", "license"],
         )
         diagnostics = bundle.get("provenance_diagnostics") or []
         expected_diagnostics = {
-            "provenance_fixture_only:source_url",
+            "provenance_fixture_only:source_path",
             "provenance_fixture_only:export_tool",
             "provenance_fixture_only:license",
         }
@@ -1940,6 +2021,28 @@ def summarize_case(
             f"{case_id}.ik_model_path_source",
             forwarding.get("ik_model_path_source"),
             "so101_model_bundle_manifest",
+        )
+        assert_false(
+            errors,
+            f"{case_id}.source_inventory_used_bundle",
+            source_inventory_forwarding.get("used_for_source_inventory"),
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.source_inventory_diagnostic_only_reason",
+            source_inventory_forwarding.get("diagnostic_only_reason"),
+            "bundle_ready_fixture_not_physical_source_authority",
+        )
+        assert_true(
+            errors,
+            f"{case_id}.source_inventory_requires_physical_so101_model_authority",
+            source_inventory_forwarding.get("requires_physical_so101_model_authority"),
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.source_authority_review_source",
+            source_authority_review.get("source"),
+            "not_supplied",
         )
     elif expectation == "weak_joint_limit_authority_not_forwarded":
         assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
@@ -2250,6 +2353,8 @@ def summarize_case(
             ),
             "bundle_synthetic_fixture_authority_fields": bundle.get("synthetic_fixture_authority_fields"),
             "bundle_forwarding": forwarding,
+            "source_inventory_forwarding": source_inventory_forwarding,
+            "source_authority_review": source_authority_review,
             "bundle_model_identity_status": get_nested(bundle, ("model_identity", "status")),
             "bundle_model_identity_matches": get_nested(bundle, ("model_identity", "matches")),
             "bundle_authority_status": bundle.get("authority_status"),
@@ -2278,6 +2383,8 @@ def flatten_case_rows(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for case in cases:
         forwarding = case["observations"]["bundle_forwarding"]
+        source_inventory_forwarding = case["observations"]["source_inventory_forwarding"]
+        source_authority_review = case["observations"]["source_authority_review"]
         reviewed_mujoco = case["observations"]["reviewed_mujoco_bundle"]
         rows.append(
             {
@@ -2308,6 +2415,32 @@ def flatten_case_rows(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "diagnostic_only_reason": forwarding.get("diagnostic_only_reason"),
                 "ik_model_path_source": forwarding.get("ik_model_path_source"),
                 "ik_model_asset_root_source": forwarding.get("ik_model_asset_root_source"),
+                "source_inventory_used_bundle": source_inventory_forwarding.get(
+                    "used_for_source_inventory"
+                ),
+                "source_inventory_diagnostic_only_reason": (
+                    source_inventory_forwarding.get("diagnostic_only_reason")
+                ),
+                "source_inventory_requires_physical_authority": (
+                    source_inventory_forwarding.get(
+                        "requires_physical_so101_model_authority"
+                    )
+                ),
+                "source_inventory_physical_authority_ready": (
+                    source_inventory_forwarding.get(
+                        "physical_so101_model_authority_ready"
+                    )
+                ),
+                "source_inventory_fixture_ready": source_inventory_forwarding.get(
+                    "hardware_free_regression_fixture_ready"
+                ),
+                "source_inventory_model_source_root_source": (
+                    source_inventory_forwarding.get("model_source_root_source")
+                ),
+                "source_inventory_authoritative_model_path_source": (
+                    source_inventory_forwarding.get("authoritative_model_path_source")
+                ),
+                "source_authority_review_source": source_authority_review.get("source"),
                 "effective_ik_model_path": forwarding.get("effective_ik_model_path"),
                 "effective_ik_model_asset_roots": forwarding.get("effective_ik_model_asset_roots"),
                 "artifact_index_missing_count": case["observations"]["artifact_index_missing_count"],

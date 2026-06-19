@@ -759,7 +759,7 @@ def so101_model_source_inventory_config(
             "--ik-model-path is forwarded only to the model contract checker and IK reachability drill.",
             "Inventory authority must be declared with --so101-authoritative-model-path or --so101-authoritative-model-root.",
             "Inventory source-authority review metadata is forwarded separately and does not replace the reviewed bundle manifest gate.",
-            "A ready bundle manifest may supply a reviewed model path as inventory root and authoritative path when no explicit inventory source options were supplied.",
+            "Only a physically reviewed ready bundle manifest may supply an inventory root and authoritative path when no explicit inventory source options were supplied.",
         ],
     }
 
@@ -782,8 +782,13 @@ def so101_inventory_forwarding_decision(
     authoritative_paths = list(args.so101_authoritative_model_path)
     authoritative_roots = list(args.so101_authoritative_model_root)
     model_path = path_from_string(bundle_forwarding.get("model_path"))
+    physical_authority_ready = (
+        bundle_forwarding.get("physical_so101_model_authority_ready") is True
+    )
+    fixture_ready = bundle_forwarding.get("hardware_free_regression_fixture_ready") is True
     use_bundle = (
         bundle_forwarding.get("ready_for_model_backed_ik") is True
+        and physical_authority_ready
         and not explicit_source_inputs
         and model_path is not None
     )
@@ -796,6 +801,12 @@ def so101_inventory_forwarding_decision(
         reason = "explicit_source_inventory_inputs_supplied"
     elif bundle_forwarding.get("ready_for_model_backed_ik") is not True:
         reason = f"bundle_not_ready_for_inventory_authority:{bundle_forwarding.get('manifest_status')}"
+    elif not physical_authority_ready:
+        reason = (
+            "bundle_ready_fixture_not_physical_source_authority"
+            if fixture_ready
+            else "bundle_ready_without_physical_source_authority"
+        )
     elif model_path is None:
         reason = "bundle_ready_without_model_path"
 
@@ -803,6 +814,9 @@ def so101_inventory_forwarding_decision(
         "used_for_source_inventory": use_bundle,
         "diagnostic_only": not use_bundle,
         "diagnostic_only_reason": None if use_bundle else reason,
+        "requires_physical_so101_model_authority": True,
+        "physical_so101_model_authority_ready": physical_authority_ready,
+        "hardware_free_regression_fixture_ready": fixture_ready,
         "model_source_root_source": "so101_model_bundle_manifest" if use_bundle else (
             "explicit_cli" if args.so101_model_source_root else "default_repo_roots"
         ),
@@ -813,7 +827,8 @@ def so101_inventory_forwarding_decision(
         "ready_for_model_backed_ik": bundle_forwarding.get("ready_for_model_backed_ik"),
         "model_path": str(model_path) if model_path is not None else None,
         "notes": [
-            "The bundle manifest supplies source-inventory authority only when ready_for_model_backed_ik is true.",
+            "The bundle manifest supplies source-inventory authority only when ready_for_model_backed_ik and physical_so101_model_authority_ready are both true.",
+            "Hardware-free fixture-ready bundles may still feed contract/IK regression, but they do not become source-inventory authority.",
             "Explicit source inventory CLI options take precedence over bundle-derived inventory inputs.",
         ],
     }
@@ -914,6 +929,8 @@ def so101_bundle_forwarding_decision(
     asset_roots = bundle.get("asset_roots")
     asset_roots = asset_roots if isinstance(asset_roots, dict) else {}
     ready = bundle.get("ready_for_model_backed_ik") is True
+    physical_authority_ready = bundle.get("physical_so101_model_authority_ready") is True
+    fixture_ready = bundle.get("hardware_free_regression_fixture_ready") is True
     explicit_model_path = args.ik_model_path is not None
     explicit_asset_roots = bool(args.ik_model_asset_root)
     manifest_status = bundle.get("status") or manifest_request.get("status")
@@ -951,6 +968,14 @@ def so101_bundle_forwarding_decision(
         "manifest_status": manifest_status,
         "manifest_path": manifest_request.get("path"),
         "ready_for_model_backed_ik": ready,
+        "physical_so101_model_authority_ready": physical_authority_ready,
+        "hardware_free_regression_fixture_ready": fixture_ready,
+        "model_authority": bundle.get("model_authority"),
+        "physical_authority_gate_status": bundle.get("physical_authority_gate_status"),
+        "synthetic_fixture_authority_fields": bundle.get(
+            "synthetic_fixture_authority_fields"
+        )
+        or [],
         "model_path": str(bundle_model_path) if bundle_model_path is not None else None,
         "asset_roots": [str(path) for path in bundle_asset_roots],
         "explicit_ik_model_path_supplied": explicit_model_path,

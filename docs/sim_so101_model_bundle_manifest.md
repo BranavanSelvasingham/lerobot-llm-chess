@@ -558,8 +558,12 @@ treated as more than diagnostic evidence. The manifest does not change
 `RobotKinematics`, the IK solver, robot execution, camera/UI flows, or
 LLM/OpenAI paths; it is evidence that the inputs required to interpret future
 model-backed IK residuals have been declared together. In integrated suite mode,
-a ready bundle can also supply the reviewed model path to the source inventory
-as a root/authoritative path when no explicit source-inventory options were
-passed; otherwise `--so101-model-source-root`,
+only a bundle that is both model-backed-IK ready and
+`physical_so101_model_authority_ready: true` can supply the reviewed model path
+to the source inventory as a root/authoritative path when no explicit
+source-inventory options were passed. Hardware-free fixture-ready bundles can
+still feed contract/IK regression, but the source-inventory forwarding record
+must stay diagnostic-only with `used_for_source_inventory: false`; otherwise
+`--so101-model-source-root`,
 `--so101-model-source-extra-root`, `--so101-authoritative-model-path`, and
 `--so101-authoritative-model-root` keep precedence.
