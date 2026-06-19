@@ -70,6 +70,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "board_pick_reviewed_model_authority_ready",
         "board_pick_detailed_evidence_ready",
         "rollout_ready_for_policy_training",
+        "rollout_status",
+        "rollout_training_authority_status",
+        "rollout_use",
+        "rollout_observed_evidence_is_policy_training_authority",
         "rollout_policy_training_authority_ready",
         "development_fixture_evidence_not_policy_training_truth",
         "next_priority_gate_id",
@@ -161,23 +165,43 @@ def rollout_state(
     ready_for_policy_training: bool,
     model_authority: str | None,
     blockers: list[str] | None = None,
+    status: str | None = None,
+    training_authority_status: str | None = None,
+    rollout_use: str | None = None,
+    observed_policy_authority: bool | None = None,
 ) -> dict[str, Any]:
+    reviewed_ready = (
+        ready_for_policy_training and model_authority == REVIEWED_SO101_MODEL_AUTHORITY
+    )
     return {
-        "status": "ok" if ready_for_policy_training else "not_policy_ready",
+        "status": (
+            status
+            if status is not None
+            else "ok"
+            if ready_for_policy_training
+            else "not_policy_ready"
+        ),
         "ready_for_policy_training": ready_for_policy_training,
         "training_authority_status": (
-            "reviewed_policy_training_rollouts_ready"
-            if ready_for_policy_training
-            and model_authority == REVIEWED_SO101_MODEL_AUTHORITY
+            training_authority_status
+            if training_authority_status is not None
+            else "reviewed_policy_training_rollouts_ready"
+            if reviewed_ready
             else "development_rollouts_prerequisites_verified_not_policy_ready"
             if model_authority == DEV_AUTHORITY
             else "reviewed_rollouts_not_ready"
         ),
         "model_authority": model_authority,
+        "observed_evidence_is_policy_training_authority": (
+            observed_policy_authority
+            if observed_policy_authority is not None
+            else reviewed_ready
+        ),
         "rollout_use": (
-            "policy_training"
-            if ready_for_policy_training
-            and model_authority == REVIEWED_SO101_MODEL_AUTHORITY
+            rollout_use
+            if rollout_use is not None
+            else "policy_training"
+            if reviewed_ready
             else "debug_imitation_curriculum_only"
         ),
         "serious_policy_training_blockers": blockers
@@ -632,6 +656,145 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "rollout_reviewed_ready_failed_status_rejected",
+            "authority": authority_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_state(
+                summaries / "rollout_reviewed_failed_status.json",
+                ready_for_policy_training=True,
+                model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+                status="failed_rollout_validation",
+            ),
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_status": "failed_rollout_validation",
+                "rollout_authority": False,
+                "development_caveat": True,
+                "blockers_contain": ["reviewed_model_backed_training_rollouts"],
+                "next_priority_gate": "focused_training_rollouts",
+            },
+        },
+        {
+            "case_id": "rollout_reviewed_ready_wrong_authority_status_rejected",
+            "authority": authority_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_state(
+                summaries / "rollout_reviewed_wrong_authority_status.json",
+                ready_for_policy_training=True,
+                model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+                training_authority_status="development_rollouts_prerequisites_verified_not_policy_ready",
+            ),
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_training_authority_status": "development_rollouts_prerequisites_verified_not_policy_ready",
+                "rollout_authority": False,
+                "development_caveat": True,
+                "blockers_contain": ["reviewed_model_backed_training_rollouts"],
+                "next_priority_gate": "focused_training_rollouts",
+            },
+        },
+        {
+            "case_id": "rollout_reviewed_ready_debug_use_rejected",
+            "authority": authority_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_state(
+                summaries / "rollout_reviewed_debug_use.json",
+                ready_for_policy_training=True,
+                model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+                rollout_use="debug_imitation_curriculum_only",
+            ),
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_use": "debug_imitation_curriculum_only",
+                "rollout_authority": False,
+                "development_caveat": True,
+                "blockers_contain": ["reviewed_model_backed_training_rollouts"],
+                "next_priority_gate": "focused_training_rollouts",
+            },
+        },
+        {
+            "case_id": "rollout_reviewed_ready_missing_policy_authority_flag_rejected",
+            "authority": authority_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_state(
+                summaries / "rollout_reviewed_missing_policy_authority_flag.json",
+                ready_for_policy_training=True,
+                model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+                observed_policy_authority=False,
+            ),
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_observed_policy_authority": False,
+                "rollout_authority": False,
+                "development_caveat": True,
+                "blockers_contain": ["reviewed_model_backed_training_rollouts"],
+                "next_priority_gate": "focused_training_rollouts",
+            },
+        },
+        {
+            "case_id": "rollout_reviewed_ready_nonempty_blockers_rejected",
+            "authority": authority_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_state(
+                summaries / "rollout_reviewed_nonempty_blockers.json",
+                ready_for_policy_training=True,
+                model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+                blockers=["reviewed_model_backed_training_rollouts"],
+            ),
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_authority": False,
+                "development_caveat": True,
+                "blockers_contain": ["reviewed_model_backed_training_rollouts"],
+                "next_priority_gate": "focused_training_rollouts",
+            },
+        },
+        {
             "case_id": "all_ready_reviewed_contract_state",
             "authority": authority_ready,
             "mujoco_scene": scene_reviewed,
@@ -726,6 +889,34 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             gate.get("rollout_ready_for_policy_training"),
             expect["rollout_raw"],
         )
+    if "rollout_status" in expect:
+        add_error(
+            errors,
+            "rollout_status",
+            gate.get("rollout_status"),
+            expect["rollout_status"],
+        )
+    if "rollout_training_authority_status" in expect:
+        add_error(
+            errors,
+            "rollout_training_authority_status",
+            gate.get("rollout_training_authority_status"),
+            expect["rollout_training_authority_status"],
+        )
+    if "rollout_use" in expect:
+        add_error(
+            errors,
+            "rollout_use",
+            gate.get("rollout_use"),
+            expect["rollout_use"],
+        )
+    if "rollout_observed_policy_authority" in expect:
+        add_error(
+            errors,
+            "rollout_observed_evidence_is_policy_training_authority",
+            gate.get("rollout_observed_evidence_is_policy_training_authority"),
+            expect["rollout_observed_policy_authority"],
+        )
     add_error(
         errors,
         "rollout_policy_training_authority_ready",
@@ -808,6 +999,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "board_pick_detailed_evidence_ready": gate.get("board_pick_detailed_evidence_ready"),
         "rollout_ready_for_policy_training": gate.get("rollout_ready_for_policy_training"),
+        "rollout_status": gate.get("rollout_status"),
+        "rollout_training_authority_status": gate.get("rollout_training_authority_status"),
+        "rollout_use": gate.get("rollout_use"),
+        "rollout_observed_evidence_is_policy_training_authority": gate.get(
+            "rollout_observed_evidence_is_policy_training_authority"
+        ),
         "rollout_policy_training_authority_ready": gate.get(
             "rollout_policy_training_authority_ready"
         ),
@@ -863,6 +1060,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "- `priority_gate_queue` preserves reviewed authority, MuJoCo scene, Gymnasium task wiring, scripted pick/place, then training rollout order.",
             "- Draft, development, and fixture-only model-authority labels are rejected even when raw readiness booleans are true.",
             "- Board-pick readiness requires detailed source-start, contact, lift, transfer, place, release, final-board-contact, and target-tolerance evidence.",
+            "- Reviewed rollout readiness requires status `ok`, reviewed-policy-ready authority status, `policy_training` use, policy-authority evidence, and no serious-policy blockers.",
             "- Use this smoke to protect training-readiness gate logic. Use reviewed SO-101 model-backed pick/place and rollout evidence before serious training.",
         ]
     )

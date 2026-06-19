@@ -1313,6 +1313,11 @@ jobs:
               "board_target_tolerance_reviewed_authority_rejected",
               "rollout_raw_ready_development_authority_rejected",
               "rollout_reviewed_authority_not_ready",
+              "rollout_reviewed_ready_failed_status_rejected",
+              "rollout_reviewed_ready_wrong_authority_status_rejected",
+              "rollout_reviewed_ready_debug_use_rejected",
+              "rollout_reviewed_ready_missing_policy_authority_flag_rejected",
+              "rollout_reviewed_ready_nonempty_blockers_rejected",
               "all_ready_reviewed_contract_state",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -1332,6 +1337,27 @@ jobs:
           assert raw_dev["rollout_ready_for_policy_training"] is True, raw_dev
           assert raw_dev["rollout_policy_training_authority_ready"] is False, raw_dev
           assert raw_dev["ready"] is False, raw_dev
+          failed_rollout = by_case["rollout_reviewed_ready_failed_status_rejected"]["gate"]
+          assert failed_rollout["rollout_ready_for_policy_training"] is True, failed_rollout
+          assert failed_rollout["rollout_status"] == "failed_rollout_validation", failed_rollout
+          assert failed_rollout["rollout_policy_training_authority_ready"] is False, failed_rollout
+          assert failed_rollout["ready"] is False, failed_rollout
+          wrong_authority_status = by_case["rollout_reviewed_ready_wrong_authority_status_rejected"]["gate"]
+          assert wrong_authority_status["rollout_training_authority_status"] == "development_rollouts_prerequisites_verified_not_policy_ready", wrong_authority_status
+          assert wrong_authority_status["rollout_policy_training_authority_ready"] is False, wrong_authority_status
+          assert wrong_authority_status["ready"] is False, wrong_authority_status
+          debug_use = by_case["rollout_reviewed_ready_debug_use_rejected"]["gate"]
+          assert debug_use["rollout_use"] == "debug_imitation_curriculum_only", debug_use
+          assert debug_use["rollout_policy_training_authority_ready"] is False, debug_use
+          assert debug_use["ready"] is False, debug_use
+          missing_policy_authority = by_case["rollout_reviewed_ready_missing_policy_authority_flag_rejected"]["gate"]
+          assert missing_policy_authority["rollout_observed_evidence_is_policy_training_authority"] is False, missing_policy_authority
+          assert missing_policy_authority["rollout_policy_training_authority_ready"] is False, missing_policy_authority
+          assert missing_policy_authority["ready"] is False, missing_policy_authority
+          nonempty_blockers = by_case["rollout_reviewed_ready_nonempty_blockers_rejected"]["gate"]
+          assert nonempty_blockers["rollout_serious_policy_training_blockers"] == ["reviewed_model_backed_training_rollouts"], nonempty_blockers
+          assert nonempty_blockers["rollout_policy_training_authority_ready"] is False, nonempty_blockers
+          assert nonempty_blockers["ready"] is False, nonempty_blockers
           scene_dev = by_case["reviewed_authority_but_scene_still_development"]["gate"]
           assert scene_dev["ready"] is False, scene_dev
           assert scene_dev["next_priority_gate_id"] == "mujoco_scene_validity", scene_dev
@@ -1371,6 +1397,12 @@ jobs:
           ready = by_case["all_ready_reviewed_contract_state"]["gate"]
           assert ready["ready"] is True, ready
           assert ready["board_pick_detailed_evidence_ready"] is True, ready
+          assert ready["rollout_status"] == "ok", ready
+          assert ready["rollout_training_authority_status"] == "reviewed_policy_training_rollouts_ready", ready
+          assert ready["rollout_use"] == "policy_training", ready
+          assert ready["rollout_observed_evidence_is_policy_training_authority"] is True, ready
+          assert ready["rollout_serious_policy_training_blockers"] == [], ready
+          assert ready["rollout_policy_training_authority_ready"] is True, ready
           assert ready["development_fixture_evidence_not_policy_training_truth"] is False, ready
           assert ready["blockers"] == [], ready
           for relative_path in (

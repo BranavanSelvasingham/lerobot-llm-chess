@@ -5277,6 +5277,17 @@ def so101_training_priority_gate_queue(
     rollout_policy_training_authority_ready = (
         training_rollouts.get("ready_for_policy_training") is True
         and training_rollouts.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
+        and training_rollouts.get("status") == "ok"
+        and (
+            training_rollouts.get("training_authority_status")
+            == "reviewed_policy_training_rollouts_ready"
+        )
+        and training_rollouts.get("rollout_use") == "policy_training"
+        and (
+            training_rollouts.get("observed_evidence_is_policy_training_authority")
+            is True
+        )
+        and not training_rollouts.get("serious_policy_training_blockers")
     )
     rollout_automation_ready = training_rollouts.get("status") == "ok"
     rollout_training_ready = (
@@ -5455,6 +5466,17 @@ def so101_training_readiness_gate_section(
     rollout_policy_training_authority_ready = (
         training_rollouts.get("ready_for_policy_training") is True
         and training_rollouts.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
+        and training_rollouts.get("status") == "ok"
+        and (
+            training_rollouts.get("training_authority_status")
+            == "reviewed_policy_training_rollouts_ready"
+        )
+        and training_rollouts.get("rollout_use") == "policy_training"
+        and (
+            training_rollouts.get("observed_evidence_is_policy_training_authority")
+            is True
+        )
+        and not training_rollouts.get("serious_policy_training_blockers")
     )
     priority_queue = so101_training_priority_gate_queue(
         reviewed_authority_gate,
@@ -5548,9 +5570,16 @@ def so101_training_readiness_gate_section(
         "rollout_training_authority_status": training_rollouts.get(
             "training_authority_status"
         ),
+        "rollout_status": training_rollouts.get("status"),
         "rollout_model_authority": training_rollouts.get("model_authority"),
+        "rollout_observed_evidence_is_policy_training_authority": training_rollouts.get(
+            "observed_evidence_is_policy_training_authority"
+        ),
         "rollout_policy_training_authority_ready": rollout_policy_training_authority_ready,
         "rollout_use": training_rollouts.get("rollout_use"),
+        "rollout_serious_policy_training_blockers": training_rollouts.get(
+            "serious_policy_training_blockers"
+        ),
         "development_fixture_evidence_not_policy_training_truth": (
             not ready
             or not board_pick_reviewed_model_authority_ready
