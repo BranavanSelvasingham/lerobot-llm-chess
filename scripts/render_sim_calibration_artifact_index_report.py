@@ -1323,6 +1323,11 @@ def so101_reviewed_model_authority_gate_row(artifact: dict[str, Any]) -> list[An
                 "checklist_blocked_by_prior_requirement_ids_by_requirement_id"
             )
         ),
+        compact_mapping(
+            metrics.get(
+                "checklist_blocked_by_prior_requirement_statuses_by_requirement_id"
+            )
+        ),
         "ok" if artifact.get("exists") is True else "missing",
     ]
 
@@ -2941,6 +2946,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Checklist Statuses",
                 "Checklist Next Actions",
                 "Checklist Prior Blockers",
+                "Checklist Prior Statuses",
                 "Artifact Status",
             ],
             [

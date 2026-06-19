@@ -3052,6 +3052,10 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
             "checklist_blocked_by_prior_requirement_ids_by_requirement_id"
         )
         or {},
+        "checklist_blocked_by_prior_requirement_statuses_by_requirement_id": gate.get(
+            "checklist_blocked_by_prior_requirement_statuses_by_requirement_id"
+        )
+        or {},
         "next_required_for_goal": next_required_for_goal,
         "next_required_action_ids": next_required_action_ids,
         "next_required_action_count": next_required_action_count,
