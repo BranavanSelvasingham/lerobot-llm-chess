@@ -26,7 +26,10 @@ is not ready
 without attempting motion. Placeholder review metadata such as `TODO` or `TBD`
 must keep those authority fields in `needs_review`, leave
 `ready_for_model_backed_ik: false`, and keep
-`motion_authority_status: "not_checked_manifest_not_ready"`. A hardware-free synthetic fixture
+`motion_authority_status: "not_checked_manifest_not_ready"`. Generic review
+scopes such as `model_bundle`, or missing per-field authority objects for joint
+limits, mesh assets, target frame, TCP offset, or base-to-board alignment, must
+also keep the manifest not ready and prevent MuJoCo motion. A hardware-free synthetic fixture
 may exercise the positive MuJoCo motion path, but it stays labeled as
 `hardware_free_regression_fixture_not_physical_so101_authority`. Motion evidence
 also carries `motion_authority_status`,
@@ -99,11 +102,14 @@ automation coverage and must also report
 `physical_so101_model_authority_ready: false`; it is not physical SO-101 model
 authority.
 
-The reviewed MuJoCo bundle matrix also includes a ready-manifest negative
-fixture whose MuJoCo `gripper` joint has an effectively immobile qpos range. That
-case must keep `ready_for_model_backed_ik: true` from the manifest checker, but
-the motion gate must fail with `simrobot_mujoco_joint_motion` because the
-gripper's before/after qpos delta is below the required motion threshold.
+The reviewed MuJoCo bundle matrix also includes generic-review-scope and
+per-field weak-authority fixtures. Those cases must stay
+`reviewed_mujoco_bundle_not_ready`, report the missing review inputs, and avoid
+MuJoCo motion. It also includes a ready-manifest negative fixture whose MuJoCo
+`gripper` joint has an effectively immobile qpos range. That case must keep
+`ready_for_model_backed_ik: true` from the manifest checker, but the motion gate
+must fail with `simrobot_mujoco_joint_motion` because the gripper's before/after
+qpos delta is below the required motion threshold.
 
 Passing this gate is still not full physical readiness. It proves reviewed-model
 handoff into MuJoCo and SimRobot joint motion. Contact-validated gripper

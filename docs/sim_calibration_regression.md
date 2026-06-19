@@ -537,9 +537,9 @@ physical-ready and fixture-only evidence fail the aggregate authority gate
 closed. It also runs the focused
 `so101_reviewed_mujoco_bundle_matrix` smoke to prove missing/not-ready manifests
 do not attempt motion, `--require-ready-reviewed-model` fails closed,
-placeholder review metadata stays `needs_review` without MuJoCo motion,
-malformed TCP offsets and incomplete base-to-board transforms stay not ready, and ready
-synthetic fixture motion remains
+placeholder review metadata and generic or missing field-specific review scopes
+stay `needs_review` without MuJoCo motion, malformed TCP offsets and incomplete
+base-to-board transforms stay not ready, and ready synthetic fixture motion remains
 `hardware_free_fixture_motion_checked_not_physical_so101_authority`. It also runs the focused
 `so101_mujoco_scene_matrix` smoke to prove generated development scenes load
 across center, corner, back-rank, and edge placements with 64 square geoms,

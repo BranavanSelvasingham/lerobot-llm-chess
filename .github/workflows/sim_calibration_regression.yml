@@ -512,6 +512,13 @@ jobs:
               "missing_manifest_require_ready_fails",
               "placeholder_manifest_not_ready",
               "placeholder_review_metadata_not_ready",
+              "generic_review_scope_not_ready",
+              "weak_review_manifest_not_ready",
+              "weak_joint_limit_authority_not_ready",
+              "weak_mesh_asset_authority_not_ready",
+              "weak_target_frame_authority_not_ready",
+              "weak_tcp_offset_authority_not_ready",
+              "weak_alignment_authority_not_ready",
               "nonstandard_json_constant_parse_error",
               "invalid_tcp_offset_shape_not_ready",
               "invalid_nonfinite_joint_limits_not_ready",
@@ -550,6 +557,57 @@ jobs:
           assert "base_to_board_alignment_authority" in placeholder_review["observations"]["missing_inputs"], placeholder_review
           assert placeholder_review["observations"]["reviewed_model_motion_checked"] is False, placeholder_review
           assert placeholder_review["observations"]["motion_authority_status"] == "not_checked_manifest_not_ready", placeholder_review
+          not_ready_review_scope_cases = [
+              "generic_review_scope_not_ready",
+              "weak_review_manifest_not_ready",
+              "weak_joint_limit_authority_not_ready",
+              "weak_mesh_asset_authority_not_ready",
+              "weak_target_frame_authority_not_ready",
+              "weak_tcp_offset_authority_not_ready",
+              "weak_alignment_authority_not_ready",
+          ]
+          for case_id in not_ready_review_scope_cases:
+              case = by_case[case_id]
+              assert case["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", case
+              assert case["observations"]["ready_for_model_backed_ik"] is False, case
+              assert case["observations"]["reviewed_model_motion_checked"] is False, case
+              assert case["observations"]["motion_authority_status"] == "not_checked_manifest_not_ready", case
+              assert case["observations"]["physical_reviewed_model_motion_checked"] is False, case
+              assert case["observations"]["hardware_free_fixture_motion_checked"] is False, case
+          generic_scope = by_case["generic_review_scope_not_ready"]
+          for missing_input in (
+              "authority",
+              "joint_limit_authority",
+              "mesh_asset_authority",
+              "target_frame_authority",
+              "tcp_offset_authority",
+              "base_to_board_alignment_authority",
+          ):
+              assert missing_input in generic_scope["observations"]["missing_inputs"], generic_scope
+          for status_key in (
+              "authority_status",
+              "joint_limits_status",
+              "mesh_assets_status",
+              "target_frame_status",
+              "tcp_offset_status",
+              "alignment_status",
+          ):
+              assert generic_scope["observations"][status_key] == "needs_review", generic_scope
+          weak_review = by_case["weak_review_manifest_not_ready"]
+          assert weak_review["observations"]["authority_status"] == "needs_review", weak_review
+          assert weak_review["observations"]["provenance_status"] == "needs_review", weak_review
+          assert "authority" in weak_review["observations"]["missing_inputs"], weak_review
+          assert "provenance" in weak_review["observations"]["missing_inputs"], weak_review
+          for case_id, status_key, missing_input in (
+              ("weak_joint_limit_authority_not_ready", "joint_limits_status", "joint_limit_authority"),
+              ("weak_mesh_asset_authority_not_ready", "mesh_assets_status", "mesh_asset_authority"),
+              ("weak_target_frame_authority_not_ready", "target_frame_status", "target_frame_authority"),
+              ("weak_tcp_offset_authority_not_ready", "tcp_offset_status", "tcp_offset_authority"),
+              ("weak_alignment_authority_not_ready", "alignment_status", "base_to_board_alignment_authority"),
+          ):
+              case = by_case[case_id]
+              assert case["observations"][status_key] == "needs_review", case
+              assert missing_input in case["observations"]["missing_inputs"], case
           nonstandard_json = by_case["nonstandard_json_constant_parse_error"]
           assert nonstandard_json["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", nonstandard_json
           assert nonstandard_json["observations"]["manifest_status"] == "model_bundle_manifest_parse_error", nonstandard_json
