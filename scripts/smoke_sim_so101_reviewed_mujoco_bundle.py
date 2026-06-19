@@ -21,6 +21,7 @@ SCHEMA = "lerobot.sim.so101_reviewed_mujoco_bundle.v1"
 DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "so101_reviewed_mujoco_bundle"
 SUMMARY_NAME = "so101_reviewed_mujoco_bundle_summary.json"
 CHECKLIST_NAME = "so101_reviewed_mujoco_bundle_checklist.csv"
+MOTION_CHECKS_NAME = "so101_reviewed_mujoco_bundle_motion_checks.csv"
 README_NAME = "README.md"
 MANIFEST_CHECKER_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_bundle_manifest.py"
 SO101_BODY_JOINTS: tuple[str, ...] = (
@@ -132,6 +133,37 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "missing_inputs",
         "diagnostics",
         "notes",
+    )
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: csv_value(row.get(field)) for field in fieldnames})
+
+
+def write_motion_checks_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = (
+        "joint",
+        "joint_type",
+        "status",
+        "ok",
+        "target_ok",
+        "moved",
+        "range_ok",
+        "before_qpos",
+        "after_qpos",
+        "expected_qpos",
+        "delta_qpos",
+        "target_deg",
+        "target_percent",
+        "reason",
+        "missing_inputs",
+        "diagnostics",
+        "motion_authority_status",
+        "physical_reviewed_model_motion_checked",
+        "hardware_free_fixture_motion_checked",
+        "motion_evidence_not_physical_so101_authority",
     )
     with path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -632,6 +664,86 @@ def motion_authority(
     }
 
 
+def motion_check_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
+    motion_authority_status = summary.get("motion_authority_status")
+    base_fields = {
+        "motion_authority_status": motion_authority_status,
+        "physical_reviewed_model_motion_checked": summary.get(
+            "physical_reviewed_model_motion_checked"
+        ),
+        "hardware_free_fixture_motion_checked": summary.get(
+            "hardware_free_fixture_motion_checked"
+        ),
+        "motion_evidence_not_physical_so101_authority": summary.get(
+            "motion_evidence_not_physical_so101_authority"
+        ),
+    }
+    simrobot_motion = summary.get("sim_robot_mujoco_sync")
+    simrobot_motion = simrobot_motion if isinstance(simrobot_motion, dict) else {}
+    motion_checks = simrobot_motion.get("motion_checks")
+    if isinstance(motion_checks, list) and motion_checks:
+        rows = []
+        for check in motion_checks:
+            if not isinstance(check, dict):
+                continue
+            row = {
+                "joint": check.get("joint"),
+                "joint_type": check.get("joint_type"),
+                "status": "motion_checked" if check.get("ok") is True else "motion_check_failed",
+                "ok": check.get("ok"),
+                "target_ok": check.get("target_ok"),
+                "moved": check.get("moved"),
+                "range_ok": check.get("range_ok"),
+                "before_qpos": check.get("before_qpos"),
+                "after_qpos": check.get("after_qpos"),
+                "expected_qpos": check.get("expected_qpos"),
+                "delta_qpos": check.get("delta_qpos"),
+                "target_deg": check.get("target_deg"),
+                "target_percent": check.get("target_percent"),
+                "reason": check.get("reason"),
+                "missing_inputs": None,
+                "diagnostics": check.get("diagnostics"),
+                **base_fields,
+            }
+            rows.append(row)
+        return rows
+
+    ready = summary.get("ready_for_model_backed_ik") is True
+    missing_inputs = summary.get("missing_inputs")
+    missing_inputs = missing_inputs if isinstance(missing_inputs, list) else []
+    diagnostics = simrobot_motion.get("diagnostics") or []
+    status = "motion_not_attempted_ready_manifest" if ready else "not_attempted_manifest_not_ready"
+    reason = (
+        simrobot_motion.get("status")
+        if ready and simrobot_motion.get("status")
+        else "manifest_not_ready_for_mujoco_motion"
+    )
+    return [
+        {
+            "joint": joint,
+            "joint_type": (
+                "gripper_slide_or_opening" if joint == "gripper" else "body_revolute"
+            ),
+            "status": status,
+            "ok": False,
+            "target_ok": False,
+            "moved": False,
+            "range_ok": None,
+            "before_qpos": None,
+            "after_qpos": None,
+            "expected_qpos": None,
+            "delta_qpos": None,
+            "target_deg": BODY_JOINT_TARGETS_DEG.get(joint),
+            "target_percent": GRIPPER_TARGET_PERCENT if joint == "gripper" else None,
+            "reason": reason,
+            "missing_inputs": missing_inputs or ["ready_reviewed_model_bundle"],
+            "diagnostics": diagnostics,
+            **base_fields,
+        }
+        for joint in SO101_JOINTS
+    ]
+
+
 def build_not_ready_summary(
     *,
     args: argparse.Namespace,
@@ -949,6 +1061,7 @@ def write_readme(path: Path, summary: dict[str, Any], rows: list[dict[str, Any]]
         f"- `model_path`: `{summary.get('model_path', {}).get('path') if isinstance(summary.get('model_path'), dict) else None}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `checklist_csv`: `{summary['artifacts']['checklist_csv']}`",
+        f"- `motion_checks_csv`: `{summary['artifacts']['motion_checks_csv']}`",
         "",
         "## Checklist",
         "",
@@ -982,10 +1095,12 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
     summary_path = output_dir / SUMMARY_NAME
     csv_path = output_dir / CHECKLIST_NAME
+    motion_csv_path = output_dir / MOTION_CHECKS_NAME
     readme_path = output_dir / README_NAME
     artifacts = {
         "summary_json": str(summary_path),
         "checklist_csv": str(csv_path),
+        "motion_checks_csv": str(motion_csv_path),
         "readme": str(readme_path),
     }
 
@@ -1008,6 +1123,7 @@ def main() -> int:
 
     write_json(summary_path, summary)
     write_csv(csv_path, rows)
+    write_motion_checks_csv(motion_csv_path, motion_check_rows(summary))
     write_readme(readme_path, summary, rows)
     print(
         json.dumps(

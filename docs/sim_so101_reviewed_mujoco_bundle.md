@@ -13,6 +13,7 @@ It writes:
 
 - `so101_reviewed_mujoco_bundle_summary.json`
 - `so101_reviewed_mujoco_bundle_checklist.csv`
+- `so101_reviewed_mujoco_bundle_motion_checks.csv`
 - `README.md`
 
 The summary carries the manifest checker's `model_authority`,
@@ -45,7 +46,10 @@ base-to-board alignment, the smoke exits `0` with
 `status: "reviewed_mujoco_bundle_not_ready"` and
 `reviewed_model_motion_checked: false`. In that not-ready state,
 `motion_authority_status` is `not_checked_manifest_not_ready`, and all motion
-authority booleans are `false`.
+authority booleans are `false`. The motion-checks CSV still writes one row for
+each expected SO-101 joint with `status: "not_attempted_manifest_not_ready"` so
+reviewers can distinguish missing model authority from missing artifact
+evidence.
 
 To reuse the integrated suite's manifest result:
 
@@ -69,6 +73,12 @@ When the manifest is ready, this gate must:
 - verify the MuJoCo backend has no joint-state fallback
 - send a deterministic joint action and confirm mapped qpos motion for all six
   SO-101 joints, including gripper qpos range mapping from the 0-100 command
+
+Ready manifests also populate `so101_reviewed_mujoco_bundle_motion_checks.csv`
+with one row per SO-101 joint. Rows preserve target, qpos, movement, range, and
+authority fields from the SimRobot/MuJoCo check; fixture-only ready cases remain
+machine-labeled as hardware-free evidence and not reviewed physical SO-101
+truth.
 
 The joint-limit comparison converts manifest body-joint limits from degrees to
 MuJoCo radians and covers `shoulder_pan`, `shoulder_lift`, `elbow_flex`,

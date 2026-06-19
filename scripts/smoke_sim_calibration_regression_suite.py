@@ -90,6 +90,9 @@ SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_CSV_NAME = (
 SO101_REVIEWED_MODEL_AUTHORITY_GATE_README_NAME = "README.md"
 SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME = "so101_reviewed_mujoco_bundle"
 SO101_REVIEWED_MUJOCO_BUNDLE_SUMMARY_NAME = "so101_reviewed_mujoco_bundle_summary.json"
+SO101_REVIEWED_MUJOCO_BUNDLE_MOTION_CHECKS_NAME = (
+    "so101_reviewed_mujoco_bundle_motion_checks.csv"
+)
 SO101_MUJOCO_SCENE_DIR_NAME = "so101_mujoco_scene"
 SO101_MUJOCO_SCENE_SUMMARY_NAME = "so101_mujoco_scene_summary.json"
 SO101_CHESS_ENV_DIR_NAME = "so101_chess_env"
@@ -1646,6 +1649,7 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_README_NAME}`",
         f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/{SO101_REVIEWED_MUJOCO_BUNDLE_SUMMARY_NAME}`",
         f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/so101_reviewed_mujoco_bundle_checklist.csv`",
+        f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/{SO101_REVIEWED_MUJOCO_BUNDLE_MOTION_CHECKS_NAME}`",
         f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/README.md`",
         "- `so101_model_source_inventory/so101_model_source_inventory_summary.json`",
         "- `so101_model_source_inventory/so101_model_source_candidates.csv`",

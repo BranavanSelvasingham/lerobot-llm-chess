@@ -1092,6 +1092,14 @@ def add_error(errors: list[str], label: str, actual: Any, expected: Any) -> None
         errors.append(f"{label}: expected {expected!r}, got {actual!r}")
 
 
+def read_motion_checks_csv(path: Path) -> tuple[list[dict[str, str]], str | None]:
+    try:
+        with path.open(newline="") as handle:
+            return list(csv.DictReader(handle)), None
+    except Exception as exc:
+        return [], f"{type(exc).__name__}: {exc}"
+
+
 def summarize_case(
     *,
     record: dict[str, Any],
@@ -1265,6 +1273,88 @@ def summarize_case(
                 expected_value,
             )
 
+    artifacts = summary.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    motion_checks_csv_path_raw = artifacts.get("motion_checks_csv")
+    motion_checks_csv_path = (
+        Path(motion_checks_csv_path_raw)
+        if isinstance(motion_checks_csv_path_raw, str) and motion_checks_csv_path_raw
+        else None
+    )
+    motion_checks_csv_exists = (
+        motion_checks_csv_path is not None and motion_checks_csv_path.is_file()
+    )
+    motion_checks_csv_rows: list[dict[str, str]] = []
+    motion_checks_csv_error: str | None = None
+    if not motion_checks_csv_exists:
+        errors.append(f"{case_id}.motion_checks_csv: expected file at {motion_checks_csv_path_raw!r}")
+    else:
+        motion_checks_csv_rows, motion_checks_csv_error = read_motion_checks_csv(
+            motion_checks_csv_path
+        )
+        if motion_checks_csv_error is not None:
+            errors.append(f"{case_id}.motion_checks_csv: {motion_checks_csv_error}")
+    expected_motion_joints = sorted(EXPECTED_MOTION_CHECK_JOINTS)
+    motion_checks_csv_joint_names = sorted(
+        row.get("joint", "")
+        for row in motion_checks_csv_rows
+        if row.get("joint")
+    )
+    if motion_checks_csv_rows:
+        add_error(
+            errors,
+            f"{case_id}.motion_checks_csv_joint_names",
+            motion_checks_csv_joint_names,
+            expected_motion_joints,
+        )
+        motion_checks_csv_statuses = [
+            row.get("status", "") for row in motion_checks_csv_rows
+        ]
+        if summary.get("ready_for_model_backed_ik") is not True:
+            add_error(
+                errors,
+                f"{case_id}.motion_checks_csv_statuses",
+                sorted(set(motion_checks_csv_statuses)),
+                ["not_attempted_manifest_not_ready"],
+            )
+        elif motion_checks:
+            expected_from_summary = sorted(
+                str(check.get("joint"))
+                for check in motion_checks
+                if isinstance(check, dict) and check.get("joint")
+            )
+            add_error(
+                errors,
+                f"{case_id}.motion_checks_csv_matches_summary_joints",
+                motion_checks_csv_joint_names,
+                expected_from_summary,
+            )
+            if summary.get("reviewed_model_motion_checked") is True:
+                add_error(
+                    errors,
+                    f"{case_id}.motion_checks_csv_statuses",
+                    sorted(set(motion_checks_csv_statuses)),
+                    ["motion_checked"],
+                )
+            else:
+                unexpected_statuses = sorted(
+                    set(motion_checks_csv_statuses)
+                    - {"motion_checked", "motion_check_failed"}
+                )
+                add_error(
+                    errors,
+                    f"{case_id}.motion_checks_csv_unexpected_statuses",
+                    unexpected_statuses,
+                    [],
+                )
+        else:
+            add_error(
+                errors,
+                f"{case_id}.motion_checks_csv_statuses",
+                sorted(set(motion_checks_csv_statuses)),
+                ["motion_not_attempted_ready_manifest"],
+            )
+
     return {
         "case_id": case_id,
         "ok": not errors,
@@ -1304,6 +1394,14 @@ def summarize_case(
                 "all_so101_joints_motion_checked"
             ),
             "motion_check_joint_names": sim_sync.get("motion_check_joint_names"),
+            "motion_checks_csv_exists": motion_checks_csv_exists,
+            "motion_checks_csv_path": str(motion_checks_csv_path)
+            if motion_checks_csv_path is not None
+            else None,
+            "motion_checks_csv_joint_names": motion_checks_csv_joint_names,
+            "motion_checks_csv_statuses": [
+                row.get("status", "") for row in motion_checks_csv_rows
+            ],
             "gripper_motion_check": gripper_motion_check,
             "motion_authority_status": summary.get("motion_authority_status"),
             "physical_reviewed_model_motion_checked": summary.get(
@@ -1364,6 +1462,9 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
             "all_so101_joints_motion_checked"
         ),
         "motion_check_joint_names": observations.get("motion_check_joint_names"),
+        "motion_checks_csv_exists": observations.get("motion_checks_csv_exists"),
+        "motion_checks_csv_joint_names": observations.get("motion_checks_csv_joint_names"),
+        "motion_checks_csv_statuses": observations.get("motion_checks_csv_statuses"),
         "gripper_motion_check": observations.get("gripper_motion_check"),
         "motion_authority_status": observations.get("motion_authority_status"),
         "physical_reviewed_model_motion_checked": observations.get(

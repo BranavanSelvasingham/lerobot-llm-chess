@@ -619,6 +619,23 @@ jobs:
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
           by_case = {case["case_id"]: case for case in summary["cases"]}
+          expected_motion_check_joints = [
+              "elbow_flex",
+              "gripper",
+              "shoulder_lift",
+              "shoulder_pan",
+              "wrist_flex",
+              "wrist_roll",
+          ]
+          for case in summary["cases"]:
+              observations = case["observations"]
+              assert observations["motion_checks_csv_exists"] is True, case
+              assert Path(observations["motion_checks_csv_path"]).is_file(), case
+              assert observations["motion_checks_csv_joint_names"] == expected_motion_check_joints, case
+              if observations["ready_for_model_backed_ik"] is False:
+                  assert sorted(set(observations["motion_checks_csv_statuses"])) == [
+                      "not_attempted_manifest_not_ready"
+                  ], case
           missing = by_case["missing_manifest_nonfailing"]
           assert missing["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", missing
           assert missing["observations"]["motion_authority_status"] == "not_checked_manifest_not_ready", missing
@@ -855,6 +872,10 @@ jobs:
           assert tiny_gripper_range["observations"]["motion_authority_status"] == "hardware_free_fixture_motion_failed", tiny_gripper_range
           assert tiny_gripper_range["observations"]["hardware_free_fixture_motion_checked"] is False, tiny_gripper_range
           assert tiny_gripper_range["observations"]["motion_evidence_not_physical_so101_authority"] is False, tiny_gripper_range
+          assert sorted(set(tiny_gripper_range["observations"]["motion_checks_csv_statuses"])) == [
+              "motion_check_failed",
+              "motion_checked",
+          ], tiny_gripper_range
           ready_fixture = by_case["ready_synthetic_fixture_motion_not_physical"]
           assert ready_fixture["observations"]["status"] == "reviewed_mujoco_bundle_motion_checked", ready_fixture
           assert ready_fixture["observations"]["reviewed_model_motion_checked"] is True, ready_fixture
@@ -864,6 +885,9 @@ jobs:
           assert ready_fixture["observations"]["physical_reviewed_model_motion_checked"] is False, ready_fixture
           assert ready_fixture["observations"]["hardware_free_fixture_motion_checked"] is True, ready_fixture
           assert ready_fixture["observations"]["motion_evidence_not_physical_so101_authority"] is True, ready_fixture
+          assert sorted(set(ready_fixture["observations"]["motion_checks_csv_statuses"])) == [
+              "motion_checked"
+          ], ready_fixture
           for relative_path in (
               "so101_reviewed_mujoco_bundle_matrix_summary.json",
               "so101_reviewed_mujoco_bundle_matrix_cases.csv",
@@ -1442,6 +1466,7 @@ jobs:
       - name: Check regression summary
         run: |
           python - <<'PY'
+          import csv
           import json
           import os
           from numbers import Real
@@ -1831,11 +1856,29 @@ jobs:
               assert reviewed_mujoco_bundle["hardware_free_fixture_motion_checked"] is False, reviewed_mujoco_bundle
               assert reviewed_mujoco_bundle["motion_evidence_not_physical_so101_authority"] is False, reviewed_mujoco_bundle
           reviewed_mujoco_artifacts = reviewed_mujoco_bundle["artifacts"]
-          for key in ("summary_json", "checklist_csv", "readme"):
+          for key in ("summary_json", "checklist_csv", "motion_checks_csv", "readme"):
               assert isinstance(reviewed_mujoco_artifacts.get(key), str) and Path(reviewed_mujoco_artifacts[key]).is_file(), (
                   key,
                   reviewed_mujoco_artifacts,
               )
+          with Path(reviewed_mujoco_artifacts["motion_checks_csv"]).open(newline="") as handle:
+              reviewed_mujoco_motion_rows = list(csv.DictReader(handle))
+          assert sorted(row["joint"] for row in reviewed_mujoco_motion_rows) == [
+              "elbow_flex",
+              "gripper",
+              "shoulder_lift",
+              "shoulder_pan",
+              "wrist_flex",
+              "wrist_roll",
+          ], reviewed_mujoco_motion_rows
+          if reviewed_mujoco_bundle["ready_for_model_backed_ik"] is True:
+              assert sorted(set(row["status"] for row in reviewed_mujoco_motion_rows)) == [
+                  "motion_checked"
+              ], reviewed_mujoco_motion_rows
+          else:
+              assert sorted(set(row["status"] for row in reviewed_mujoco_motion_rows)) == [
+                  "not_attempted_manifest_not_ready"
+              ], reviewed_mujoco_motion_rows
           source_inventory = summary["so101_model_source_inventory"]
           assert source_inventory["ok"] is True, source_inventory
           assert source_inventory["status"] in {
@@ -3178,6 +3221,12 @@ jobs:
               for row in artifacts_by_category["so101_reviewed_mujoco_bundle"]
           ), artifacts_by_category["so101_reviewed_mujoco_bundle"]
           assert any(
+              row.get("label") == "so101_reviewed_mujoco_bundle:motion_checks_csv"
+              and row.get("kind") == "csv"
+              and row.get("exists") is True
+              for row in artifacts_by_category["so101_reviewed_mujoco_bundle"]
+          ), artifacts_by_category["so101_reviewed_mujoco_bundle"]
+          assert any(
               row.get("label") == "so101_reviewed_mujoco_bundle:readme" and row.get("exists") is True
               for row in artifacts_by_category["so101_reviewed_mujoco_bundle"]
           ), artifacts_by_category["so101_reviewed_mujoco_bundle"]
@@ -3431,6 +3480,7 @@ jobs:
           assert "`so101_reviewed_model_authority_gate/so101_reviewed_model_authority_blocker_packet.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_checklist.csv`" in entrypoint_text, entrypoint_text
+          assert "`so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_motion_checks.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_inventory_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_candidates.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_model_source_inventory/so101_model_source_inventory_review_packet.json`" in entrypoint_text, entrypoint_text
@@ -3637,6 +3687,7 @@ jobs:
               "so101_reviewed_model_authority_gate/so101_reviewed_model_authority_blocker_packet.json",
               "so101_reviewed_model_authority_gate/so101_reviewed_model_authority_blocker_packet.csv",
               "so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_summary.json",
+              "so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_motion_checks.csv",
               "so101_model_source_inventory/so101_model_source_inventory_summary.json",
               "so101_model_source_inventory/so101_model_source_inventory_review_packet.json",
               "so101_model_source_inventory/so101_model_source_inventory_review_packet.csv",
