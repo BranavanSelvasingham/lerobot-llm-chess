@@ -57,8 +57,8 @@ python scripts/smoke_sim_so101_chess_env_matrix.py --output-dir /private/tmp/ler
 The matrix writes `so101_chess_env_matrix_summary.json`,
 `so101_chess_env_matrix_cases.csv`, and `README.md`. It proves joint-state
 fallback can remain explicit and non-training, `--require-mujoco` fails closed
-without a model path, and a generated development MJCF can drive the Gymnasium
-task without becoming reviewed SO-101 truth.
+without a model path or with an invalid model path, and a generated development
+MJCF can drive the Gymnasium task without becoming reviewed SO-101 truth.
 
 This is the bridge between the existing calibration/model-readiness evidence
 and later policy training. It should become a hard MuJoCo gate after the SO-101

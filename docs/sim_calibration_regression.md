@@ -685,7 +685,7 @@ The standalone chess-env matrix writes `so101_chess_env_matrix_summary.json`,
 `observed_evidence_is_physical_so101_authority: false`, and
 `ready_for_policy_training: false`. It covers joint-state fallback allowed,
 Gymnasium-required fallback allowed, fail-closed `--require-mujoco` with no model
-path, and generated development-MuJoCo env wiring that remains
+path or an invalid model path, and generated development-MuJoCo env wiring that remains
 `development_scaffold_not_reviewed`.
 
 The standalone board-pick probe matrix writes

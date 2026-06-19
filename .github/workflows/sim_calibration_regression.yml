@@ -794,6 +794,7 @@ jobs:
               "fallback_without_model_allowed",
               "gymnasium_required_fallback_allowed",
               "require_mujoco_without_model_fails",
+              "require_mujoco_invalid_model_path_fails",
               "development_mujoco_required_not_policy_ready",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -811,6 +812,14 @@ jobs:
           assert require_mujoco["observations"]["env_ok"] is False, require_mujoco
           assert require_mujoco["observations"]["mujoco_backend_required"] is True, require_mujoco
           assert require_mujoco["observations"]["training_authority_status"] == "requirements_failed_not_policy_ready", require_mujoco
+          invalid_model_path = by_case["require_mujoco_invalid_model_path_fails"]
+          assert invalid_model_path["record"]["return_code"] == 1, invalid_model_path
+          assert invalid_model_path["observations"]["env_ok"] is False, invalid_model_path
+          assert invalid_model_path["observations"]["mujoco_backend_required"] is True, invalid_model_path
+          assert invalid_model_path["observations"]["mujoco_backend_loaded"] is False, invalid_model_path
+          assert invalid_model_path["observations"]["joint_state_fallback_active"] is True, invalid_model_path
+          assert "MuJoCo model path does not exist" in invalid_model_path["observations"]["sim_status_reason"], invalid_model_path
+          assert invalid_model_path["observations"]["training_authority_status"] == "requirements_failed_not_policy_ready", invalid_model_path
           dev_mujoco = by_case["development_mujoco_required_not_policy_ready"]
           assert dev_mujoco["observations"]["env_ok"] is True, dev_mujoco
           assert dev_mujoco["observations"]["model_authority"] == "development_scaffold_not_reviewed", dev_mujoco

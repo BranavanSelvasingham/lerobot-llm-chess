@@ -86,6 +86,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "joint_state_fallback_active",
         "sim_status_ok",
         "sim_fallback",
+        "sim_status_reason",
         "gymnasium_task_wiring_status",
         "training_authority_status",
         "ready_for_model_backed_ik",
@@ -155,7 +156,7 @@ def create_development_scene(output_dir: Path, python_path: Path) -> tuple[dict[
     return run_child(case_dir=scene_dir, command=command, expected_summary_path=summary_path)
 
 
-def case_specs(development_model_path: str | None) -> list[dict[str, Any]]:
+def case_specs(development_model_path: str | None, invalid_model_path: str) -> list[dict[str, Any]]:
     return [
         {
             "case_id": "fallback_without_model_allowed",
@@ -222,6 +223,34 @@ def case_specs(development_model_path: str | None) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "require_mujoco_invalid_model_path_fails",
+            "args": [
+                "--require-gymnasium",
+                "--require-mujoco",
+                "--mujoco-model-path",
+                invalid_model_path,
+            ],
+            "expect": {
+                "return_code": 1,
+                "env_ok": False,
+                "status": "failed_requirements",
+                "model_authority": "joint_state_fallback_no_reviewed_model",
+                "gymnasium_required": True,
+                "mujoco_backend_required": True,
+                "mujoco_backend_loaded": False,
+                "joint_state_fallback_active": True,
+                "sim_status_ok": False,
+                "sim_fallback": "joint_state",
+                "sim_status_reason_contains": "MuJoCo model path does not exist",
+                "gymnasium_task_wiring_status": "failed_requirements",
+                "training_authority_status": "requirements_failed_not_policy_ready",
+                "ready_for_model_backed_ik": False,
+                "ready_for_policy_training": False,
+                "scripted_pick_place_complete": True,
+                "hard_failures_contain": ["mujoco_backend_required_but_not_loaded"],
+            },
+        },
+        {
             "case_id": "development_mujoco_required_not_policy_ready",
             "args": [
                 "--require-gymnasium",
@@ -279,6 +308,7 @@ def summarize_case(
         "joint_state_fallback_active": summary.get("joint_state_fallback_active"),
         "sim_status_ok": sim_status.get("ok"),
         "sim_fallback": sim_status.get("fallback"),
+        "sim_status_reason": sim_status.get("reason"),
         "gymnasium_task_wiring_status": summary.get("gymnasium_task_wiring_status"),
         "training_authority_status": summary.get("training_authority_status"),
         "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
@@ -290,9 +320,14 @@ def summarize_case(
     }
     add_error(errors, f"{case_id}.return_code", record.get("return_code"), expect["return_code"])
     for key, expected in expect.items():
-        if key in {"return_code", "hard_failures_contain"}:
+        if key in {"return_code", "hard_failures_contain", "sim_status_reason_contains"}:
             continue
         add_error(errors, f"{case_id}.{key}", observations.get(key), expected)
+    reason_contains = expect.get("sim_status_reason_contains")
+    if isinstance(reason_contains, str) and reason_contains not in str(observations.get("sim_status_reason")):
+        errors.append(
+            f"{case_id}.sim_status_reason: expected {reason_contains!r} in {observations.get('sim_status_reason')!r}"
+        )
     for required_failure in expect.get("hard_failures_contain", []):
         hard_failures = observations.get("hard_failures")
         if not isinstance(hard_failures, list) or required_failure not in hard_failures:
@@ -369,6 +404,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "joint_state_fallback_active": observations.get("joint_state_fallback_active"),
         "sim_status_ok": observations.get("sim_status_ok"),
         "sim_fallback": observations.get("sim_fallback"),
+        "sim_status_reason": observations.get("sim_status_reason"),
         "gymnasium_task_wiring_status": observations.get("gymnasium_task_wiring_status"),
         "training_authority_status": observations.get("training_authority_status"),
         "ready_for_model_backed_ik": observations.get("ready_for_model_backed_ik"),
@@ -418,7 +454,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "## Caveats",
             "",
             "- Joint-state fallback is allowed only when MuJoCo is not required.",
-            "- `--require-mujoco` must fail closed when no MuJoCo model path is supplied.",
+            "- `--require-mujoco` must fail closed when no MuJoCo model path is supplied or the supplied model path cannot load.",
             "- Development MJCF task wiring remains `development_scaffold_not_reviewed` and `ready_for_policy_training: false`.",
         ]
     )
@@ -439,9 +475,10 @@ def main() -> int:
     if not isinstance(development_model_path, str) or not Path(development_model_path).is_file():
         development_model_path = None
 
+    invalid_model_path = str(output_dir / "missing_models" / "so101_missing.xml")
     cases = [
         run_case(output_dir=output_dir, python_path=args.python, spec=spec)
-        for spec in case_specs(development_model_path)
+        for spec in case_specs(development_model_path, invalid_model_path)
     ]
     scene_ok = bool(scene_summary.get("ok")) and development_model_path is not None
     ok = scene_ok and all(case["ok"] for case in cases)
