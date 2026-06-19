@@ -107,12 +107,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--authority-reviewed-by",
         default=None,
-        help="Optional reviewed-by identifier. Authority is populated only with --authority-reviewed-at too.",
+        help=(
+            "Optional reviewed-by identifier. Authority is populated only with a stable "
+            "review artifact handle supplied by --authority-review-id or --authority-review-url."
+        ),
     )
     parser.add_argument(
         "--authority-reviewed-at",
         default=None,
-        help="Optional deterministic review date/string. Authority is populated only with --authority-reviewed-by too.",
+        help=(
+            "Optional deterministic review date/string. A date alone does not satisfy "
+            "review authority; also supply --authority-review-id or --authority-review-url."
+        ),
+    )
+    parser.add_argument(
+        "--authority-review-id",
+        default=None,
+        help="Optional review ticket, commit, checklist, or artifact identifier for source authority.",
+    )
+    parser.add_argument(
+        "--authority-review-url",
+        default=None,
+        help="Optional URL to the reviewed source-authority record.",
     )
     parser.add_argument("--provenance-source-url", default=None)
     parser.add_argument("--provenance-source-commit", default=None)
@@ -604,26 +620,43 @@ def mesh_asset_review_from_contract(contract_result: dict[str, Any]) -> dict[str
 
 
 def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, Any]]:
-    required = {
+    supplied = {
         "reviewed_by": args.authority_reviewed_by,
         "reviewed_at": args.authority_reviewed_at,
+        "review_id": args.authority_review_id,
+        "review_url": args.authority_review_url,
     }
-    missing = [key for key, value in required.items() if not value]
+    missing = []
+    if not args.authority_reviewed_by:
+        missing.append("reviewed_by")
+    if not args.authority_review_id and not args.authority_review_url:
+        missing.append("review_id_or_review_url")
     if missing:
         return {}, {
             "status": "TODO_authority_review_required",
-            "required_fields": sorted(required),
+            "required_fields": ["reviewed_by", "review_id_or_review_url"],
+            "optional_fields": ["reviewed_at"],
             "missing_fields": missing,
-            "supplied_fields": {key: value for key, value in required.items() if value},
-            "reason": "The probe never infers reviewed model authority from a path or asset root.",
+            "supplied_fields": {key: value for key, value in supplied.items() if value},
+            "reason": (
+                "The probe never infers reviewed model authority from a path or asset root; "
+                "reviewed authority needs reviewer identity plus review_id or review_url."
+            ),
         }
-    return {
+    authority = {
         "source_authority_status": "operator_reviewed",
         "reviewed_by": args.authority_reviewed_by,
-        "reviewed_at": args.authority_reviewed_at,
-    }, {
+    }
+    if args.authority_reviewed_at:
+        authority["reviewed_at"] = args.authority_reviewed_at
+    if args.authority_review_id:
+        authority["review_id"] = args.authority_review_id
+    if args.authority_review_url:
+        authority["review_url"] = args.authority_review_url
+    return authority, {
         "status": "operator_supplied",
-        "required_fields": sorted(required),
+        "required_fields": ["reviewed_by", "review_id_or_review_url"],
+        "optional_fields": ["reviewed_at"],
         "missing_fields": [],
     }
 
@@ -1020,7 +1053,7 @@ def build_review_packet(
                 "model_path": model_request.get("path"),
                 "sha256": observed_source_hints.get("sha256"),
             },
-            "Choose the authoritative SO-101 model source and record accepted authority review metadata.",
+            "Choose the authoritative SO-101 model source and record reviewer identity plus review_id or review_url.",
         ),
         review_packet_row(
             2,

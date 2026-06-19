@@ -57,9 +57,8 @@ dependencies, and authority have been reviewed. When an authoritative path/root
 is declared, also pass `--so101-source-authority-source-reference`,
 `--so101-source-authority-license-basis`, every required
 `--so101-source-authority-review-scope` value (`model_identity`, `provenance`,
-and `license`), `--so101-source-authority-reviewed-by`, plus at least one
-trace field: `--so101-source-authority-reviewed-at`,
-`--so101-source-authority-review-id`, or
+and `license`), `--so101-source-authority-reviewed-by`, plus a stable artifact
+handle: `--so101-source-authority-review-id` or
 `--so101-source-authority-review-url`. Without those metadata fields the
 inventory can report an authoritative candidate, but it also reports
 `source_authority_review_status: "review_metadata_missing"` and queues

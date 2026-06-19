@@ -84,14 +84,15 @@ inventing reviewed target-frame authority, limits, calibrated TCP, or
 board-alignment values. That means the generated manifest remains
 diagnostic-only until an operator replaces those placeholders with reviewed
 fields and this checker reports `ready_for_model_backed_ik: true`.
-When `--authority-reviewed-by` and `--authority-reviewed-at` are supplied, the
-probe writes `authority.source_authority_status: "operator_reviewed"`, which is
-one of the manifest checker's accepted reviewed statuses; that still only
-covers source-authority metadata and does not make observed model hints,
-joint limits, mesh references, TCP offset, or board alignment reviewed truth.
-`authority` must include an accepted reviewed status plus reviewer/date/id/url
-evidence, and `provenance` must include a source reference, export tool, and
-license basis. The manifest must also declare `model_sha256` (or an accepted
+When `--authority-reviewed-by` and `--authority-review-id` or
+`--authority-review-url` are supplied, the probe writes
+`authority.source_authority_status: "operator_reviewed"`, which is one of the
+manifest checker's accepted reviewed statuses; that still only covers
+source-authority metadata and does not make observed model hints, joint limits,
+mesh references, TCP offset, or board alignment reviewed truth. `authority`
+must include an accepted reviewed status plus reviewer identity and a stable
+review artifact handle, and `provenance` must include a source reference,
+export tool, and license basis. The manifest must also declare `model_sha256` (or an accepted
 alias such as `model_file_sha256`) matching the resolved `model_path` file. A
 missing, malformed, or mismatched digest records `model_identity` as not ready
 and lists `model_sha256` in `missing_inputs`; this prevents an already-reviewed
@@ -242,7 +243,8 @@ resolved from the manifest directory.
   "authority": {
     "source_authority_status": "reviewed",
     "reviewed_by": "operator-or-review-id",
-    "reviewed_at": "2026-06-16"
+    "reviewed_at": "2026-06-16",
+    "review_id": "review-ticket-or-commit"
   },
   "provenance": {
     "source_url": "https://cad.onshape.com/...",
@@ -255,6 +257,7 @@ resolved from the manifest directory.
     "target_frame_authority_status": "reviewed",
     "reviewed_by": "operator-or-review-id",
     "reviewed_at": "2026-06-16",
+    "review_id": "review-ticket-or-commit",
     "source": "reviewed model target frame or TCP-frame record"
   },
   "joint_limits_deg": {
@@ -269,12 +272,14 @@ resolved from the manifest directory.
     "joint_limit_authority_status": "reviewed",
     "reviewed_by": "operator-or-review-id",
     "reviewed_at": "2026-06-16",
+    "review_id": "review-ticket-or-commit",
     "source": "reviewed model bundle or calibration record"
   },
   "mesh_asset_authority": {
     "mesh_asset_authority_status": "reviewed",
     "reviewed_by": "operator-or-review-id",
     "reviewed_at": "2026-06-16",
+    "review_id": "review-ticket-or-commit",
     "source": "reviewed mesh root or model export"
   },
   "tcp_offset_m": {
@@ -286,6 +291,7 @@ resolved from the manifest directory.
     "tcp_offset_authority_status": "reviewed",
     "reviewed_by": "operator-or-review-id",
     "reviewed_at": "2026-06-16",
+    "review_id": "review-ticket-or-commit",
     "source": "reviewed TCP/gripper-tip calibration record"
   },
   "base_to_board_transform": {
@@ -304,6 +310,7 @@ resolved from the manifest directory.
     "base_to_board_alignment_authority_status": "reviewed",
     "reviewed_by": "operator-or-review-id",
     "reviewed_at": "2026-06-16",
+    "review_id": "review-ticket-or-commit",
     "source": "reviewed board registration or calibration record"
   }
 }
@@ -430,7 +437,7 @@ true:
 - `model_path` exists
 - `asset_roots` is present and all supplied roots are directories
 - `authority` declares an accepted reviewed status plus traceable review
-  evidence (`reviewed_by` plus `reviewed_at`, `review_id`, or `review_url`)
+  evidence (`reviewed_by` plus `review_id` or `review_url`)
 - `provenance` declares source reference, export tool, and license basis fields;
   fixture-only provenance is still non-physical automation evidence
 - finite numeric joint limits cover every SO-101 joint and include accepted
