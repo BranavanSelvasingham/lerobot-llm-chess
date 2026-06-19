@@ -34,6 +34,16 @@ metadata gate when the supplied values are real and non-placeholder. It reports
 `source_intake_model_authority: "source_intake_not_authority"` plus false
 observed-evidence and physical-authority flags, so it remains operator guidance
 rather than reviewed SO-101 model authority.
+When the inventory finds a high/medium SO-101 candidate, the source-intake
+checklist also records a `recommended_candidate` object and mirrors
+`recommended_candidate_path`, `recommended_candidate_source_root`, and
+`recommended_candidate_authoritative` on each action row. The generated review
+and bundle-probe commands use that observed path/root as operator convenience
+only; the checklist still reports false authority flags until an operator
+declares the reviewed source and supplies non-placeholder review metadata. When
+multiple unreviewed candidates have equal relevance, the recommendation is
+deterministic and prefers non-archive, non-`nomesh`, shallower paths before
+falling back to lexical ordering.
 
 The full hardware-free simulator calibration regression suite now runs this
 inventory automatically under `so101_model_source_inventory/` before
@@ -161,13 +171,15 @@ python scripts/smoke_sim_so101_source_authority_matrix.py --output-dir /private/
 ```
 
 The smoke generates synthetic URDF fixtures under the output directory and runs
-the inventory through nine non-hardware cases: missing source root, unverified
-candidate, authoritative path without review metadata, authoritative path with
-placeholder review metadata, authoritative path with reviewer-only thin review
-metadata, authoritative path with placeholder source/license metadata,
-authoritative path with complete source-review metadata, single authoritative
-root with complete source-review metadata, and ambiguous authoritative root. It
-writes:
+the inventory through thirteen non-hardware cases: missing source root,
+unverified candidate, candidate recommendation preference, authoritative path
+without review metadata, authoritative path with placeholder review metadata,
+authoritative path with angle-bracket template metadata, authoritative path with
+reviewer-only thin review metadata, authoritative path with invalid review URL,
+authoritative path with placeholder source/license metadata, non-SO-101
+authoritative relevance rejection, authoritative path with complete
+source-review metadata, single authoritative root with complete source-review
+metadata, and ambiguous authoritative root. It writes:
 
 - `so101_source_authority_matrix_summary.json`
 - `so101_source_authority_matrix_cases.csv`
@@ -190,6 +202,10 @@ The ambiguous-root fixture must remain
 `review_packet_model_authority: "review_packet_not_authority"`, and false
 physical SO-101 authority flags; the smoke proves the inventory state machine,
 not a reviewed robot model.
+The candidate recommendation fixture also proves that source-intake commands
+carry the selected top-level model path and asset/source root into the review and
+bundle-probe rerun commands without converting that recommendation into
+authority.
 
 ## Owner Check Evidence
 

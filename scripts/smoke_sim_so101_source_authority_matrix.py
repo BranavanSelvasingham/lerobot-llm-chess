@@ -99,6 +99,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "source_intake_status",
         "source_intake_model_authority",
         "source_intake_action_ids",
+        "source_intake_recommended_candidate_path",
+        "source_intake_recommended_candidate_source_root",
+        "source_intake_recommended_candidate_authoritative",
         "review_packet_status",
         "review_packet_model_authority",
         "physical_so101_model_authority_ready",
@@ -180,21 +183,31 @@ def generic_non_so101_urdf(robot_name: str) -> str:
 def create_fixtures(output_dir: Path) -> dict[str, Path]:
     fixture_dir = output_dir / "fixtures"
     single_root = fixture_dir / "single_source_root"
+    preferred_root = fixture_dir / "preferred_source_root"
     ambiguous_root = fixture_dir / "ambiguous_source_root"
     generic_root = fixture_dir / "generic_source_root"
     missing_root = fixture_dir / "missing_source_root"
     single_root.mkdir(parents=True, exist_ok=True)
+    preferred_root.mkdir(parents=True, exist_ok=True)
+    (preferred_root / "archive").mkdir(parents=True, exist_ok=True)
     ambiguous_root.mkdir(parents=True, exist_ok=True)
     generic_root.mkdir(parents=True, exist_ok=True)
     (single_root / "LICENSE").write_text("Synthetic fixture license for hardware-free smoke testing only.\n")
+    (preferred_root / "LICENSE").write_text("Synthetic fixture license for hardware-free smoke testing only.\n")
     (ambiguous_root / "LICENSE").write_text("Synthetic fixture license for hardware-free smoke testing only.\n")
     (generic_root / "LICENSE").write_text("Synthetic fixture license for hardware-free smoke testing only.\n")
 
     single_model = single_root / "so101_synthetic_source.urdf"
+    preferred_model = preferred_root / "so101_synthetic_source.urdf"
+    preferred_nomesh_model = preferred_root / "so101_synthetic_source.nomesh.urdf"
+    preferred_archive_model = preferred_root / "archive" / "so101_synthetic_source.urdf"
     ambiguous_a = ambiguous_root / "so101_synthetic_source_a.urdf"
     ambiguous_b = ambiguous_root / "so101_synthetic_source_b.urdf"
     generic_model = generic_root / "generic_robot_source.urdf"
     single_model.write_text(synthetic_urdf("so101_synthetic_source"))
+    preferred_model.write_text(synthetic_urdf("so101_synthetic_source"))
+    preferred_nomesh_model.write_text(synthetic_urdf("so101_synthetic_source_nomesh"))
+    preferred_archive_model.write_text(synthetic_urdf("so101_synthetic_source_archive"))
     ambiguous_a.write_text(synthetic_urdf("so101_synthetic_source_a"))
     ambiguous_b.write_text(synthetic_urdf("so101_synthetic_source_b"))
     generic_model.write_text(generic_non_so101_urdf("generic_robot_source"))
@@ -202,6 +215,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     return {
         "single_root": single_root,
         "single_model": single_model,
+        "preferred_root": preferred_root,
+        "preferred_model": preferred_model,
+        "preferred_nomesh_model": preferred_nomesh_model,
+        "preferred_archive_model": preferred_archive_model,
         "ambiguous_root": ambiguous_root,
         "ambiguous_model_a": ambiguous_a,
         "ambiguous_model_b": ambiguous_b,
@@ -370,6 +387,40 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                     "supply_reviewed_so101_model_bundle_manifest",
                 ],
                 "actions_absent": ["scan_or_supply_so101_model_source_root"],
+                "source_intake_recommended_candidate_path": str(
+                    normalize_path(fixtures["single_model"])
+                ),
+                "source_intake_recommended_candidate_source_root": str(
+                    normalize_path(fixtures["single_root"])
+                ),
+                "source_intake_recommended_candidate_authoritative": False,
+            },
+        },
+        {
+            "case_id": "candidate_prefer_top_level_model",
+            "args": ["--root", str(fixtures["preferred_root"])],
+            "expect": {
+                "status": "missing_authoritative_model",
+                "candidate_count": 3,
+                "authoritative_candidate_count": 0,
+                "source_authority_gate_status": "source_authority_blocked_missing_authoritative_model",
+                "source_authority_review_status": "not_applicable_no_authoritative_candidate",
+                "source_authority_review_ready": False,
+                "source_intake_status": "source_authority_review_required",
+                "review_packet_status": "review_packet_source_candidates_need_authority_review",
+                "blockers_contain": ["review_and_declare_authoritative_so101_model_source"],
+                "actions_contain": [
+                    "review_and_declare_authoritative_so101_model_source",
+                    "run_so101_model_bundle_probe",
+                    "supply_reviewed_so101_model_bundle_manifest",
+                ],
+                "source_intake_recommended_candidate_path": str(
+                    normalize_path(fixtures["preferred_model"])
+                ),
+                "source_intake_recommended_candidate_source_root": str(
+                    normalize_path(fixtures["preferred_root"])
+                ),
+                "source_intake_recommended_candidate_authoritative": False,
             },
         },
         {
@@ -395,6 +446,13 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                     "run_so101_model_bundle_probe",
                     "supply_reviewed_so101_model_bundle_manifest",
                 ],
+                "source_intake_recommended_candidate_path": str(
+                    normalize_path(fixtures["single_model"])
+                ),
+                "source_intake_recommended_candidate_source_root": str(
+                    normalize_path(fixtures["single_root"])
+                ),
+                "source_intake_recommended_candidate_authoritative": True,
             },
         },
         {
@@ -763,6 +821,12 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
     source_review = source_review if isinstance(source_review, dict) else {}
     source_intake = inventory.get("source_intake_checklist")
     source_intake = source_intake if isinstance(source_intake, dict) else {}
+    source_intake_recommended_candidate = source_intake.get("recommended_candidate")
+    source_intake_recommended_candidate = (
+        source_intake_recommended_candidate
+        if isinstance(source_intake_recommended_candidate, dict)
+        else {}
+    )
 
     add_error(errors, f"{case_id}.return_code", record.get("return_code"), 0)
     add_error(errors, f"{case_id}.ok", inventory.get("ok"), True)
@@ -853,6 +917,25 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
     )
     if not all(isinstance(action.get("command"), list) for action in source_intake.get("actions") or []):
         errors.append(f"{case_id}.source_intake_commands: expected all commands to be lists")
+    if "source_intake_recommended_candidate_path" in expect:
+        add_error(
+            errors,
+            f"{case_id}.source_intake_recommended_candidate_path",
+            source_intake_recommended_candidate.get("candidate_path"),
+            expect["source_intake_recommended_candidate_path"],
+        )
+        add_error(
+            errors,
+            f"{case_id}.source_intake_recommended_candidate_source_root",
+            source_intake_recommended_candidate.get("source_root"),
+            expect.get("source_intake_recommended_candidate_source_root"),
+        )
+        add_error(
+            errors,
+            f"{case_id}.source_intake_recommended_candidate_authoritative",
+            source_intake_recommended_candidate.get("authoritative"),
+            expect.get("source_intake_recommended_candidate_authoritative"),
+        )
     review_command_action_ids = {
         "review_and_declare_authoritative_so101_model_source",
         "record_source_authority_review_metadata",
@@ -879,6 +962,28 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
             errors.append(
                 f"{case_id}.{action_id}.source_intake_command: missing review artifact flag"
             )
+        if "source_intake_recommended_candidate_path" in expect:
+            if expect["source_intake_recommended_candidate_path"] not in command:
+                errors.append(
+                    f"{case_id}.{action_id}.source_intake_command: missing recommended candidate path"
+                )
+
+    if "source_intake_recommended_candidate_path" in expect:
+        for action in source_intake.get("actions") or []:
+            if action.get("action_id") != "run_so101_model_bundle_probe":
+                continue
+            command = action.get("command")
+            command = command if isinstance(command, list) else []
+            for expected in (
+                "--model-path",
+                expect["source_intake_recommended_candidate_path"],
+                "--asset-root",
+                expect.get("source_intake_recommended_candidate_source_root"),
+            ):
+                if expected not in command:
+                    errors.append(
+                        f"{case_id}.run_so101_model_bundle_probe.command: missing {expected!r}"
+                    )
 
     expect_contains(
         errors,
@@ -1038,6 +1143,15 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
             "source_intake_status": inventory.get("source_intake_status"),
             "source_intake_model_authority": inventory.get("source_intake_model_authority"),
             "source_intake_action_ids": inventory.get("source_intake_action_ids"),
+            "source_intake_recommended_candidate_path": (
+                source_intake_recommended_candidate.get("candidate_path")
+            ),
+            "source_intake_recommended_candidate_source_root": (
+                source_intake_recommended_candidate.get("source_root")
+            ),
+            "source_intake_recommended_candidate_authoritative": (
+                source_intake_recommended_candidate.get("authoritative")
+            ),
             "source_intake_physical_so101_model_authority_ready": inventory.get(
                 "source_intake_physical_so101_model_authority_ready"
             ),
@@ -1090,6 +1204,15 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "source_intake_status": observations.get("source_intake_status"),
         "source_intake_model_authority": observations.get("source_intake_model_authority"),
         "source_intake_action_ids": observations.get("source_intake_action_ids"),
+        "source_intake_recommended_candidate_path": observations.get(
+            "source_intake_recommended_candidate_path"
+        ),
+        "source_intake_recommended_candidate_source_root": observations.get(
+            "source_intake_recommended_candidate_source_root"
+        ),
+        "source_intake_recommended_candidate_authoritative": observations.get(
+            "source_intake_recommended_candidate_authoritative"
+        ),
         "review_packet_status": observations.get("review_packet_status"),
         "review_packet_model_authority": observations.get("review_packet_model_authority"),
         "physical_so101_model_authority_ready": observations.get(

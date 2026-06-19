@@ -101,6 +101,9 @@ SOURCE_INTAKE_FIELDNAMES = (
     "gate",
     "title",
     "detail",
+    "recommended_candidate_path",
+    "recommended_candidate_source_root",
+    "recommended_candidate_authoritative",
     "command",
     "required_inputs",
 )
@@ -1106,10 +1109,17 @@ def build_root_records(roots: list[Path], root_source: str) -> list[dict[str, An
 
 
 def candidate_sort_key(candidate: dict[str, Any]) -> tuple[Any, ...]:
+    relative_path = str(candidate.get("relative_path") or candidate.get("path") or "")
+    relative_parts = Path(relative_path).parts
+    archived_path_penalty = int(any(part.lower() in {"archive", "archives"} for part in relative_parts))
+    nomesh_path_penalty = int("nomesh" in relative_path.lower())
     return (
         not candidate["authoritative"],
         -int(candidate["direct_robot_kinematics_compatible"]),
         -int(candidate["relevance_score"]),
+        archived_path_penalty,
+        nomesh_path_penalty,
+        len(relative_parts),
         candidate["suffix"],
         candidate["path"],
     )
@@ -1392,13 +1402,41 @@ def source_intake_status(summary: dict[str, Any]) -> str:
     return "source_authority_ready_waiting_for_bundle_manifest"
 
 
-def source_intake_command_template(action_id: str) -> list[str]:
+def source_intake_recommended_candidate(summary: dict[str, Any]) -> dict[str, Any]:
+    candidates = summary.get("candidates")
+    candidates = candidates if isinstance(candidates, list) else []
+    candidate_by_id = {
+        candidate.get("candidate_id"): candidate
+        for candidate in candidates
+        if isinstance(candidate, dict) and candidate.get("candidate_id")
+    }
+    selected_id = summary.get("selected_authoritative_candidate_id")
+    recommended_contract_check = summary.get("recommended_contract_check")
+    recommended_contract_check = (
+        recommended_contract_check
+        if isinstance(recommended_contract_check, dict)
+        else {}
+    )
+    candidate = candidate_by_id.get(selected_id) if selected_id else None
+    if candidate is None:
+        candidate = candidate_by_id.get(recommended_contract_check.get("candidate_id"))
+    return candidate if isinstance(candidate, dict) else {}
+
+
+def source_intake_command_template(
+    action_id: str,
+    summary: dict[str, Any] | None = None,
+) -> list[str]:
+    summary = summary or {}
+    candidate = source_intake_recommended_candidate(summary)
+    source_root = candidate.get("source_root") or "<absolute-so101-model-source-root>"
+    model_path = candidate.get("path") or "<absolute-reviewed-so101-model-file>"
     if action_id == "scan_or_supply_so101_model_source_root":
         return [
             "python",
             "scripts/smoke_sim_so101_model_source_inventory.py",
             "--root",
-            "<absolute-so101-model-source-root>",
+            source_root,
             "--output-dir",
             "/private/tmp/lerobot_sim/so101_model_source_inventory_external",
         ]
@@ -1412,9 +1450,9 @@ def source_intake_command_template(action_id: str) -> list[str]:
             "python",
             "scripts/smoke_sim_so101_model_source_inventory.py",
             "--root",
-            "<absolute-so101-model-source-root>",
+            source_root,
             "--authoritative-path",
-            "<absolute-reviewed-so101-model-file>",
+            model_path,
             "--authority-license-basis",
             "<reviewed-license-or-redistribution-basis>",
             "--authority-source-reference",
@@ -1439,7 +1477,9 @@ def source_intake_command_template(action_id: str) -> list[str]:
             "python",
             "scripts/smoke_sim_so101_model_bundle_probe.py",
             "--model-path",
-            "<absolute-reviewed-so101-model-file>",
+            model_path,
+            "--asset-root",
+            source_root,
             "--output-dir",
             "/private/tmp/lerobot_sim/so101_model_bundle_probe_review_draft",
         ]
@@ -1460,6 +1500,17 @@ def build_source_intake_checklist(summary: dict[str, Any]) -> dict[str, Any]:
     source_authority_review = (
         source_authority_review if isinstance(source_authority_review, dict) else {}
     )
+    recommended_candidate = source_intake_recommended_candidate(summary)
+    recommended_candidate_context = {
+        "candidate_id": recommended_candidate.get("candidate_id"),
+        "candidate_path": recommended_candidate.get("path"),
+        "source_root": recommended_candidate.get("source_root"),
+        "source_root_type": recommended_candidate.get("source_root_type"),
+        "authoritative": recommended_candidate.get("authoritative"),
+        "likely_so101_relevance": recommended_candidate.get("likely_so101_relevance"),
+        "relevance_score": recommended_candidate.get("relevance_score"),
+        "file_sha256": recommended_candidate.get("file_sha256"),
+    }
     actions: list[dict[str, Any]] = []
     for action in summary.get("next_required_for_goal") or []:
         if not isinstance(action, dict):
@@ -1475,7 +1526,26 @@ def build_source_intake_checklist(summary: dict[str, Any]) -> dict[str, Any]:
                 "gate": action.get("gate"),
                 "title": action.get("title"),
                 "detail": action.get("detail"),
-                "command": source_intake_command_template(action_id),
+                "recommended_candidate_id": recommended_candidate_context.get(
+                    "candidate_id"
+                ),
+                "recommended_candidate_path": recommended_candidate_context.get(
+                    "candidate_path"
+                ),
+                "recommended_candidate_source_root": recommended_candidate_context.get(
+                    "source_root"
+                ),
+                "recommended_candidate_authoritative": recommended_candidate_context.get(
+                    "authoritative"
+                ),
+                "recommended_candidate_relevance": recommended_candidate_context.get(
+                    "likely_so101_relevance"
+                ),
+                "recommended_candidate_sha256": recommended_candidate_context.get(
+                    "file_sha256"
+                ),
+                "evidence_context": recommended_candidate_context,
+                "command": source_intake_command_template(action_id, summary),
                 "required_inputs": (
                     source_authority_review.get("missing_required_fields") or []
                     if action_id
@@ -1546,6 +1616,8 @@ def build_source_intake_checklist(summary: dict[str, Any]) -> dict[str, Any]:
         or [],
         "next_required_for_goal": summary.get("next_required_for_goal") or [],
         "next_required_action_ids": summary.get("next_required_action_ids") or [],
+        "recommended_candidate": recommended_candidate_context,
+        "recommended_contract_check": summary.get("recommended_contract_check"),
         "action_count": len(actions),
         "actions": actions,
         "observed_evidence_is_authority": False,
