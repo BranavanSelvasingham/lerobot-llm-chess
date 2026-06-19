@@ -112,6 +112,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_handoff_motion_authority_status",
         "reviewed_mujoco_handoff_physical_motion_checked",
         "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked",
+        "reviewed_mujoco_handoff_missing_inputs",
+        "reviewed_mujoco_handoff_pending_action_ids",
+        "reviewed_mujoco_handoff_ready_has_open_work",
+        "reviewed_mujoco_handoff_blockers",
         "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority",
         "scene_uses_reviewed_mujoco_handoff",
         "mujoco_scene_validity_status",
@@ -148,7 +152,11 @@ def read_json_object(path: Path, *, label: str) -> dict[str, Any]:
 
 
 def handoff_fixture_payload(state: str) -> dict[str, Any]:
-    ready = state == "ready"
+    ready = state in {
+        "ready",
+        "ready_with_missing_input",
+        "ready_with_pending_action",
+    }
     fixture_ready = state == "fixture"
     status = (
         "physical_reviewed_mujoco_handoff_ready"
@@ -226,6 +234,19 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
                 ],
             }
         )
+    elif state == "ready_with_missing_input":
+        payload["missing_inputs"] = [
+            "reviewed_mujoco_downstream_handoff_missing_input_should_fail_closed"
+        ]
+    elif state == "ready_with_pending_action":
+        payload["next_required_for_goal"] = [
+            {
+                "action_id": "rerun_reviewed_mujoco_downstream_handoff",
+                "gate": "mujoco_scene_validity",
+                "title": "Rerun reviewed MuJoCo downstream handoff",
+                "detail": "Pending downstream handoff action must fail closed even with ready status.",
+            }
+        ]
     elif state == "schema_mismatch_ready":
         payload["schema"] = "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v0"
     return payload
@@ -312,6 +333,46 @@ def case_specs() -> list[dict[str, Any]]:
             "expected_handoff_contract_ok": False,
         },
         {
+            "case_id": "ready_handoff_with_missing_input_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": False,
+            "handoff_state": "ready_with_missing_input",
+            "require_handoff": True,
+            "expected_status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "expected_handoff_intake_status": "handoff_contract_invalid",
+            "expected_handoff_ready": False,
+            "expected_handoff_contract_ok": False,
+            "expected_handoff_missing_inputs": [
+                "reviewed_mujoco_downstream_handoff_missing_input_should_fail_closed"
+            ],
+            "expected_handoff_pending_action_ids": [],
+            "expected_handoff_blockers_contain": [
+                "resolve_ready_reviewed_mujoco_handoff_missing_inputs"
+            ],
+        },
+        {
+            "case_id": "ready_handoff_with_pending_action_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": False,
+            "handoff_state": "ready_with_pending_action",
+            "require_handoff": True,
+            "expected_status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "expected_handoff_intake_status": "handoff_contract_invalid",
+            "expected_handoff_ready": False,
+            "expected_handoff_contract_ok": False,
+            "expected_handoff_missing_inputs": [],
+            "expected_handoff_pending_action_ids": [
+                "rerun_reviewed_mujoco_downstream_handoff"
+            ],
+            "expected_handoff_blockers_contain": [
+                "resolve_ready_reviewed_mujoco_handoff_pending_actions"
+            ],
+        },
+        {
             "case_id": "ready_handoff_intake_still_development_scene",
             "source_square": "e4",
             "target_square": "e5",
@@ -349,6 +410,13 @@ def run_child(
 def add_error(errors: list[str], label: str, actual: Any, expected: Any) -> None:
     if actual != expected:
         errors.append(f"{label}: expected {expected!r}, got {actual!r}")
+
+
+def expect_contains(errors: list[str], label: str, values: Any, expected_values: list[str]) -> None:
+    values = values if isinstance(values, list) else []
+    for expected in expected_values:
+        if expected not in values:
+            errors.append(f"{label}: expected {expected!r} in {values!r}")
 
 
 def summarize_case(
@@ -442,6 +510,18 @@ def summarize_case(
         ),
         "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked": summary.get(
             "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked"
+        ),
+        "reviewed_mujoco_handoff_missing_inputs": summary.get(
+            "reviewed_mujoco_handoff_missing_inputs"
+        ),
+        "reviewed_mujoco_handoff_pending_action_ids": summary.get(
+            "reviewed_mujoco_handoff_pending_action_ids"
+        ),
+        "reviewed_mujoco_handoff_ready_has_open_work": summary.get(
+            "reviewed_mujoco_handoff_ready_has_open_work"
+        ),
+        "reviewed_mujoco_handoff_blockers": summary.get(
+            "reviewed_mujoco_handoff_blockers"
         ),
         "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": summary.get(
             "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority"
@@ -552,6 +632,26 @@ def summarize_case(
             observations["reviewed_mujoco_handoff_ready"],
             spec["expected_handoff_ready"],
         )
+    if "expected_handoff_missing_inputs" in spec:
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_missing_inputs",
+            observations["reviewed_mujoco_handoff_missing_inputs"],
+            spec["expected_handoff_missing_inputs"],
+        )
+    if "expected_handoff_pending_action_ids" in spec:
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_pending_action_ids",
+            observations["reviewed_mujoco_handoff_pending_action_ids"],
+            spec["expected_handoff_pending_action_ids"],
+        )
+    expect_contains(
+        errors,
+        f"{case_id}.reviewed_mujoco_handoff_blockers",
+        observations["reviewed_mujoco_handoff_blockers"],
+        spec.get("expected_handoff_blockers_contain", []),
+    )
     if expected_handoff_requested:
         add_error(
             errors,
@@ -695,6 +795,18 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked": observations.get(
             "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked"
+        ),
+        "reviewed_mujoco_handoff_missing_inputs": observations.get(
+            "reviewed_mujoco_handoff_missing_inputs"
+        ),
+        "reviewed_mujoco_handoff_pending_action_ids": observations.get(
+            "reviewed_mujoco_handoff_pending_action_ids"
+        ),
+        "reviewed_mujoco_handoff_ready_has_open_work": observations.get(
+            "reviewed_mujoco_handoff_ready_has_open_work"
+        ),
+        "reviewed_mujoco_handoff_blockers": observations.get(
+            "reviewed_mujoco_handoff_blockers"
         ),
         "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": observations.get(
             "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority"

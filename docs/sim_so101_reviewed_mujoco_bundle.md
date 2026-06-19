@@ -93,6 +93,11 @@ gates must consume. It always reports
 true only when physical reviewed model authority and MuJoCo/SimRobot motion are
 both true; fixture-positive runs instead report
 `fixture_handoff_ready_not_physical_so101_authority: true`.
+Downstream consumers must also reject any raw-ready or fixture-ready handoff
+that still carries non-empty `missing_inputs`, `next_required_for_goal`, or
+`next_required_action_ids`. A ready-shaped handoff with open work is
+contradictory and cannot unblock scene, Gymnasium, pick/place, or training
+readiness gates.
 
 The joint-limit comparison converts manifest body-joint limits from degrees to
 MuJoCo radians and covers `shoulder_pan`, `shoulder_lift`, `elbow_flex`,

@@ -5686,6 +5686,36 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
         )
         is True
     )
+    handoff_raw_missing_inputs = reviewed_mujoco_bundle.get("missing_inputs")
+    handoff_missing_inputs = unique_string_values(
+        handoff_raw_missing_inputs if isinstance(handoff_raw_missing_inputs, list) else []
+    )
+    handoff_next_required = reviewed_mujoco_bundle.get("next_required_for_goal")
+    handoff_next_required_action_ids = unique_string_values(
+        [
+            action.get("action_id") if isinstance(action, dict) else action
+            for action in handoff_next_required
+        ]
+        if isinstance(handoff_next_required, list)
+        else []
+    )
+    handoff_raw_explicit_action_ids = reviewed_mujoco_bundle.get(
+        "next_required_action_ids"
+    )
+    handoff_explicit_action_ids = unique_string_values(
+        handoff_raw_explicit_action_ids
+        if isinstance(handoff_raw_explicit_action_ids, list)
+        else []
+    )
+    handoff_pending_action_ids = unique_string_values(
+        [
+            *handoff_explicit_action_ids,
+            *handoff_next_required_action_ids,
+        ]
+    )
+    ready_handoff_has_open_work = (raw_ready or fixture_ready) and bool(
+        handoff_missing_inputs or handoff_pending_action_ids
+    )
 
     physical_ready_contract_ok = (
         not raw_ready
@@ -5733,6 +5763,10 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
         blockers.append("provide_complete_reviewed_mujoco_downstream_handoff_items")
     if not item_count_ok:
         blockers.append("fix_reviewed_mujoco_downstream_handoff_item_count")
+    if (raw_ready or fixture_ready) and handoff_missing_inputs:
+        blockers.append("resolve_ready_reviewed_mujoco_handoff_missing_inputs")
+    if (raw_ready or fixture_ready) and handoff_pending_action_ids:
+        blockers.append("resolve_ready_reviewed_mujoco_handoff_pending_actions")
     if raw_ready and not physical_ready_contract_ok:
         blockers.append("repair_physical_reviewed_mujoco_handoff_readiness_flags")
     if fixture_ready and not fixture_contract_ok:
@@ -5784,6 +5818,9 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
         "item_count": item_count,
         "item_ids": item_ids,
         "missing_item_ids": missing_item_ids,
+        "missing_inputs": handoff_missing_inputs,
+        "pending_action_ids": handoff_pending_action_ids,
+        "ready_handoff_has_open_work": ready_handoff_has_open_work,
         "blockers": blockers,
         "next_action_ids": next_action_ids,
         "physical_motion_checked": physical_motion_checked,
@@ -6223,6 +6260,15 @@ def so101_training_readiness_gate_section(
         ),
         "reviewed_mujoco_downstream_handoff_missing_item_ids": (
             downstream_handoff_contract.get("missing_item_ids")
+        ),
+        "reviewed_mujoco_downstream_handoff_missing_inputs": (
+            downstream_handoff_contract.get("missing_inputs")
+        ),
+        "reviewed_mujoco_downstream_handoff_pending_action_ids": (
+            downstream_handoff_contract.get("pending_action_ids")
+        ),
+        "reviewed_mujoco_downstream_handoff_ready_has_open_work": (
+            downstream_handoff_contract.get("ready_handoff_has_open_work")
         ),
         "reviewed_mujoco_downstream_handoff_contract_blockers": (
             downstream_handoff_contract.get("blockers")

@@ -86,6 +86,20 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n")
 
 
+def unique_strings(values: list[Any]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        if value is None:
+            continue
+        text = str(value)
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        result.append(text)
+    return result
+
+
 def write_steps(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
@@ -127,6 +141,9 @@ def handoff_intake_result(
     fixture_motion_checked: bool = False,
     motion_evidence_not_physical: Any = None,
     physical_model_authority_ready: Any = None,
+    missing_inputs: list[str] | None = None,
+    pending_action_ids: list[str] | None = None,
+    ready_handoff_has_open_work: bool = False,
 ) -> dict[str, Any]:
     return {
         "reviewed_mujoco_handoff_requested": requested,
@@ -157,6 +174,9 @@ def handoff_intake_result(
         "reviewed_mujoco_handoff_physical_so101_model_authority_ready": (
             physical_model_authority_ready
         ),
+        "reviewed_mujoco_handoff_missing_inputs": missing_inputs or [],
+        "reviewed_mujoco_handoff_pending_action_ids": pending_action_ids or [],
+        "reviewed_mujoco_handoff_ready_has_open_work": ready_handoff_has_open_work,
         "reviewed_mujoco_handoff_item_ids": item_ids or [],
         "reviewed_mujoco_handoff_blockers": blockers or [],
     }
@@ -228,6 +248,32 @@ def reviewed_handoff_intake(
     fixture_ready = (
         payload.get("fixture_handoff_ready_not_physical_so101_authority") is True
     )
+    raw_missing_inputs = payload.get("missing_inputs")
+    handoff_missing_inputs = unique_strings(
+        raw_missing_inputs if isinstance(raw_missing_inputs, list) else []
+    )
+    handoff_next_required = payload.get("next_required_for_goal")
+    handoff_next_required_action_ids = unique_strings(
+        [
+            action.get("action_id") if isinstance(action, dict) else action
+            for action in handoff_next_required
+        ]
+        if isinstance(handoff_next_required, list)
+        else []
+    )
+    raw_explicit_action_ids = payload.get("next_required_action_ids")
+    handoff_explicit_action_ids = unique_strings(
+        raw_explicit_action_ids if isinstance(raw_explicit_action_ids, list) else []
+    )
+    handoff_pending_action_ids = unique_strings(
+        [
+            *handoff_explicit_action_ids,
+            *handoff_next_required_action_ids,
+        ]
+    )
+    ready_handoff_has_open_work = (raw_ready or fixture_ready) and bool(
+        handoff_missing_inputs or handoff_pending_action_ids
+    )
     motion_authority_status = payload.get("motion_authority_status")
     physical_model_authority_ready = payload.get("physical_so101_model_authority_ready")
     motion_evidence_not_physical = payload.get(
@@ -268,6 +314,7 @@ def reviewed_handoff_intake(
         and payload.get("reviewed_model_motion_checked") == (
             physical_motion_checked or fixture_motion_checked
         )
+        and not ready_handoff_has_open_work
         and physical_ready_contract_ok
         and fixture_contract_ok
     )
@@ -287,6 +334,10 @@ def reviewed_handoff_intake(
         blockers.append("provide_complete_reviewed_mujoco_downstream_handoff_items")
     if not item_count_ok:
         blockers.append("fix_reviewed_mujoco_downstream_handoff_item_count")
+    if (raw_ready or fixture_ready) and handoff_missing_inputs:
+        blockers.append("resolve_ready_reviewed_mujoco_handoff_missing_inputs")
+    if (raw_ready or fixture_ready) and handoff_pending_action_ids:
+        blockers.append("resolve_ready_reviewed_mujoco_handoff_pending_actions")
     if raw_ready and not physical_ready_contract_ok:
         blockers.append("repair_physical_reviewed_mujoco_handoff_readiness_flags")
     if fixture_ready and not fixture_contract_ok:
@@ -316,6 +367,9 @@ def reviewed_handoff_intake(
         fixture_motion_checked=fixture_motion_checked,
         motion_evidence_not_physical=motion_evidence_not_physical,
         physical_model_authority_ready=physical_model_authority_ready,
+        missing_inputs=handoff_missing_inputs,
+        pending_action_ids=handoff_pending_action_ids,
+        ready_handoff_has_open_work=ready_handoff_has_open_work,
     )
 
 

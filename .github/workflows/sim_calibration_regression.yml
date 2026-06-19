@@ -1145,6 +1145,8 @@ jobs:
               "required_fixture_handoff_rejected",
               "forged_ready_handoff_without_physical_motion_rejected",
               "incomplete_ready_handoff_rejected",
+              "ready_handoff_with_missing_input_rejected",
+              "ready_handoff_with_pending_action_rejected",
               "ready_handoff_intake_still_development_scene",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -1158,6 +1160,8 @@ jobs:
               "required_fixture_handoff_rejected",
               "forged_ready_handoff_without_physical_motion_rejected",
               "incomplete_ready_handoff_rejected",
+              "ready_handoff_with_missing_input_rejected",
+              "ready_handoff_with_pending_action_rejected",
           }
           by_case = {case["case_id"]: case for case in summary["cases"]}
           invalid_steps = by_case["invalid_max_steps_rejected"]["observations"]
@@ -1186,6 +1190,24 @@ jobs:
           assert incomplete_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", incomplete_handoff
           assert incomplete_handoff["reviewed_mujoco_handoff_contract_ok"] is False, incomplete_handoff
           assert incomplete_handoff["reviewed_mujoco_handoff_ready"] is False, incomplete_handoff
+          missing_input_handoff = by_case["ready_handoff_with_missing_input_rejected"]["observations"]
+          assert missing_input_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", missing_input_handoff
+          assert missing_input_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", missing_input_handoff
+          assert missing_input_handoff["reviewed_mujoco_handoff_contract_ok"] is False, missing_input_handoff
+          assert missing_input_handoff["reviewed_mujoco_handoff_ready"] is False, missing_input_handoff
+          assert missing_input_handoff["reviewed_mujoco_handoff_ready_has_open_work"] is True, missing_input_handoff
+          assert missing_input_handoff["reviewed_mujoco_handoff_missing_inputs"] == ["reviewed_mujoco_downstream_handoff_missing_input_should_fail_closed"], missing_input_handoff
+          assert missing_input_handoff["reviewed_mujoco_handoff_pending_action_ids"] == [], missing_input_handoff
+          assert "resolve_ready_reviewed_mujoco_handoff_missing_inputs" in missing_input_handoff["reviewed_mujoco_handoff_blockers"], missing_input_handoff
+          pending_action_handoff = by_case["ready_handoff_with_pending_action_rejected"]["observations"]
+          assert pending_action_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", pending_action_handoff
+          assert pending_action_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", pending_action_handoff
+          assert pending_action_handoff["reviewed_mujoco_handoff_contract_ok"] is False, pending_action_handoff
+          assert pending_action_handoff["reviewed_mujoco_handoff_ready"] is False, pending_action_handoff
+          assert pending_action_handoff["reviewed_mujoco_handoff_ready_has_open_work"] is True, pending_action_handoff
+          assert pending_action_handoff["reviewed_mujoco_handoff_missing_inputs"] == [], pending_action_handoff
+          assert pending_action_handoff["reviewed_mujoco_handoff_pending_action_ids"] == ["rerun_reviewed_mujoco_downstream_handoff"], pending_action_handoff
+          assert "resolve_ready_reviewed_mujoco_handoff_pending_actions" in pending_action_handoff["reviewed_mujoco_handoff_blockers"], pending_action_handoff
           ready_handoff = by_case["ready_handoff_intake_still_development_scene"]["observations"]
           assert ready_handoff["status"] == "ok", ready_handoff
           assert ready_handoff["reviewed_mujoco_handoff_intake_status"] == "reviewed_mujoco_handoff_ready_for_scene_intake", ready_handoff
@@ -1613,6 +1635,8 @@ jobs:
               "reviewed_authority_fixture_handoff_not_training_ready",
               "reviewed_authority_raw_handoff_ready_without_physical_motion_rejected",
               "reviewed_authority_incomplete_handoff_items_rejected",
+              "reviewed_authority_handoff_ready_with_missing_input_rejected",
+              "reviewed_authority_handoff_ready_with_pending_action_rejected",
               "reviewed_authority_handoff_physical_truth_claim_rejected",
               "reviewed_authority_but_board_still_development",
               "reviewed_authority_but_scene_still_development",
@@ -1678,6 +1702,22 @@ jobs:
           assert incomplete_handoff["reviewed_mujoco_downstream_handoff_ready"] is False, incomplete_handoff
           assert "model_authority" in incomplete_handoff["reviewed_mujoco_downstream_handoff_missing_item_ids"], incomplete_handoff
           assert "provide_complete_reviewed_mujoco_downstream_handoff_items" in incomplete_handoff["reviewed_mujoco_downstream_handoff_contract_blockers"], incomplete_handoff
+          missing_input_handoff = by_case["reviewed_authority_handoff_ready_with_missing_input_rejected"]["gate"]
+          assert missing_input_handoff["reviewed_mujoco_downstream_handoff_raw_ready"] is True, missing_input_handoff
+          assert missing_input_handoff["reviewed_mujoco_downstream_handoff_contract_ok"] is False, missing_input_handoff
+          assert missing_input_handoff["reviewed_mujoco_downstream_handoff_ready"] is False, missing_input_handoff
+          assert missing_input_handoff["reviewed_mujoco_downstream_handoff_ready_has_open_work"] is True, missing_input_handoff
+          assert missing_input_handoff["reviewed_mujoco_downstream_handoff_missing_inputs"] == ["reviewed_mujoco_downstream_handoff_missing_input_should_fail_closed"], missing_input_handoff
+          assert missing_input_handoff["reviewed_mujoco_downstream_handoff_pending_action_ids"] == [], missing_input_handoff
+          assert "resolve_ready_reviewed_mujoco_handoff_missing_inputs" in missing_input_handoff["reviewed_mujoco_downstream_handoff_contract_blockers"], missing_input_handoff
+          pending_action_handoff = by_case["reviewed_authority_handoff_ready_with_pending_action_rejected"]["gate"]
+          assert pending_action_handoff["reviewed_mujoco_downstream_handoff_raw_ready"] is True, pending_action_handoff
+          assert pending_action_handoff["reviewed_mujoco_downstream_handoff_contract_ok"] is False, pending_action_handoff
+          assert pending_action_handoff["reviewed_mujoco_downstream_handoff_ready"] is False, pending_action_handoff
+          assert pending_action_handoff["reviewed_mujoco_downstream_handoff_ready_has_open_work"] is True, pending_action_handoff
+          assert pending_action_handoff["reviewed_mujoco_downstream_handoff_missing_inputs"] == [], pending_action_handoff
+          assert pending_action_handoff["reviewed_mujoco_downstream_handoff_pending_action_ids"] == ["rerun_reviewed_mujoco_downstream_handoff"], pending_action_handoff
+          assert "resolve_ready_reviewed_mujoco_handoff_pending_actions" in pending_action_handoff["reviewed_mujoco_downstream_handoff_contract_blockers"], pending_action_handoff
           physical_truth_claim = by_case["reviewed_authority_handoff_physical_truth_claim_rejected"]["gate"]
           assert physical_truth_claim["reviewed_mujoco_downstream_handoff_contract_ok"] is False, physical_truth_claim
           assert physical_truth_claim["reviewed_mujoco_downstream_handoff_ready"] is False, physical_truth_claim
