@@ -520,6 +520,7 @@ jobs:
               "invalid_nonfinite_base_to_board_transform_not_ready",
               "mismatched_model_sha_not_ready",
               "ready_manifest_mismatched_mujoco_joint_limits",
+              "ready_manifest_gripper_range_not_moving",
               "ready_synthetic_fixture_motion_not_physical",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -601,6 +602,30 @@ jobs:
           assert mismatched_limits["observations"]["reviewed_model_motion_checked"] is False, mismatched_limits
           assert mismatched_limits["observations"]["motion_authority_status"] == "hardware_free_fixture_motion_failed", mismatched_limits
           assert mismatched_limits["observations"]["hardware_free_fixture_motion_checked"] is False, mismatched_limits
+          tiny_gripper_range = by_case["ready_manifest_gripper_range_not_moving"]
+          assert tiny_gripper_range["record"]["return_code"] == 1, tiny_gripper_range
+          assert tiny_gripper_range["observations"]["status"] == "reviewed_mujoco_bundle_motion_failed", tiny_gripper_range
+          assert tiny_gripper_range["observations"]["ready_for_model_backed_ik"] is True, tiny_gripper_range
+          assert tiny_gripper_range["observations"]["simrobot_sync_ok"] is False, tiny_gripper_range
+          assert tiny_gripper_range["observations"]["all_so101_joints_motion_checked"] is True, tiny_gripper_range
+          assert tiny_gripper_range["observations"]["motion_check_joint_names"] == [
+              "elbow_flex",
+              "gripper",
+              "shoulder_lift",
+              "shoulder_pan",
+              "wrist_flex",
+              "wrist_roll",
+          ], tiny_gripper_range
+          tiny_gripper_check = tiny_gripper_range["observations"]["gripper_motion_check"]
+          assert tiny_gripper_check["moved"] is False, tiny_gripper_range
+          assert tiny_gripper_check["ok"] is False, tiny_gripper_range
+          assert tiny_gripper_check["range_ok"] is False, tiny_gripper_range
+          assert tiny_gripper_check["target_ok"] is True, tiny_gripper_range
+          assert "simrobot_mujoco_joint_motion" in tiny_gripper_range["observations"]["missing_inputs"], tiny_gripper_range
+          assert tiny_gripper_range["observations"]["reviewed_model_motion_checked"] is False, tiny_gripper_range
+          assert tiny_gripper_range["observations"]["motion_authority_status"] == "hardware_free_fixture_motion_failed", tiny_gripper_range
+          assert tiny_gripper_range["observations"]["hardware_free_fixture_motion_checked"] is False, tiny_gripper_range
+          assert tiny_gripper_range["observations"]["motion_evidence_not_physical_so101_authority"] is False, tiny_gripper_range
           ready_fixture = by_case["ready_synthetic_fixture_motion_not_physical"]
           assert ready_fixture["observations"]["status"] == "reviewed_mujoco_bundle_motion_checked", ready_fixture
           assert ready_fixture["observations"]["reviewed_model_motion_checked"] is True, ready_fixture
