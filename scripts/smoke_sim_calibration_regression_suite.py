@@ -4093,6 +4093,9 @@ def so101_reviewed_mujoco_motion_bundle_consistency_section(
     motion_model_declared_sha256 = normalized_sha256(
         motion_model_identity.get("declared_sha256")
     )
+    motion_model_observed_sha256 = normalized_sha256(
+        motion_model_identity.get("observed_sha256")
+    )
     prerequisites_ready = (
         physical_authority_ready
         and source_bundle_consistency_ready
@@ -4105,6 +4108,14 @@ def so101_reviewed_mujoco_motion_bundle_consistency_section(
         bundle_model_declared_sha256
         and motion_model_declared_sha256
         and bundle_model_declared_sha256 == motion_model_declared_sha256
+    )
+    motion_observed_digest_missing = bool(
+        motion_model_declared_sha256 and not motion_model_observed_sha256
+    )
+    motion_observed_digest_conflicts_with_declared = bool(
+        motion_model_declared_sha256
+        and motion_model_observed_sha256
+        and motion_model_declared_sha256 != motion_model_observed_sha256
     )
     if not prerequisites_ready:
         status = "not_checked_prerequisites_not_ready"
@@ -4126,6 +4137,14 @@ def so101_reviewed_mujoco_motion_bundle_consistency_section(
         status = "reviewed_mujoco_motion_model_digest_missing"
         ready = False
         blocker = "record_reviewed_mujoco_motion_model_sha256"
+    elif motion_observed_digest_missing:
+        status = "reviewed_mujoco_motion_model_observed_digest_missing"
+        ready = False
+        blocker = "verify_reviewed_mujoco_motion_model_file_sha256"
+    elif motion_observed_digest_conflicts_with_declared:
+        status = "reviewed_mujoco_motion_model_observed_digest_mismatch"
+        ready = False
+        blocker = "inspect_reviewed_mujoco_motion_model_file_sha256"
     elif not model_digest_matches:
         status = "reviewed_mujoco_motion_model_digest_mismatch"
         ready = False
@@ -4145,11 +4164,21 @@ def so101_reviewed_mujoco_motion_bundle_consistency_section(
         "reviewed_mujoco_motion_model_path_matches_bundle": model_path_matches,
         "bundle_model_declared_sha256": bundle_model_declared_sha256,
         "reviewed_mujoco_motion_model_declared_sha256": motion_model_declared_sha256,
+        "reviewed_mujoco_motion_model_observed_sha256": motion_model_observed_sha256,
         "reviewed_mujoco_motion_model_sha256_matches_bundle": model_digest_matches,
+        "reviewed_mujoco_motion_model_observed_sha256_missing": (
+            motion_observed_digest_missing
+        ),
+        "reviewed_mujoco_motion_model_observed_sha256_matches_declared": bool(
+            motion_model_declared_sha256
+            and motion_model_observed_sha256
+            and motion_model_declared_sha256 == motion_model_observed_sha256
+        ),
         "blocker": blocker,
         "notes": [
             "This check prevents physical-reviewed MuJoCo motion evidence from closing authority for a different model path or digest than the reviewed bundle manifest.",
             "It is evaluated only after source-to-bundle identity is ready and the reviewed-MuJoCo child reports physical motion ready.",
+            "The reviewed-MuJoCo motion summary must also carry an observed model-file digest that matches its reviewed declared digest.",
         ],
     }
 
@@ -4393,6 +4422,38 @@ def so101_reviewed_model_authority_gate_section(
                 ),
             }
         ]
+    elif (
+        motion_consistency_status
+        == "reviewed_mujoco_motion_model_observed_digest_missing"
+    ):
+        motion_consistency_actions = [
+            {
+                "action_id": "verify_reviewed_mujoco_motion_model_file_sha256",
+                "gate": "mujoco_scene_validity",
+                "title": "Verify reviewed MuJoCo motion model file digest",
+                "detail": (
+                    "Rerun the reviewed-MuJoCo motion check against a readable "
+                    "model file so the observed SHA-256 can be compared with the "
+                    "reviewed motion declaration."
+                ),
+            }
+        ]
+    elif (
+        motion_consistency_status
+        == "reviewed_mujoco_motion_model_observed_digest_mismatch"
+    ):
+        motion_consistency_actions = [
+            {
+                "action_id": "inspect_reviewed_mujoco_motion_model_file_sha256",
+                "gate": "mujoco_scene_validity",
+                "title": "Inspect reviewed MuJoCo motion model file digest",
+                "detail": (
+                    "Resolve the mismatch between the reviewed-MuJoCo motion "
+                    "model SHA-256 declaration and the observed model file digest "
+                    "before closing SO-101 model authority."
+                ),
+            }
+        ]
     elif motion_consistency_status == "reviewed_mujoco_motion_model_digest_mismatch":
         motion_consistency_actions = [
             {
@@ -4589,6 +4650,20 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
         )
     elif motion_bundle_consistency_status == "reviewed_mujoco_motion_model_digest_missing":
         physical_motion_next_action_id = "record_reviewed_mujoco_motion_model_sha256"
+    elif (
+        motion_bundle_consistency_status
+        == "reviewed_mujoco_motion_model_observed_digest_missing"
+    ):
+        physical_motion_next_action_id = (
+            "verify_reviewed_mujoco_motion_model_file_sha256"
+        )
+    elif (
+        motion_bundle_consistency_status
+        == "reviewed_mujoco_motion_model_observed_digest_mismatch"
+    ):
+        physical_motion_next_action_id = (
+            "inspect_reviewed_mujoco_motion_model_file_sha256"
+        )
     elif motion_bundle_consistency_status == "reviewed_mujoco_motion_model_digest_mismatch":
         physical_motion_next_action_id = (
             "align_reviewed_mujoco_motion_with_bundle_model_digest"

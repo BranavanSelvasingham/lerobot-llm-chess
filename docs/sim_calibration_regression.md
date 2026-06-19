@@ -628,15 +628,19 @@ status is `reviewed_mujoco_bundle_motion_checked` and
 `motion_authority_status` is `physical_reviewed_model_motion_checked`, and when
 the motion evidence matches the reviewed bundle model identity. The
 physical-reviewed MuJoCo motion summary must carry the same reviewed bundle
-model path and declared SHA-256 as the bundle manifest. The nested
+model path and declared SHA-256 as the bundle manifest, and its observed
+model-file SHA-256 must be present and match that reviewed motion declaration.
+The nested
 `reviewed_mujoco_motion_bundle_consistency` object reports
 `reviewed_mujoco_motion_model_path_missing`,
 `reviewed_mujoco_motion_model_path_mismatch`,
 `reviewed_mujoco_motion_model_digest_missing`,
+`reviewed_mujoco_motion_model_observed_digest_missing`,
+`reviewed_mujoco_motion_model_observed_digest_mismatch`,
 `reviewed_mujoco_motion_model_digest_mismatch`, or the ready status
 `reviewed_mujoco_motion_matches_bundle_model_identity`; the aggregate gate stays
-blocked until the reviewed-motion model path and digest match the reviewed
-bundle identity. The generated artifact index and HTML/Markdown report surface
+blocked until the reviewed-motion model path, declared digest, and observed
+model-file digest match the reviewed bundle identity. The generated artifact index and HTML/Markdown report surface
 both `physical_reviewed_model_motion_child_ready` and
 `reviewed_mujoco_motion_bundle_consistency_status` so reviewers can distinguish
 child MuJoCo motion from aggregate reviewed SO-101 authority.

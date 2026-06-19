@@ -83,6 +83,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_motion_bundle_consistency_ready",
         "reviewed_mujoco_motion_model_path_matches_bundle",
         "reviewed_mujoco_motion_model_sha256_matches_bundle",
+        "reviewed_mujoco_motion_model_observed_sha256_missing",
+        "reviewed_mujoco_motion_model_observed_sha256_matches_declared",
         "physical_reviewed_model_motion_checked",
         "physical_reviewed_model_motion_reported",
         "physical_reviewed_model_motion_status_ready",
@@ -366,8 +368,12 @@ def motion_physical_ready(
     *,
     model_path: Path | None = None,
     sha256: str | None = SOURCE_MODEL_SHA256,
+    declared_sha256: Any = UNSET,
+    observed_sha256: Any = UNSET,
     fixture_motion_checked: bool = False,
 ) -> dict[str, Any]:
+    declared = sha256 if declared_sha256 is UNSET else declared_sha256
+    observed = sha256 if observed_sha256 is UNSET else observed_sha256
     return {
         "status": "reviewed_mujoco_bundle_motion_checked",
         "motion_authority_status": "physical_reviewed_model_motion_checked",
@@ -375,9 +381,9 @@ def motion_physical_ready(
         "hardware_free_fixture_motion_checked": fixture_motion_checked,
         "model_path": {"path": normalize_path(model_path) if model_path else None},
         "model_identity": {
-            "declared_sha256": sha256,
-            "observed_sha256": sha256,
-            "matches": bool(sha256),
+            "declared_sha256": declared,
+            "observed_sha256": observed,
+            "matches": bool(declared and observed and declared == observed),
         },
         "next_required_for_goal": [],
         "summary_path": str(summary_path),
@@ -900,6 +906,78 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "source_ready_physical_bundle_motion_model_observed_digest_missing",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready(
+                summary_dir / "motion_model_observed_digest_missing.json",
+                model_path=source_model,
+                declared_sha256=SOURCE_MODEL_SHA256,
+                observed_sha256=None,
+            ),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_bundle_model_path_and_digest_consistent",
+                "consistency_ready": True,
+                "motion_bundle_consistency_status": (
+                    "reviewed_mujoco_motion_model_observed_digest_missing"
+                ),
+                "motion_bundle_consistency_ready": False,
+                "development_fixture": True,
+                "motion_child_ready": True,
+                "motion_path_matches_bundle": True,
+                "motion_digest_matches_bundle": True,
+                "motion_observed_sha256_missing": True,
+                "motion_observed_sha256_matches_declared": False,
+                "blockers_contain": [
+                    "verify_reviewed_mujoco_motion_model_file_sha256"
+                ],
+                "actions_contain": [
+                    "verify_reviewed_mujoco_motion_model_file_sha256"
+                ],
+                "action_required_contains": ["physical_reviewed_mujoco_motion_checked"],
+                "blocker_packet_next_actions_contain": [
+                    "verify_reviewed_mujoco_motion_model_file_sha256"
+                ],
+            },
+        },
+        {
+            "case_id": "source_ready_physical_bundle_motion_model_observed_digest_mismatch",
+            "source": source_ready(summary_dir / "source_ready.json", source_model),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready(
+                summary_dir / "motion_model_observed_digest_mismatch.json",
+                model_path=source_model,
+                declared_sha256=SOURCE_MODEL_SHA256,
+                observed_sha256=BUNDLE_MODEL_SHA256,
+            ),
+            "expect": {
+                "ready": False,
+                "consistency_status": "source_bundle_model_path_and_digest_consistent",
+                "consistency_ready": True,
+                "motion_bundle_consistency_status": (
+                    "reviewed_mujoco_motion_model_observed_digest_mismatch"
+                ),
+                "motion_bundle_consistency_ready": False,
+                "development_fixture": True,
+                "motion_child_ready": True,
+                "motion_path_matches_bundle": True,
+                "motion_digest_matches_bundle": True,
+                "motion_observed_sha256_missing": False,
+                "motion_observed_sha256_matches_declared": False,
+                "blockers_contain": [
+                    "inspect_reviewed_mujoco_motion_model_file_sha256"
+                ],
+                "actions_contain": [
+                    "inspect_reviewed_mujoco_motion_model_file_sha256"
+                ],
+                "action_required_contains": ["physical_reviewed_mujoco_motion_checked"],
+                "blocker_packet_next_actions_contain": [
+                    "inspect_reviewed_mujoco_motion_model_file_sha256"
+                ],
+            },
+        },
+        {
             "case_id": "source_ready_physical_bundle_motion_model_path_mismatch",
             "source": source_ready(summary_dir / "source_ready.json", source_model),
             "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
@@ -1382,6 +1460,24 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
                 ),
                 expect["motion_digest_matches_bundle"],
             )
+        if "motion_observed_sha256_missing" in expect:
+            add_error(
+                errors,
+                "motion_observed_sha256_missing",
+                motion_bundle_consistency.get(
+                    "reviewed_mujoco_motion_model_observed_sha256_missing"
+                ),
+                expect["motion_observed_sha256_missing"],
+            )
+        if "motion_observed_sha256_matches_declared" in expect:
+            add_error(
+                errors,
+                "motion_observed_sha256_matches_declared",
+                motion_bundle_consistency.get(
+                    "reviewed_mujoco_motion_model_observed_sha256_matches_declared"
+                ),
+                expect["motion_observed_sha256_matches_declared"],
+            )
 
     if "blockers_exact" in expect:
         add_error(errors, "blockers", gate.get("blockers"), expect["blockers_exact"])
@@ -1511,6 +1607,16 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "reviewed_mujoco_motion_model_sha256_matches_bundle": motion_consistency.get(
             "reviewed_mujoco_motion_model_sha256_matches_bundle"
+        ),
+        "reviewed_mujoco_motion_model_observed_sha256_missing": (
+            motion_consistency.get(
+                "reviewed_mujoco_motion_model_observed_sha256_missing"
+            )
+        ),
+        "reviewed_mujoco_motion_model_observed_sha256_matches_declared": (
+            motion_consistency.get(
+                "reviewed_mujoco_motion_model_observed_sha256_matches_declared"
+            )
         ),
         "physical_reviewed_model_motion_checked": gate.get(
             "physical_reviewed_model_motion_checked"
