@@ -200,6 +200,14 @@ def case_specs() -> list[dict[str, Any]]:
             "expected_error_contains": "Invalid chess square",
         },
         {
+            "case_id": "invalid_target_square_rejected",
+            "source_square": "e4",
+            "target_square": "z9",
+            "expected_status": "invalid_task_configuration",
+            "expect_ok": False,
+            "expected_error_contains": "Invalid chess square",
+        },
+        {
             "case_id": "same_source_target_rejected",
             "source_square": "e4",
             "target_square": "e4",

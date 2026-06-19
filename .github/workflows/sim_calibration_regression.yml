@@ -1574,6 +1574,7 @@ jobs:
               "alternate_source_d4_e5_records_pick_gap",
               "reversed_source_e5_e4_records_pick_gap",
               "invalid_source_square_rejected",
+              "invalid_target_square_rejected",
               "same_source_target_rejected",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -1587,6 +1588,7 @@ jobs:
           ], summary["expected_gap_case_ids"]
           assert summary["invalid_task_case_ids"] == [
               "invalid_source_square_rejected",
+              "invalid_target_square_rejected",
               "same_source_target_rejected",
           ], summary["invalid_task_case_ids"]
           by_case = {case["case_id"]: case for case in summary["cases"]}
@@ -1641,12 +1643,21 @@ jobs:
           assert invalid_source["observations"]["ok"] is False, invalid_source
           assert invalid_source["observations"]["return_code"] == 1, invalid_source
           assert "Invalid chess square" in invalid_source["observations"]["configuration_error"]["message"], invalid_source
+          invalid_target = by_case["invalid_target_square_rejected"]
+          assert invalid_target["observations"]["status"] == "invalid_task_configuration", invalid_target
+          assert invalid_target["observations"]["ok"] is False, invalid_target
+          assert invalid_target["observations"]["return_code"] == 1, invalid_target
+          assert "Invalid chess square" in invalid_target["observations"]["configuration_error"]["message"], invalid_target
           same_square = by_case["same_source_target_rejected"]
           assert same_square["observations"]["status"] == "invalid_task_configuration", same_square
           assert same_square["observations"]["ok"] is False, same_square
           assert same_square["observations"]["return_code"] == 1, same_square
           assert "piece_square and target_square must differ" in same_square["observations"]["configuration_error"]["message"], same_square
-          for case_id in ("invalid_source_square_rejected", "same_source_target_rejected"):
+          for case_id in (
+              "invalid_source_square_rejected",
+              "invalid_target_square_rejected",
+              "same_source_target_rejected",
+          ):
               obs = by_case[case_id]["observations"]
               assert obs["source_pick_started_at_source"] is False, by_case[case_id]
               assert obs["board_source_pick_place_verified"] is False, by_case[case_id]

@@ -780,10 +780,11 @@ It reports
 `ready_for_model_backed_ik: false`, and `ready_for_policy_training: false`.
 It covers the current seeded `e4 -> e5` board-source pick/place fixture plus
 alternate target/source cases that must record expected place/pick gaps, plus
-invalid source/target task cases that must write fail-closed summary/CSV/README
-artifacts without generating model XML or manifests. Those gap and invalid
-cases make the fixture boundary explicit before reviewed model-backed IK is
-available. The matrix also exports and asserts the detailed contact path:
+invalid source squares, invalid target squares, and same-square task cases that
+must write fail-closed summary/CSV/README artifacts without generating model XML
+or manifests. Those gap and invalid cases make the fixture boundary explicit
+before reviewed model-backed IK is available. The matrix also exports and
+asserts the detailed contact path:
 source-start, two-finger contact, board-contact clearance during lift, transfer,
 placement without manual piece-pose edits, release-contact clearance, final
 board contact, and final target XY tolerance.
