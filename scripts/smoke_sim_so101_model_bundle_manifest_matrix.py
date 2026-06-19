@@ -17,6 +17,10 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from smoke_sim_so101_bundle_ready_forwarding import create_fixtures  # noqa: E402
+from smoke_sim_so101_model_bundle_manifest import (  # noqa: E402
+    EXPECTED_SO101_JOINTS,
+    EXPECTED_TARGET_FRAME,
+)
 
 DEFAULT_OUTPUT_DIR = (
     Path("/private/tmp") / "lerobot_sim" / "so101_model_bundle_manifest_matrix"
@@ -227,6 +231,179 @@ def assert_review_requirements_url_policy(
         ["http", "https"],
     )
     return expected_url_fields
+
+
+def assert_reviewed_manifest_template_contract(
+    errors: list[str],
+    case_id: str,
+    summary: dict[str, Any],
+    artifacts: dict[str, Any],
+) -> None:
+    template = summary.get("reviewed_manifest_template")
+    template = template if isinstance(template, dict) else {}
+    template_path = artifacts.get("reviewed_manifest_template_json")
+    if isinstance(template_path, str) and Path(template_path).is_file():
+        try:
+            template_from_file = json.loads(Path(template_path).read_text())
+        except json.JSONDecodeError as exc:
+            errors.append(
+                f"{case_id}.reviewed_manifest_template_json: invalid JSON {exc}"
+            )
+        else:
+            add_error(
+                errors,
+                f"{case_id}.reviewed_manifest_template_json_matches_summary",
+                template_from_file,
+                template,
+            )
+
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.model_authority",
+        template.get("model_authority"),
+        "reviewed_manifest_template_not_authority",
+    )
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.ready_for_model_backed_ik",
+        template.get("ready_for_model_backed_ik"),
+        False,
+    )
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.physical_so101_model_authority_ready",
+        template.get("physical_so101_model_authority_ready"),
+        False,
+    )
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.observed_evidence_is_authority",
+        template.get("observed_evidence_is_authority"),
+        False,
+    )
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.physical_so101_truth_claimed",
+        template.get("physical_so101_truth_claimed"),
+        False,
+    )
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.development_fixture_boundary",
+        template.get("development_fixture_evidence_not_physical_so101_truth"),
+        True,
+    )
+    expected_scope_map = {
+        "authority": ["model_identity", "provenance", "license"],
+        "target_frame_authority": ["target_frame"],
+        "joint_limit_authority": ["joint_limits"],
+        "mesh_asset_authority": ["mesh_assets"],
+        "tcp_offset_authority": ["tcp_offset"],
+        "base_to_board_alignment_authority": ["base_to_board_alignment"],
+    }
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.required_review_scopes_by_field",
+        template.get("required_review_scopes_by_field"),
+        expected_scope_map,
+    )
+
+    manifest_template = template.get("manifest_template")
+    manifest_template = manifest_template if isinstance(manifest_template, dict) else {}
+    expected_fields = [
+        "model_path",
+        "model_sha256",
+        "asset_roots",
+        "authority",
+        "provenance",
+        "target_frame",
+        "target_frame_authority",
+        "joint_limits_deg",
+        "joint_limit_authority",
+        "mesh_asset_authority",
+        "tcp_offset_m",
+        "tcp_offset_authority",
+        "base_to_board_transform",
+        "base_to_board_alignment_authority",
+    ]
+    for field in expected_fields:
+        if field not in manifest_template:
+            errors.append(
+                f"{case_id}.reviewed_manifest_template.manifest_template.{field}: expected field"
+            )
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.manifest_template.target_frame",
+        manifest_template.get("target_frame"),
+        EXPECTED_TARGET_FRAME,
+    )
+
+    authority = manifest_template.get("authority")
+    authority = authority if isinstance(authority, dict) else {}
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.authority.review_scopes",
+        authority.get("review_scopes"),
+        ["model_identity", "provenance", "license"],
+    )
+    expected_single_scope_fields = {
+        "target_frame_authority": "target_frame",
+        "joint_limit_authority": "joint_limits",
+        "mesh_asset_authority": "mesh_assets",
+        "tcp_offset_authority": "tcp_offset",
+        "base_to_board_alignment_authority": "base_to_board_alignment",
+    }
+    for field, expected_scope in expected_single_scope_fields.items():
+        review = manifest_template.get(field)
+        review = review if isinstance(review, dict) else {}
+        add_error(
+            errors,
+            f"{case_id}.reviewed_manifest_template.{field}.review_scope",
+            review.get("review_scope"),
+            expected_scope,
+        )
+
+    joint_limits = manifest_template.get("joint_limits_deg")
+    joint_limits = joint_limits if isinstance(joint_limits, dict) else {}
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.joint_limits_deg.keys",
+        sorted(joint_limits.keys()),
+        sorted(EXPECTED_SO101_JOINTS),
+    )
+    for joint in EXPECTED_SO101_JOINTS:
+        value = joint_limits.get(joint)
+        if not isinstance(value, list) or len(value) != 2:
+            errors.append(
+                f"{case_id}.reviewed_manifest_template.joint_limits_deg.{joint}: expected lower/upper placeholder pair"
+            )
+
+    tcp_offset = manifest_template.get("tcp_offset_m")
+    tcp_offset = tcp_offset if isinstance(tcp_offset, dict) else {}
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.tcp_offset_m.keys",
+        sorted(tcp_offset.keys()),
+        ["x", "y", "z"],
+    )
+    alignment = manifest_template.get("base_to_board_transform")
+    alignment = alignment if isinstance(alignment, dict) else {}
+    translation = alignment.get("translation_m")
+    translation = translation if isinstance(translation, dict) else {}
+    rotation = alignment.get("rotation_rpy_rad")
+    rotation = rotation if isinstance(rotation, dict) else {}
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.base_to_board.translation_m.keys",
+        sorted(translation.keys()),
+        ["x", "y", "z"],
+    )
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.base_to_board.rotation_rpy_rad.keys",
+        sorted(rotation.keys()),
+        ["pitch", "roll", "yaw"],
+    )
 
 
 def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
@@ -623,6 +800,12 @@ def summarize_case(
         errors,
         case_id,
         review_requirements,
+    )
+    assert_reviewed_manifest_template_contract(
+        errors,
+        case_id,
+        summary,
+        artifacts,
     )
 
     add_error(errors, f"{case_id}.return_code", record.get("return_code"), 0)
