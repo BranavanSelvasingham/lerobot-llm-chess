@@ -187,16 +187,23 @@ def compact_list(value: Any) -> str:
     return "<br>".join(markdown_code(item) for item in value)
 
 
+def compact_mapping_value(value: Any) -> str:
+    if isinstance(value, dict):
+        return "{" + ", ".join(
+            f"{key}={compact_mapping_value(mapped)}"
+            for key, mapped in sorted(value.items(), key=lambda item: str(item[0]))
+        ) + "}"
+    if isinstance(value, list):
+        return "[" + ", ".join(compact_mapping_value(item) for item in value) + "]"
+    return str(value)
+
+
 def compact_mapping(value: Any) -> str:
     if not isinstance(value, dict) or not value:
         return ""
     parts = []
     for key, mapped in sorted(value.items(), key=lambda item: str(item[0])):
-        if isinstance(mapped, list):
-            rendered = "[" + ", ".join(str(item) for item in mapped) + "]"
-        else:
-            rendered = str(mapped)
-        parts.append(markdown_code(f"{key}={rendered}"))
+        parts.append(markdown_code(f"{key}={compact_mapping_value(mapped)}"))
     return "<br>".join(parts)
 
 

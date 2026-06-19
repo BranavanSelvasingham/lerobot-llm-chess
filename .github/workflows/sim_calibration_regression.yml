@@ -4446,6 +4446,8 @@ jobs:
           assert "### SO-101 Model Source Inventory" in report_text, report_text
           assert "### SO-101 Model Bundle Manifest" in report_text, report_text
           assert "### SO-101 MuJoCo Development Gates" in report_text, report_text
+          assert "Checklist Prior Statuses" in report_text, report_text
+          assert "physical_reviewed_mujoco_motion_checked={physical_bundle_authority_ready=action_required, source_bundle_consistency=blocked_by_prior_requirements}" in report_text, report_text
           entrypoint_text = entrypoint_path.read_text()
           assert "Open `artifact_index_report.md` first." in entrypoint_text, entrypoint_text
           assert "`calibration_regression_summary.json`" in entrypoint_text, entrypoint_text
