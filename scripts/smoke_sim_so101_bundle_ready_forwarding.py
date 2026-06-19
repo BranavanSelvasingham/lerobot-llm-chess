@@ -136,6 +136,9 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `placeholder_manifest`: `{summary['fixtures']['placeholder_manifest_path']}`",
         f"- `placeholder_review_manifest`: `{summary['fixtures']['placeholder_review_manifest_path']}`",
         f"- `thin_review_manifest`: `{summary['fixtures']['thin_review_manifest_path']}`",
+        f"- `invalid_review_url_manifest`: `{summary['fixtures']['invalid_review_url_manifest_path']}`",
+        f"- `generic_review_scope_manifest`: `{summary['fixtures']['generic_review_scope_manifest_path']}`",
+        f"- `pending_review_metadata_manifest`: `{summary['fixtures']['pending_review_metadata_manifest_path']}`",
         f"- `weak_review_manifest`: `{summary['fixtures']['weak_review_manifest_path']}`",
         f"- `placeholder_provenance_manifest`: `{summary['fixtures']['placeholder_provenance_manifest_path']}`",
         f"- `fixture_provenance_reviewed_authority_manifest`: `{summary['fixtures']['fixture_provenance_reviewed_authority_manifest_path']}`",
@@ -463,6 +466,25 @@ def generic_review_scope_manifest_payload(model_filename: str) -> dict[str, Any]
     return payload
 
 
+def pending_review_metadata_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    for review_field in (
+        "authority",
+        "target_frame_authority",
+        "joint_limit_authority",
+        "mesh_asset_authority",
+        "tcp_offset_authority",
+        "base_to_board_alignment_authority",
+    ):
+        payload[review_field]["next_required_action_ids"] = [
+            f"resolve_{review_field}_open_review_item",
+        ]
+    payload["authority"]["missing_inputs"] = [
+        "reviewed_so101_source_authority_signoff",
+    ]
+    return payload
+
+
 def weak_joint_limit_authority_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload.pop("joint_limit_authority", None)
@@ -522,6 +544,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     thin_review_dir = fixture_dir / "thin_review_bundle"
     invalid_review_url_dir = fixture_dir / "invalid_review_url_bundle"
     generic_review_scope_dir = fixture_dir / "generic_review_scope_bundle"
+    pending_review_metadata_dir = fixture_dir / "pending_review_metadata_bundle"
     weak_review_dir = fixture_dir / "weak_review_bundle"
     placeholder_provenance_dir = fixture_dir / "placeholder_provenance_bundle"
     fixture_provenance_reviewed_authority_dir = (
@@ -546,6 +569,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         thin_review_dir,
         invalid_review_url_dir,
         generic_review_scope_dir,
+        pending_review_metadata_dir,
         weak_review_dir,
         placeholder_provenance_dir,
         fixture_provenance_reviewed_authority_dir,
@@ -580,6 +604,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     invalid_review_url_model_path.write_text(mjcf_with_mesh_reference())
     generic_review_scope_model_path = generic_review_scope_dir / "model" / "synthetic_so101_mujoco.xml"
     generic_review_scope_model_path.write_text(mjcf_with_mesh_reference())
+    pending_review_metadata_model_path = (
+        pending_review_metadata_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    pending_review_metadata_model_path.write_text(mjcf_with_mesh_reference())
     weak_review_model_path = weak_review_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_review_model_path.write_text(mjcf_with_mesh_reference())
     placeholder_provenance_model_path = (
@@ -627,6 +655,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     thin_review_manifest_path = thin_review_dir / "so101_model_bundle.thin_review.json"
     invalid_review_url_manifest_path = invalid_review_url_dir / "so101_model_bundle.invalid_review_url.json"
     generic_review_scope_manifest_path = generic_review_scope_dir / "so101_model_bundle.generic_review_scope.json"
+    pending_review_metadata_manifest_path = (
+        pending_review_metadata_dir / "so101_model_bundle.pending_review_metadata.json"
+    )
     weak_review_manifest_path = weak_review_dir / "so101_model_bundle.weak_review.json"
     placeholder_provenance_manifest_path = (
         placeholder_provenance_dir / "so101_model_bundle.placeholder_provenance.json"
@@ -677,6 +708,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         generic_review_scope_manifest_path,
         generic_review_scope_manifest_payload(model_filename=generic_review_scope_model_path.name),
         generic_review_scope_model_path,
+    )
+    write_manifest_json(
+        pending_review_metadata_manifest_path,
+        pending_review_metadata_manifest_payload(
+            model_filename=pending_review_metadata_model_path.name
+        ),
+        pending_review_metadata_model_path,
     )
     write_manifest_json(
         weak_review_manifest_path,
@@ -751,6 +789,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "thin_review_manifest_path": thin_review_manifest_path,
         "invalid_review_url_manifest_path": invalid_review_url_manifest_path,
         "generic_review_scope_manifest_path": generic_review_scope_manifest_path,
+        "pending_review_metadata_manifest_path": pending_review_metadata_manifest_path,
         "weak_review_manifest_path": weak_review_manifest_path,
         "placeholder_provenance_manifest_path": placeholder_provenance_manifest_path,
         "fixture_provenance_reviewed_authority_manifest_path": (
@@ -772,6 +811,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "thin_review_model_path": thin_review_model_path,
         "invalid_review_url_model_path": invalid_review_url_model_path,
         "generic_review_scope_model_path": generic_review_scope_model_path,
+        "pending_review_metadata_model_path": pending_review_metadata_model_path,
         "weak_review_model_path": weak_review_model_path,
         "placeholder_provenance_model_path": placeholder_provenance_model_path,
         "fixture_provenance_reviewed_authority_model_path": (

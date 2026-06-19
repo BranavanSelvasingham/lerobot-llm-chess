@@ -96,6 +96,12 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "tcp_offset_status",
         "alignment_status",
         "contract_checker_status",
+        "authority_review_open_work_fields",
+        "joint_limits_review_open_work_fields",
+        "mesh_assets_review_open_work_fields",
+        "target_frame_review_open_work_fields",
+        "tcp_offset_review_open_work_fields",
+        "alignment_review_open_work_fields",
         "missing_inputs",
         "next_required_action_ids",
         "review_packet_status",
@@ -129,6 +135,15 @@ def expect_contains(errors: list[str], label: str, values: Any, expected: list[s
 def nested_status(summary: dict[str, Any], key: str) -> Any:
     value = summary.get(key)
     return value.get("status") if isinstance(value, dict) else None
+
+
+def review_open_work_fields(summary: dict[str, Any], key: str) -> list[str]:
+    value = summary.get(key)
+    value = value if isinstance(value, dict) else {}
+    review = value.get("review")
+    review = review if isinstance(review, dict) else value
+    fields = review.get("review_evidence_open_work_fields")
+    return fields if isinstance(fields, list) else []
 
 
 def field_check_status(summary: dict[str, Any], requirement_id: str) -> str | None:
@@ -258,6 +273,35 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                     "tcp_offset_authority",
                     "base_to_board_alignment_authority",
                 ],
+            },
+        },
+        {
+            "case_id": "pending_review_metadata_not_ready",
+            "manifest_path": fixtures["pending_review_metadata_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "physical_ready": False,
+                "fixture_ready": False,
+                "authority_status": "needs_review",
+                "joint_limits_status": "needs_review",
+                "mesh_assets_status": "needs_review",
+                "target_frame_status": "needs_review",
+                "tcp_offset_status": "needs_review",
+                "alignment_status": "needs_review",
+                "missing_inputs": [
+                    "authority",
+                    "joint_limit_authority",
+                    "mesh_asset_authority",
+                    "target_frame_authority",
+                    "tcp_offset_authority",
+                    "base_to_board_alignment_authority",
+                ],
+                "authority_open_work_fields": [
+                    "missing_inputs",
+                    "next_required_action_ids",
+                ],
+                "review_open_work_fields": ["next_required_action_ids"],
             },
         },
         {
@@ -538,6 +582,27 @@ def summarize_case(
         summary.get("synthetic_fixture_authority_fields"),
         expect.get("synthetic_fields_contain", []),
     )
+    if "authority_open_work_fields" in expect:
+        expect_contains(
+            errors,
+            f"{case_id}.authority_review_open_work_fields",
+            review_open_work_fields(summary, "authority"),
+            expect["authority_open_work_fields"],
+        )
+    if "review_open_work_fields" in expect:
+        for label, summary_key in (
+            ("joint_limits", "joint_limits"),
+            ("mesh_assets", "mesh_assets"),
+            ("target_frame", "target_frame"),
+            ("tcp_offset", "tcp_offset"),
+            ("alignment", "base_to_board_alignment"),
+        ):
+            expect_contains(
+                errors,
+                f"{case_id}.{label}_review_open_work_fields",
+                review_open_work_fields(summary, summary_key),
+                expect["review_open_work_fields"],
+            )
 
     review_packet = summary.get("review_packet")
     review_packet = review_packet if isinstance(review_packet, dict) else {}
@@ -610,6 +675,24 @@ def summarize_case(
             "contract_checker_status": (summary.get("contract_checker") or {}).get(
                 "status"
             ),
+            "authority_review_open_work_fields": review_open_work_fields(
+                summary, "authority"
+            ),
+            "joint_limits_review_open_work_fields": review_open_work_fields(
+                summary, "joint_limits"
+            ),
+            "mesh_assets_review_open_work_fields": review_open_work_fields(
+                summary, "mesh_assets"
+            ),
+            "target_frame_review_open_work_fields": review_open_work_fields(
+                summary, "target_frame"
+            ),
+            "tcp_offset_review_open_work_fields": review_open_work_fields(
+                summary, "tcp_offset"
+            ),
+            "alignment_review_open_work_fields": review_open_work_fields(
+                summary, "base_to_board_alignment"
+            ),
             "missing_inputs": missing_inputs,
             "next_required_action_ids": next_required_action_ids,
             "review_packet_status": summary.get("review_packet_status"),
@@ -666,6 +749,24 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "tcp_offset_status": obs.get("tcp_offset_status"),
         "alignment_status": obs.get("alignment_status"),
         "contract_checker_status": obs.get("contract_checker_status"),
+        "authority_review_open_work_fields": obs.get(
+            "authority_review_open_work_fields"
+        ),
+        "joint_limits_review_open_work_fields": obs.get(
+            "joint_limits_review_open_work_fields"
+        ),
+        "mesh_assets_review_open_work_fields": obs.get(
+            "mesh_assets_review_open_work_fields"
+        ),
+        "target_frame_review_open_work_fields": obs.get(
+            "target_frame_review_open_work_fields"
+        ),
+        "tcp_offset_review_open_work_fields": obs.get(
+            "tcp_offset_review_open_work_fields"
+        ),
+        "alignment_review_open_work_fields": obs.get(
+            "alignment_review_open_work_fields"
+        ),
         "missing_inputs": obs.get("missing_inputs"),
         "next_required_action_ids": obs.get("next_required_action_ids"),
         "review_packet_status": obs.get("review_packet_status"),

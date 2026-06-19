@@ -684,10 +684,11 @@ It reports `model_authority: "model_bundle_manifest_matrix_not_authority"`,
 synthetic fixture manifest that must stay
 `hardware_free_regression_fixture_not_physical_so101_authority`, placeholder
 alignment, placeholder/thin/invalid review evidence, generic review scopes,
-weak field-specific authority, placeholder provenance, reviewed-status fixture
-provenance, wrong target frame, invalid TCP/alignment payloads, and mismatched
-model SHA. Ready fixture cases exercise the manifest state machine only; they
-must keep `physical_so101_model_authority_ready: false`.
+ready-shaped review metadata with pending follow-up, weak field-specific
+authority, placeholder provenance, reviewed-status fixture provenance, wrong
+target frame, invalid TCP/alignment payloads, and mismatched model SHA. Ready
+fixture cases exercise the manifest state machine only; they must keep
+`physical_so101_model_authority_ready: false`.
 
 The standalone reviewed-authority gate matrix writes
 `so101_reviewed_authority_gate_matrix_summary.json`, `.csv`, and `README.md`.

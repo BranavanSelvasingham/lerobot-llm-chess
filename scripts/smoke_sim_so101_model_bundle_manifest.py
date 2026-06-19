@@ -147,6 +147,17 @@ REVIEW_EVIDENCE_REQUIRED_GROUPS = (
     ("review_trace", ("reviewed_at", "review_id", "review_url")),
     ("review_artifact", ("review_id", "review_url")),
 )
+REVIEW_OPEN_WORK_FIELDS = (
+    "missing_inputs",
+    "missing_review_inputs",
+    "next_required_for_goal",
+    "next_required_action_ids",
+    "pending_action_ids",
+    "blockers",
+    "review_blockers",
+    "unresolved_findings",
+    "open_findings",
+)
 PLACEHOLDER_REVIEW_EVIDENCE_VALUES = {
     "na",
     "n/a",
@@ -756,11 +767,18 @@ def review_evidence_summary(
         for scope_id in required_review_scope_ids
         if scope_id not in supplied_review_scope_ids
     ]
+    open_work_fields = [
+        field_name
+        for field_name in REVIEW_OPEN_WORK_FIELDS
+        if non_empty(value.get(field_name))
+    ]
     return {
         "supplied_fields": supplied_fields,
         "valid_fields": valid_fields,
         "placeholder_fields": placeholder_fields,
         "invalid_fields": invalid_fields,
+        "open_work_fields": open_work_fields,
+        "ready_has_open_work": bool(open_work_fields),
         "present": bool(valid_fields),
         "required_groups": required_groups,
         "satisfied_required_groups": satisfied_required_groups,
@@ -779,6 +797,7 @@ def review_evidence_summary(
             and not invalid_fields
             and not missing_required_groups
             and not missing_review_scope_ids
+            and not open_work_fields
         ),
     }
 
@@ -789,6 +808,10 @@ def review_evidence_report_fields(review_evidence: dict[str, Any]) -> dict[str, 
         "review_evidence_valid_fields": review_evidence["valid_fields"],
         "review_evidence_placeholder_fields": review_evidence["placeholder_fields"],
         "review_evidence_invalid_fields": review_evidence["invalid_fields"],
+        "review_evidence_open_work_fields": review_evidence["open_work_fields"],
+        "review_evidence_ready_has_open_work": review_evidence[
+            "ready_has_open_work"
+        ],
         "review_evidence_required_groups": review_evidence["required_groups"],
         "review_evidence_satisfied_required_groups": review_evidence[
             "satisfied_required_groups"
@@ -1167,6 +1190,8 @@ def inspect_authority(manifest: dict[str, Any] | None) -> dict[str, Any]:
         diagnostics.append(f"authority_review_evidence_placeholder:{field_name}")
     for field_name in review_evidence["invalid_fields"]:
         diagnostics.append(f"authority_review_evidence_invalid:{field_name}")
+    for field_name in review_evidence["open_work_fields"]:
+        diagnostics.append(f"authority_review_evidence_open_work:{field_name}")
     for scope_id in review_evidence["missing_review_scope_ids"]:
         diagnostics.append(f"authority_review_scope_missing:{scope_id}")
 
@@ -1393,6 +1418,10 @@ def inspect_joint_limit_review(
         diagnostics.append(f"joint_limit_authority_review_evidence_placeholder:{field_name}")
     for field_name in review_evidence["invalid_fields"]:
         diagnostics.append(f"joint_limit_authority_review_evidence_invalid:{field_name}")
+    for field_name in review_evidence["open_work_fields"]:
+        diagnostics.append(
+            f"joint_limit_authority_review_evidence_open_work:{field_name}"
+        )
     for scope_id in review_evidence["missing_review_scope_ids"]:
         diagnostics.append(f"joint_limit_authority_review_scope_missing:{scope_id}")
 
@@ -1595,6 +1624,8 @@ def inspect_review_metadata(
         diagnostics.append(f"{diagnostic_prefix}_review_evidence_placeholder:{field_name}")
     for field_name in review_evidence["invalid_fields"]:
         diagnostics.append(f"{diagnostic_prefix}_review_evidence_invalid:{field_name}")
+    for field_name in review_evidence["open_work_fields"]:
+        diagnostics.append(f"{diagnostic_prefix}_review_evidence_open_work:{field_name}")
     for scope_id in review_evidence["missing_review_scope_ids"]:
         diagnostics.append(f"{diagnostic_prefix}_review_scope_missing:{scope_id}")
 
@@ -2059,6 +2090,10 @@ def inspect_mesh_asset_review(manifest: dict[str, Any] | None) -> dict[str, Any]
         diagnostics.append(f"mesh_asset_authority_review_evidence_placeholder:{field_name}")
     for field_name in review_evidence["invalid_fields"]:
         diagnostics.append(f"mesh_asset_authority_review_evidence_invalid:{field_name}")
+    for field_name in review_evidence["open_work_fields"]:
+        diagnostics.append(
+            f"mesh_asset_authority_review_evidence_open_work:{field_name}"
+        )
     for scope_id in review_evidence["missing_review_scope_ids"]:
         diagnostics.append(f"mesh_asset_authority_review_scope_missing:{scope_id}")
 
@@ -2575,7 +2610,9 @@ def review_requirement_item(
         "required_inputs": required_inputs or [],
         "placeholder_rule": (
             "TODO/TBD/unknown, placeholder/review-required values, and unedited "
-            "<...> template tokens are rejected."
+            "<...> template tokens are rejected. Review authority objects with "
+            "non-empty missing_inputs, next_required_for_goal, next_required_action_ids, "
+            "pending_action_ids, blockers, or open findings are also rejected."
         ),
         "synthetic_fixture_status": synthetic_fixture_status,
         "notes": notes,

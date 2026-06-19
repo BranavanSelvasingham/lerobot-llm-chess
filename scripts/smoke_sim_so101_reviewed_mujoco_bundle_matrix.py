@@ -448,6 +448,55 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "pending_review_metadata_not_ready",
+            "manifest_path": fixtures["pending_review_metadata_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "authority_status": "needs_review",
+                "joint_limits_status": "needs_review",
+                "mesh_assets_status": "needs_review",
+                "target_frame_status": "needs_review",
+                "tcp_offset_status": "needs_review",
+                "alignment_status": "needs_review",
+                "missing_inputs_contains": [
+                    "authority",
+                    "joint_limit_authority",
+                    "mesh_asset_authority",
+                    "target_frame_authority",
+                    "tcp_offset_authority",
+                    "base_to_board_alignment_authority",
+                ],
+                "authority_diagnostics_contains": [
+                    "authority_review_evidence_open_work:missing_inputs",
+                    "authority_review_evidence_open_work:next_required_action_ids",
+                ],
+                "joint_limits_diagnostics_contains": [
+                    "joint_limit_authority_review_evidence_open_work:next_required_action_ids"
+                ],
+                "mesh_assets_diagnostics_contains": [
+                    "mesh_asset_authority_review_evidence_open_work:next_required_action_ids"
+                ],
+                "target_frame_diagnostics_contains": [
+                    "target_frame_authority_review_evidence_open_work:next_required_action_ids"
+                ],
+                "tcp_offset_diagnostics_contains": [
+                    "tcp_offset_authority_review_evidence_open_work:next_required_action_ids"
+                ],
+                "alignment_diagnostics_contains": [
+                    "base_to_board_alignment_authority_review_evidence_open_work:next_required_action_ids"
+                ],
+            },
+        },
+        {
             "case_id": "weak_review_manifest_not_ready",
             "manifest_path": fixtures["weak_review_manifest_path"],
             "require_ready": False,

@@ -214,13 +214,20 @@ license-basis fields: a ready-shaped manifest with placeholder provenance stays
 `model_bundle_manifest_needs_follow_up` and remains diagnostic-only.
 Each authority section reports `review_evidence_required_groups`,
 `review_evidence_satisfied_required_groups`, and
-`review_evidence_missing_required_groups` in the JSON summary. The
+`review_evidence_missing_required_groups` in the JSON summary. It also reports
+`review_evidence_open_work_fields` and
+`review_evidence_ready_has_open_work` when a reviewed-looking authority object
+still carries follow-up work. The
 machine-readable group names are `review_actor` for `reviewed_by` and
 `review_trace` for `reviewed_at`, `review_id`, or `review_url`. The
 `review_artifact` group also requires `review_id` or `review_url`, so a date
 alone cannot make a reviewed SO-101 authority section ready. `review_url`
 values must be HTTP(S) URLs; use `review_id` for ticket IDs, commit IDs, or
-other non-URL artifact handles.
+other non-URL artifact handles. Review authority objects that still carry
+non-empty `missing_inputs`, `next_required_for_goal`,
+`next_required_action_ids`, `pending_action_ids`, blockers, or open findings
+are also rejected. Those fields mean the review packet itself is still
+incomplete, even if the status string says `reviewed`.
 
 ## Integrated Suite Mode
 
@@ -480,22 +487,25 @@ true:
 - `model_path` exists
 - `asset_roots` is present and all supplied roots are directories
 - `authority` declares an accepted reviewed status plus traceable review
-  evidence (`reviewed_by` plus `review_id` or HTTP(S) `review_url`)
+  evidence (`reviewed_by` plus `review_id` or HTTP(S) `review_url`) and no
+  open review-work fields
 - `provenance` declares source reference, export tool, and license basis fields;
   fixture-only provenance is still non-physical automation evidence
 - finite numeric joint limits cover every SO-101 joint and include accepted
-  joint-limit review authority
+  joint-limit review authority with no open review work
 - at least one mesh reference is visible to the asset preflight and all mesh
   references resolve
 - mesh/asset-root authority includes an accepted review status plus traceable
-  review evidence
+  review evidence and no open review work
 - the target frame is explicitly declared and includes accepted target-frame
-  review authority
+  review authority with no open review work
 - a valid finite x/y/z TCP offset in meters is present, stays within the broad
-  automation sanity bound, and includes accepted TCP review authority
+  automation sanity bound, and includes accepted TCP review authority with no
+  open review work
 - a real `base_to_board_transform` or `base_to_board_alignment` is populated
   with finite translation/rotation fields, stays within the broad automation
-  sanity bound, and includes accepted alignment review authority
+  sanity bound, and includes accepted alignment review authority with no open
+  review work
 - the child SO-101 model contract checker reports `model_contract_checked`, or
   the URDF has the expected static joint/frame contract and the only runtime
   follow-up is missing optional `placo`

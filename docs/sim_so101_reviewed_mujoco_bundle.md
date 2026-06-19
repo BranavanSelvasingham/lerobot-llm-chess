@@ -132,7 +132,9 @@ automation coverage and must also report
 authority.
 
 The reviewed MuJoCo bundle matrix also includes generic-review-scope and
-per-field weak-authority fixtures. Those cases must stay
+per-field weak-authority fixtures. It also includes a ready-shaped manifest
+whose authority sections still carry pending review actions or missing review
+inputs. Those cases must stay
 `reviewed_mujoco_bundle_not_ready`, report the missing review inputs, and avoid
 MuJoCo motion. The matrix also covers a manifest target-frame mismatch and a
 model file that lacks the manifest target-frame site; both must stay diagnostic

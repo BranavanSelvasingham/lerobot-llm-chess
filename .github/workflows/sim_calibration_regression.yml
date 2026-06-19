@@ -329,6 +329,7 @@ jobs:
               "thin_review_metadata_not_ready",
               "invalid_review_url_not_ready",
               "generic_review_scope_not_ready",
+              "pending_review_metadata_not_ready",
               "weak_review_manifest_not_ready",
               "placeholder_provenance_not_ready",
               "reviewed_status_with_fixture_provenance_not_physical_authority",
@@ -375,6 +376,37 @@ jobs:
           generic_scope = by_case["generic_review_scope_not_ready"]["observations"]
           assert generic_scope["authority_status"] == "needs_review", generic_scope
           assert "target_frame_authority" in generic_scope["missing_inputs"], generic_scope
+          pending_review = by_case["pending_review_metadata_not_ready"]["observations"]
+          for key in (
+              "authority_status",
+              "joint_limits_status",
+              "mesh_assets_status",
+              "target_frame_status",
+              "tcp_offset_status",
+              "alignment_status",
+          ):
+              assert pending_review[key] == "needs_review", pending_review
+          for missing_input in (
+              "authority",
+              "joint_limit_authority",
+              "mesh_asset_authority",
+              "target_frame_authority",
+              "tcp_offset_authority",
+              "base_to_board_alignment_authority",
+          ):
+              assert missing_input in pending_review["missing_inputs"], pending_review
+          assert pending_review["authority_review_open_work_fields"] == [
+              "missing_inputs",
+              "next_required_action_ids",
+          ], pending_review
+          for key in (
+              "joint_limits_review_open_work_fields",
+              "mesh_assets_review_open_work_fields",
+              "target_frame_review_open_work_fields",
+              "tcp_offset_review_open_work_fields",
+              "alignment_review_open_work_fields",
+          ):
+              assert pending_review[key] == ["next_required_action_ids"], pending_review
           placeholder_provenance = by_case["placeholder_provenance_not_ready"]["observations"]
           assert placeholder_provenance["provenance_status"] == "needs_review", placeholder_provenance
           assert "provenance" in placeholder_provenance["missing_inputs"], placeholder_provenance
@@ -798,6 +830,7 @@ jobs:
               "placeholder_manifest_not_ready",
               "placeholder_review_metadata_not_ready",
               "generic_review_scope_not_ready",
+              "pending_review_metadata_not_ready",
               "weak_review_manifest_not_ready",
               "weak_joint_limit_authority_not_ready",
               "weak_mesh_asset_authority_not_ready",
@@ -876,6 +909,7 @@ jobs:
           assert placeholder_review["observations"]["motion_authority_status"] == "not_checked_manifest_not_ready", placeholder_review
           not_ready_review_scope_cases = [
               "generic_review_scope_not_ready",
+              "pending_review_metadata_not_ready",
               "weak_review_manifest_not_ready",
               "weak_joint_limit_authority_not_ready",
               "weak_mesh_asset_authority_not_ready",
@@ -910,6 +944,29 @@ jobs:
               "alignment_status",
           ):
               assert generic_scope["observations"][status_key] == "needs_review", generic_scope
+          pending_review = by_case["pending_review_metadata_not_ready"]
+          assert pending_review["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", pending_review
+          assert pending_review["observations"]["ready_for_model_backed_ik"] is False, pending_review
+          assert pending_review["observations"]["reviewed_model_motion_checked"] is False, pending_review
+          assert pending_review["observations"]["motion_authority_status"] == "not_checked_manifest_not_ready", pending_review
+          for missing_input in (
+              "authority",
+              "joint_limit_authority",
+              "mesh_asset_authority",
+              "target_frame_authority",
+              "tcp_offset_authority",
+              "base_to_board_alignment_authority",
+          ):
+              assert missing_input in pending_review["observations"]["missing_inputs"], pending_review
+          for status_key in (
+              "authority_status",
+              "joint_limits_status",
+              "mesh_assets_status",
+              "target_frame_status",
+              "tcp_offset_status",
+              "alignment_status",
+          ):
+              assert pending_review["observations"][status_key] == "needs_review", pending_review
           weak_review = by_case["weak_review_manifest_not_ready"]
           assert weak_review["observations"]["authority_status"] == "needs_review", weak_review
           assert weak_review["observations"]["provenance_status"] == "needs_review", weak_review
