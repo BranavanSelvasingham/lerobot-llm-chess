@@ -317,6 +317,8 @@ jobs:
               "source_ready_physical_bundle_motion_status_inconsistent",
               "source_ready_physical_bundle_motion_model_path_missing",
               "source_ready_physical_bundle_motion_model_digest_missing",
+              "source_ready_physical_bundle_motion_model_observed_digest_missing",
+              "source_ready_physical_bundle_motion_model_observed_digest_mismatch",
               "source_ready_physical_bundle_motion_model_path_mismatch",
               "source_ready_physical_bundle_motion_model_digest_mismatch",
               "source_ready_hardware_free_bundle_fixture",
@@ -455,6 +457,34 @@ jobs:
           assert motion_digest_missing["physical_reviewed_model_motion_checked"] is False, motion_digest_missing
           assert "record_reviewed_mujoco_motion_model_sha256" in motion_digest_missing["next_required_action_ids"], motion_digest_missing
           assert "record_reviewed_mujoco_motion_model_sha256" in motion_digest_missing_case["blocker_packet"]["next_action_ids"], motion_digest_missing_case
+          motion_observed_digest_missing_case = by_case["source_ready_physical_bundle_motion_model_observed_digest_missing"]
+          motion_observed_digest_missing = motion_observed_digest_missing_case["gate"]
+          assert motion_observed_digest_missing["ready"] is False, motion_observed_digest_missing
+          assert motion_observed_digest_missing["source_bundle_consistency_status"] == "source_bundle_model_path_and_digest_consistent", motion_observed_digest_missing
+          assert motion_observed_digest_missing["reviewed_mujoco_motion_bundle_consistency_status"] == "reviewed_mujoco_motion_model_observed_digest_missing", motion_observed_digest_missing
+          assert motion_observed_digest_missing["reviewed_mujoco_motion_bundle_consistency"]["reviewed_mujoco_motion_model_path_matches_bundle"] is True, motion_observed_digest_missing
+          assert motion_observed_digest_missing["reviewed_mujoco_motion_bundle_consistency"]["reviewed_mujoco_motion_model_sha256_matches_bundle"] is True, motion_observed_digest_missing
+          assert motion_observed_digest_missing["reviewed_mujoco_motion_bundle_consistency"]["reviewed_mujoco_motion_model_observed_sha256"] is None, motion_observed_digest_missing
+          assert motion_observed_digest_missing["reviewed_mujoco_motion_bundle_consistency"]["reviewed_mujoco_motion_model_observed_sha256_missing"] is True, motion_observed_digest_missing
+          assert motion_observed_digest_missing["reviewed_mujoco_motion_bundle_consistency"]["reviewed_mujoco_motion_model_observed_sha256_matches_declared"] is False, motion_observed_digest_missing
+          assert motion_observed_digest_missing["physical_reviewed_model_motion_child_ready"] is True, motion_observed_digest_missing
+          assert motion_observed_digest_missing["physical_reviewed_model_motion_checked"] is False, motion_observed_digest_missing
+          assert "verify_reviewed_mujoco_motion_model_file_sha256" in motion_observed_digest_missing["next_required_action_ids"], motion_observed_digest_missing
+          assert "verify_reviewed_mujoco_motion_model_file_sha256" in motion_observed_digest_missing_case["blocker_packet"]["next_action_ids"], motion_observed_digest_missing_case
+          motion_observed_digest_mismatch_case = by_case["source_ready_physical_bundle_motion_model_observed_digest_mismatch"]
+          motion_observed_digest_mismatch = motion_observed_digest_mismatch_case["gate"]
+          assert motion_observed_digest_mismatch["ready"] is False, motion_observed_digest_mismatch
+          assert motion_observed_digest_mismatch["source_bundle_consistency_status"] == "source_bundle_model_path_and_digest_consistent", motion_observed_digest_mismatch
+          assert motion_observed_digest_mismatch["reviewed_mujoco_motion_bundle_consistency_status"] == "reviewed_mujoco_motion_model_observed_digest_mismatch", motion_observed_digest_mismatch
+          assert motion_observed_digest_mismatch["reviewed_mujoco_motion_bundle_consistency"]["reviewed_mujoco_motion_model_path_matches_bundle"] is True, motion_observed_digest_mismatch
+          assert motion_observed_digest_mismatch["reviewed_mujoco_motion_bundle_consistency"]["reviewed_mujoco_motion_model_sha256_matches_bundle"] is True, motion_observed_digest_mismatch
+          assert motion_observed_digest_mismatch["reviewed_mujoco_motion_bundle_consistency"]["reviewed_mujoco_motion_model_observed_sha256"] == "b" * 64, motion_observed_digest_mismatch
+          assert motion_observed_digest_mismatch["reviewed_mujoco_motion_bundle_consistency"]["reviewed_mujoco_motion_model_observed_sha256_missing"] is False, motion_observed_digest_mismatch
+          assert motion_observed_digest_mismatch["reviewed_mujoco_motion_bundle_consistency"]["reviewed_mujoco_motion_model_observed_sha256_matches_declared"] is False, motion_observed_digest_mismatch
+          assert motion_observed_digest_mismatch["physical_reviewed_model_motion_child_ready"] is True, motion_observed_digest_mismatch
+          assert motion_observed_digest_mismatch["physical_reviewed_model_motion_checked"] is False, motion_observed_digest_mismatch
+          assert "inspect_reviewed_mujoco_motion_model_file_sha256" in motion_observed_digest_mismatch["next_required_action_ids"], motion_observed_digest_mismatch
+          assert "inspect_reviewed_mujoco_motion_model_file_sha256" in motion_observed_digest_mismatch_case["blocker_packet"]["next_action_ids"], motion_observed_digest_mismatch_case
           motion_path_mismatch_case = by_case["source_ready_physical_bundle_motion_model_path_mismatch"]
           motion_path_mismatch = motion_path_mismatch_case["gate"]
           assert motion_path_mismatch["ready"] is False, motion_path_mismatch
