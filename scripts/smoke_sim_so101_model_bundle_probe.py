@@ -41,6 +41,11 @@ EXPECTED_SO101_JOINTS = (
     "wrist_roll",
     "gripper",
 )
+AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS = (
+    "model_identity",
+    "provenance",
+    "license",
+)
 
 CSV_FIELDNAMES = (
     "requirement_id",
@@ -131,6 +136,16 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional URL to the reviewed source-authority record.",
     )
+    parser.add_argument(
+        "--authority-review-scope",
+        action="append",
+        default=[],
+        choices=AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS,
+        help=(
+            "Repeatable source-authority review scope for the top-level authority "
+            f"block. Required values: {', '.join(AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS)}."
+        ),
+    )
     parser.add_argument("--provenance-source-url", default=None)
     parser.add_argument("--provenance-source-commit", default=None)
     parser.add_argument("--provenance-export-tool", default=None)
@@ -153,6 +168,26 @@ def unique_paths(paths: list[Path]) -> list[Path]:
         seen.add(key)
         unique.append(normalized)
     return unique
+
+
+def normalized_review_scope_ids(value: Any) -> list[str]:
+    if value is None:
+        raw_values: list[Any] = []
+    elif isinstance(value, (list, tuple, set)):
+        raw_values = list(value)
+    else:
+        raw_values = [value]
+
+    seen: set[str] = set()
+    normalized: list[str] = []
+    for raw_value in raw_values:
+        for raw_scope in str(raw_value).split(","):
+            scope = raw_scope.strip().lower().replace("-", "_")
+            if not scope or scope in seen:
+                continue
+            seen.add(scope)
+            normalized.append(scope)
+    return normalized
 
 
 def executable_arg(path: Path) -> str:
@@ -621,17 +656,25 @@ def mesh_asset_review_from_contract(contract_result: dict[str, Any]) -> dict[str
 
 
 def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, Any]]:
+    supplied_review_scope_ids = normalized_review_scope_ids(args.authority_review_scope)
+    missing_review_scope_ids = [
+        scope_id
+        for scope_id in AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS
+        if scope_id not in supplied_review_scope_ids
+    ]
     supplied = {
         "reviewed_by": args.authority_reviewed_by,
         "reviewed_at": args.authority_reviewed_at,
         "review_id": args.authority_review_id,
         "review_url": args.authority_review_url,
+        "review_scopes": supplied_review_scope_ids,
     }
     missing = []
     if not args.authority_reviewed_by:
         missing.append("reviewed_by")
     if not args.authority_review_id and not args.authority_review_url:
         missing.append("review_id_or_review_url")
+    missing.extend(f"review_scope:{scope_id}" for scope_id in missing_review_scope_ids)
     invalid_fields = []
     if args.authority_review_url:
         parsed_url = urlparse(args.authority_review_url.strip())
@@ -640,24 +683,41 @@ def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str,
     if missing:
         return {}, {
             "status": "TODO_authority_review_required",
-            "required_fields": ["reviewed_by", "review_id_or_review_url"],
+            "required_fields": [
+                "reviewed_by",
+                "review_id_or_review_url",
+                *[f"review_scope:{scope_id}" for scope_id in AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS],
+            ],
             "optional_fields": ["reviewed_at"],
             "missing_fields": missing,
             "invalid_fields": invalid_fields,
             "supplied_fields": {key: value for key, value in supplied.items() if value},
+            "required_review_scope_ids": list(AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS),
+            "supplied_review_scope_ids": supplied_review_scope_ids,
+            "missing_review_scope_ids": missing_review_scope_ids,
+            "review_scope_ready": not missing_review_scope_ids,
             "reason": (
                 "The probe never infers reviewed model authority from a path or asset root; "
-                "reviewed authority needs reviewer identity plus review_id or review_url."
+                "reviewed authority needs reviewer identity, review_id or review_url, "
+                "and explicit model_identity/provenance/license review scopes."
             ),
         }
     if invalid_fields and not args.authority_review_id:
         return {}, {
             "status": "TODO_authority_review_required",
-            "required_fields": ["reviewed_by", "review_id_or_review_url"],
+            "required_fields": [
+                "reviewed_by",
+                "review_id_or_review_url",
+                *[f"review_scope:{scope_id}" for scope_id in AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS],
+            ],
             "optional_fields": ["reviewed_at"],
             "missing_fields": ["review_id_or_valid_review_url"],
             "invalid_fields": invalid_fields,
             "supplied_fields": {key: value for key, value in supplied.items() if value},
+            "required_review_scope_ids": list(AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS),
+            "supplied_review_scope_ids": supplied_review_scope_ids,
+            "missing_review_scope_ids": missing_review_scope_ids,
+            "review_scope_ready": not missing_review_scope_ids,
             "reason": (
                 "review_url must be an http(s) URL; use review_id for ticket IDs, "
                 "commit IDs, or other non-URL artifact handles."
@@ -666,16 +726,25 @@ def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str,
     if invalid_fields:
         return {}, {
             "status": "TODO_authority_review_required",
-            "required_fields": ["reviewed_by", "review_id_or_review_url"],
+            "required_fields": [
+                "reviewed_by",
+                "review_id_or_review_url",
+                *[f"review_scope:{scope_id}" for scope_id in AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS],
+            ],
             "optional_fields": ["reviewed_at"],
             "missing_fields": [],
             "invalid_fields": invalid_fields,
             "supplied_fields": {key: value for key, value in supplied.items() if value},
+            "required_review_scope_ids": list(AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS),
+            "supplied_review_scope_ids": supplied_review_scope_ids,
+            "missing_review_scope_ids": missing_review_scope_ids,
+            "review_scope_ready": not missing_review_scope_ids,
             "reason": "Remove or fix invalid review_url before recording authority.",
         }
     authority = {
         "source_authority_status": "operator_reviewed",
         "reviewed_by": args.authority_reviewed_by,
+        "review_scopes": supplied_review_scope_ids,
     }
     if args.authority_reviewed_at:
         authority["reviewed_at"] = args.authority_reviewed_at
@@ -685,10 +754,18 @@ def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str,
         authority["review_url"] = args.authority_review_url
     return authority, {
         "status": "operator_supplied",
-        "required_fields": ["reviewed_by", "review_id_or_review_url"],
+        "required_fields": [
+            "reviewed_by",
+            "review_id_or_review_url",
+            *[f"review_scope:{scope_id}" for scope_id in AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS],
+        ],
         "optional_fields": ["reviewed_at"],
         "missing_fields": [],
         "invalid_fields": [],
+        "required_review_scope_ids": list(AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS),
+        "supplied_review_scope_ids": supplied_review_scope_ids,
+        "missing_review_scope_ids": [],
+        "review_scope_ready": True,
     }
 
 
@@ -764,6 +841,7 @@ def build_candidate_manifest(
                 "tcp_frame_authority",
                 "target_frame_metadata",
             ],
+            "required_review_scope_ids": ["target_frame"],
             "reason": "The probe records the requested target frame for diagnostics but cannot infer reviewed TCP-frame authority.",
         },
         "joint_limits_placeholder": {
@@ -777,6 +855,7 @@ def build_candidate_manifest(
                 "wrist_roll",
                 "gripper",
             ],
+            "required_review_scope_ids": ["joint_limits"],
             "reason": "The probe cannot infer reviewed joint-limit authority from model existence alone.",
         },
         "observed_joint_limits_deg_from_model": observed_joint_limits,
@@ -790,11 +869,13 @@ def build_candidate_manifest(
                 "tool_center_point_offset_m",
             ],
             "required_shape": {"x": "meters", "y": "meters", "z": "meters"},
+            "required_review_scope_ids": ["tcp_offset"],
             "reason": "The probe cannot infer gripper contact TCP from the model alone.",
         },
         "base_to_board_alignment_placeholder": {
             "status": "TODO_calibrated_base_to_board_transform_required",
             "accepted_manifest_fields": ["base_to_board_transform", "base_to_board_alignment"],
+            "required_review_scope_ids": ["base_to_board_alignment"],
             "reason": "Future model-backed IK residuals need the simulator base frame aligned to the chess board frame.",
         },
         "probe_child_diagnostics": {
@@ -803,11 +884,11 @@ def build_candidate_manifest(
             "contract_checker": contract_result["diagnostic_excerpt"],
         },
         "notes": [
-            "This candidate manifest is a review draft. It should stay diagnostic-only until authority, provenance, target-frame authority, joint limits, TCP, and base-to-board fields are replaced with reviewed values.",
+            "This candidate manifest is a review draft. It should stay diagnostic-only until authority, provenance, target-frame authority, joint limits, TCP, and base-to-board fields are replaced with reviewed values and field-specific review scopes.",
             "The probe does not copy, ingest, or modify model/mesh assets.",
             "Extra probe_child_diagnostics fields are for operator review; the bundle manifest checker derives readiness from the declared manifest fields.",
-            "Populate target_frame_authority or an equivalent target-frame review field before expecting ready_for_model_backed_ik.",
-            "Populate joint_limits_deg or an equivalent joint-limit authority field before expecting ready_for_model_backed_ik.",
+            "Populate target_frame_authority or an equivalent target-frame review field with review_scope target_frame before expecting ready_for_model_backed_ik.",
+            "Populate joint_limits_deg or an equivalent joint-limit authority field with review_scope joint_limits before expecting ready_for_model_backed_ik.",
             "observed_source_hints_from_model is raw candidate evidence for review only; copy source URL/export/license fields into provenance only after separate authority review.",
             "observed_joint_limits_deg_from_model is raw candidate evidence for review only; copy it into joint_limits_deg only after separate authority review.",
             "observed_mesh_asset_references_from_model is raw candidate evidence for review only; supply reviewed asset roots before expecting mesh readiness.",
@@ -1083,8 +1164,9 @@ def build_review_packet(
                 "model_request_status": model_request.get("status"),
                 "model_path": model_request.get("path"),
                 "sha256": observed_source_hints.get("sha256"),
+                "required_review_scope_ids": list(AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS),
             },
-            "Choose the authoritative SO-101 model source and record reviewer identity plus review_id or review_url.",
+            "Choose the authoritative SO-101 model source and record reviewer identity, review_id or review_url, and review scopes: model_identity, provenance, license.",
         ),
         review_packet_row(
             2,
@@ -1118,7 +1200,7 @@ def build_review_packet(
                 "unresolved_references": mesh_asset_review.get("unresolved_references"),
                 "asset_preflight_status": asset_preflight.get("status"),
             },
-            "Supply reviewed asset roots until mesh preflight has no missing or unresolved references, then record mesh authority.",
+            "Supply reviewed asset roots until mesh preflight has no missing or unresolved references, then record mesh authority with review_scope mesh_assets.",
         ),
         review_packet_row(
             4,
@@ -1133,7 +1215,7 @@ def build_review_packet(
                 "values_deg": observed_joint_limits.get("values_deg"),
                 "missing_joints": observed_joint_limits.get("missing_joints"),
             },
-            "Review raw candidate limits before declaring reviewed joint_limits_deg and joint-limit authority.",
+            "Review raw candidate limits before declaring reviewed joint_limits_deg and joint-limit authority with review_scope joint_limits.",
         ),
         review_packet_row(
             5,
@@ -1145,7 +1227,7 @@ def build_review_packet(
                 "target_frame": manifest_excerpt.get("target_frame"),
                 "contract_status": contract_excerpt.get("status"),
             },
-            "Confirm the target frame is the intended SO-101 gripper/TCP frame and record review metadata.",
+            "Confirm the target frame is the intended SO-101 gripper/TCP frame and record review metadata with review_scope target_frame.",
         ),
         review_packet_row(
             6,
@@ -1157,7 +1239,7 @@ def build_review_packet(
                 "manifest_tcp_offset": manifest_excerpt.get("tcp_offset"),
                 "candidate_manifest": str(candidate_manifest_path),
             },
-            "Measure or review target-frame-to-TCP/gripper-tip offset and record authority.",
+            "Measure or review target-frame-to-TCP/gripper-tip offset and record authority with review_scope tcp_offset.",
         ),
         review_packet_row(
             7,
@@ -1169,7 +1251,7 @@ def build_review_packet(
                 "manifest_base_to_board_alignment": manifest_excerpt.get("base_to_board_alignment"),
                 "candidate_manifest": str(candidate_manifest_path),
             },
-            "Record reviewed base-to-board translation and roll/pitch/yaw alignment for the chess scene.",
+            "Record reviewed base-to-board translation and roll/pitch/yaw alignment for the chess scene with review_scope base_to_board_alignment.",
         ),
         review_packet_row(
             8,
@@ -1309,11 +1391,12 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
             "## Next Inputs",
             "",
             "- Replace empty `authority` and `provenance` placeholders with reviewed source fields.",
+            "- Top-level `authority` requires `reviewed_by`, `review_id` or HTTP(S) `review_url`, and `review_scopes`: `model_identity`, `provenance`, `license`.",
             "- Review `observed_source_hints_from_model` before copying source URL/export/license evidence into `provenance`.",
-            "- Supply reviewed mesh asset roots that resolve every `mesh_asset_review_missing_references` entry.",
-            "- Replace `target_frame_authority_placeholder` with accepted reviewed target-frame/TCP-frame authority.",
-            "- Replace `tcp_offset_placeholder` with one accepted calibrated TCP/gripper-tip offset field.",
-            "- Replace `base_to_board_alignment_placeholder` with a real base-to-board transform/alignment.",
+            "- Supply reviewed mesh asset roots that resolve every `mesh_asset_review_missing_references` entry and record `review_scope: mesh_assets`.",
+            "- Replace `target_frame_authority_placeholder` with accepted reviewed target-frame/TCP-frame authority carrying `review_scope: target_frame`.",
+            "- Replace `tcp_offset_placeholder` with one accepted calibrated TCP/gripper-tip offset field carrying `review_scope: tcp_offset`.",
+            "- Replace `base_to_board_alignment_placeholder` with a real base-to-board transform/alignment carrying `review_scope: base_to_board_alignment`.",
             "- Re-run `scripts/smoke_sim_so101_model_bundle_manifest.py` on the candidate manifest before enabling model-backed IK.",
             "- Use `so101_model_bundle_review_packet.json` and `.csv` as review intake only; they are not model authority.",
         ]

@@ -237,6 +237,14 @@ run the focused probe/generator first:
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_so101_model_bundle_probe.py --model-path /absolute/path/to/so101.urdf --asset-root /absolute/path/to/assets --output-dir /private/tmp/lerobot_sim/so101_model_bundle_probe
 ```
 
+When source authority has already been reviewed, pass reviewer metadata plus all
+top-level authority scopes before expecting the candidate manifest to carry a
+non-empty `authority` block:
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 scripts/smoke_sim_so101_model_bundle_probe.py --model-path /absolute/path/to/so101.urdf --asset-root /absolute/path/to/assets --authority-reviewed-by operator --authority-review-id review-ticket --authority-review-scope model_identity --authority-review-scope provenance --authority-review-scope license --output-dir /private/tmp/lerobot_sim/so101_model_bundle_probe
+```
+
 The probe writes `so101_model_bundle.candidate.json`,
 `so101_model_bundle_probe_summary.json`,
 `so101_model_bundle_review_packet.json`,
@@ -255,6 +263,9 @@ TCP or base-to-board values. The generated draft keeps
 joint limits, TCP, and base-to-board alignment, and therefore remains
 diagnostic-only until the manifest checker reports
 `ready_for_model_backed_ik: true`.
+The integrated suite forwards ready source-authority reviewer metadata and
+scopes into the probe only when a candidate model is present; it does not use
+source-review metadata to authorize a no-model default run.
 The review packet groups observed candidate source, joint-limit, mesh, TCP, and
 board-alignment evidence into operator review items, but it reports
 `model_authority: "review_packet_not_authority"` and never fills reviewed

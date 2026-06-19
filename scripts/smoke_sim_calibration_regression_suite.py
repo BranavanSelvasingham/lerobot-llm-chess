@@ -981,6 +981,7 @@ def so101_model_bundle_probe_command(
     model_path: Path | None,
     asset_roots: list[Path],
     target_frame: str,
+    source_authority_review: dict[str, Any],
 ) -> list[str]:
     command = [
         python,
@@ -994,6 +995,21 @@ def so101_model_bundle_probe_command(
     ]
     if model_path is not None:
         command.extend(["--model-path", str(model_path.expanduser())])
+    if (
+        model_path is not None
+        and source_authority_review.get("ready_if_authoritative_source_declared") is True
+    ):
+        for source_key, cli_name in (
+            ("authority_reviewed_by", "--authority-reviewed-by"),
+            ("authority_reviewed_at", "--authority-reviewed-at"),
+            ("authority_review_id", "--authority-review-id"),
+            ("authority_review_url", "--authority-review-url"),
+        ):
+            value = source_authority_review.get(source_key)
+            if value:
+                command.extend([cli_name, str(value)])
+        for scope_id in source_authority_review.get("supplied_review_scope_ids") or []:
+            command.extend(["--authority-review-scope", str(scope_id)])
     for asset_root in asset_roots:
         command.extend(["--asset-root", str(asset_root.expanduser())])
     return command
@@ -6164,6 +6180,7 @@ def main() -> int:
             model_path=so101_model_bundle_probe_model_path,
             asset_roots=effective_ik_model_asset_roots,
             target_frame="gripper_frame_link",
+            source_authority_review=so101_source_authority_review,
         ),
         output_dir=so101_model_bundle_probe_dir,
         expected_json_path=so101_model_bundle_probe_summary_path,
