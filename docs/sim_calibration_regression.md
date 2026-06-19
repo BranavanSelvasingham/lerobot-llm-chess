@@ -666,7 +666,7 @@ complete fields, generic-review-scope and per-field weak-authority fixtures,
 manifest/model target-frame mismatches that must block motion authority,
 non-standard JSON constants that must parse-fail, malformed
 and non-finite TCP/alignment manifest payloads, non-finite or reversed joint
-limits, malformed or unavailable asset-root declarations, unresolved model mesh references, a
+limits, malformed, unavailable, or non-directory asset-root declarations, unresolved model mesh references, a
 ready manifest whose declared body-joint bounds intentionally mismatch the
 loaded MuJoCo `jnt_range`, and a ready synthetic fixture manifest whose MuJoCo/SimRobot motion
 check must remain

@@ -141,6 +141,15 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
     )
     write_json(unavailable_asset_root_path, unavailable_asset_root)
 
+    file_asset_root = json_clone(ready_payload)
+    file_asset_root_path = fixture_dir / "asset_root_is_file.txt"
+    file_asset_root_path.write_text("not a directory\n")
+    file_asset_root["asset_roots"] = [str(normalize_path(file_asset_root_path))]
+    file_asset_root_manifest_path = (
+        fixture_dir / "so101_model_bundle.file_asset_root.json"
+    )
+    write_json(file_asset_root_manifest_path, file_asset_root)
+
     missing_mesh_dir = output_dir / "fixtures" / "missing_mesh_bundle"
     missing_mesh_model_dir = missing_mesh_dir / "model"
     missing_mesh_model_dir.mkdir(parents=True, exist_ok=True)
@@ -193,6 +202,7 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
         "nonfinite_joint_limits_manifest_path": nonfinite_joint_limits_path,
         "invalid_asset_roots_manifest_path": invalid_asset_roots_path,
         "unavailable_asset_root_manifest_path": unavailable_asset_root_path,
+        "file_asset_root_manifest_path": file_asset_root_manifest_path,
         "missing_mesh_manifest_path": missing_mesh_manifest_path,
         "reversed_joint_limits_manifest_path": reversed_joint_limits_path,
         "nonfinite_tcp_manifest_path": nonfinite_tcp_path,
@@ -724,6 +734,25 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "asset_roots_status": "needs_follow_up",
                 "missing_inputs_contains": ["asset_roots"],
                 "asset_roots_diagnostics_contains": ["asset_root_unavailable"],
+            },
+        },
+        {
+            "case_id": "file_asset_root_not_ready",
+            "manifest_path": fixtures["file_asset_root_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "asset_roots_status": "needs_follow_up",
+                "missing_inputs_contains": ["asset_roots"],
+                "asset_roots_diagnostics_contains": ["asset_root_not_directory"],
             },
         },
         {
