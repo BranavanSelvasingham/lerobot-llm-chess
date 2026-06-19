@@ -32,6 +32,18 @@ SO101_JOINTS: tuple[str, ...] = (
 )
 DEVELOPMENT_MODEL_AUTHORITY = "development_scaffold_not_reviewed"
 DOWNSTREAM_HANDOFF_MODEL_AUTHORITY = "downstream_handoff_not_authority"
+DOWNSTREAM_HANDOFF_SCHEMA = "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1"
+EXPECTED_DOWNSTREAM_HANDOFF_ITEM_IDS: tuple[str, ...] = (
+    "model_authority",
+    "model_identity",
+    "target_frame",
+    "tcp_offset_m",
+    "base_to_board_alignment",
+    "joint_limits",
+    "mesh_assets",
+    "mujoco_motion",
+    "downstream_gate_handoff",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -93,95 +105,173 @@ def write_steps(path: Path, rows: list[dict[str, Any]]) -> None:
             writer.writerow({field: row.get(field, "") for field in fieldnames})
 
 
+def handoff_intake_result(
+    *,
+    requested: bool,
+    required: bool,
+    path: str | None,
+    status: str,
+    intake_ok: bool,
+    ready: bool,
+    source_status: Any = None,
+    model_authority: Any = None,
+    observed_evidence_is_authority: Any = None,
+    physical_truth_claimed: Any = None,
+    fixture_ready: bool = False,
+    item_ids: list[str] | None = None,
+    blockers: list[str] | None = None,
+    schema: Any = None,
+    contract_ok: bool = False,
+    motion_authority_status: Any = None,
+    physical_motion_checked: bool = False,
+    fixture_motion_checked: bool = False,
+    motion_evidence_not_physical: Any = None,
+    physical_model_authority_ready: Any = None,
+) -> dict[str, Any]:
+    return {
+        "reviewed_mujoco_handoff_requested": requested,
+        "reviewed_mujoco_handoff_required": required,
+        "reviewed_mujoco_handoff_path": path,
+        "reviewed_mujoco_handoff_intake_status": status,
+        "reviewed_mujoco_handoff_intake_ok": intake_ok,
+        "reviewed_mujoco_handoff_contract_ok": contract_ok,
+        "reviewed_mujoco_handoff_ready": ready,
+        "reviewed_mujoco_handoff_source_status": source_status,
+        "reviewed_mujoco_handoff_schema": schema,
+        "reviewed_mujoco_handoff_model_authority": model_authority,
+        "reviewed_mujoco_handoff_observed_evidence_is_authority": (
+            observed_evidence_is_authority
+        ),
+        "reviewed_mujoco_handoff_physical_truth_claimed": physical_truth_claimed,
+        "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": (
+            fixture_ready
+        ),
+        "reviewed_mujoco_handoff_motion_authority_status": motion_authority_status,
+        "reviewed_mujoco_handoff_physical_motion_checked": physical_motion_checked,
+        "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked": (
+            fixture_motion_checked
+        ),
+        "reviewed_mujoco_handoff_motion_evidence_not_physical_so101_authority": (
+            motion_evidence_not_physical
+        ),
+        "reviewed_mujoco_handoff_physical_so101_model_authority_ready": (
+            physical_model_authority_ready
+        ),
+        "reviewed_mujoco_handoff_item_ids": item_ids or [],
+        "reviewed_mujoco_handoff_blockers": blockers or [],
+    }
+
+
 def reviewed_handoff_intake(
     path: Path | None,
     *,
     required: bool,
 ) -> dict[str, Any]:
     if path is None:
-        return {
-            "reviewed_mujoco_handoff_requested": False,
-            "reviewed_mujoco_handoff_required": required,
-            "reviewed_mujoco_handoff_path": None,
-            "reviewed_mujoco_handoff_intake_status": "not_requested",
-            "reviewed_mujoco_handoff_intake_ok": not required,
-            "reviewed_mujoco_handoff_ready": False,
-            "reviewed_mujoco_handoff_source_status": None,
-            "reviewed_mujoco_handoff_model_authority": None,
-            "reviewed_mujoco_handoff_observed_evidence_is_authority": None,
-            "reviewed_mujoco_handoff_physical_truth_claimed": None,
-            "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": False,
-            "reviewed_mujoco_handoff_item_ids": [],
-            "reviewed_mujoco_handoff_blockers": ["supply_reviewed_mujoco_downstream_handoff"]
-            if required
-            else [],
-        }
+        return handoff_intake_result(
+            requested=False,
+            required=required,
+            path=None,
+            status="not_requested",
+            intake_ok=not required,
+            ready=False,
+            blockers=["supply_reviewed_mujoco_downstream_handoff"] if required else [],
+        )
 
     resolved = path.expanduser().resolve(strict=False)
     if not resolved.is_file():
-        return {
-            "reviewed_mujoco_handoff_requested": True,
-            "reviewed_mujoco_handoff_required": required,
-            "reviewed_mujoco_handoff_path": str(resolved),
-            "reviewed_mujoco_handoff_intake_status": "handoff_json_missing",
-            "reviewed_mujoco_handoff_intake_ok": False,
-            "reviewed_mujoco_handoff_ready": False,
-            "reviewed_mujoco_handoff_source_status": None,
-            "reviewed_mujoco_handoff_model_authority": None,
-            "reviewed_mujoco_handoff_observed_evidence_is_authority": None,
-            "reviewed_mujoco_handoff_physical_truth_claimed": None,
-            "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": False,
-            "reviewed_mujoco_handoff_item_ids": [],
-            "reviewed_mujoco_handoff_blockers": ["supply_reviewed_mujoco_downstream_handoff"],
-        }
+        return handoff_intake_result(
+            requested=True,
+            required=required,
+            path=str(resolved),
+            status="handoff_json_missing",
+            intake_ok=False,
+            ready=False,
+            blockers=["supply_reviewed_mujoco_downstream_handoff"],
+        )
 
     try:
         payload = json.loads(resolved.read_text())
     except Exception as exc:
-        return {
-            "reviewed_mujoco_handoff_requested": True,
-            "reviewed_mujoco_handoff_required": required,
-            "reviewed_mujoco_handoff_path": str(resolved),
-            "reviewed_mujoco_handoff_intake_status": "handoff_json_parse_error",
-            "reviewed_mujoco_handoff_intake_ok": False,
-            "reviewed_mujoco_handoff_ready": False,
-            "reviewed_mujoco_handoff_source_status": None,
-            "reviewed_mujoco_handoff_model_authority": None,
-            "reviewed_mujoco_handoff_observed_evidence_is_authority": None,
-            "reviewed_mujoco_handoff_physical_truth_claimed": None,
-            "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": False,
-            "reviewed_mujoco_handoff_item_ids": [],
-            "reviewed_mujoco_handoff_blockers": [f"{type(exc).__name__}: {exc}"],
-        }
+        return handoff_intake_result(
+            requested=True,
+            required=required,
+            path=str(resolved),
+            status="handoff_json_parse_error",
+            intake_ok=False,
+            ready=False,
+            blockers=[f"{type(exc).__name__}: {exc}"],
+        )
     if not isinstance(payload, dict):
-        return {
-            "reviewed_mujoco_handoff_requested": True,
-            "reviewed_mujoco_handoff_required": required,
-            "reviewed_mujoco_handoff_path": str(resolved),
-            "reviewed_mujoco_handoff_intake_status": "handoff_json_not_object",
-            "reviewed_mujoco_handoff_intake_ok": False,
-            "reviewed_mujoco_handoff_ready": False,
-            "reviewed_mujoco_handoff_source_status": None,
-            "reviewed_mujoco_handoff_model_authority": None,
-            "reviewed_mujoco_handoff_observed_evidence_is_authority": None,
-            "reviewed_mujoco_handoff_physical_truth_claimed": None,
-            "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": False,
-            "reviewed_mujoco_handoff_item_ids": [],
-            "reviewed_mujoco_handoff_blockers": ["handoff_json_not_object"],
-        }
+        return handoff_intake_result(
+            requested=True,
+            required=required,
+            path=str(resolved),
+            status="handoff_json_not_object",
+            intake_ok=False,
+            ready=False,
+            blockers=["handoff_json_not_object"],
+        )
 
     item_ids = payload.get("handoff_item_ids")
     item_ids = [str(item) for item in item_ids] if isinstance(item_ids, list) else []
-    contract_ok = (
-        payload.get("model_authority") == DOWNSTREAM_HANDOFF_MODEL_AUTHORITY
-        and payload.get("observed_evidence_is_authority") is False
-        and payload.get("physical_so101_truth_claimed") is False
-        and "downstream_gate_handoff" in item_ids
+    missing_item_ids = sorted(set(EXPECTED_DOWNSTREAM_HANDOFF_ITEM_IDS) - set(item_ids))
+    handoff_item_count = payload.get("handoff_item_count")
+    item_count_ok = (
+        isinstance(handoff_item_count, int)
+        and handoff_item_count == len(item_ids)
+        and handoff_item_count >= len(EXPECTED_DOWNSTREAM_HANDOFF_ITEM_IDS)
     )
-    ready = payload.get("downstream_handoff_ready") is True
+    raw_ready = payload.get("downstream_handoff_ready") is True
+    physical_motion_checked = payload.get("physical_reviewed_model_motion_checked") is True
+    fixture_motion_checked = payload.get("hardware_free_fixture_motion_checked") is True
     fixture_ready = (
         payload.get("fixture_handoff_ready_not_physical_so101_authority") is True
     )
+    motion_authority_status = payload.get("motion_authority_status")
+    physical_model_authority_ready = payload.get("physical_so101_model_authority_ready")
+    motion_evidence_not_physical = payload.get(
+        "motion_evidence_not_physical_so101_authority"
+    )
+    physical_ready_contract_ok = (
+        not raw_ready
+        or (
+            physical_motion_checked
+            and payload.get("status") == "physical_reviewed_mujoco_handoff_ready"
+            and motion_authority_status == "physical_reviewed_model_motion_checked"
+            and physical_model_authority_ready is True
+            and fixture_ready is False
+            and fixture_motion_checked is False
+            and motion_evidence_not_physical is False
+        )
+    )
+    fixture_contract_ok = (
+        not fixture_ready
+        or (
+            raw_ready is False
+            and physical_motion_checked is False
+            and fixture_motion_checked is True
+            and motion_authority_status
+            == "hardware_free_fixture_motion_checked_not_physical_so101_authority"
+            and motion_evidence_not_physical is True
+        )
+    )
+    contract_ok = (
+        payload.get("schema") == DOWNSTREAM_HANDOFF_SCHEMA
+        and payload.get("model_authority") == DOWNSTREAM_HANDOFF_MODEL_AUTHORITY
+        and payload.get("observed_evidence_is_authority") is False
+        and payload.get("physical_so101_truth_claimed") is False
+        and payload.get("development_fixture_evidence_not_physical_so101_truth") is True
+        and item_count_ok
+        and not missing_item_ids
+        and payload.get("downstream_handoff_ready") == physical_motion_checked
+        and payload.get("reviewed_model_motion_checked") == (
+            physical_motion_checked or fixture_motion_checked
+        )
+        and physical_ready_contract_ok
+        and fixture_contract_ok
+    )
+    ready = contract_ok and raw_ready
     if not contract_ok:
         intake_status = "handoff_contract_invalid"
     elif ready:
@@ -191,31 +281,42 @@ def reviewed_handoff_intake(
     else:
         intake_status = "reviewed_mujoco_handoff_not_ready"
     blockers = []
+    if payload.get("schema") != DOWNSTREAM_HANDOFF_SCHEMA:
+        blockers.append("provide_current_reviewed_mujoco_downstream_handoff_schema")
+    if missing_item_ids:
+        blockers.append("provide_complete_reviewed_mujoco_downstream_handoff_items")
+    if not item_count_ok:
+        blockers.append("fix_reviewed_mujoco_downstream_handoff_item_count")
+    if raw_ready and not physical_ready_contract_ok:
+        blockers.append("repair_physical_reviewed_mujoco_handoff_readiness_flags")
+    if fixture_ready and not fixture_contract_ok:
+        blockers.append("repair_fixture_reviewed_mujoco_handoff_flags")
     if not contract_ok:
         blockers.append("provide_valid_reviewed_mujoco_downstream_handoff")
     if not ready:
         blockers.append("make_reviewed_mujoco_downstream_handoff_ready")
-    return {
-        "reviewed_mujoco_handoff_requested": True,
-        "reviewed_mujoco_handoff_required": required,
-        "reviewed_mujoco_handoff_path": str(resolved),
-        "reviewed_mujoco_handoff_intake_status": intake_status,
-        "reviewed_mujoco_handoff_intake_ok": contract_ok and (ready or not required),
-        "reviewed_mujoco_handoff_ready": ready,
-        "reviewed_mujoco_handoff_source_status": payload.get("status"),
-        "reviewed_mujoco_handoff_model_authority": payload.get("model_authority"),
-        "reviewed_mujoco_handoff_observed_evidence_is_authority": payload.get(
-            "observed_evidence_is_authority"
-        ),
-        "reviewed_mujoco_handoff_physical_truth_claimed": payload.get(
-            "physical_so101_truth_claimed"
-        ),
-        "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": (
-            fixture_ready
-        ),
-        "reviewed_mujoco_handoff_item_ids": item_ids,
-        "reviewed_mujoco_handoff_blockers": blockers,
-    }
+    return handoff_intake_result(
+        requested=True,
+        required=required,
+        path=str(resolved),
+        status=intake_status,
+        intake_ok=contract_ok and (ready or not required),
+        ready=ready,
+        source_status=payload.get("status"),
+        model_authority=payload.get("model_authority"),
+        observed_evidence_is_authority=payload.get("observed_evidence_is_authority"),
+        physical_truth_claimed=payload.get("physical_so101_truth_claimed"),
+        fixture_ready=fixture_ready,
+        item_ids=item_ids,
+        blockers=blockers,
+        schema=payload.get("schema"),
+        contract_ok=contract_ok,
+        motion_authority_status=motion_authority_status,
+        physical_motion_checked=physical_motion_checked,
+        fixture_motion_checked=fixture_motion_checked,
+        motion_evidence_not_physical=motion_evidence_not_physical,
+        physical_model_authority_ready=physical_model_authority_ready,
+    )
 
 
 def joint_positions_from_obs(obs: dict[str, Any]) -> dict[str, float]:

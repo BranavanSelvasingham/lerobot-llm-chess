@@ -944,6 +944,9 @@ jobs:
               "same_source_target_rejected",
               "invalid_max_steps_rejected",
               "required_handoff_not_ready_rejected",
+              "required_fixture_handoff_rejected",
+              "forged_ready_handoff_without_physical_motion_rejected",
+              "incomplete_ready_handoff_rejected",
               "ready_handoff_intake_still_development_scene",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -954,6 +957,9 @@ jobs:
           }
           handoff_required_negative_case_ids = {
               "required_handoff_not_ready_rejected",
+              "required_fixture_handoff_rejected",
+              "forged_ready_handoff_without_physical_motion_rejected",
+              "incomplete_ready_handoff_rejected",
           }
           by_case = {case["case_id"]: case for case in summary["cases"]}
           invalid_steps = by_case["invalid_max_steps_rejected"]["observations"]
@@ -962,12 +968,34 @@ jobs:
           handoff_required = by_case["required_handoff_not_ready_rejected"]["observations"]
           assert handoff_required["status"] == "reviewed_mujoco_handoff_required_but_not_ready", handoff_required
           assert handoff_required["reviewed_mujoco_handoff_intake_status"] == "reviewed_mujoco_handoff_not_ready", handoff_required
+          assert handoff_required["reviewed_mujoco_handoff_contract_ok"] is True, handoff_required
           assert handoff_required["reviewed_mujoco_handoff_ready"] is False, handoff_required
           assert handoff_required["reviewed_mujoco_handoff_physical_truth_claimed"] is False, handoff_required
+          fixture_handoff = by_case["required_fixture_handoff_rejected"]["observations"]
+          assert fixture_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", fixture_handoff
+          assert fixture_handoff["reviewed_mujoco_handoff_intake_status"] == "fixture_handoff_not_physical_so101_authority", fixture_handoff
+          assert fixture_handoff["reviewed_mujoco_handoff_contract_ok"] is True, fixture_handoff
+          assert fixture_handoff["reviewed_mujoco_handoff_ready"] is False, fixture_handoff
+          assert fixture_handoff["reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority"] is True, fixture_handoff
+          forged_handoff = by_case["forged_ready_handoff_without_physical_motion_rejected"]["observations"]
+          assert forged_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", forged_handoff
+          assert forged_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", forged_handoff
+          assert forged_handoff["reviewed_mujoco_handoff_contract_ok"] is False, forged_handoff
+          assert forged_handoff["reviewed_mujoco_handoff_ready"] is False, forged_handoff
+          assert forged_handoff["reviewed_mujoco_handoff_physical_motion_checked"] is False, forged_handoff
+          incomplete_handoff = by_case["incomplete_ready_handoff_rejected"]["observations"]
+          assert incomplete_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", incomplete_handoff
+          assert incomplete_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", incomplete_handoff
+          assert incomplete_handoff["reviewed_mujoco_handoff_contract_ok"] is False, incomplete_handoff
+          assert incomplete_handoff["reviewed_mujoco_handoff_ready"] is False, incomplete_handoff
           ready_handoff = by_case["ready_handoff_intake_still_development_scene"]["observations"]
           assert ready_handoff["status"] == "ok", ready_handoff
           assert ready_handoff["reviewed_mujoco_handoff_intake_status"] == "reviewed_mujoco_handoff_ready_for_scene_intake", ready_handoff
+          assert ready_handoff["reviewed_mujoco_handoff_contract_ok"] is True, ready_handoff
           assert ready_handoff["reviewed_mujoco_handoff_ready"] is True, ready_handoff
+          assert ready_handoff["reviewed_mujoco_handoff_physical_motion_checked"] is True, ready_handoff
+          assert ready_handoff["reviewed_mujoco_handoff_hardware_free_fixture_motion_checked"] is False, ready_handoff
+          assert ready_handoff["reviewed_mujoco_handoff_motion_authority_status"] == "physical_reviewed_model_motion_checked", ready_handoff
           assert ready_handoff["reviewed_mujoco_handoff_model_authority"] == "downstream_handoff_not_authority", ready_handoff
           assert ready_handoff["reviewed_mujoco_handoff_physical_truth_claimed"] is False, ready_handoff
           assert ready_handoff["scene_uses_reviewed_mujoco_handoff"] is False, ready_handoff
@@ -2566,7 +2594,10 @@ jobs:
           assert so101_mujoco_scene["reviewed_mujoco_handoff_requested"] is True, so101_mujoco_scene
           assert so101_mujoco_scene["reviewed_mujoco_handoff_required"] is False, so101_mujoco_scene
           assert so101_mujoco_scene["reviewed_mujoco_handoff_intake_status"] == "reviewed_mujoco_handoff_not_ready", so101_mujoco_scene
+          assert so101_mujoco_scene["reviewed_mujoco_handoff_contract_ok"] is True, so101_mujoco_scene
           assert so101_mujoco_scene["reviewed_mujoco_handoff_ready"] is False, so101_mujoco_scene
+          assert so101_mujoco_scene["reviewed_mujoco_handoff_physical_motion_checked"] is False, so101_mujoco_scene
+          assert so101_mujoco_scene["reviewed_mujoco_handoff_hardware_free_fixture_motion_checked"] is False, so101_mujoco_scene
           assert so101_mujoco_scene["reviewed_mujoco_handoff_model_authority"] == "downstream_handoff_not_authority", so101_mujoco_scene
           assert so101_mujoco_scene["reviewed_mujoco_handoff_physical_truth_claimed"] is False, so101_mujoco_scene
           assert so101_mujoco_scene["scene_uses_reviewed_mujoco_handoff"] is False, so101_mujoco_scene
@@ -3736,6 +3767,7 @@ jobs:
               and row.get("metrics", {}).get("model_authority") == "development_scaffold_not_reviewed"
               and row.get("metrics", {}).get("ready_for_model_backed_ik") is False
               and row.get("metrics", {}).get("reviewed_mujoco_handoff_intake_status") == "reviewed_mujoco_handoff_not_ready"
+              and row.get("metrics", {}).get("reviewed_mujoco_handoff_contract_ok") is True
               and row.get("metrics", {}).get("reviewed_mujoco_handoff_ready") is False
               and row.get("metrics", {}).get("reviewed_mujoco_handoff_physical_truth_claimed") is False
               for row in artifacts_by_category["so101_mujoco_scene"]

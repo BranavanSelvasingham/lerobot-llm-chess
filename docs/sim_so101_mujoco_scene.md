@@ -39,6 +39,24 @@ The summary must report:
 - `sim_robot_mujoco_sync.after_status.fallback: null`
 - `env_scripted_pick_place.scripted_pick_place_complete: true`
 
+The smoke can also ingest the reviewed MuJoCo downstream handoff emitted by
+`smoke_sim_so101_reviewed_mujoco_bundle.py`:
+
+```bash
+python scripts/smoke_sim_so101_mujoco_scene.py \
+  --reviewed-mujoco-handoff-json /path/to/so101_reviewed_mujoco_bundle_downstream_handoff.json \
+  --require-reviewed-mujoco-handoff
+```
+
+The intake is contract-checked before readiness is trusted. A handoff must use
+the current downstream schema, include the complete item set
+(`model_authority`, `model_identity`, `target_frame`, `tcp_offset_m`,
+`base_to_board_alignment`, `joint_limits`, `mesh_assets`, `mujoco_motion`, and
+`downstream_gate_handoff`), preserve false physical-truth claims, and make
+`downstream_handoff_ready` coherent with physical reviewed MuJoCo motion. Fixture
+motion, incomplete ready payloads, or forged ready flags fail closed when the
+handoff is required.
+
 Invalid scene requests fail closed with artifacts instead of a traceback. For
 example, an invalid chess square or identical source/target square writes
 `so101_mujoco_scene_summary.json`, an empty steps CSV, and `README.md`, returns
@@ -56,6 +74,9 @@ The matrix writes `so101_mujoco_scene_matrix_summary.json`,
 `so101_mujoco_scene_matrix_cases.csv`, and `README.md`. It validates generated
 development scenes across center, corner, back-rank, and edge placements, plus
 fail-closed invalid-square, same-source/target, and non-positive max-step cases,
+fail-closed required handoff cases for not-ready, fixture-only, forged-ready, and
+incomplete-ready handoffs, and a valid ready-handoff intake case that still keeps
+the generated scene development-only,
 while keeping every case labeled as non-authoritative development scaffolding.
 
 This scene is intentionally not an authoritative model bundle. It is generated

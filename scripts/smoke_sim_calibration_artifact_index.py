@@ -2254,6 +2254,9 @@ def collect_so101_mujoco_smoke_artifacts(
         "reviewed_mujoco_handoff_intake_ok": smoke.get(
             "reviewed_mujoco_handoff_intake_ok"
         ),
+        "reviewed_mujoco_handoff_contract_ok": smoke.get(
+            "reviewed_mujoco_handoff_contract_ok"
+        ),
         "reviewed_mujoco_handoff_ready": smoke.get(
             "reviewed_mujoco_handoff_ready"
         ),

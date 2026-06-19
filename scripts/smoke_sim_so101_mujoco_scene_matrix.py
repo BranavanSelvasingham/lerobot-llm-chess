@@ -17,6 +17,18 @@ DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "so101_mujoco_scene_
 SCHEMA = "lerobot.sim.so101_mujoco_scene_matrix.v1"
 SCENE_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_mujoco_scene.py"
 SCENE_SUMMARY_NAME = "so101_mujoco_scene_summary.json"
+DOWNSTREAM_HANDOFF_SCHEMA = "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1"
+EXPECTED_DOWNSTREAM_HANDOFF_ITEM_IDS: tuple[str, ...] = (
+    "model_authority",
+    "model_identity",
+    "target_frame",
+    "tcp_offset_m",
+    "base_to_board_alignment",
+    "joint_limits",
+    "mesh_assets",
+    "mujoco_motion",
+    "downstream_gate_handoff",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -93,9 +105,13 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_handoff_requested",
         "reviewed_mujoco_handoff_required",
         "reviewed_mujoco_handoff_intake_status",
+        "reviewed_mujoco_handoff_contract_ok",
         "reviewed_mujoco_handoff_ready",
         "reviewed_mujoco_handoff_model_authority",
         "reviewed_mujoco_handoff_physical_truth_claimed",
+        "reviewed_mujoco_handoff_motion_authority_status",
+        "reviewed_mujoco_handoff_physical_motion_checked",
+        "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked",
         "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority",
         "scene_uses_reviewed_mujoco_handoff",
         "mujoco_scene_validity_status",
@@ -134,36 +150,85 @@ def read_json_object(path: Path, *, label: str) -> dict[str, Any]:
 def handoff_fixture_payload(state: str) -> dict[str, Any]:
     ready = state == "ready"
     fixture_ready = state == "fixture"
-    return {
-        "schema": "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1",
-        "ok": True,
-        "status": "physical_reviewed_mujoco_handoff_ready"
+    status = (
+        "physical_reviewed_mujoco_handoff_ready"
         if ready
         else "fixture_mujoco_handoff_ready_not_physical_authority"
         if fixture_ready
-        else "waiting_for_reviewed_bundle_authority",
+        else "waiting_for_reviewed_bundle_authority"
+    )
+    physical_motion_checked = ready
+    fixture_motion_checked = fixture_ready
+    payload = {
+        "schema": DOWNSTREAM_HANDOFF_SCHEMA,
+        "ok": True,
+        "status": status,
         "model_authority": "downstream_handoff_not_authority",
+        "ready_for_model_backed_ik": ready or fixture_ready,
+        "reviewed_model_motion_checked": physical_motion_checked or fixture_motion_checked,
+        "physical_reviewed_model_motion_checked": physical_motion_checked,
+        "hardware_free_fixture_motion_checked": fixture_motion_checked,
+        "motion_evidence_not_physical_so101_authority": fixture_ready,
+        "motion_authority_status": "physical_reviewed_model_motion_checked"
+        if ready
+        else "hardware_free_fixture_motion_checked_not_physical_so101_authority"
+        if fixture_ready
+        else "not_checked_manifest_not_ready",
+        "physical_so101_model_authority_ready": ready,
+        "hardware_free_regression_fixture_ready": fixture_ready,
         "downstream_handoff_ready": ready,
         "fixture_handoff_ready_not_physical_so101_authority": fixture_ready,
         "observed_evidence_is_authority": False,
         "physical_so101_truth_claimed": False,
         "development_fixture_evidence_not_physical_so101_truth": True,
-        "handoff_item_count": 1,
-        "handoff_item_ids": ["downstream_gate_handoff"],
+        "handoff_item_count": len(EXPECTED_DOWNSTREAM_HANDOFF_ITEM_IDS),
+        "handoff_item_ids": list(EXPECTED_DOWNSTREAM_HANDOFF_ITEM_IDS),
         "handoff_items": [
             {
-                "priority": 1,
-                "handoff_key": "downstream_gate_handoff",
-                "status": "physical_reviewed_mujoco_handoff_ready"
-                if ready
-                else "fixture_mujoco_handoff_ready_not_physical_authority"
-                if fixture_ready
-                else "waiting_for_reviewed_bundle_authority",
+                "priority": index,
+                "handoff_key": item_id,
+                "status": status,
                 "ready_for_downstream": ready,
                 "authority_status": "physical_handoff_ready" if ready else "blocked",
             }
+            for index, item_id in enumerate(EXPECTED_DOWNSTREAM_HANDOFF_ITEM_IDS, start=1)
         ],
     }
+    if state == "forged_ready_without_physical_motion":
+        payload.update(
+            {
+                "status": "physical_reviewed_mujoco_handoff_ready",
+                "downstream_handoff_ready": True,
+                "reviewed_model_motion_checked": False,
+                "physical_reviewed_model_motion_checked": False,
+                "physical_so101_model_authority_ready": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+            }
+        )
+    elif state == "incomplete_ready":
+        payload.update(
+            {
+                "status": "physical_reviewed_mujoco_handoff_ready",
+                "downstream_handoff_ready": True,
+                "physical_reviewed_model_motion_checked": True,
+                "physical_so101_model_authority_ready": True,
+                "motion_authority_status": "physical_reviewed_model_motion_checked",
+                "handoff_item_count": 1,
+                "handoff_item_ids": ["downstream_gate_handoff"],
+                "handoff_items": [
+                    {
+                        "priority": 1,
+                        "handoff_key": "downstream_gate_handoff",
+                        "status": "physical_reviewed_mujoco_handoff_ready",
+                        "ready_for_downstream": True,
+                        "authority_status": "physical_handoff_ready",
+                    }
+                ],
+            }
+        )
+    elif state == "schema_mismatch_ready":
+        payload["schema"] = "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v0"
+    return payload
 
 
 def case_specs() -> list[dict[str, Any]]:
@@ -205,6 +270,46 @@ def case_specs() -> list[dict[str, Any]]:
             "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
             "expected_handoff_intake_status": "reviewed_mujoco_handoff_not_ready",
             "expected_handoff_ready": False,
+            "expected_handoff_contract_ok": True,
+        },
+        {
+            "case_id": "required_fixture_handoff_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": False,
+            "handoff_state": "fixture",
+            "require_handoff": True,
+            "expected_status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "expected_handoff_intake_status": "fixture_handoff_not_physical_so101_authority",
+            "expected_handoff_ready": False,
+            "expected_handoff_contract_ok": True,
+        },
+        {
+            "case_id": "forged_ready_handoff_without_physical_motion_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": False,
+            "handoff_state": "forged_ready_without_physical_motion",
+            "require_handoff": True,
+            "expected_status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "expected_handoff_intake_status": "handoff_contract_invalid",
+            "expected_handoff_ready": False,
+            "expected_handoff_contract_ok": False,
+        },
+        {
+            "case_id": "incomplete_ready_handoff_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": False,
+            "handoff_state": "incomplete_ready",
+            "require_handoff": True,
+            "expected_status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "expected_handoff_intake_status": "handoff_contract_invalid",
+            "expected_handoff_ready": False,
+            "expected_handoff_contract_ok": False,
         },
         {
             "case_id": "ready_handoff_intake_still_development_scene",
@@ -214,6 +319,7 @@ def case_specs() -> list[dict[str, Any]]:
             "handoff_state": "ready",
             "expected_handoff_intake_status": "reviewed_mujoco_handoff_ready_for_scene_intake",
             "expected_handoff_ready": True,
+            "expected_handoff_contract_ok": True,
         },
     ]
 
@@ -316,6 +422,9 @@ def summarize_case(
         "reviewed_mujoco_handoff_intake_status": summary.get(
             "reviewed_mujoco_handoff_intake_status"
         ),
+        "reviewed_mujoco_handoff_contract_ok": summary.get(
+            "reviewed_mujoco_handoff_contract_ok"
+        ),
         "reviewed_mujoco_handoff_ready": summary.get(
             "reviewed_mujoco_handoff_ready"
         ),
@@ -324,6 +433,15 @@ def summarize_case(
         ),
         "reviewed_mujoco_handoff_physical_truth_claimed": summary.get(
             "reviewed_mujoco_handoff_physical_truth_claimed"
+        ),
+        "reviewed_mujoco_handoff_motion_authority_status": summary.get(
+            "reviewed_mujoco_handoff_motion_authority_status"
+        ),
+        "reviewed_mujoco_handoff_physical_motion_checked": summary.get(
+            "reviewed_mujoco_handoff_physical_motion_checked"
+        ),
+        "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked": summary.get(
+            "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked"
         ),
         "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": summary.get(
             "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority"
@@ -419,6 +537,13 @@ def summarize_case(
             f"{case_id}.reviewed_mujoco_handoff_intake_status",
             observations["reviewed_mujoco_handoff_intake_status"],
             spec["expected_handoff_intake_status"],
+        )
+    if "expected_handoff_contract_ok" in spec:
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_contract_ok",
+            observations["reviewed_mujoco_handoff_contract_ok"],
+            spec["expected_handoff_contract_ok"],
         )
     if "expected_handoff_ready" in spec:
         add_error(
@@ -550,6 +675,9 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "reviewed_mujoco_handoff_intake_status": observations.get(
             "reviewed_mujoco_handoff_intake_status"
         ),
+        "reviewed_mujoco_handoff_contract_ok": observations.get(
+            "reviewed_mujoco_handoff_contract_ok"
+        ),
         "reviewed_mujoco_handoff_ready": observations.get(
             "reviewed_mujoco_handoff_ready"
         ),
@@ -558,6 +686,15 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "reviewed_mujoco_handoff_physical_truth_claimed": observations.get(
             "reviewed_mujoco_handoff_physical_truth_claimed"
+        ),
+        "reviewed_mujoco_handoff_motion_authority_status": observations.get(
+            "reviewed_mujoco_handoff_motion_authority_status"
+        ),
+        "reviewed_mujoco_handoff_physical_motion_checked": observations.get(
+            "reviewed_mujoco_handoff_physical_motion_checked"
+        ),
+        "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked": observations.get(
+            "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked"
         ),
         "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": observations.get(
             "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority"
