@@ -53,9 +53,12 @@ the current downstream schema, include the complete item set
 (`model_authority`, `model_identity`, `target_frame`, `tcp_offset_m`,
 `base_to_board_alignment`, `joint_limits`, `mesh_assets`, `mujoco_motion`, and
 `downstream_gate_handoff`), preserve false physical-truth claims, and make
-`downstream_handoff_ready` coherent with physical reviewed MuJoCo motion. Fixture
-motion, incomplete ready payloads, forged ready flags, or handoffs that claim
-authority/physical SO-101 truth fail closed when the handoff is required.
+`downstream_handoff_ready` coherent with physical reviewed MuJoCo motion. It
+also requires the handoff gate list to keep `mujoco_scene_validity`,
+`gymnasium_task_wiring`, and reviewed-model-backed pick/place explicit. Fixture
+motion, incomplete ready payloads, forged ready flags, missing downstream gate
+entries, or handoffs that claim authority/physical SO-101 truth fail closed when
+the handoff is required.
 
 Invalid scene requests fail closed with artifacts instead of a traceback. For
 example, an invalid chess square or identical source/target square writes

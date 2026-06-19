@@ -1352,6 +1352,7 @@ jobs:
               "ready_handoff_with_missing_input_rejected",
               "ready_handoff_with_pending_action_rejected",
               "ready_handoff_physical_truth_claim_rejected",
+              "ready_handoff_missing_scene_gate_rejected",
               "required_ready_handoff_intake_still_development_scene",
               "ready_handoff_intake_still_development_scene",
           ], summary["case_ids"]
@@ -1370,6 +1371,7 @@ jobs:
               "ready_handoff_with_missing_input_rejected",
               "ready_handoff_with_pending_action_rejected",
               "ready_handoff_physical_truth_claim_rejected",
+              "ready_handoff_missing_scene_gate_rejected",
           }
           by_case = {case["case_id"]: case for case in summary["cases"]}
           invalid_steps = by_case["invalid_max_steps_rejected"]["observations"]
@@ -1425,6 +1427,17 @@ jobs:
           assert physical_truth_handoff["reviewed_mujoco_handoff_physical_truth_claimed"] is True, physical_truth_handoff
           assert "mark_downstream_handoff_as_non_authority_snapshot" in physical_truth_handoff["reviewed_mujoco_handoff_blockers"], physical_truth_handoff
           assert "remove_physical_so101_truth_claim_from_downstream_handoff" in physical_truth_handoff["reviewed_mujoco_handoff_blockers"], physical_truth_handoff
+          missing_scene_gate_handoff = by_case["ready_handoff_missing_scene_gate_rejected"]["observations"]
+          assert missing_scene_gate_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", missing_scene_gate_handoff
+          assert missing_scene_gate_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", missing_scene_gate_handoff
+          assert missing_scene_gate_handoff["reviewed_mujoco_handoff_contract_ok"] is False, missing_scene_gate_handoff
+          assert missing_scene_gate_handoff["reviewed_mujoco_handoff_ready"] is False, missing_scene_gate_handoff
+          assert missing_scene_gate_handoff["reviewed_mujoco_handoff_gates_unblocked_when_physical_ready"] == [
+              "gymnasium_task_wiring",
+              "reviewed_model_backed_contact_grasp_pick_place",
+          ], missing_scene_gate_handoff
+          assert missing_scene_gate_handoff["reviewed_mujoco_handoff_blocked_gates_until_physical_ready"] == [], missing_scene_gate_handoff
+          assert "provide_reviewed_mujoco_downstream_handoff_unblocked_gate_list" in missing_scene_gate_handoff["reviewed_mujoco_handoff_blockers"], missing_scene_gate_handoff
           required_ready_handoff = by_case["required_ready_handoff_intake_still_development_scene"]["observations"]
           assert required_ready_handoff["status"] == "ok", required_ready_handoff
           assert required_ready_handoff["reviewed_mujoco_handoff_required"] is True, required_ready_handoff

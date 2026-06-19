@@ -44,6 +44,11 @@ EXPECTED_DOWNSTREAM_HANDOFF_ITEM_IDS: tuple[str, ...] = (
     "mujoco_motion",
     "downstream_gate_handoff",
 )
+EXPECTED_DOWNSTREAM_HANDOFF_GATES: tuple[str, ...] = (
+    "mujoco_scene_validity",
+    "gymnasium_task_wiring",
+    "reviewed_model_backed_contact_grasp_pick_place",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -144,6 +149,8 @@ def handoff_intake_result(
     missing_inputs: list[str] | None = None,
     pending_action_ids: list[str] | None = None,
     ready_handoff_has_open_work: bool = False,
+    gates_unblocked_when_physical_ready: list[str] | None = None,
+    blocked_gates_until_physical_ready: list[str] | None = None,
 ) -> dict[str, Any]:
     return {
         "reviewed_mujoco_handoff_requested": requested,
@@ -177,6 +184,12 @@ def handoff_intake_result(
         "reviewed_mujoco_handoff_missing_inputs": missing_inputs or [],
         "reviewed_mujoco_handoff_pending_action_ids": pending_action_ids or [],
         "reviewed_mujoco_handoff_ready_has_open_work": ready_handoff_has_open_work,
+        "reviewed_mujoco_handoff_gates_unblocked_when_physical_ready": (
+            gates_unblocked_when_physical_ready or []
+        ),
+        "reviewed_mujoco_handoff_blocked_gates_until_physical_ready": (
+            blocked_gates_until_physical_ready or []
+        ),
         "reviewed_mujoco_handoff_item_ids": item_ids or [],
         "reviewed_mujoco_handoff_blockers": blockers or [],
     }
@@ -271,6 +284,19 @@ def reviewed_handoff_intake(
             *handoff_next_required_action_ids,
         ]
     )
+    raw_gates_unblocked = payload.get("gates_unblocked_when_physical_handoff_ready")
+    gates_unblocked = unique_strings(
+        raw_gates_unblocked if isinstance(raw_gates_unblocked, list) else []
+    )
+    raw_blocked_gates = payload.get("blocked_gates_until_physical_handoff_ready")
+    blocked_gates = unique_strings(
+        raw_blocked_gates if isinstance(raw_blocked_gates, list) else []
+    )
+    expected_gates = list(EXPECTED_DOWNSTREAM_HANDOFF_GATES)
+    expected_blocked_gates = [] if raw_ready else expected_gates
+    gate_contract_ok = (
+        gates_unblocked == expected_gates and blocked_gates == expected_blocked_gates
+    )
     ready_handoff_has_open_work = (raw_ready or fixture_ready) and bool(
         handoff_missing_inputs or handoff_pending_action_ids
     )
@@ -314,6 +340,7 @@ def reviewed_handoff_intake(
         and payload.get("reviewed_model_motion_checked") == (
             physical_motion_checked or fixture_motion_checked
         )
+        and gate_contract_ok
         and not ready_handoff_has_open_work
         and physical_ready_contract_ok
         and fixture_contract_ok
@@ -342,6 +369,10 @@ def reviewed_handoff_intake(
         blockers.append("provide_complete_reviewed_mujoco_downstream_handoff_items")
     if not item_count_ok:
         blockers.append("fix_reviewed_mujoco_downstream_handoff_item_count")
+    if gates_unblocked != expected_gates:
+        blockers.append("provide_reviewed_mujoco_downstream_handoff_unblocked_gate_list")
+    if blocked_gates != expected_blocked_gates:
+        blockers.append("provide_reviewed_mujoco_downstream_handoff_blocked_gate_list")
     if (raw_ready or fixture_ready) and handoff_missing_inputs:
         blockers.append("resolve_ready_reviewed_mujoco_handoff_missing_inputs")
     if (raw_ready or fixture_ready) and handoff_pending_action_ids:
@@ -378,6 +409,8 @@ def reviewed_handoff_intake(
         missing_inputs=handoff_missing_inputs,
         pending_action_ids=handoff_pending_action_ids,
         ready_handoff_has_open_work=ready_handoff_has_open_work,
+        gates_unblocked_when_physical_ready=gates_unblocked,
+        blocked_gates_until_physical_ready=blocked_gates,
     )
 
 

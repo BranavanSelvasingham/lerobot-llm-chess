@@ -777,8 +777,10 @@ scripted environment completion. It also covers invalid-square,
 same-source/target, and non-positive max-step requests that must fail closed
 without writing a model XML or manifest. Reviewed MuJoCo handoff cases also
 cover not-ready, fixture-only, forged-ready, and incomplete-ready payloads that
-must fail closed when a reviewed handoff is required; the valid ready-handoff
-case records `reviewed_mujoco_handoff_contract_ok: true` and
+must fail closed when a reviewed handoff is required. The matrix also rejects a
+ready-shaped handoff whose `gates_unblocked_when_physical_handoff_ready` does
+not explicitly include `mujoco_scene_validity`. The valid ready-handoff case
+records `reviewed_mujoco_handoff_contract_ok: true` and
 `reviewed_mujoco_handoff_physical_motion_checked: true` but still keeps
 `scene_uses_reviewed_mujoco_handoff: false` until the scene actually consumes a
 reviewed model bundle.

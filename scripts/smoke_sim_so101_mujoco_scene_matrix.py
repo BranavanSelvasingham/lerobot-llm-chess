@@ -29,6 +29,11 @@ EXPECTED_DOWNSTREAM_HANDOFF_ITEM_IDS: tuple[str, ...] = (
     "mujoco_motion",
     "downstream_gate_handoff",
 )
+EXPECTED_DOWNSTREAM_HANDOFF_GATES: tuple[str, ...] = (
+    "mujoco_scene_validity",
+    "gymnasium_task_wiring",
+    "reviewed_model_backed_contact_grasp_pick_place",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -116,6 +121,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_handoff_missing_inputs",
         "reviewed_mujoco_handoff_pending_action_ids",
         "reviewed_mujoco_handoff_ready_has_open_work",
+        "reviewed_mujoco_handoff_gates_unblocked_when_physical_ready",
+        "reviewed_mujoco_handoff_blocked_gates_until_physical_ready",
         "reviewed_mujoco_handoff_blockers",
         "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority",
         "scene_uses_reviewed_mujoco_handoff",
@@ -158,6 +165,7 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
         "ready_with_missing_input",
         "ready_with_pending_action",
         "ready_with_physical_truth_claim",
+        "ready_missing_scene_gate",
     }
     fixture_ready = state == "fixture"
     status = (
@@ -191,6 +199,12 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
         "observed_evidence_is_authority": False,
         "physical_so101_truth_claimed": False,
         "development_fixture_evidence_not_physical_so101_truth": True,
+        "gates_unblocked_when_physical_handoff_ready": list(
+            EXPECTED_DOWNSTREAM_HANDOFF_GATES
+        ),
+        "blocked_gates_until_physical_handoff_ready": []
+        if ready
+        else list(EXPECTED_DOWNSTREAM_HANDOFF_GATES),
         "handoff_item_count": len(EXPECTED_DOWNSTREAM_HANDOFF_ITEM_IDS),
         "handoff_item_ids": list(EXPECTED_DOWNSTREAM_HANDOFF_ITEM_IDS),
         "handoff_items": [
@@ -252,6 +266,11 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
     elif state == "ready_with_physical_truth_claim":
         payload["observed_evidence_is_authority"] = True
         payload["physical_so101_truth_claimed"] = True
+    elif state == "ready_missing_scene_gate":
+        payload["gates_unblocked_when_physical_handoff_ready"] = [
+            "gymnasium_task_wiring",
+            "reviewed_model_backed_contact_grasp_pick_place",
+        ]
     elif state == "schema_mismatch_ready":
         payload["schema"] = "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v0"
     return payload
@@ -401,6 +420,27 @@ def case_specs() -> list[dict[str, Any]]:
             "expected_handoff_blockers_contain": [
                 "mark_downstream_handoff_as_non_authority_snapshot",
                 "remove_physical_so101_truth_claim_from_downstream_handoff",
+            ],
+        },
+        {
+            "case_id": "ready_handoff_missing_scene_gate_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": False,
+            "handoff_state": "ready_missing_scene_gate",
+            "require_handoff": True,
+            "expected_status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "expected_handoff_intake_status": "handoff_contract_invalid",
+            "expected_handoff_ready": False,
+            "expected_handoff_contract_ok": False,
+            "expected_handoff_gates_unblocked": [
+                "gymnasium_task_wiring",
+                "reviewed_model_backed_contact_grasp_pick_place",
+            ],
+            "expected_handoff_blocked_gates": [],
+            "expected_handoff_blockers_contain": [
+                "provide_reviewed_mujoco_downstream_handoff_unblocked_gate_list"
             ],
         },
         {
@@ -565,6 +605,12 @@ def summarize_case(
         "reviewed_mujoco_handoff_ready_has_open_work": summary.get(
             "reviewed_mujoco_handoff_ready_has_open_work"
         ),
+        "reviewed_mujoco_handoff_gates_unblocked_when_physical_ready": summary.get(
+            "reviewed_mujoco_handoff_gates_unblocked_when_physical_ready"
+        ),
+        "reviewed_mujoco_handoff_blocked_gates_until_physical_ready": summary.get(
+            "reviewed_mujoco_handoff_blocked_gates_until_physical_ready"
+        ),
         "reviewed_mujoco_handoff_blockers": summary.get(
             "reviewed_mujoco_handoff_blockers"
         ),
@@ -690,6 +736,35 @@ def summarize_case(
             f"{case_id}.reviewed_mujoco_handoff_pending_action_ids",
             observations["reviewed_mujoco_handoff_pending_action_ids"],
             spec["expected_handoff_pending_action_ids"],
+        )
+    if expected_handoff_requested:
+        handoff_state = str(spec.get("handoff_state"))
+        default_blocked_gates = (
+            []
+            if handoff_state
+            in {
+                "ready",
+                "ready_with_missing_input",
+                "ready_with_pending_action",
+                "ready_with_physical_truth_claim",
+                "ready_missing_scene_gate",
+            }
+            else list(EXPECTED_DOWNSTREAM_HANDOFF_GATES)
+        )
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_gates_unblocked_when_physical_ready",
+            observations["reviewed_mujoco_handoff_gates_unblocked_when_physical_ready"],
+            spec.get(
+                "expected_handoff_gates_unblocked",
+                list(EXPECTED_DOWNSTREAM_HANDOFF_GATES),
+            ),
+        )
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_blocked_gates_until_physical_ready",
+            observations["reviewed_mujoco_handoff_blocked_gates_until_physical_ready"],
+            spec.get("expected_handoff_blocked_gates", default_blocked_gates),
         )
     expect_contains(
         errors,
@@ -858,6 +933,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "reviewed_mujoco_handoff_ready_has_open_work": observations.get(
             "reviewed_mujoco_handoff_ready_has_open_work"
+        ),
+        "reviewed_mujoco_handoff_gates_unblocked_when_physical_ready": observations.get(
+            "reviewed_mujoco_handoff_gates_unblocked_when_physical_ready"
+        ),
+        "reviewed_mujoco_handoff_blocked_gates_until_physical_ready": observations.get(
+            "reviewed_mujoco_handoff_blocked_gates_until_physical_ready"
         ),
         "reviewed_mujoco_handoff_blockers": observations.get(
             "reviewed_mujoco_handoff_blockers"
