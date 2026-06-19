@@ -345,6 +345,7 @@ jobs:
           assert summary["case_ids"] == [
               "missing_model_probe_not_authority",
               "placeholder_authority_provenance_rejected",
+              "invalid_reviewed_at_rejected",
               "valid_authority_provenance_still_draft_not_ready",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -380,6 +381,16 @@ jobs:
           assert "provenance" in placeholder["missing_inputs"], placeholder
           assert "record_reviewed_model_source_authority" in placeholder["next_required_action_ids"], placeholder
           assert "record_model_provenance" in placeholder["next_required_action_ids"], placeholder
+          invalid_reviewed_at = by_case["invalid_reviewed_at_rejected"]["observations"]
+          assert invalid_reviewed_at["status"] == "candidate_manifest_needs_review", invalid_reviewed_at
+          assert invalid_reviewed_at["model_request_status"] == "model_supplied", invalid_reviewed_at
+          assert invalid_reviewed_at["authority_empty"] is True, invalid_reviewed_at
+          assert invalid_reviewed_at["provenance_empty"] is False, invalid_reviewed_at
+          assert invalid_reviewed_at["authority_row_status"] == "action_required", invalid_reviewed_at
+          assert invalid_reviewed_at["provenance_row_status"] == "ok", invalid_reviewed_at
+          assert invalid_reviewed_at["authority_invalid_fields"] == ["reviewed_at"], invalid_reviewed_at
+          assert "authority" in invalid_reviewed_at["missing_inputs"], invalid_reviewed_at
+          assert "record_reviewed_model_source_authority" in invalid_reviewed_at["next_required_action_ids"], invalid_reviewed_at
           valid = by_case["valid_authority_provenance_still_draft_not_ready"]["observations"]
           assert valid["status"] == "candidate_manifest_needs_review", valid
           assert valid["model_request_status"] == "model_supplied", valid
@@ -433,6 +444,7 @@ jobs:
               "placeholder_review_metadata_not_ready",
               "thin_review_metadata_not_ready",
               "invalid_review_url_not_ready",
+              "invalid_reviewed_at_not_ready",
               "generic_review_scope_not_ready",
               "pending_review_metadata_not_ready",
               "weak_review_manifest_not_ready",
@@ -504,6 +516,34 @@ jobs:
           generic_scope = by_case["generic_review_scope_not_ready"]["observations"]
           assert generic_scope["authority_status"] == "needs_review", generic_scope
           assert "target_frame_authority" in generic_scope["missing_inputs"], generic_scope
+          invalid_reviewed_at = by_case["invalid_reviewed_at_not_ready"]["observations"]
+          for key in (
+              "authority_status",
+              "joint_limits_status",
+              "mesh_assets_status",
+              "target_frame_status",
+              "tcp_offset_status",
+              "alignment_status",
+          ):
+              assert invalid_reviewed_at[key] == "needs_review", invalid_reviewed_at
+          for key in (
+              "authority_review_invalid_fields",
+              "joint_limits_review_invalid_fields",
+              "mesh_assets_review_invalid_fields",
+              "target_frame_review_invalid_fields",
+              "tcp_offset_review_invalid_fields",
+              "alignment_review_invalid_fields",
+          ):
+              assert invalid_reviewed_at[key] == ["reviewed_at"], invalid_reviewed_at
+          for missing_input in (
+              "authority",
+              "joint_limit_authority",
+              "mesh_asset_authority",
+              "target_frame_authority",
+              "tcp_offset_authority",
+              "base_to_board_alignment_authority",
+          ):
+              assert missing_input in invalid_reviewed_at["missing_inputs"], invalid_reviewed_at
           pending_review = by_case["pending_review_metadata_not_ready"]["observations"]
           for key in (
               "authority_status",

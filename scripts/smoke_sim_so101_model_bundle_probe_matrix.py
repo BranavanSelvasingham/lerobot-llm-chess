@@ -201,6 +201,13 @@ def valid_authority_args() -> list[str]:
     ]
 
 
+def invalid_reviewed_at_args() -> list[str]:
+    args = valid_authority_args()
+    reviewed_at_index = args.index("--authority-reviewed-at") + 1
+    args[reviewed_at_index] = "not-a-date"
+    return args
+
+
 def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
     model_path = fixtures["model_path"]
     return [
@@ -247,6 +254,21 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                     "record_reviewed_model_source_authority",
                     "record_model_provenance",
                 ],
+            },
+        },
+        {
+            "case_id": "invalid_reviewed_at_rejected",
+            "args": ["--model-path", str(model_path), *invalid_reviewed_at_args()],
+            "expect": {
+                "status": "candidate_manifest_needs_review",
+                "model_request_status": "model_supplied",
+                "authority_empty": True,
+                "provenance_empty": False,
+                "authority_row_status": "action_required",
+                "provenance_row_status": "ok",
+                "authority_invalid_fields": ["reviewed_at"],
+                "missing_inputs": ["authority"],
+                "next_actions": ["record_reviewed_model_source_authority"],
             },
         },
         {
@@ -392,6 +414,7 @@ def summarize_case(
         "authority_row_status": authority_row.get("status"),
         "provenance_row_status": provenance_row.get("status"),
         "authority_placeholder_fields": authority_placeholder.get("placeholder_fields") or [],
+        "authority_invalid_fields": authority_placeholder.get("invalid_fields") or [],
         "provenance_placeholder_fields": provenance_placeholder.get("placeholder_fields") or [],
         "missing_inputs": missing_inputs,
         "next_required_action_ids": next_actions,
@@ -425,6 +448,12 @@ def summarize_case(
         "authority_placeholder_fields",
         observations["authority_placeholder_fields"],
         expect.get("authority_placeholder_fields", []),
+    )
+    expect_contains(
+        errors,
+        "authority_invalid_fields",
+        observations["authority_invalid_fields"],
+        expect.get("authority_invalid_fields", []),
     )
     expect_contains(
         errors,
@@ -465,6 +494,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         "",
         "- Missing model input still emits a draft and keeps model path, authority, and provenance actions open.",
         "- Placeholder authority/provenance inputs stay in placeholder diagnostics and do not populate manifest fields.",
+        "- Malformed authority review timestamps keep authority open and do not populate manifest authority fields.",
         "- Valid authority/provenance metadata can populate the draft, but the draft remains non-ready until model digest, meshes, reviewed joint limits, target-frame authority, TCP offset, and base-to-board alignment are supplied.",
         "",
         "Summary:",

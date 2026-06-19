@@ -9,6 +9,7 @@ import json
 import re
 import subprocess
 import sys
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -242,6 +243,27 @@ def invalid_review_url(value: Any) -> bool:
         return True
     parsed = urlparse(value.strip())
     return parsed.scheme not in {"http", "https"} or not parsed.netloc
+
+
+def invalid_reviewed_at(value: Any) -> bool:
+    if not non_empty(value):
+        return False
+    if not isinstance(value, str):
+        return True
+    raw = value.strip()
+    if not re.match(r"^\d{4}-\d{2}-\d{2}($|[T ])", raw):
+        return True
+    try:
+        date.fromisoformat(raw)
+        return False
+    except ValueError:
+        pass
+    normalized = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+    try:
+        datetime.fromisoformat(normalized)
+    except ValueError:
+        return True
+    return False
 
 
 def executable_arg(path: Path) -> str:
@@ -736,7 +758,11 @@ def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str,
     invalid_fields = sorted(
         key
         for key, value in supplied_review_fields.items()
-        if key not in placeholder_fields and key == "review_url" and invalid_review_url(value)
+        if key not in placeholder_fields
+        and (
+            (key == "review_url" and invalid_review_url(value))
+            or (key == "reviewed_at" and invalid_reviewed_at(value))
+        )
     )
     valid_review_fields = {
         key: value
@@ -812,7 +838,7 @@ def build_authority(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str,
             "supplied_review_scope_ids": supplied_review_scope_ids,
             "missing_review_scope_ids": missing_review_scope_ids,
             "review_scope_ready": not missing_review_scope_ids,
-            "reason": "Remove or fix invalid review_url before recording authority.",
+            "reason": "Remove or fix invalid reviewed_at/review_url before recording authority.",
         }
     authority = {
         "source_authority_status": "operator_reviewed",

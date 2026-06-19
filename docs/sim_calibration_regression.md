@@ -278,9 +278,10 @@ The standalone `scripts/smoke_sim_so101_model_bundle_probe_matrix.py` smoke
 keeps this boundary repeatable: missing model input remains non-authority,
 placeholder authority/provenance values such as `TODO`, `TBD`, `unknown`, and
 `placeholder-*` stay in placeholder diagnostics instead of populating candidate
-manifest fields, and valid authority/provenance metadata still leaves the draft
-blocked on model digest, mesh assets, reviewed joint limits, target-frame
-authority, TCP offset, and base-to-board alignment.
+manifest fields, malformed authority review timestamps keep authority open,
+and valid authority/provenance metadata still leaves the draft blocked on model
+digest, mesh assets, reviewed joint limits, target-frame authority, TCP offset,
+and base-to-board alignment.
 The review packet groups observed candidate source, joint-limit, mesh, TCP, and
 board-alignment evidence into operator review items, but it reports
 `model_authority: "review_packet_not_authority"` and never fills reviewed
@@ -719,11 +720,12 @@ It reports `model_authority: "model_bundle_manifest_matrix_not_authority"`,
 synthetic fixture manifest that must stay
 `hardware_free_regression_fixture_not_physical_so101_authority`, a ready-shaped
 manifest whose referenced model file is missing, placeholder alignment,
-placeholder/thin/invalid review evidence, generic review scopes, ready-shaped
-review metadata with pending follow-up, weak field-specific authority,
-placeholder or malformed provenance, reviewed-status fixture provenance, wrong
-target frame, invalid TCP/alignment payloads, and mismatched model SHA. Ready
-fixture cases exercise the manifest state machine only; they must keep
+placeholder/thin/invalid review evidence, malformed review timestamps, generic
+review scopes, ready-shaped review metadata with pending follow-up, weak
+field-specific authority, placeholder or malformed provenance, reviewed-status
+fixture provenance, wrong target frame, invalid TCP/alignment payloads, and
+mismatched model SHA. Ready fixture cases exercise the manifest state machine
+only; they must keep
 `physical_so101_model_authority_ready: false`.
 
 The standalone model-bundle probe matrix writes
@@ -732,9 +734,10 @@ reports `model_authority: "model_bundle_probe_matrix_not_authority"`,
 `observed_evidence_is_physical_so101_authority: false`, and
 `ready_for_policy_training: false`. Its cases prove that missing model input
 stays non-authority, placeholder authority/provenance values do not populate the
-candidate manifest, and valid authority/provenance metadata still leaves the
-draft blocked until model digest, meshes, reviewed joint limits, target-frame
-authority, TCP offset, and base-to-board alignment are supplied.
+candidate manifest, malformed authority review timestamps keep authority open,
+and valid authority/provenance metadata still leaves the draft blocked until
+model digest, meshes, reviewed joint limits, target-frame authority, TCP offset,
+and base-to-board alignment are supplied.
 
 The standalone reviewed-authority gate matrix writes
 `so101_reviewed_authority_gate_matrix_summary.json`, `.csv`, and `README.md`.

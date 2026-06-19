@@ -7,8 +7,10 @@ import csv
 import hashlib
 import json
 import math
+import re
 import subprocess
 import sys
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -688,7 +690,30 @@ def invalid_review_url(value: Any) -> bool:
     return parsed.scheme not in {"http", "https"} or not parsed.netloc
 
 
+def invalid_reviewed_at(value: Any) -> bool:
+    if not non_empty(value):
+        return False
+    if not isinstance(value, str):
+        return True
+    raw = value.strip()
+    if not re.match(r"^\d{4}-\d{2}-\d{2}($|[T ])", raw):
+        return True
+    try:
+        date.fromisoformat(raw)
+        return False
+    except ValueError:
+        pass
+    normalized = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+    try:
+        datetime.fromisoformat(normalized)
+    except ValueError:
+        return True
+    return False
+
+
 def invalid_review_evidence(field_name: str, value: Any) -> bool:
+    if field_name == "reviewed_at":
+        return invalid_reviewed_at(value)
     if field_name != "review_url":
         return False
     return invalid_review_url(value)
