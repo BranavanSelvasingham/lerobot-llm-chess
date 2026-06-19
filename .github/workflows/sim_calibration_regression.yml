@@ -1204,6 +1204,7 @@ jobs:
               "incomplete_ready_handoff_rejected",
               "ready_handoff_with_missing_input_rejected",
               "ready_handoff_with_pending_action_rejected",
+              "ready_handoff_physical_truth_claim_rejected",
               "ready_handoff_intake_still_development_scene",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -1219,6 +1220,7 @@ jobs:
               "incomplete_ready_handoff_rejected",
               "ready_handoff_with_missing_input_rejected",
               "ready_handoff_with_pending_action_rejected",
+              "ready_handoff_physical_truth_claim_rejected",
           }
           by_case = {case["case_id"]: case for case in summary["cases"]}
           invalid_steps = by_case["invalid_max_steps_rejected"]["observations"]
@@ -1265,6 +1267,15 @@ jobs:
           assert pending_action_handoff["reviewed_mujoco_handoff_missing_inputs"] == [], pending_action_handoff
           assert pending_action_handoff["reviewed_mujoco_handoff_pending_action_ids"] == ["rerun_reviewed_mujoco_downstream_handoff"], pending_action_handoff
           assert "resolve_ready_reviewed_mujoco_handoff_pending_actions" in pending_action_handoff["reviewed_mujoco_handoff_blockers"], pending_action_handoff
+          physical_truth_handoff = by_case["ready_handoff_physical_truth_claim_rejected"]["observations"]
+          assert physical_truth_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", physical_truth_handoff
+          assert physical_truth_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", physical_truth_handoff
+          assert physical_truth_handoff["reviewed_mujoco_handoff_contract_ok"] is False, physical_truth_handoff
+          assert physical_truth_handoff["reviewed_mujoco_handoff_ready"] is False, physical_truth_handoff
+          assert physical_truth_handoff["reviewed_mujoco_handoff_observed_evidence_is_authority"] is True, physical_truth_handoff
+          assert physical_truth_handoff["reviewed_mujoco_handoff_physical_truth_claimed"] is True, physical_truth_handoff
+          assert "mark_downstream_handoff_as_non_authority_snapshot" in physical_truth_handoff["reviewed_mujoco_handoff_blockers"], physical_truth_handoff
+          assert "remove_physical_so101_truth_claim_from_downstream_handoff" in physical_truth_handoff["reviewed_mujoco_handoff_blockers"], physical_truth_handoff
           ready_handoff = by_case["ready_handoff_intake_still_development_scene"]["observations"]
           assert ready_handoff["status"] == "ok", ready_handoff
           assert ready_handoff["reviewed_mujoco_handoff_intake_status"] == "reviewed_mujoco_handoff_ready_for_scene_intake", ready_handoff
@@ -1282,7 +1293,10 @@ jobs:
               assert obs["ready_for_model_backed_ik"] is False, case
               assert obs["ready_for_policy_training"] is False, case
               assert obs["physical_authority"] is False, case
-              assert obs["reviewed_mujoco_handoff_physical_truth_claimed"] in {False, None}, case
+              if case["case_id"] == "ready_handoff_physical_truth_claim_rejected":
+                  assert obs["reviewed_mujoco_handoff_physical_truth_claimed"] is True, case
+              else:
+                  assert obs["reviewed_mujoco_handoff_physical_truth_claimed"] in {False, None}, case
               if case["case_id"] in negative_case_ids:
                   assert obs["status"] == "invalid_task_configuration", case
                   assert obs["mujoco_scene_validity_status"] == "invalid_task_configuration", case

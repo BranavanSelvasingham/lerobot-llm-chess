@@ -108,6 +108,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_handoff_contract_ok",
         "reviewed_mujoco_handoff_ready",
         "reviewed_mujoco_handoff_model_authority",
+        "reviewed_mujoco_handoff_observed_evidence_is_authority",
         "reviewed_mujoco_handoff_physical_truth_claimed",
         "reviewed_mujoco_handoff_motion_authority_status",
         "reviewed_mujoco_handoff_physical_motion_checked",
@@ -156,6 +157,7 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
         "ready",
         "ready_with_missing_input",
         "ready_with_pending_action",
+        "ready_with_physical_truth_claim",
     }
     fixture_ready = state == "fixture"
     status = (
@@ -247,6 +249,9 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
                 "detail": "Pending downstream handoff action must fail closed even with ready status.",
             }
         ]
+    elif state == "ready_with_physical_truth_claim":
+        payload["observed_evidence_is_authority"] = True
+        payload["physical_so101_truth_claimed"] = True
     elif state == "schema_mismatch_ready":
         payload["schema"] = "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v0"
     return payload
@@ -370,6 +375,25 @@ def case_specs() -> list[dict[str, Any]]:
             ],
             "expected_handoff_blockers_contain": [
                 "resolve_ready_reviewed_mujoco_handoff_pending_actions"
+            ],
+        },
+        {
+            "case_id": "ready_handoff_physical_truth_claim_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": False,
+            "handoff_state": "ready_with_physical_truth_claim",
+            "require_handoff": True,
+            "expected_status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "expected_handoff_intake_status": "handoff_contract_invalid",
+            "expected_handoff_ready": False,
+            "expected_handoff_contract_ok": False,
+            "expected_handoff_observed_evidence_is_authority": True,
+            "expected_handoff_physical_truth_claimed": True,
+            "expected_handoff_blockers_contain": [
+                "mark_downstream_handoff_as_non_authority_snapshot",
+                "remove_physical_so101_truth_claim_from_downstream_handoff",
             ],
         },
         {
@@ -498,6 +522,9 @@ def summarize_case(
         ),
         "reviewed_mujoco_handoff_model_authority": summary.get(
             "reviewed_mujoco_handoff_model_authority"
+        ),
+        "reviewed_mujoco_handoff_observed_evidence_is_authority": summary.get(
+            "reviewed_mujoco_handoff_observed_evidence_is_authority"
         ),
         "reviewed_mujoco_handoff_physical_truth_claimed": summary.get(
             "reviewed_mujoco_handoff_physical_truth_claimed"
@@ -661,9 +688,15 @@ def summarize_case(
         )
         add_error(
             errors,
+            f"{case_id}.reviewed_mujoco_handoff_observed_evidence_is_authority",
+            observations["reviewed_mujoco_handoff_observed_evidence_is_authority"],
+            spec.get("expected_handoff_observed_evidence_is_authority", False),
+        )
+        add_error(
+            errors,
             f"{case_id}.reviewed_mujoco_handoff_physical_truth_claimed",
             observations["reviewed_mujoco_handoff_physical_truth_claimed"],
-            False,
+            spec.get("expected_handoff_physical_truth_claimed", False),
         )
     if expect_ok:
         add_error(
@@ -783,6 +816,9 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "reviewed_mujoco_handoff_model_authority": observations.get(
             "reviewed_mujoco_handoff_model_authority"
+        ),
+        "reviewed_mujoco_handoff_observed_evidence_is_authority": observations.get(
+            "reviewed_mujoco_handoff_observed_evidence_is_authority"
         ),
         "reviewed_mujoco_handoff_physical_truth_claimed": observations.get(
             "reviewed_mujoco_handoff_physical_truth_claimed"

@@ -328,6 +328,14 @@ def reviewed_handoff_intake(
     else:
         intake_status = "reviewed_mujoco_handoff_not_ready"
     blockers = []
+    if payload.get("model_authority") != DOWNSTREAM_HANDOFF_MODEL_AUTHORITY:
+        blockers.append("repair_reviewed_mujoco_downstream_handoff_authority")
+    if payload.get("observed_evidence_is_authority") is not False:
+        blockers.append("mark_downstream_handoff_as_non_authority_snapshot")
+    if payload.get("physical_so101_truth_claimed") is True:
+        blockers.append("remove_physical_so101_truth_claim_from_downstream_handoff")
+    if payload.get("development_fixture_evidence_not_physical_so101_truth") is not True:
+        blockers.append("mark_downstream_handoff_development_fixture_boundary")
     if payload.get("schema") != DOWNSTREAM_HANDOFF_SCHEMA:
         blockers.append("provide_current_reviewed_mujoco_downstream_handoff_schema")
     if missing_item_ids:

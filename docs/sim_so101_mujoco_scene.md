@@ -54,8 +54,8 @@ the current downstream schema, include the complete item set
 `base_to_board_alignment`, `joint_limits`, `mesh_assets`, `mujoco_motion`, and
 `downstream_gate_handoff`), preserve false physical-truth claims, and make
 `downstream_handoff_ready` coherent with physical reviewed MuJoCo motion. Fixture
-motion, incomplete ready payloads, or forged ready flags fail closed when the
-handoff is required.
+motion, incomplete ready payloads, forged ready flags, or handoffs that claim
+authority/physical SO-101 truth fail closed when the handoff is required.
 
 Invalid scene requests fail closed with artifacts instead of a traceback. For
 example, an invalid chess square or identical source/target square writes
@@ -75,8 +75,9 @@ The matrix writes `so101_mujoco_scene_matrix_summary.json`,
 development scenes across center, corner, back-rank, and edge placements, plus
 fail-closed invalid-square, same-source/target, and non-positive max-step cases,
 fail-closed required handoff cases for not-ready, fixture-only, forged-ready, and
-incomplete-ready handoffs, and a valid ready-handoff intake case that still keeps
-the generated scene development-only,
+incomplete-ready handoffs, ready handoffs with open review work, and ready
+handoffs that claim authority/physical SO-101 truth, plus a valid ready-handoff
+intake case that still keeps the generated scene development-only,
 while keeping every case labeled as non-authoritative development scaffolding.
 
 This scene is intentionally not an authoritative model bundle. It is generated
