@@ -99,6 +99,12 @@ automation coverage and must also report
 `physical_so101_model_authority_ready: false`; it is not physical SO-101 model
 authority.
 
+The reviewed MuJoCo bundle matrix also includes a ready-manifest negative
+fixture whose MuJoCo `gripper` joint has an effectively immobile qpos range. That
+case must keep `ready_for_model_backed_ik: true` from the manifest checker, but
+the motion gate must fail with `simrobot_mujoco_joint_motion` because the
+gripper's before/after qpos delta is below the required motion threshold.
+
 Passing this gate is still not full physical readiness. It proves reviewed-model
 handoff into MuJoCo and SimRobot joint motion. Contact-validated gripper
 grasp/lift/place physics and board-source pickup with reviewed model-backed IK

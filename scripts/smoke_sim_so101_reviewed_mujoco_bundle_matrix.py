@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
@@ -75,6 +77,14 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def json_clone(payload: dict[str, Any]) -> dict[str, Any]:
     return json.loads(json.dumps(payload))
 
@@ -86,6 +96,31 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
     ready_payload = json.loads(fixtures["ready_manifest_path"].read_text())
     ready_payload["model_path"] = str(normalize_path(fixtures["ready_model_path"]))
     ready_payload["asset_roots"] = [str(normalize_path(fixtures["ready_asset_root"]))]
+    ready_model_path = normalize_path(fixtures["ready_model_path"])
+    ready_model_dir = ready_model_path.parent
+
+    tiny_gripper_dir = output_dir / "fixtures" / "tiny_gripper_range_bundle"
+    tiny_gripper_model_dir = tiny_gripper_dir / "model"
+    tiny_gripper_model_dir.mkdir(parents=True, exist_ok=True)
+    ready_mesh_dir = ready_model_dir / "meshes"
+    if ready_mesh_dir.exists():
+        shutil.copytree(ready_mesh_dir, tiny_gripper_model_dir / "meshes", dirs_exist_ok=True)
+    tiny_gripper_model_path = tiny_gripper_model_dir / "synthetic_so101_tiny_gripper_range.xml"
+    root = ET.fromstring(ready_model_path.read_text())
+    gripper_range_patched = False
+    for joint in root.iter("joint"):
+        if joint.attrib.get("name") == "gripper":
+            joint.set("range", "0 1e-12")
+            gripper_range_patched = True
+            break
+    if not gripper_range_patched:
+        raise RuntimeError("failed_to_patch_tiny_gripper_range_fixture")
+    tiny_gripper_model_path.write_text(ET.tostring(root, encoding="unicode") + "\n")
+    tiny_gripper_payload = json_clone(ready_payload)
+    tiny_gripper_payload["model_path"] = str(normalize_path(tiny_gripper_model_path))
+    tiny_gripper_payload["model_sha256"] = sha256_file(tiny_gripper_model_path)
+    tiny_gripper_manifest_path = tiny_gripper_dir / "so101_model_bundle.tiny_gripper_range.json"
+    write_json(tiny_gripper_manifest_path, tiny_gripper_payload)
 
     nonfinite_joint_limits = json_clone(ready_payload)
     nonfinite_joint_limits["joint_limits_deg"]["shoulder_pan"] = ["NaN", 110.0]
@@ -122,6 +157,8 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
     write_json(mismatched_model_sha_path, mismatched_model_sha)
 
     return {
+        "tiny_gripper_range_manifest_path": tiny_gripper_manifest_path,
+        "tiny_gripper_range_model_path": tiny_gripper_model_path,
         "nonfinite_joint_limits_manifest_path": nonfinite_joint_limits_path,
         "nonfinite_tcp_manifest_path": nonfinite_tcp_path,
         "nonfinite_alignment_manifest_path": nonfinite_alignment_path,
@@ -159,8 +196,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "physical_so101_model_authority_ready",
         "hardware_free_regression_fixture_ready",
         "reviewed_model_motion_checked",
+        "simrobot_sync_ok",
         "all_so101_joints_motion_checked",
         "motion_check_joint_names",
+        "gripper_motion_check",
         "motion_authority_status",
         "physical_reviewed_model_motion_checked",
         "hardware_free_fixture_motion_checked",
@@ -438,6 +477,37 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "ready_manifest_gripper_range_not_moving",
+            "manifest_path": fixtures["tiny_gripper_range_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 1,
+                "gate_ok": False,
+                "status": "reviewed_mujoco_bundle_motion_failed",
+                "ready_for_model_backed_ik": True,
+                "model_authority": (
+                    "hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_so101_model_authority_ready": False,
+                "hardware_free_regression_fixture_ready": True,
+                "reviewed_model_motion_checked": False,
+                "simrobot_sync_ok": False,
+                "all_so101_joints_motion_checked": True,
+                "motion_check_joint_names": list(EXPECTED_MOTION_CHECK_JOINTS),
+                "gripper_motion_check": {
+                    "ok": False,
+                    "target_ok": True,
+                    "moved": False,
+                    "range_ok": False,
+                },
+                "motion_authority_status": "hardware_free_fixture_motion_failed",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "missing_inputs_contains": ["simrobot_mujoco_joint_motion"],
+            },
+        },
+        {
             "case_id": "ready_synthetic_fixture_motion_not_physical",
             "manifest_path": fixtures["ready_manifest_path"],
             "require_ready": False,
@@ -452,8 +522,15 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "physical_so101_model_authority_ready": False,
                 "hardware_free_regression_fixture_ready": True,
                 "reviewed_model_motion_checked": True,
+                "simrobot_sync_ok": True,
                 "all_so101_joints_motion_checked": True,
                 "motion_check_joint_names": list(EXPECTED_MOTION_CHECK_JOINTS),
+                "gripper_motion_check": {
+                    "ok": True,
+                    "target_ok": True,
+                    "moved": True,
+                    "range_ok": True,
+                },
                 "motion_authority_status": (
                     "hardware_free_fixture_motion_checked_not_physical_so101_authority"
                 ),
@@ -649,8 +726,14 @@ def summarize_case(
         sim_sync = summary.get("sim_robot_mujoco_sync")
         if not isinstance(model_load, dict) or model_load.get("ok") is not True:
             errors.append(f"{case_id}.mujoco_model_load: expected ok true")
-        if not isinstance(sim_sync, dict) or sim_sync.get("ok") is not True:
-            errors.append(f"{case_id}.sim_robot_mujoco_sync: expected ok true")
+        expected_sync_ok = expect.get("simrobot_sync_ok", True)
+        actual_sync_ok = sim_sync.get("ok") if isinstance(sim_sync, dict) else None
+        add_error(
+            errors,
+            f"{case_id}.simrobot_sync_ok",
+            actual_sync_ok,
+            expected_sync_ok,
+        )
     sim_sync = summary.get("sim_robot_mujoco_sync")
     sim_sync = sim_sync if isinstance(sim_sync, dict) else {}
     if "all_so101_joints_motion_checked" in expect:
@@ -667,6 +750,22 @@ def summarize_case(
             sim_sync.get("motion_check_joint_names"),
             expect["motion_check_joint_names"],
         )
+    motion_checks = sim_sync.get("motion_checks")
+    motion_checks = motion_checks if isinstance(motion_checks, list) else []
+    gripper_motion_checks = [
+        check
+        for check in motion_checks
+        if isinstance(check, dict) and check.get("joint") == "gripper"
+    ]
+    gripper_motion_check = gripper_motion_checks[0] if gripper_motion_checks else {}
+    if "gripper_motion_check" in expect:
+        for key, expected_value in expect["gripper_motion_check"].items():
+            add_error(
+                errors,
+                f"{case_id}.gripper_motion_check.{key}",
+                gripper_motion_check.get(key),
+                expected_value,
+            )
 
     return {
         "case_id": case_id,
@@ -696,10 +795,12 @@ def summarize_case(
                 "hardware_free_regression_fixture_ready"
             ),
             "reviewed_model_motion_checked": summary.get("reviewed_model_motion_checked"),
+            "simrobot_sync_ok": sim_sync.get("ok"),
             "all_so101_joints_motion_checked": sim_sync.get(
                 "all_so101_joints_motion_checked"
             ),
             "motion_check_joint_names": sim_sync.get("motion_check_joint_names"),
+            "gripper_motion_check": gripper_motion_check,
             "motion_authority_status": summary.get("motion_authority_status"),
             "physical_reviewed_model_motion_checked": summary.get(
                 "physical_reviewed_model_motion_checked"
@@ -752,10 +853,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
             "hardware_free_regression_fixture_ready"
         ),
         "reviewed_model_motion_checked": observations.get("reviewed_model_motion_checked"),
+        "simrobot_sync_ok": observations.get("simrobot_sync_ok"),
         "all_so101_joints_motion_checked": observations.get(
             "all_so101_joints_motion_checked"
         ),
         "motion_check_joint_names": observations.get("motion_check_joint_names"),
+        "gripper_motion_check": observations.get("gripper_motion_check"),
         "motion_authority_status": observations.get("motion_authority_status"),
         "physical_reviewed_model_motion_checked": observations.get(
             "physical_reviewed_model_motion_checked"
@@ -816,6 +919,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "",
             "- Missing or not-ready manifests must not attempt MuJoCo motion.",
             "- The `--require-ready-reviewed-model` case must fail closed when no ready manifest exists.",
+            "- The tiny-gripper-range fixture must reach manifest readiness but fail the SimRobot motion gate on `simrobot_mujoco_joint_motion`.",
             "- Ready synthetic fixture motion must remain `hardware_free_fixture_motion_checked_not_physical_so101_authority`.",
         ]
     )
