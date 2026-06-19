@@ -34,6 +34,11 @@ EXPECTED_MOTION_CHECK_JOINTS = (
     "wrist_flex",
     "wrist_roll",
 )
+EXPECTED_DOWNSTREAM_HANDOFF_GATES = (
+    "mujoco_scene_validity",
+    "gymnasium_task_wiring",
+    "reviewed_model_backed_contact_grasp_pick_place",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -1649,6 +1654,11 @@ def summarize_case(
         summary.get("hardware_free_fixture_motion_checked") is True
         and summary.get("ready_handoff_has_open_work") is not True,
     )
+    downstream_handoff_csv_item_ids = sorted(
+        row.get("handoff_key", "")
+        for row in downstream_handoff_csv_rows
+        if row.get("handoff_key")
+    )
     if downstream_handoff:
         add_error(
             errors,
@@ -1673,6 +1683,42 @@ def summarize_case(
             f"{case_id}.downstream_handoff_json.observed_evidence_is_authority",
             downstream_handoff.get("observed_evidence_is_authority"),
             False,
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.development_fixture_caveat",
+            downstream_handoff.get(
+                "development_fixture_evidence_not_physical_so101_truth"
+            ),
+            True,
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.downstream_handoff_ready",
+            downstream_handoff.get("downstream_handoff_ready"),
+            summary.get("downstream_handoff_ready"),
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.fixture_handoff_ready",
+            downstream_handoff.get(
+                "fixture_handoff_ready_not_physical_so101_authority"
+            ),
+            summary.get("fixture_handoff_ready_not_physical_so101_authority"),
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.gates_unblocked",
+            downstream_handoff.get("gates_unblocked_when_physical_handoff_ready"),
+            list(EXPECTED_DOWNSTREAM_HANDOFF_GATES),
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.blocked_gates",
+            downstream_handoff.get("blocked_gates_until_physical_handoff_ready"),
+            []
+            if summary.get("downstream_handoff_ready") is True
+            else list(EXPECTED_DOWNSTREAM_HANDOFF_GATES),
         )
         if "downstream_gate_handoff" not in set(
             downstream_handoff.get("handoff_item_ids") or []
@@ -1699,11 +1745,38 @@ def summarize_case(
                 len(downstream_handoff_csv_rows),
                 downstream_handoff.get("handoff_item_count"),
             )
-    downstream_handoff_csv_item_ids = sorted(
-        row.get("handoff_key", "")
-        for row in downstream_handoff_csv_rows
-        if row.get("handoff_key")
-    )
+            add_error(
+                errors,
+                f"{case_id}.downstream_handoff_csv_item_ids_match_json",
+                downstream_handoff_csv_item_ids,
+                sorted(
+                    str(item)
+                    for item in downstream_handoff.get("handoff_item_ids") or []
+                ),
+            )
+            expected_ready_text = str(downstream_handoff.get("downstream_handoff_ready"))
+            unexpected_ready_rows = sorted(
+                f"{row.get('handoff_key')}={row.get('ready_for_downstream')}"
+                for row in downstream_handoff_csv_rows
+                if row.get("ready_for_downstream") != expected_ready_text
+            )
+            add_error(
+                errors,
+                f"{case_id}.downstream_handoff_csv_ready_flags",
+                unexpected_ready_rows,
+                [],
+            )
+            missing_caveat_rows = sorted(
+                str(row.get("handoff_key"))
+                for row in downstream_handoff_csv_rows
+                if not row.get("caveat")
+            )
+            add_error(
+                errors,
+                f"{case_id}.downstream_handoff_csv_caveats",
+                missing_caveat_rows,
+                [],
+            )
     if downstream_handoff_csv_rows and "downstream_gate_handoff" not in set(
         downstream_handoff_csv_item_ids
     ):
