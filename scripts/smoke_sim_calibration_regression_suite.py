@@ -5114,6 +5114,23 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
                 "file; an authoritative root alone does not authorize a different "
                 "selected model file."
             ),
+            "source_bundle_consistency_status": consistency_status,
+            "source_bundle_consistency_blocker": source_bundle_consistency.get(
+                "blocker"
+            ),
+            "selected_authoritative_candidate_path": source_bundle_consistency.get(
+                "selected_authoritative_candidate_path"
+            ),
+            "bundle_model_path": source_bundle_consistency.get("bundle_model_path"),
+            "selected_authoritative_candidate_sha256": (
+                source_bundle_consistency.get("selected_authoritative_candidate_sha256")
+            ),
+            "bundle_model_declared_sha256": source_bundle_consistency.get(
+                "bundle_model_declared_sha256"
+            ),
+            "bundle_model_observed_sha256": source_bundle_consistency.get(
+                "bundle_model_observed_sha256"
+            ),
         },
         {
             "item_id": "physical_reviewed_mujoco_motion_checked",
@@ -5133,6 +5150,29 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
                 "Load the reviewed bundle in MuJoCo, map all SO-101 joints, find the target "
                 "frame, prove SimRobot joint motion without fallback behavior, and keep "
                 "the motion summary tied to the same reviewed model path and digest."
+            ),
+            "reviewed_mujoco_motion_bundle_consistency_status": (
+                motion_bundle_consistency_status
+            ),
+            "reviewed_mujoco_motion_bundle_consistency_blocker": (
+                motion_bundle_consistency.get("blocker")
+            ),
+            "bundle_model_path": motion_bundle_consistency.get("bundle_model_path"),
+            "reviewed_mujoco_motion_model_path": motion_bundle_consistency.get(
+                "reviewed_mujoco_motion_model_path"
+            ),
+            "bundle_model_declared_sha256": motion_bundle_consistency.get(
+                "bundle_model_declared_sha256"
+            ),
+            "reviewed_mujoco_motion_model_declared_sha256": (
+                motion_bundle_consistency.get(
+                    "reviewed_mujoco_motion_model_declared_sha256"
+                )
+            ),
+            "reviewed_mujoco_motion_model_observed_sha256": (
+                motion_bundle_consistency.get(
+                    "reviewed_mujoco_motion_model_observed_sha256"
+                )
             ),
         },
     ]
@@ -5587,6 +5627,18 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "observed_ready",
         "blocked_by_prior_requirement_ids",
         "next_action_id",
+        "source_bundle_consistency_status",
+        "source_bundle_consistency_blocker",
+        "selected_authoritative_candidate_path",
+        "bundle_model_path",
+        "selected_authoritative_candidate_sha256",
+        "bundle_model_declared_sha256",
+        "bundle_model_observed_sha256",
+        "reviewed_mujoco_motion_bundle_consistency_status",
+        "reviewed_mujoco_motion_bundle_consistency_blocker",
+        "reviewed_mujoco_motion_model_path",
+        "reviewed_mujoco_motion_model_declared_sha256",
+        "reviewed_mujoco_motion_model_observed_sha256",
         "evidence_artifact_path",
         "blockers",
         "operator_action",

@@ -110,6 +110,18 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "blocker_packet_action_required_item_ids",
         "blocker_packet_blocked_by_prior_requirements_item_ids",
         "blocker_packet_next_action_ids",
+        "blocker_source_bundle_consistency_status",
+        "blocker_source_bundle_consistency_blocker",
+        "blocker_selected_authoritative_candidate_path",
+        "blocker_bundle_model_path",
+        "blocker_selected_authoritative_candidate_sha256",
+        "blocker_bundle_model_declared_sha256",
+        "blocker_bundle_model_observed_sha256",
+        "blocker_motion_bundle_consistency_status",
+        "blocker_motion_bundle_consistency_blocker",
+        "blocker_reviewed_mujoco_motion_model_path",
+        "blocker_reviewed_mujoco_motion_model_declared_sha256",
+        "blocker_reviewed_mujoco_motion_model_observed_sha256",
         "checklist_status_by_requirement_id",
         "checklist_next_action_ids_by_requirement_id",
         "checklist_blocked_by_prior_requirement_ids_by_requirement_id",
@@ -1522,6 +1534,13 @@ def expect_contains(errors: list[str], label: str, values: Any, expected_values:
             errors.append(f"{label}: expected {expected!r} in {values!r}")
 
 
+def blocker_item_by_id(blocker_packet: dict[str, Any], item_id: str) -> dict[str, Any]:
+    for item in blocker_packet.get("items", []):
+        if isinstance(item, dict) and item.get("item_id") == item_id:
+            return item
+    return {}
+
+
 def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
     gate = so101_reviewed_model_authority_gate_section(
         spec["source"],
@@ -1531,6 +1550,14 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
     gate_summary_path = case_dir / "so101_reviewed_model_authority_gate_summary.json"
     blocker_packet = so101_reviewed_model_authority_blocker_packet(
         {**gate, "summary_path": str(gate_summary_path)}
+    )
+    source_bundle_blocker_item = blocker_item_by_id(
+        blocker_packet,
+        "source_bundle_consistency",
+    )
+    motion_blocker_item = blocker_item_by_id(
+        blocker_packet,
+        "physical_reviewed_mujoco_motion_checked",
     )
     expect = spec["expect"]
     errors: list[str] = []
@@ -1714,6 +1741,27 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
     if not isinstance(source_bundle_consistency, dict):
         errors.append("source_bundle_consistency: expected dict")
     else:
+        for item_field, consistency_field in (
+            ("source_bundle_consistency_status", "status"),
+            ("source_bundle_consistency_blocker", "blocker"),
+            (
+                "selected_authoritative_candidate_path",
+                "selected_authoritative_candidate_path",
+            ),
+            ("bundle_model_path", "bundle_model_path"),
+            (
+                "selected_authoritative_candidate_sha256",
+                "selected_authoritative_candidate_sha256",
+            ),
+            ("bundle_model_declared_sha256", "bundle_model_declared_sha256"),
+            ("bundle_model_observed_sha256", "bundle_model_observed_sha256"),
+        ):
+            add_error(
+                errors,
+                f"blocker_source_bundle.{item_field}",
+                source_bundle_blocker_item.get(item_field),
+                source_bundle_consistency.get(consistency_field),
+            )
         add_error(
             errors,
             "nested_consistency_status",
@@ -1844,6 +1892,36 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
     if not isinstance(motion_bundle_consistency, dict):
         errors.append("reviewed_mujoco_motion_bundle_consistency: expected dict")
     else:
+        for item_field, consistency_field in (
+            (
+                "reviewed_mujoco_motion_bundle_consistency_status",
+                "status",
+            ),
+            (
+                "reviewed_mujoco_motion_bundle_consistency_blocker",
+                "blocker",
+            ),
+            ("bundle_model_path", "bundle_model_path"),
+            (
+                "reviewed_mujoco_motion_model_path",
+                "reviewed_mujoco_motion_model_path",
+            ),
+            ("bundle_model_declared_sha256", "bundle_model_declared_sha256"),
+            (
+                "reviewed_mujoco_motion_model_declared_sha256",
+                "reviewed_mujoco_motion_model_declared_sha256",
+            ),
+            (
+                "reviewed_mujoco_motion_model_observed_sha256",
+                "reviewed_mujoco_motion_model_observed_sha256",
+            ),
+        ):
+            add_error(
+                errors,
+                f"blocker_motion.{item_field}",
+                motion_blocker_item.get(item_field),
+                motion_bundle_consistency.get(consistency_field),
+            )
         add_error(
             errors,
             "nested_motion_bundle_consistency_status",
@@ -2062,6 +2140,8 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             for requirement_id, row in checklist_by_requirement.items()
             if row.get("blocked_by_prior_requirement_ids")
         },
+        "blocker_source_bundle_item": source_bundle_blocker_item,
+        "blocker_motion_item": motion_blocker_item,
     }
 
 
@@ -2074,6 +2154,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
     motion_consistency = (
         motion_consistency if isinstance(motion_consistency, dict) else {}
     )
+    source_bundle_item = case.get("blocker_source_bundle_item")
+    source_bundle_item = (
+        source_bundle_item if isinstance(source_bundle_item, dict) else {}
+    )
+    motion_item = case.get("blocker_motion_item")
+    motion_item = motion_item if isinstance(motion_item, dict) else {}
     return {
         "case_id": case["case_id"],
         "ok": case["ok"],
@@ -2185,6 +2271,40 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
             "blocked_by_prior_requirements_item_ids"
         ),
         "blocker_packet_next_action_ids": blocker_packet.get("next_action_ids"),
+        "blocker_source_bundle_consistency_status": source_bundle_item.get(
+            "source_bundle_consistency_status"
+        ),
+        "blocker_source_bundle_consistency_blocker": source_bundle_item.get(
+            "source_bundle_consistency_blocker"
+        ),
+        "blocker_selected_authoritative_candidate_path": source_bundle_item.get(
+            "selected_authoritative_candidate_path"
+        ),
+        "blocker_bundle_model_path": source_bundle_item.get("bundle_model_path"),
+        "blocker_selected_authoritative_candidate_sha256": source_bundle_item.get(
+            "selected_authoritative_candidate_sha256"
+        ),
+        "blocker_bundle_model_declared_sha256": source_bundle_item.get(
+            "bundle_model_declared_sha256"
+        ),
+        "blocker_bundle_model_observed_sha256": source_bundle_item.get(
+            "bundle_model_observed_sha256"
+        ),
+        "blocker_motion_bundle_consistency_status": motion_item.get(
+            "reviewed_mujoco_motion_bundle_consistency_status"
+        ),
+        "blocker_motion_bundle_consistency_blocker": motion_item.get(
+            "reviewed_mujoco_motion_bundle_consistency_blocker"
+        ),
+        "blocker_reviewed_mujoco_motion_model_path": motion_item.get(
+            "reviewed_mujoco_motion_model_path"
+        ),
+        "blocker_reviewed_mujoco_motion_model_declared_sha256": motion_item.get(
+            "reviewed_mujoco_motion_model_declared_sha256"
+        ),
+        "blocker_reviewed_mujoco_motion_model_observed_sha256": motion_item.get(
+            "reviewed_mujoco_motion_model_observed_sha256"
+        ),
         "checklist_status_by_requirement_id": case.get(
             "checklist_status_by_requirement_id"
         ),
