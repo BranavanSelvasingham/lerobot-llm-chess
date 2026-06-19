@@ -34,6 +34,12 @@ The matrix explicitly exports and checks the contact path booleans for
 board-contact clearance during lift, release-contact clearance after retreat,
 final board contact, and final target XY tolerance so downstream rollout gates
 do not have to infer those conditions from one aggregate pick/place flag.
+It also checks the machine-readable phase contract:
+`pick_place_phase_evidence`, `pick_place_phase_ids`,
+`pick_place_failed_phase_ids`, `pick_place_phase_count`, and
+`pick_place_all_required_phases_verified`. The required phases are
+`source_reset`, `two_finger_grasp`, `lift_clearance`,
+`transfer_toward_target`, and `release_place`.
 
 The smoke resets the free piece onto source square `e4`, seeds the development
 robot at a source-pick pose, closes on the board piece, lifts it off the board,
@@ -45,7 +51,9 @@ Expected current status is
 source square, two-finger contact is visible after close/settle, the piece
 lifts while board contact clears, the transfer moves toward the target, the
 piece lands back on the board within the target XY tolerance, and gripper
-contact clears after retreat.
+contact clears after retreat. The placement check now also records
+`final_place_z_error_m` against `place_z_tolerance_m`, so the release/place
+phase is not only an XY check.
 
 This is still development evidence, not physical SO-101 grasp truth. It uses
 the generated `development_scaffold_not_reviewed` MJCF, an enlarged/lightened

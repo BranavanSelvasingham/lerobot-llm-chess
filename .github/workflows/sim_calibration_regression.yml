@@ -3221,6 +3221,18 @@ jobs:
           assert so101_mujoco_board_pick_probe["release_contact_cleared_after_retreat"] is True, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["final_board_contact_observed"] is True, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["final_target_xy_error_m"] <= so101_mujoco_board_pick_probe["target_xy_tolerance_m"], so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["final_place_z_error_m"] <= so101_mujoco_board_pick_probe["place_z_tolerance_m"], so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["pick_place_phase_ids"] == [
+              "source_reset",
+              "two_finger_grasp",
+              "lift_clearance",
+              "transfer_toward_target",
+              "release_place",
+          ], so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["pick_place_phase_count"] == 5, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["pick_place_failed_phase_ids"] == [], so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["pick_place_all_required_phases_verified"] is True, so101_mujoco_board_pick_probe
+          assert len(so101_mujoco_board_pick_probe["pick_place_phase_evidence"]) == 5, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["manual_piece_pose_used_after_reset"] is False, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["robot_pose_seeded_for_source_fixture"] is True, so101_mujoco_board_pick_probe
           assert isinstance(so101_mujoco_board_pick_probe["probe_count"], int) and so101_mujoco_board_pick_probe["probe_count"] > 0, so101_mujoco_board_pick_probe

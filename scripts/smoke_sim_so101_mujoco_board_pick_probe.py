@@ -39,6 +39,7 @@ TARGET_PAN_RAD = 0.07
 LIFT_Z_THRESHOLD_M = 0.02
 TARGET_XY_TOLERANCE_M = 0.01
 SOURCE_PICK_XY_TOLERANCE_M = 0.02
+PLACE_Z_TOLERANCE_M = 0.005
 LOWER_JOINT_TARGETS = {
     "shoulder_lift": 0.0,
     "elbow_flex": 0.0,
@@ -74,6 +75,13 @@ NEXT_REQUIRED_FOR_GOAL = (
         "title": "Repeat board-source pick/place with reviewed model-backed IK",
         "detail": "Repeat the board-source pick/place proof with calibrated gripper geometry before treating training rollouts as physical truth.",
     },
+)
+PICK_PLACE_PHASE_IDS = (
+    "source_reset",
+    "two_finger_grasp",
+    "lift_clearance",
+    "transfer_toward_target",
+    "release_place",
 )
 
 
@@ -308,6 +316,23 @@ def row_by_stage(rows: list[dict[str, Any]], stage: str) -> dict[str, Any]:
     raise AssertionError(f"Missing row for stage {stage!r}.")
 
 
+def phase_evidence_row(
+    *,
+    phase_id: str,
+    stage: str,
+    ok: bool,
+    criteria: list[str],
+    metrics: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "phase_id": phase_id,
+        "stage": stage,
+        "ok": bool(ok),
+        "criteria": criteria,
+        "metrics": metrics,
+    }
+
+
 def write_readme(path: Path, summary: dict[str, Any]) -> None:
     lines = [
         "# SO-101 MuJoCo Board Pick Probe",
@@ -323,6 +348,8 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- Board contact cleared during lift: `{summary.get('board_contact_cleared_during_lift')}`",
         f"- Transfer verified: `{summary.get('transfer_verified')}`",
         f"- Place verified: `{summary.get('place_without_manual_piece_pose_verified')}`",
+        f"- All required phases verified: `{summary.get('pick_place_all_required_phases_verified')}`",
+        f"- Failed phase IDs: `{summary.get('pick_place_failed_phase_ids')}`",
         f"- Release contact cleared after retreat: `{summary.get('release_contact_cleared_after_retreat')}`",
         f"- Final target XY error m: `{summary.get('final_target_xy_error_m')}`",
         f"- Rows CSV: `{summary['artifacts']['rows_csv']}`",
@@ -367,6 +394,13 @@ def missing_dependency_summary(args: argparse.Namespace, deps: dict[str, bool], 
         "robot_pose_seeded_for_source_fixture": False,
         "final_target_xy_error_m": None,
         "target_xy_tolerance_m": TARGET_XY_TOLERANCE_M,
+        "final_place_z_error_m": None,
+        "place_z_tolerance_m": PLACE_Z_TOLERANCE_M,
+        "pick_place_phase_evidence": [],
+        "pick_place_phase_ids": [],
+        "pick_place_failed_phase_ids": [],
+        "pick_place_phase_count": 0,
+        "pick_place_all_required_phases_verified": False,
         "artifacts": {
             "summary_json": str(summary_path),
             "rows_csv": str(rows_path),
@@ -418,7 +452,14 @@ def invalid_task_summary(
         "robot_pose_seeded_for_source_fixture": False,
         "final_target_xy_error_m": None,
         "target_xy_tolerance_m": TARGET_XY_TOLERANCE_M,
+        "final_place_z_error_m": None,
+        "place_z_tolerance_m": PLACE_Z_TOLERANCE_M,
         "piece_reset_to_source_before_run": False,
+        "pick_place_phase_evidence": [],
+        "pick_place_phase_ids": [],
+        "pick_place_failed_phase_ids": [],
+        "pick_place_phase_count": 0,
+        "pick_place_all_required_phases_verified": False,
         "artifacts": {
             "summary_json": str(summary_path),
             "rows_csv": str(rows_path),
@@ -732,13 +773,103 @@ def main() -> int:
         final_board_contact_observed
         and release_contact_cleared_after_retreat
         and final_target_xy_error_m <= TARGET_XY_TOLERANCE_M
+        and final_place_z_error_m <= PLACE_Z_TOLERANCE_M
     )
+    pick_place_phase_evidence = [
+        phase_evidence_row(
+            phase_id="source_reset",
+            stage="source_reset_piece_on_board",
+            ok=bool(source_reset["source_xy_error_m"] <= SOURCE_PICK_XY_TOLERANCE_M),
+            criteria=[
+                "piece_reset_to_source_before_run",
+                "source_xy_error_within_tolerance",
+            ],
+            metrics={
+                "source_xy_error_m": source_reset["source_xy_error_m"],
+                "source_pick_xy_tolerance_m": SOURCE_PICK_XY_TOLERANCE_M,
+                "manual_piece_pose_set": source_reset["manual_piece_pose_set"],
+            },
+        ),
+        phase_evidence_row(
+            phase_id="two_finger_grasp",
+            stage="close_on_source_piece_after_settle",
+            ok=close_two_finger_contact_observed,
+            criteria=[
+                "fixed_finger_contact_observed",
+                "moving_finger_contact_observed",
+                "source_xy_error_within_tolerance_after_close",
+            ],
+            metrics={
+                "fixed_finger_contact_count": close_settle["fixed_finger_contact_count"],
+                "moving_finger_contact_count": close_settle["moving_finger_contact_count"],
+                "source_xy_error_m": close_settle["source_xy_error_m"],
+                "source_pick_xy_tolerance_m": SOURCE_PICK_XY_TOLERANCE_M,
+            },
+        ),
+        phase_evidence_row(
+            phase_id="lift_clearance",
+            stage="lift_from_source_without_manual_piece_pose",
+            ok=lift_verified,
+            criteria=[
+                "piece_lifted_above_threshold",
+                "gripper_contact_retained",
+                "board_contact_cleared",
+            ],
+            metrics={
+                "lift_without_manual_piece_pose_m": lift_without_manual_piece_pose_m,
+                "lift_z_threshold_m": LIFT_Z_THRESHOLD_M,
+                "gripper_contact_count": lift["gripper_contact_count"],
+                "board_contact_count": lift["board_contact_count"],
+            },
+        ),
+        phase_evidence_row(
+            phase_id="transfer_toward_target",
+            stage="transfer_to_target_without_manual_piece_pose",
+            ok=transfer_verified,
+            criteria=[
+                "target_xy_error_decreases",
+                "gripper_contact_retained",
+                "board_contact_clear_during_transfer",
+            ],
+            metrics={
+                "target_xy_error_m": transfer["target_xy_error_m"],
+                "close_target_xy_error_m": close_settle["target_xy_error_m"],
+                "source_to_target_progress_m": transfer["source_to_target_progress_m"],
+                "gripper_contact_count": transfer["gripper_contact_count"],
+                "board_contact_count": transfer["board_contact_count"],
+            },
+        ),
+        phase_evidence_row(
+            phase_id="release_place",
+            stage="retreat_after_release_without_manual_piece_pose",
+            ok=place_without_manual_piece_pose_verified,
+            criteria=[
+                "final_board_contact_observed",
+                "release_contact_cleared_after_retreat",
+                "final_target_xy_error_within_tolerance",
+                "final_place_z_error_within_tolerance",
+            ],
+            metrics={
+                "final_board_contact_observed": final_board_contact_observed,
+                "release_contact_cleared_after_retreat": release_contact_cleared_after_retreat,
+                "final_target_xy_error_m": final_target_xy_error_m,
+                "target_xy_tolerance_m": TARGET_XY_TOLERANCE_M,
+                "final_place_z_error_m": final_place_z_error_m,
+                "place_z_tolerance_m": PLACE_Z_TOLERANCE_M,
+            },
+        ),
+    ]
+    pick_place_failed_phase_ids = [
+        phase["phase_id"] for phase in pick_place_phase_evidence if not phase["ok"]
+    ]
+    pick_place_all_required_phases_verified = not pick_place_failed_phase_ids
     board_source_pick_place_verified = bool(
         source_pick_started_at_source
         and close_two_finger_contact_observed
         and lift_verified
         and transfer_verified
         and place_without_manual_piece_pose_verified
+        and pick_place_all_required_phases_verified
     )
     if board_source_pick_place_verified:
         status = "development_board_source_pick_place_verified"
@@ -800,6 +931,14 @@ def main() -> int:
         "final_target_xy_error_m": final_target_xy_error_m,
         "target_xy_tolerance_m": TARGET_XY_TOLERANCE_M,
         "final_place_z_error_m": final_place_z_error_m,
+        "place_z_tolerance_m": PLACE_Z_TOLERANCE_M,
+        "pick_place_phase_evidence": pick_place_phase_evidence,
+        "pick_place_phase_ids": [
+            phase["phase_id"] for phase in pick_place_phase_evidence
+        ],
+        "pick_place_failed_phase_ids": pick_place_failed_phase_ids,
+        "pick_place_phase_count": len(pick_place_phase_evidence),
+        "pick_place_all_required_phases_verified": pick_place_all_required_phases_verified,
         "source_to_target_progress_m": final["source_to_target_progress_m"],
         "piece_reset_to_source_before_run": True,
         "manual_piece_pose_used_after_reset": False,

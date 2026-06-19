@@ -17,6 +17,13 @@ DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "so101_mujoco_board_
 SCHEMA = "lerobot.sim.so101_mujoco_board_pick_probe_matrix.v1"
 PROBE_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_mujoco_board_pick_probe.py"
 PROBE_SUMMARY_NAME = "so101_mujoco_board_pick_probe_summary.json"
+EXPECTED_PHASE_IDS = [
+    "source_reset",
+    "two_finger_grasp",
+    "lift_clearance",
+    "transfer_toward_target",
+    "release_place",
+]
 
 
 def parse_args() -> argparse.Namespace:
@@ -93,6 +100,12 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "final_target_within_tolerance",
         "final_target_xy_error_m",
         "target_xy_tolerance_m",
+        "final_place_z_error_m",
+        "place_z_tolerance_m",
+        "pick_place_phase_ids",
+        "pick_place_failed_phase_ids",
+        "pick_place_phase_count",
+        "pick_place_all_required_phases_verified",
         "ready_for_model_backed_ik",
         "ready_for_policy_training",
         "physical_authority",
@@ -301,6 +314,15 @@ def summarize_case(
         "final_target_xy_error_m": final_error,
         "target_xy_tolerance_m": tolerance,
         "final_target_within_tolerance": final_target_within_tolerance,
+        "final_place_z_error_m": summary.get("final_place_z_error_m"),
+        "place_z_tolerance_m": summary.get("place_z_tolerance_m"),
+        "pick_place_phase_evidence": summary.get("pick_place_phase_evidence"),
+        "pick_place_phase_ids": summary.get("pick_place_phase_ids"),
+        "pick_place_failed_phase_ids": summary.get("pick_place_failed_phase_ids"),
+        "pick_place_phase_count": summary.get("pick_place_phase_count"),
+        "pick_place_all_required_phases_verified": summary.get(
+            "pick_place_all_required_phases_verified"
+        ),
         "manual_piece_pose_used_after_reset": summary.get("manual_piece_pose_used_after_reset"),
         "robot_pose_seeded_for_source_fixture": summary.get("robot_pose_seeded_for_source_fixture"),
         "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
@@ -398,6 +420,57 @@ def summarize_case(
         )
         add_error(
             errors,
+            f"{case_id}.pick_place_phase_ids",
+            observations["pick_place_phase_ids"],
+            EXPECTED_PHASE_IDS,
+        )
+        add_error(
+            errors,
+            f"{case_id}.pick_place_phase_count",
+            observations["pick_place_phase_count"],
+            len(EXPECTED_PHASE_IDS),
+        )
+        add_error(
+            errors,
+            f"{case_id}.pick_place_all_required_phases_verified",
+            observations["pick_place_all_required_phases_verified"],
+            spec["expect_board_pick_place"],
+        )
+        phase_evidence = observations["pick_place_phase_evidence"]
+        if not isinstance(phase_evidence, list):
+            errors.append(f"{case_id}.pick_place_phase_evidence: expected list")
+        elif len(phase_evidence) != len(EXPECTED_PHASE_IDS):
+            errors.append(
+                f"{case_id}.pick_place_phase_evidence: expected {len(EXPECTED_PHASE_IDS)} rows, got {len(phase_evidence)}"
+            )
+        else:
+            phase_ids = [
+                phase.get("phase_id") for phase in phase_evidence if isinstance(phase, dict)
+            ]
+            add_error(errors, f"{case_id}.phase_evidence_ids", phase_ids, EXPECTED_PHASE_IDS)
+            for phase in phase_evidence:
+                if not isinstance(phase, dict):
+                    errors.append(f"{case_id}.phase_evidence: expected dict rows")
+                    continue
+                if not isinstance(phase.get("criteria"), list) or not phase["criteria"]:
+                    errors.append(
+                        f"{case_id}.{phase.get('phase_id')}.criteria: expected non-empty list"
+                    )
+                if not isinstance(phase.get("metrics"), dict) or not phase["metrics"]:
+                    errors.append(
+                        f"{case_id}.{phase.get('phase_id')}.metrics: expected non-empty dict"
+                    )
+        if spec["expect_board_pick_place"]:
+            add_error(
+                errors,
+                f"{case_id}.pick_place_failed_phase_ids",
+                observations["pick_place_failed_phase_ids"],
+                [],
+            )
+        elif not observations["pick_place_failed_phase_ids"]:
+            errors.append(f"{case_id}.pick_place_failed_phase_ids: expected at least one failed phase")
+        add_error(
+            errors,
             f"{case_id}.manual_piece_pose_used_after_reset",
             observations["manual_piece_pose_used_after_reset"],
             False,
@@ -443,8 +516,17 @@ def summarize_case(
             ("final_board_contact_observed", False),
             ("manual_piece_pose_used_after_reset", False),
             ("robot_pose_seeded_for_source_fixture", False),
+            ("pick_place_all_required_phases_verified", False),
         ):
             add_error(errors, f"{case_id}.{key}", observations[key], expected)
+        add_error(errors, f"{case_id}.pick_place_phase_ids", observations["pick_place_phase_ids"], [])
+        add_error(
+            errors,
+            f"{case_id}.pick_place_failed_phase_ids",
+            observations["pick_place_failed_phase_ids"],
+            [],
+        )
+        add_error(errors, f"{case_id}.pick_place_phase_count", observations["pick_place_phase_count"], 0)
         configuration_error = observations["configuration_error"]
         if not isinstance(configuration_error, dict):
             errors.append(f"{case_id}.configuration_error: expected dict, got {configuration_error!r}")
@@ -551,6 +633,14 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "final_target_within_tolerance": observations.get("final_target_within_tolerance"),
         "final_target_xy_error_m": observations.get("final_target_xy_error_m"),
         "target_xy_tolerance_m": observations.get("target_xy_tolerance_m"),
+        "final_place_z_error_m": observations.get("final_place_z_error_m"),
+        "place_z_tolerance_m": observations.get("place_z_tolerance_m"),
+        "pick_place_phase_ids": observations.get("pick_place_phase_ids"),
+        "pick_place_failed_phase_ids": observations.get("pick_place_failed_phase_ids"),
+        "pick_place_phase_count": observations.get("pick_place_phase_count"),
+        "pick_place_all_required_phases_verified": observations.get(
+            "pick_place_all_required_phases_verified"
+        ),
         "ready_for_model_backed_ik": observations.get("ready_for_model_backed_ik"),
         "ready_for_policy_training": observations.get("ready_for_policy_training"),
         "physical_authority": observations.get("physical_authority"),
