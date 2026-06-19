@@ -73,9 +73,10 @@ python scripts/smoke_sim_so101_mujoco_scene_matrix.py --output-dir /private/tmp/
 The matrix writes `so101_mujoco_scene_matrix_summary.json`,
 `so101_mujoco_scene_matrix_cases.csv`, and `README.md`. It validates generated
 development scenes across center, corner, back-rank, and edge placements, plus
-fail-closed invalid-square, same-source/target, and non-positive max-step cases,
-fail-closed required handoff cases for not-ready, fixture-only, forged-ready, and
-incomplete-ready handoffs, ready handoffs with open review work, and ready
+fail-closed invalid source-square, invalid target-square, same-source/target,
+and non-positive max-step cases, fail-closed required handoff cases for
+not-ready, fixture-only, forged-ready, and incomplete-ready handoffs, ready
+handoffs with open review work, and ready
 handoffs that claim authority/physical SO-101 truth, plus valid optional and
 required ready-handoff intake cases that still keep the generated scene
 development-only,

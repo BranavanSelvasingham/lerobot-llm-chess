@@ -1307,6 +1307,7 @@ jobs:
               "back_rank_to_edge_scene_b8_a4",
               "edge_to_center_scene_h2_d5",
               "invalid_source_square_rejected",
+              "invalid_target_square_rejected",
               "same_source_target_rejected",
               "invalid_max_steps_rejected",
               "required_handoff_not_ready_rejected",
@@ -1322,6 +1323,7 @@ jobs:
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
           negative_case_ids = {
               "invalid_source_square_rejected",
+              "invalid_target_square_rejected",
               "same_source_target_rejected",
               "invalid_max_steps_rejected",
           }

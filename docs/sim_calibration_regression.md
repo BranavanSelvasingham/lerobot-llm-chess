@@ -565,9 +565,10 @@ base-to-board transforms stay not ready, and ready synthetic fixture motion rema
 across center, corner, back-rank, and edge placements with 64 square geoms,
 target marker/site presence, SimRobot joint sync, and Gymnasium scripted
 completion while remaining non-authoritative. The same matrix requires invalid
-scene requests, such as invalid chess squares, identical source/target squares,
-or a non-positive step budget, to fail closed with summary/CSV/README artifacts
-and no generated model XML or manifest. It also runs the focused
+scene requests, such as invalid source squares, invalid target squares,
+identical source/target squares, or a non-positive step budget, to fail closed
+with summary/CSV/README artifacts and no generated model XML or manifest. It
+also runs the focused
 `so101_chess_env_matrix` smoke to prove Gymnasium task wiring can run in
 explicit fallback mode, `--require-mujoco` fails closed without a model path or
 with an invalid model path, invalid task configuration and incomplete scripted
