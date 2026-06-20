@@ -151,6 +151,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `status`: `{summary['status']}`",
         f"- `ready_manifest`: `{summary['fixtures']['ready_manifest_path']}`",
         f"- `missing_model_file_manifest`: `{summary['fixtures']['missing_model_file_manifest_path']}`",
+        f"- `model_path_directory_manifest`: `{summary['fixtures']['model_path_directory_manifest_path']}`",
         f"- `mismatched_model_sha_manifest`: `{summary['fixtures']['mismatched_model_sha_manifest_path']}`",
         f"- `placeholder_manifest`: `{summary['fixtures']['placeholder_manifest_path']}`",
         f"- `placeholder_review_manifest`: `{summary['fixtures']['placeholder_review_manifest_path']}`",
@@ -739,6 +740,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     bundle_dir = fixture_dir / "ready_bundle"
     missing_model_file_dir = fixture_dir / "missing_model_file_bundle"
     unsupported_suffix_dir = fixture_dir / "unsupported_suffix_bundle"
+    model_path_directory_dir = fixture_dir / "model_path_directory_bundle"
     mismatched_model_sha_dir = fixture_dir / "mismatched_model_sha_bundle"
     conflicting_model_sha_alias_dir = fixture_dir / "conflicting_model_sha_alias_bundle"
     placeholder_dir = fixture_dir / "placeholder_bundle"
@@ -795,6 +797,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         bundle_dir,
         missing_model_file_dir,
         unsupported_suffix_dir,
+        model_path_directory_dir,
         mismatched_model_sha_dir,
         conflicting_model_sha_alias_dir,
         placeholder_dir,
@@ -994,6 +997,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     unsupported_suffix_manifest_path = (
         unsupported_suffix_dir / "so101_model_bundle.unsupported_suffix.json"
     )
+    model_path_directory_manifest_path = (
+        model_path_directory_dir / "so101_model_bundle.model_path_directory.json"
+    )
     mismatched_model_sha_manifest_path = (
         mismatched_model_sha_dir / "so101_model_bundle.mismatched_model_sha.json"
     )
@@ -1106,6 +1112,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         manifest_payload(ready=True, model_filename=unsupported_suffix_model_path.name),
         unsupported_suffix_model_path,
     )
+    model_path_directory_payload = manifest_payload(ready=True, model_filename=".")
+    model_path_directory_payload["model_sha256"] = "1" * 64
+    write_json(model_path_directory_manifest_path, model_path_directory_payload)
     write_json(
         mismatched_model_sha_manifest_path,
         mismatched_model_sha_manifest_payload(
@@ -1338,6 +1347,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "ready_manifest_path": ready_manifest_path,
         "missing_model_file_manifest_path": missing_model_file_manifest_path,
         "unsupported_suffix_manifest_path": unsupported_suffix_manifest_path,
+        "model_path_directory_manifest_path": model_path_directory_manifest_path,
         "mismatched_model_sha_manifest_path": mismatched_model_sha_manifest_path,
         "conflicting_model_sha_alias_manifest_path": (
             conflicting_model_sha_alias_manifest_path

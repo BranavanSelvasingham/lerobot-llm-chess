@@ -478,6 +478,7 @@ jobs:
               "ready_synthetic_fixture_manifest_not_physical_authority",
               "missing_model_file_not_ready",
               "unsupported_model_suffix_not_ready",
+              "model_path_directory_not_ready",
               "placeholder_alignment_manifest_not_ready",
               "placeholder_review_metadata_not_ready",
               "thin_review_metadata_not_ready",
@@ -566,6 +567,21 @@ jobs:
           assert "non_blocking_contract_checker_result" in unsupported_suffix["missing_inputs"], unsupported_suffix
           assert "select_reviewed_so101_model_path" in unsupported_suffix["next_required_action_ids"], unsupported_suffix
           assert "clear_model_contract_and_asset_preflight" in unsupported_suffix["next_required_action_ids"], unsupported_suffix
+          model_path_directory = by_case["model_path_directory_not_ready"]["observations"]
+          assert model_path_directory["status"] == "model_bundle_manifest_needs_follow_up", model_path_directory
+          assert model_path_directory["ready_for_model_backed_ik"] is False, model_path_directory
+          assert model_path_directory["model_path_status"] == "unavailable", model_path_directory
+          assert model_path_directory["model_path_supported_suffix"] is False, model_path_directory
+          assert "model_path_not_file" in model_path_directory["model_path_diagnostics"], model_path_directory
+          assert model_path_directory["model_identity_status"] == "invalid", model_path_directory
+          assert "model_path" in model_path_directory["missing_inputs"], model_path_directory
+          assert "model_sha256" in model_path_directory["missing_inputs"], model_path_directory
+          assert "mesh_assets" in model_path_directory["missing_inputs"], model_path_directory
+          assert "non_blocking_contract_checker_result" in model_path_directory["missing_inputs"], model_path_directory
+          assert "select_reviewed_so101_model_path" in model_path_directory["next_required_action_ids"], model_path_directory
+          assert "record_reviewed_so101_model_file_sha256" in model_path_directory["next_required_action_ids"], model_path_directory
+          assert "resolve_so101_mesh_assets" in model_path_directory["next_required_action_ids"], model_path_directory
+          assert "clear_model_contract_and_asset_preflight" in model_path_directory["next_required_action_ids"], model_path_directory
           reviewed_fixture = by_case["reviewed_status_with_fixture_provenance_not_physical_authority"]["observations"]
           assert reviewed_fixture["ready_for_model_backed_ik"] is True, reviewed_fixture
           assert reviewed_fixture["physical_so101_model_authority_ready"] is False, reviewed_fixture
