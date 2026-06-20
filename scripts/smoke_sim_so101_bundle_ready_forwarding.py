@@ -699,6 +699,23 @@ def weak_mesh_asset_authority_manifest_payload(model_filename: str) -> dict[str,
     return payload
 
 
+def candidate_source_lock_only_mesh_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = weak_mesh_asset_authority_manifest_payload(model_filename=model_filename)
+    payload["observed_inputs"] = {
+        "candidate_source_lock_digest_handoff": {
+            "digest_row_count": 33,
+            "expected_file_digest_count": 20,
+            "extra_lockable_file_count": 13,
+            "extra_lockable_relative_paths": [
+                "assets/base_so101_v2.part",
+                "assets/shoulder_so101_v1.part",
+            ],
+            "authority_boundary": "candidate_source_lock_digest_not_authority",
+        },
+    }
+    return payload
+
+
 def conflicting_mesh_asset_review_alias_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload["mesh_assets_review"] = {
@@ -912,6 +929,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         fixture_dir / "conflicting_joint_limit_nested_alias_bundle"
     )
     weak_mesh_dir = fixture_dir / "weak_mesh_bundle"
+    candidate_source_lock_only_mesh_dir = (
+        fixture_dir / "candidate_source_lock_only_mesh_bundle"
+    )
     conflicting_mesh_review_alias_dir = (
         fixture_dir / "conflicting_mesh_review_alias_bundle"
     )
@@ -985,6 +1005,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         conflicting_joint_limit_alias_dir,
         conflicting_joint_limit_nested_alias_dir,
         weak_mesh_dir,
+        candidate_source_lock_only_mesh_dir,
         conflicting_mesh_review_alias_dir,
         weak_target_frame_dir,
         conflicting_target_frame_review_alias_dir,
@@ -1115,6 +1136,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     )
     weak_mesh_model_path = weak_mesh_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_mesh_model_path.write_text(mjcf_with_mesh_reference())
+    candidate_source_lock_only_mesh_model_path = (
+        candidate_source_lock_only_mesh_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    candidate_source_lock_only_mesh_model_path.write_text(mjcf_with_mesh_reference())
     conflicting_mesh_review_alias_model_path = (
         conflicting_mesh_review_alias_dir / "model" / "synthetic_so101_mujoco.xml"
     )
@@ -1288,6 +1313,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         / "so101_model_bundle.conflicting_joint_limit_nested_alias.json"
     )
     weak_mesh_manifest_path = weak_mesh_dir / "so101_model_bundle.weak_mesh_assets.json"
+    candidate_source_lock_only_mesh_manifest_path = (
+        candidate_source_lock_only_mesh_dir
+        / "so101_model_bundle.candidate_source_lock_only_mesh.json"
+    )
     conflicting_mesh_review_alias_manifest_path = (
         conflicting_mesh_review_alias_dir
         / "so101_model_bundle.conflicting_mesh_review_alias.json"
@@ -1561,6 +1590,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_mesh_model_path,
     )
     write_manifest_json(
+        candidate_source_lock_only_mesh_manifest_path,
+        candidate_source_lock_only_mesh_manifest_payload(
+            model_filename=candidate_source_lock_only_mesh_model_path.name
+        ),
+        candidate_source_lock_only_mesh_model_path,
+    )
+    write_manifest_json(
         conflicting_mesh_review_alias_manifest_path,
         conflicting_mesh_asset_review_alias_manifest_payload(
             model_filename=conflicting_mesh_review_alias_model_path.name
@@ -1730,6 +1766,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
             conflicting_joint_limit_nested_alias_manifest_path
         ),
         "weak_mesh_manifest_path": weak_mesh_manifest_path,
+        "candidate_source_lock_only_mesh_manifest_path": (
+            candidate_source_lock_only_mesh_manifest_path
+        ),
         "conflicting_mesh_review_alias_manifest_path": (
             conflicting_mesh_review_alias_manifest_path
         ),

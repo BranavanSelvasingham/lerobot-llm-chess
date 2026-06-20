@@ -1044,6 +1044,19 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "candidate_source_lock_only_mesh_authority_not_ready",
+            "manifest_path": fixtures[
+                "candidate_source_lock_only_mesh_manifest_path"
+            ],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "mesh_assets_status": "needs_review",
+                "missing_inputs": ["mesh_asset_authority"],
+                "next_actions": ["record_mesh_asset_authority"],
+            },
+        },
+        {
             "case_id": "conflicting_mesh_asset_review_alias_not_ready",
             "manifest_path": fixtures["conflicting_mesh_review_alias_manifest_path"],
             "expect": {
