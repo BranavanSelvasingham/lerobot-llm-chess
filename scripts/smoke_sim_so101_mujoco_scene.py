@@ -161,6 +161,9 @@ def handoff_intake_result(
     fixture_motion_checked: bool = False,
     motion_evidence_not_physical: Any = None,
     physical_model_authority_ready: Any = None,
+    joint_limit_enablement_ok: bool = False,
+    joint_limit_enablement_status: Any = None,
+    missing_limited_joints: list[str] | None = None,
     missing_inputs: list[str] | None = None,
     pending_action_ids: list[str] | None = None,
     ready_handoff_has_open_work: bool = False,
@@ -195,6 +198,15 @@ def handoff_intake_result(
         ),
         "reviewed_mujoco_handoff_physical_so101_model_authority_ready": (
             physical_model_authority_ready
+        ),
+        "reviewed_mujoco_handoff_joint_limit_enablement_ok": (
+            joint_limit_enablement_ok
+        ),
+        "reviewed_mujoco_handoff_joint_limit_enablement_status": (
+            joint_limit_enablement_status
+        ),
+        "reviewed_mujoco_handoff_missing_limited_joints": (
+            missing_limited_joints or []
         ),
         "reviewed_mujoco_handoff_missing_inputs": missing_inputs or [],
         "reviewed_mujoco_handoff_pending_action_ids": pending_action_ids or [],
@@ -320,6 +332,26 @@ def reviewed_handoff_intake(
     motion_evidence_not_physical = payload.get(
         "motion_evidence_not_physical_so101_authority"
     )
+    mujoco_motion_inputs = payload.get("mujoco_motion_inputs")
+    mujoco_motion_inputs = (
+        mujoco_motion_inputs if isinstance(mujoco_motion_inputs, dict) else {}
+    )
+    joint_limit_enablement = mujoco_motion_inputs.get("mujoco_joint_limit_enablement")
+    joint_limit_enablement = (
+        joint_limit_enablement if isinstance(joint_limit_enablement, dict) else {}
+    )
+    joint_limit_enablement_status = joint_limit_enablement.get("status")
+    raw_missing_limited_joints = joint_limit_enablement.get("missing_limited_joints")
+    missing_limited_joints = unique_strings(
+        raw_missing_limited_joints
+        if isinstance(raw_missing_limited_joints, list)
+        else []
+    )
+    joint_limit_enablement_ok = (
+        joint_limit_enablement.get("ok") is True
+        and joint_limit_enablement_status == "so101_mujoco_joints_limited"
+        and missing_limited_joints == []
+    )
     physical_ready_contract_ok = (
         not raw_ready
         or (
@@ -357,6 +389,7 @@ def reviewed_handoff_intake(
         )
         and gate_contract_ok
         and not ready_handoff_has_open_work
+        and (not (raw_ready or fixture_ready) or joint_limit_enablement_ok)
         and physical_ready_contract_ok
         and fixture_contract_ok
     )
@@ -392,6 +425,8 @@ def reviewed_handoff_intake(
         blockers.append("resolve_ready_reviewed_mujoco_handoff_missing_inputs")
     if (raw_ready or fixture_ready) and handoff_pending_action_ids:
         blockers.append("resolve_ready_reviewed_mujoco_handoff_pending_actions")
+    if (raw_ready or fixture_ready) and not joint_limit_enablement_ok:
+        blockers.append("provide_reviewed_mujoco_joint_limit_enablement_evidence")
     if raw_ready and not physical_ready_contract_ok:
         blockers.append("repair_physical_reviewed_mujoco_handoff_readiness_flags")
     if fixture_ready and not fixture_contract_ok:
@@ -421,6 +456,9 @@ def reviewed_handoff_intake(
         fixture_motion_checked=fixture_motion_checked,
         motion_evidence_not_physical=motion_evidence_not_physical,
         physical_model_authority_ready=physical_model_authority_ready,
+        joint_limit_enablement_ok=joint_limit_enablement_ok,
+        joint_limit_enablement_status=joint_limit_enablement_status,
+        missing_limited_joints=missing_limited_joints,
         missing_inputs=handoff_missing_inputs,
         pending_action_ids=handoff_pending_action_ids,
         ready_handoff_has_open_work=ready_handoff_has_open_work,

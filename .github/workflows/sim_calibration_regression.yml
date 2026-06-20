@@ -1521,6 +1521,7 @@ jobs:
               "ready_handoff_with_pending_action_rejected",
               "ready_handoff_physical_truth_claim_rejected",
               "ready_handoff_missing_scene_gate_rejected",
+              "ready_handoff_unlimited_joint_rejected",
               "required_ready_handoff_intake_still_development_scene",
               "ready_handoff_intake_still_development_scene",
           ], summary["case_ids"]
@@ -1561,6 +1562,7 @@ jobs:
               "ready_handoff_with_pending_action_rejected",
               "ready_handoff_physical_truth_claim_rejected",
               "ready_handoff_missing_scene_gate_rejected",
+              "ready_handoff_unlimited_joint_rejected",
           }
           by_case = {case["case_id"]: case for case in summary["cases"]}
           invalid_steps = by_case["invalid_max_steps_rejected"]["observations"]
@@ -1627,6 +1629,15 @@ jobs:
           ], missing_scene_gate_handoff
           assert missing_scene_gate_handoff["reviewed_mujoco_handoff_blocked_gates_until_physical_ready"] == [], missing_scene_gate_handoff
           assert "provide_reviewed_mujoco_downstream_handoff_unblocked_gate_list" in missing_scene_gate_handoff["reviewed_mujoco_handoff_blockers"], missing_scene_gate_handoff
+          unlimited_joint_handoff = by_case["ready_handoff_unlimited_joint_rejected"]["observations"]
+          assert unlimited_joint_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", unlimited_joint_handoff
+          assert unlimited_joint_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", unlimited_joint_handoff
+          assert unlimited_joint_handoff["reviewed_mujoco_handoff_contract_ok"] is False, unlimited_joint_handoff
+          assert unlimited_joint_handoff["reviewed_mujoco_handoff_ready"] is False, unlimited_joint_handoff
+          assert unlimited_joint_handoff["reviewed_mujoco_handoff_joint_limit_enablement_ok"] is False, unlimited_joint_handoff
+          assert unlimited_joint_handoff["reviewed_mujoco_handoff_joint_limit_enablement_status"] == "so101_mujoco_joints_unlimited", unlimited_joint_handoff
+          assert unlimited_joint_handoff["reviewed_mujoco_handoff_missing_limited_joints"] == ["shoulder_pan"], unlimited_joint_handoff
+          assert "provide_reviewed_mujoco_joint_limit_enablement_evidence" in unlimited_joint_handoff["reviewed_mujoco_handoff_blockers"], unlimited_joint_handoff
           required_ready_handoff = by_case["required_ready_handoff_intake_still_development_scene"]["observations"]
           assert required_ready_handoff["status"] == "ok", required_ready_handoff
           assert required_ready_handoff["reviewed_mujoco_handoff_required"] is True, required_ready_handoff
@@ -1636,6 +1647,9 @@ jobs:
           assert required_ready_handoff["reviewed_mujoco_handoff_physical_motion_checked"] is True, required_ready_handoff
           assert required_ready_handoff["reviewed_mujoco_handoff_hardware_free_fixture_motion_checked"] is False, required_ready_handoff
           assert required_ready_handoff["reviewed_mujoco_handoff_motion_authority_status"] == "physical_reviewed_model_motion_checked", required_ready_handoff
+          assert required_ready_handoff["reviewed_mujoco_handoff_joint_limit_enablement_ok"] is True, required_ready_handoff
+          assert required_ready_handoff["reviewed_mujoco_handoff_joint_limit_enablement_status"] == "so101_mujoco_joints_limited", required_ready_handoff
+          assert required_ready_handoff["reviewed_mujoco_handoff_missing_limited_joints"] == [], required_ready_handoff
           assert required_ready_handoff["reviewed_mujoco_handoff_model_authority"] == "downstream_handoff_not_authority", required_ready_handoff
           assert required_ready_handoff["reviewed_mujoco_handoff_physical_truth_claimed"] is False, required_ready_handoff
           assert required_ready_handoff["scene_uses_reviewed_mujoco_handoff"] is False, required_ready_handoff
@@ -1648,6 +1662,9 @@ jobs:
           assert ready_handoff["reviewed_mujoco_handoff_physical_motion_checked"] is True, ready_handoff
           assert ready_handoff["reviewed_mujoco_handoff_hardware_free_fixture_motion_checked"] is False, ready_handoff
           assert ready_handoff["reviewed_mujoco_handoff_motion_authority_status"] == "physical_reviewed_model_motion_checked", ready_handoff
+          assert ready_handoff["reviewed_mujoco_handoff_joint_limit_enablement_ok"] is True, ready_handoff
+          assert ready_handoff["reviewed_mujoco_handoff_joint_limit_enablement_status"] == "so101_mujoco_joints_limited", ready_handoff
+          assert ready_handoff["reviewed_mujoco_handoff_missing_limited_joints"] == [], ready_handoff
           assert ready_handoff["reviewed_mujoco_handoff_model_authority"] == "downstream_handoff_not_authority", ready_handoff
           assert ready_handoff["reviewed_mujoco_handoff_physical_truth_claimed"] is False, ready_handoff
           assert ready_handoff["scene_uses_reviewed_mujoco_handoff"] is False, ready_handoff
