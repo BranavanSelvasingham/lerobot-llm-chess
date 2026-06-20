@@ -487,9 +487,12 @@ model coverage against the expected SO-101 control joint names. Those joint
 coverage fields are intake diagnostics only; they are not reviewed joint-limit
 truth and must still be reconciled against the reviewed bundle manifest before
 model-backed IK or policy training can rely on them. The artifacts also list the
-command templates, explicit clone/fetch/checkout/intake/checker command steps,
-plus flat external/vendor review requirements for either a local external
-checkout or a vendored locked bundle. The intake summary and artifact index
+command templates, explicit clone/fetch/checkout/intake/source-inventory/checker
+command steps, plus flat external/vendor review requirements for either a local
+external checkout or a vendored locked bundle. The source-inventory command
+templates include both a candidate scan and a post-review authoritative-source
+rerun with reviewer/license/provenance placeholders; those commands are still
+operator guidance until real review metadata is supplied. The intake summary and artifact index
 expose model-observation row counts, selected model observation row count, digest
 row counts, selected model digest row count, selected model expected-joint
 coverage status and counts, requirement row count, selected row count,

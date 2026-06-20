@@ -1198,9 +1198,9 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         )
     expected_selected_command_count = 0
     if expected_selected_option == "external_pinned_source_root":
-        expected_selected_command_count = 5
+        expected_selected_command_count = 7
     elif expected_selected_option == "vendor_locked_bundle":
-        expected_selected_command_count = 3
+        expected_selected_command_count = 5
     if (
         operator_command_plan.get("selected_option_command_count")
         != expected_selected_command_count
@@ -1209,8 +1209,8 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
             f"{case_id}.candidate_operator_command_plan.selected_option_command_count invalid"
         )
     for command_key, minimum_count in (
-        ("external_pinned_source_root_commands", 5),
-        ("vendor_locked_bundle_commands", 3),
+        ("external_pinned_source_root_commands", 7),
+        ("vendor_locked_bundle_commands", 5),
     ):
         commands = operator_command_plan.get(command_key)
         commands = commands if isinstance(commands, list) else []
@@ -1232,6 +1232,27 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
                 errors.append(
                     f"{case_id}.candidate_operator_command_plan.{command_key} missing step/command"
                 )
+        step_ids = {
+            str(command.get("step_id"))
+            for command in commands
+            if isinstance(command, dict) and command.get("step_id")
+        }
+        required_step_ids = (
+            {
+                "run_source_inventory_on_candidate_checkout",
+                "run_source_inventory_after_source_authority_review",
+            }
+            if command_key == "external_pinned_source_root_commands"
+            else {
+                "run_source_inventory_on_vendored_subset",
+                "run_source_inventory_after_vendor_source_authority_review",
+            }
+        )
+        if not required_step_ids <= step_ids:
+            errors.append(
+                f"{case_id}.candidate_operator_command_plan.{command_key} "
+                f"missing source inventory steps {sorted(required_step_ids - step_ids)!r}"
+            )
     intake_options = operator_plan.get("intake_options")
     intake_options = intake_options if isinstance(intake_options, list) else []
     option_ids = [

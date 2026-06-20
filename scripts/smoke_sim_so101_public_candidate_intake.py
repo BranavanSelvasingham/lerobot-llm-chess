@@ -151,6 +151,13 @@ def candidate_operator_command_plan(summary: dict[str, Any]) -> dict[str, Any]:
     model_relative_path = summary.get("model_relative_path") or DEFAULT_MODEL_RELATIVE_PATH
     checkout_root = "<local-SO-ARM100-checkout>"
     so101_source_root = f"{checkout_root}/Simulation/SO101"
+    selected_source_model_path = f"{so101_source_root}/{model_relative_path}"
+    vendored_source_root = "<repo-vendored-SO101-asset-root>"
+    vendored_selected_model_path = f"{vendored_source_root}/{model_relative_path}"
+    source_reference = (
+        f"{upstream.get('source_tree_url') or DEFAULT_SOURCE_TREE_URL} "
+        f"commit:{upstream_commit or '<immutable-upstream-commit-sha>'}"
+    )
     reviewed_manifest_path = (
         "<reviewed-edited-copy-of-"
         "so101_public_candidate_review_manifest_template.direct.json>"
@@ -230,6 +237,54 @@ def candidate_operator_command_plan(summary: dict[str, Any]) -> dict[str, Any]:
             "executes_in_smoke": False,
         },
         {
+            "step_id": "run_source_inventory_on_candidate_checkout",
+            "command": command_string(
+                [
+                    "python",
+                    "scripts/smoke_sim_so101_model_source_inventory.py",
+                    "--root",
+                    so101_source_root,
+                    "--output-dir",
+                    "/private/tmp/lerobot_sim/soarm100_so101_source_inventory_candidate",
+                ]
+            ),
+            "network_required": False,
+            "executes_in_smoke": False,
+        },
+        {
+            "step_id": "run_source_inventory_after_source_authority_review",
+            "command": command_string(
+                [
+                    "python",
+                    "scripts/smoke_sim_so101_model_source_inventory.py",
+                    "--root",
+                    so101_source_root,
+                    "--authoritative-path",
+                    selected_source_model_path,
+                    "--authority-reviewed-by",
+                    "<reviewer-or-team>",
+                    "--authority-reviewed-at",
+                    "<review-date-YYYY-MM-DD>",
+                    "--authority-review-id",
+                    "<stable-source-authority-review-id>",
+                    "--authority-source-reference",
+                    source_reference,
+                    "--authority-license-basis",
+                    "<reviewed-license-basis>",
+                    "--authority-review-scope",
+                    "model_identity",
+                    "--authority-review-scope",
+                    "provenance",
+                    "--authority-review-scope",
+                    "license",
+                    "--output-dir",
+                    "/private/tmp/lerobot_sim/soarm100_so101_source_inventory_reviewed",
+                ]
+            ),
+            "network_required": False,
+            "executes_in_smoke": False,
+        },
+        {
             "step_id": "run_reviewed_bundle_manifest_checker_after_review",
             "command": command_string(
                 [
@@ -264,7 +319,7 @@ def candidate_operator_command_plan(summary: dict[str, Any]) -> dict[str, Any]:
                     "python",
                     "scripts/smoke_sim_so101_public_candidate_intake.py",
                     "--source-root",
-                    "<repo-vendored-SO101-asset-root>",
+                    vendored_source_root,
                     "--upstream-commit",
                     str(upstream_commit or "<immutable-upstream-commit-sha>"),
                     "--model-relative-path",
@@ -273,6 +328,54 @@ def candidate_operator_command_plan(summary: dict[str, Any]) -> dict[str, Any]:
                     "vendor_locked_bundle",
                     "--output-dir",
                     "/private/tmp/lerobot_sim/so101_public_candidate_intake_vendored",
+                ]
+            ),
+            "network_required": False,
+            "executes_in_smoke": False,
+        },
+        {
+            "step_id": "run_source_inventory_on_vendored_subset",
+            "command": command_string(
+                [
+                    "python",
+                    "scripts/smoke_sim_so101_model_source_inventory.py",
+                    "--root",
+                    vendored_source_root,
+                    "--output-dir",
+                    "/private/tmp/lerobot_sim/soarm100_so101_source_inventory_vendored_candidate",
+                ]
+            ),
+            "network_required": False,
+            "executes_in_smoke": False,
+        },
+        {
+            "step_id": "run_source_inventory_after_vendor_source_authority_review",
+            "command": command_string(
+                [
+                    "python",
+                    "scripts/smoke_sim_so101_model_source_inventory.py",
+                    "--root",
+                    vendored_source_root,
+                    "--authoritative-path",
+                    vendored_selected_model_path,
+                    "--authority-reviewed-by",
+                    "<reviewer-or-team>",
+                    "--authority-reviewed-at",
+                    "<review-date-YYYY-MM-DD>",
+                    "--authority-review-id",
+                    "<stable-source-authority-review-id>",
+                    "--authority-source-reference",
+                    source_reference,
+                    "--authority-license-basis",
+                    "<reviewed-license-basis>",
+                    "--authority-review-scope",
+                    "model_identity",
+                    "--authority-review-scope",
+                    "provenance",
+                    "--authority-review-scope",
+                    "license",
+                    "--output-dir",
+                    "/private/tmp/lerobot_sim/soarm100_so101_source_inventory_reviewed_vendored",
                 ]
             ),
             "network_required": False,
@@ -328,6 +431,7 @@ def candidate_operator_command_plan(summary: dict[str, Any]) -> dict[str, Any]:
         "limitations": [
             "These commands are an operator checklist; this smoke does not execute network, copy, or vendor steps.",
             "A command plan with a pinned commit is review handoff evidence only, not reviewed physical SO-101 authority.",
+            "Source-inventory commands must be rerun with real reviewer metadata before they can satisfy source-authority readiness.",
             "The reviewed bundle manifest checker must still pass after reviewer-edited authority fields are supplied.",
         ],
     }

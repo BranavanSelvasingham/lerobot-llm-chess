@@ -540,7 +540,7 @@ jobs:
           assert external_decision["candidate_operator_intake_decision_status"] == "candidate_intake_decision_recorded_not_authority", external_decision
           assert external_decision["candidate_operator_intake_selected_option"] == "external_pinned_source_root", external_decision
           assert external_decision["candidate_operator_command_plan_status"] == "candidate_operator_commands_ready_for_pinned_source_review", external_decision
-          assert external_decision["candidate_operator_command_plan_selected_option_command_count"] == 5, external_decision
+          assert external_decision["candidate_operator_command_plan_selected_option_command_count"] == 7, external_decision
           assert external_decision["candidate_operator_intake_option_count"] == 2, external_decision
           assert external_decision["candidate_operator_intake_selected_requirement_count"] == 4, external_decision
           assert external_decision["candidate_operator_intake_selected_requirement_ids"] == [
@@ -559,7 +559,7 @@ jobs:
           assert vendor_decision["candidate_operator_intake_decision_status"] == "candidate_intake_decision_recorded_not_authority", vendor_decision
           assert vendor_decision["candidate_operator_intake_selected_option"] == "vendor_locked_bundle", vendor_decision
           assert vendor_decision["candidate_operator_command_plan_status"] == "candidate_operator_commands_ready_for_pinned_source_review", vendor_decision
-          assert vendor_decision["candidate_operator_command_plan_selected_option_command_count"] == 3, vendor_decision
+          assert vendor_decision["candidate_operator_command_plan_selected_option_command_count"] == 5, vendor_decision
           assert vendor_decision["candidate_operator_intake_option_count"] == 2, vendor_decision
           assert vendor_decision["candidate_operator_intake_selected_requirement_count"] == 5, vendor_decision
           assert vendor_decision["candidate_operator_intake_selected_requirement_ids"] == [
@@ -5112,6 +5112,7 @@ jobs:
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_plan_model_authority") == "candidate_operator_intake_plan_not_authority", metrics
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_decision_status") == "candidate_intake_decision_recorded_not_authority", metrics
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_option") == "external_pinned_source_root", metrics
+              assert metrics.get("candidate_intake_checked_external_decision_operator_command_plan_selected_option_command_count") == 7, metrics
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_requirement_count") == 4, metrics
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_requirement_ids") == [
                   "external_checkout_path_declared",
@@ -5138,6 +5139,7 @@ jobs:
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_plan_model_authority") == "candidate_operator_intake_plan_not_authority", metrics
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_decision_status") == "candidate_intake_decision_recorded_not_authority", metrics
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_option") == "vendor_locked_bundle", metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_operator_command_plan_selected_option_command_count") == 5, metrics
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_count") == 5, metrics
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_ids") == [
                   "vendor_import_path_declared",
