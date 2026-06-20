@@ -3062,8 +3062,26 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
     metrics = {
         "status": gate.get("status"),
         "ok": gate.get("ok"),
+        "model_authority": gate.get("model_authority"),
         "ready": gate.get("ready"),
         "reviewed_model_authority_ready": gate.get("reviewed_model_authority_ready"),
+        "observed_evidence_is_physical_so101_authority": gate.get(
+            "observed_evidence_is_physical_so101_authority"
+        ),
+        "observed_evidence_is_policy_training_authority": gate.get(
+            "observed_evidence_is_policy_training_authority"
+        ),
+        "development_fixture_evidence_present": gate.get(
+            "development_fixture_evidence_present"
+        ),
+        "development_fixture_evidence_not_physical_so101_truth": gate.get(
+            "development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "development_fixture_evidence_not_policy_training_truth": gate.get(
+            "development_fixture_evidence_not_policy_training_truth"
+        ),
+        "ready_for_model_backed_ik": gate.get("ready_for_model_backed_ik"),
+        "ready_for_policy_training": gate.get("ready_for_policy_training"),
         "review_status": gate.get("review_status"),
         "source_authority_ready": gate.get("source_authority_ready"),
         "source_authority_gate_status": gate.get("source_authority_gate_status"),
@@ -3098,9 +3116,6 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
         "reviewed_mujoco_bundle_status": gate.get("reviewed_mujoco_bundle_status"),
         "reviewed_mujoco_motion_authority_status": gate.get(
             "reviewed_mujoco_motion_authority_status"
-        ),
-        "development_fixture_evidence_not_physical_so101_truth": gate.get(
-            "development_fixture_evidence_not_physical_so101_truth"
         ),
         "blockers": gate.get("blockers") or [],
         "blocker_count": gate.get("blocker_count"),

@@ -3782,10 +3782,28 @@ jobs:
                   action_id in reviewed_model_authority_gate["next_required_action_ids"]
                   for action_id in reviewed_model_authority_gate[key]
               ), reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["model_authority"] == (
+              "reviewed_so101_model_authority_gate"
+              if reviewed_model_authority_gate["ready"] is True
+              else "reviewed_model_authority_gate_not_authority"
+          ), reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["observed_evidence_is_physical_so101_authority"] == (
+              reviewed_model_authority_gate["ready"] is True
+          ), reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["observed_evidence_is_policy_training_authority"] is False, reviewed_model_authority_gate
           assert isinstance(
               reviewed_model_authority_gate["development_fixture_evidence_not_physical_so101_truth"],
               bool,
           ), reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["development_fixture_evidence_not_physical_so101_truth"] == (
+              reviewed_model_authority_gate["ready"] is False
+              or reviewed_model_authority_gate["development_fixture_evidence_present"] is True
+          ), reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["development_fixture_evidence_not_policy_training_truth"] is True, reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["ready_for_model_backed_ik"] == (
+              reviewed_model_authority_gate["ready"] is True
+          ), reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["ready_for_policy_training"] is False, reviewed_model_authority_gate
           assert reviewed_model_authority_gate["blocker_packet_status"] == reviewed_model_authority_gate["status"], reviewed_model_authority_gate
           assert reviewed_model_authority_gate["blocker_packet_model_authority"] == "blocker_packet_not_authority", reviewed_model_authority_gate
           assert isinstance(reviewed_model_authority_gate["blocker_packet_item_count"], int), reviewed_model_authority_gate
@@ -4816,6 +4834,24 @@ jobs:
               metrics = row.get("metrics", {})
               assert metrics.get("ready") in {True, False}, metrics
               assert metrics.get("reviewed_model_authority_ready") == metrics.get("ready"), metrics
+              assert metrics.get("model_authority") == (
+                  "reviewed_so101_model_authority_gate"
+                  if metrics.get("ready") is True
+                  else "reviewed_model_authority_gate_not_authority"
+              ), metrics
+              assert metrics.get("observed_evidence_is_physical_so101_authority") == (
+                  metrics.get("ready") is True
+              ), metrics
+              assert metrics.get("observed_evidence_is_policy_training_authority") is False, metrics
+              assert metrics.get("development_fixture_evidence_not_physical_so101_truth") == (
+                  metrics.get("ready") is False
+                  or metrics.get("development_fixture_evidence_present") is True
+              ), metrics
+              assert metrics.get("development_fixture_evidence_not_policy_training_truth") is True, metrics
+              assert metrics.get("ready_for_model_backed_ik") == (
+                  metrics.get("ready") is True
+              ), metrics
+              assert metrics.get("ready_for_policy_training") is False, metrics
               assert metrics.get("source_authority_ready") in {True, False, None}, metrics
               assert metrics.get("physical_so101_model_authority_ready") in {True, False, None}, metrics
               assert metrics.get("source_bundle_consistency_ready") in {True, False, None}, metrics

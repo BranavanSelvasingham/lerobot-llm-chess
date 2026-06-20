@@ -4713,6 +4713,9 @@ def so101_reviewed_model_authority_gate_section(
         and physical_reviewed_motion_ready
         and not development_fixture_evidence_present
     )
+    development_fixture_evidence_not_physical_truth = (
+        not ready or development_fixture_evidence_present
+    )
 
     blockers = unique_string_values(
         [
@@ -5063,8 +5066,21 @@ def so101_reviewed_model_authority_gate_section(
         "status": "reviewed_model_authority_ready"
         if ready
         else "reviewed_model_authority_blocked",
+        "model_authority": (
+            "reviewed_so101_model_authority_gate"
+            if ready
+            else "reviewed_model_authority_gate_not_authority"
+        ),
         "ready": ready,
         "reviewed_model_authority_ready": ready,
+        "observed_evidence_is_physical_so101_authority": ready,
+        "observed_evidence_is_policy_training_authority": False,
+        "development_fixture_evidence_not_physical_so101_truth": (
+            development_fixture_evidence_not_physical_truth
+        ),
+        "development_fixture_evidence_not_policy_training_truth": True,
+        "ready_for_model_backed_ik": ready,
+        "ready_for_policy_training": False,
         "source_authority_ready": source_authority_ready,
         "source_authority_status_ready": source_authority_status_ready,
         "source_authority_gate_status": source_inventory.get("source_authority_gate_status"),
@@ -5122,10 +5138,6 @@ def so101_reviewed_model_authority_gate_section(
         "source_inventory_summary_path": source_inventory.get("summary_path"),
         "bundle_manifest_summary_path": bundle_manifest.get("summary_path"),
         "reviewed_mujoco_bundle_summary_path": reviewed_mujoco_bundle.get("summary_path"),
-        "development_fixture_evidence_not_physical_so101_truth": (
-            not ready
-            or development_fixture_evidence_present
-        ),
         "notes": [
             "This top-level gate is a summary over the source inventory, bundle manifest, and reviewed MuJoCo bundle artifacts.",
             "It is ready only when source authority, physical bundle authority, source-to-bundle model path/digest consistency, and physical-reviewed MuJoCo motion are all true.",
@@ -5992,7 +6004,18 @@ def write_so101_reviewed_model_authority_gate_artifacts(
                 "# SO-101 Reviewed Model Authority Gate",
                 "",
                 f"- Status: `{gate.get('status')}`",
+                f"- Model authority: `{gate.get('model_authority')}`",
                 f"- Ready: `{markdown_bool(gate.get('ready'))}`",
+                "- Observed physical SO-101 authority: "
+                f"`{markdown_bool(gate.get('observed_evidence_is_physical_so101_authority'))}`",
+                "- Observed policy-training authority: "
+                f"`{markdown_bool(gate.get('observed_evidence_is_policy_training_authority'))}`",
+                "- Development fixture evidence is not policy-training truth: "
+                f"`{markdown_bool(gate.get('development_fixture_evidence_not_policy_training_truth'))}`",
+                "- Ready for model-backed IK: "
+                f"`{markdown_bool(gate.get('ready_for_model_backed_ik'))}`",
+                "- Ready for policy training: "
+                f"`{markdown_bool(gate.get('ready_for_policy_training'))}`",
                 f"- Source authority ready: `{markdown_bool(gate.get('source_authority_ready'))}`",
                 "- Physical SO-101 model authority ready: "
                 f"`{markdown_bool(gate.get('physical_so101_model_authority_ready'))}`",

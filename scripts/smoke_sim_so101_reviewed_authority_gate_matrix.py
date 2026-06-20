@@ -71,8 +71,14 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "case_id",
         "ok",
         "gate_status",
+        "model_authority",
         "gate_ready",
         "reviewed_model_authority_ready",
+        "observed_evidence_is_physical_so101_authority",
+        "observed_evidence_is_policy_training_authority",
+        "development_fixture_evidence_not_policy_training_truth",
+        "ready_for_model_backed_ik",
+        "ready_for_policy_training",
         "source_authority_ready",
         "source_authority_status_ready",
         "source_authority_contradictory_ready_state",
@@ -1654,6 +1660,44 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
     )
     add_error(
         errors,
+        "model_authority",
+        gate.get("model_authority"),
+        "reviewed_so101_model_authority_gate"
+        if expect["ready"]
+        else "reviewed_model_authority_gate_not_authority",
+    )
+    add_error(
+        errors,
+        "observed_evidence_is_physical_so101_authority",
+        gate.get("observed_evidence_is_physical_so101_authority"),
+        expect["ready"],
+    )
+    add_error(
+        errors,
+        "observed_evidence_is_policy_training_authority",
+        gate.get("observed_evidence_is_policy_training_authority"),
+        False,
+    )
+    add_error(
+        errors,
+        "development_fixture_evidence_not_policy_training_truth",
+        gate.get("development_fixture_evidence_not_policy_training_truth"),
+        True,
+    )
+    add_error(
+        errors,
+        "ready_for_model_backed_ik",
+        gate.get("ready_for_model_backed_ik"),
+        expect["ready"],
+    )
+    add_error(
+        errors,
+        "ready_for_policy_training",
+        gate.get("ready_for_policy_training"),
+        False,
+    )
+    add_error(
+        errors,
         "source_bundle_consistency_status",
         gate.get("source_bundle_consistency_status"),
         expect["consistency_status"],
@@ -2443,8 +2487,20 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "case_id": case["case_id"],
         "ok": case["ok"],
         "gate_status": gate.get("status"),
+        "model_authority": gate.get("model_authority"),
         "gate_ready": gate.get("ready"),
         "reviewed_model_authority_ready": gate.get("reviewed_model_authority_ready"),
+        "observed_evidence_is_physical_so101_authority": gate.get(
+            "observed_evidence_is_physical_so101_authority"
+        ),
+        "observed_evidence_is_policy_training_authority": gate.get(
+            "observed_evidence_is_policy_training_authority"
+        ),
+        "development_fixture_evidence_not_policy_training_truth": gate.get(
+            "development_fixture_evidence_not_policy_training_truth"
+        ),
+        "ready_for_model_backed_ik": gate.get("ready_for_model_backed_ik"),
+        "ready_for_policy_training": gate.get("ready_for_policy_training"),
         "source_authority_ready": gate.get("source_authority_ready"),
         "source_authority_status_ready": gate.get("source_authority_status_ready"),
         "source_authority_contradictory_ready_state": gate.get(
