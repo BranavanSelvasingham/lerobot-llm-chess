@@ -848,9 +848,11 @@ The standalone chess-env matrix writes `so101_chess_env_matrix_summary.json`,
 `.csv`, and `README.md`. It reports
 `model_authority: "so101_chess_env_matrix_not_authority"`,
 `observed_evidence_is_physical_so101_authority: false`, and
-`ready_for_policy_training: false`. It covers joint-state fallback allowed,
-Gymnasium-required fallback allowed, fail-closed `--require-mujoco` with no model
-path or an invalid model path, and generated development-MuJoCo env wiring that remains
+`ready_for_policy_training: false`. It covers joint-state fallback allowed only
+when no MuJoCo model path is supplied, Gymnasium-required fallback allowed,
+fail-closed supplied invalid model paths even without `--require-mujoco`,
+fail-closed `--require-mujoco` with no model path, and generated
+development-MuJoCo env wiring that remains
 `development_scaffold_not_reviewed`. Invalid Gymnasium task configuration and
 too-short scripted episode budgets must fail closed without becoming fallback
 success evidence. The matrix also records `development_scene.contract_errors`

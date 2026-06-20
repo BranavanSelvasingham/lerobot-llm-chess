@@ -1958,6 +1958,7 @@ jobs:
               "fallback_without_model_allowed",
               "gymnasium_required_fallback_allowed",
               "require_mujoco_without_model_fails",
+              "supplied_invalid_model_path_fails_without_require_mujoco",
               "require_mujoco_invalid_model_path_fails",
               "invalid_max_steps_rejected",
               "short_budget_scripted_pick_place_incomplete_fails",

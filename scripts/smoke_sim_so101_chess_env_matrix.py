@@ -276,6 +276,33 @@ def case_specs(development_model_path: str | None, invalid_model_path: str) -> l
             },
         },
         {
+            "case_id": "supplied_invalid_model_path_fails_without_require_mujoco",
+            "args": [
+                "--mujoco-model-path",
+                invalid_model_path,
+            ],
+            "expect": {
+                "return_code": 1,
+                "env_ok": False,
+                "status": "failed_requirements",
+                "model_authority": "joint_state_fallback_no_reviewed_model",
+                "gymnasium_required": False,
+                "mujoco_backend_required": False,
+                "mujoco_backend_loaded": False,
+                "joint_state_fallback_active": True,
+                "sim_status_ok": False,
+                "sim_fallback": "joint_state",
+                "sim_status_reason_contains": "MuJoCo model path does not exist",
+                "gymnasium_task_wiring_status": "failed_requirements",
+                **GYM_API_CONTRACT_EXPECTATION,
+                "training_authority_status": "requirements_failed_not_policy_ready",
+                "ready_for_model_backed_ik": False,
+                "ready_for_policy_training": False,
+                "scripted_pick_place_complete": True,
+                "hard_failures_contain": ["mujoco_model_path_supplied_but_not_loaded"],
+            },
+        },
+        {
             "case_id": "require_mujoco_invalid_model_path_fails",
             "args": [
                 "--require-gymnasium",
@@ -712,7 +739,8 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "## Caveats",
             "",
             "- Joint-state fallback is allowed only when MuJoCo is not required.",
-            "- `--require-mujoco` must fail closed when no MuJoCo model path is supplied or the supplied model path cannot load.",
+            "- A supplied MuJoCo model path must load; otherwise the smoke fails closed even when `--require-mujoco` is not set.",
+            "- `--require-mujoco` must fail closed when no MuJoCo model path is supplied.",
             "- Development MJCF task wiring remains `development_scaffold_not_reviewed` and `ready_for_policy_training: false`.",
         ]
     )

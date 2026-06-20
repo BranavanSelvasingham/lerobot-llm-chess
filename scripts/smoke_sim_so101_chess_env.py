@@ -476,6 +476,8 @@ def main() -> int:
             max_steps=args.max_steps,
         )
         sim_status = scripted_result["final_info"]["sim_status"]
+        if config.mujoco_model_path is not None and not sim_status.get("ok"):
+            hard_failures.append("mujoco_model_path_supplied_but_not_loaded")
         if args.require_mujoco and not sim_status.get("ok"):
             hard_failures.append("mujoco_backend_required_but_not_loaded")
         if not scripted_result["gymnasium_api_contract"].get("ok"):

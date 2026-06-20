@@ -26,9 +26,12 @@ a six-value `float32` action space for the SO-101 controlled joints,
 observation-space keys, reset/final observation keys, shapes, dtypes, and any
 missing or mismatched fields.
 
-By default the smoke accepts the existing joint-state fallback and records
-whether Gymnasium and MuJoCo are importable. To require a real MuJoCo backend,
-pass a reviewed model path and require MuJoCo:
+By default the smoke accepts the existing joint-state fallback only when no
+MuJoCo model path is supplied, and records whether Gymnasium and MuJoCo are
+importable. If a `--mujoco-model-path` is supplied, that model must load; the
+smoke fails closed instead of silently treating a supplied-but-unloaded model as
+fallback evidence. To require a real MuJoCo backend, pass a reviewed model path
+and require MuJoCo:
 
 ```bash
 python scripts/smoke_sim_so101_chess_env.py \
@@ -63,8 +66,9 @@ python scripts/smoke_sim_so101_chess_env_matrix.py --output-dir /private/tmp/ler
 
 The matrix writes `so101_chess_env_matrix_summary.json`,
 `so101_chess_env_matrix_cases.csv`, and `README.md`. It proves joint-state
-fallback can remain explicit and non-training, `--require-mujoco` fails closed
-without a model path or with an invalid model path, invalid max-step
+fallback can remain explicit and non-training only when no MuJoCo model path was
+provided, a supplied invalid model path fails closed even without
+`--require-mujoco`, `--require-mujoco` fails closed without a model path, invalid max-step
 configuration writes fail-closed artifacts, too-short scripted episodes fail
 instead of reporting a green env smoke, and a generated development MJCF can
 drive the Gymnasium task without becoming reviewed SO-101 truth. The matrix also
