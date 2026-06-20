@@ -821,7 +821,12 @@ Every case also asserts the first-gate serious-training boundary fields:
 `training_priority_gate_id`, `training_priority_gate_order`,
 `next_training_gate_after_ready`,
 `blocks_serious_policy_training_until_ready`, and
-`ready_does_not_imply_policy_training_ready`.
+`ready_does_not_imply_policy_training_ready`. It exports and checks
+`operator_action_immediate_actions_match_blocker_packet`,
+`operator_action_immediate_actions_missing_from_blocker_packet`, and
+`blocker_packet_actions_missing_from_operator_actions` so the focused matrix
+also proves the operator-action checklist stays synchronized with the blocker
+packet's immediate next actions.
 
 The standalone reviewed-MuJoCo bundle matrix writes
 `so101_reviewed_mujoco_bundle_matrix_summary.json`, `.csv`, and `README.md`.

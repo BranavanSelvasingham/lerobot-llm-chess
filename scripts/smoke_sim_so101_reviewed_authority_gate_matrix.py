@@ -133,6 +133,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "operator_action_count",
         "operator_action_immediate_action_count",
         "operator_action_immediate_action_ids",
+        "operator_action_immediate_actions_match_blocker_packet",
+        "operator_action_immediate_actions_missing_from_blocker_packet",
+        "blocker_packet_actions_missing_from_operator_actions",
         "operator_action_command_template_count",
         "operator_action_command_scopes",
         "blocker_source_bundle_consistency_status",
@@ -2365,6 +2368,26 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
     )
     add_error(
         errors,
+        "artifact_operator_action_immediate_actions_match_blocker_packet",
+        gate_artifacts.get("operator_action_immediate_actions_match_blocker_packet"),
+        True,
+    )
+    add_error(
+        errors,
+        "artifact_operator_action_immediate_actions_missing_from_blocker_packet",
+        gate_artifacts.get(
+            "operator_action_immediate_actions_missing_from_blocker_packet"
+        ),
+        [],
+    )
+    add_error(
+        errors,
+        "artifact_blocker_packet_actions_missing_from_operator_actions",
+        gate_artifacts.get("blocker_packet_actions_missing_from_operator_actions"),
+        [],
+    )
+    add_error(
+        errors,
         "operator_actions_model_authority",
         operator_actions.get("model_authority"),
         "operator_actions_not_authority",
@@ -2374,6 +2397,24 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         "operator_actions_policy_training_authority_claimed",
         operator_actions.get("policy_training_authority_claimed"),
         False,
+    )
+    add_error(
+        errors,
+        "operator_actions_immediate_actions_match_blocker_packet",
+        operator_actions.get("immediate_actions_match_blocker_packet"),
+        True,
+    )
+    add_error(
+        errors,
+        "operator_actions_immediate_actions_missing_from_blocker_packet",
+        operator_actions.get("immediate_actions_missing_from_blocker_packet"),
+        [],
+    )
+    add_error(
+        errors,
+        "operator_actions_blocker_packet_actions_missing_from_operator_actions",
+        operator_actions.get("blocker_packet_actions_missing_from_operator_actions"),
+        [],
     )
     if not operator_actions_path.is_file():
         errors.append("operator_actions_json_missing")
@@ -2390,6 +2431,14 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         errors.append(
             "readme_queue_contract: expected "
             f"{expected_queue_contract_line!r}"
+        )
+    expected_operator_sync_line = (
+        "- Operator immediate actions match blocker packet: `true`"
+    )
+    if expected_operator_sync_line not in readme_text:
+        errors.append(
+            "readme_operator_action_sync: expected "
+            f"{expected_operator_sync_line!r}"
         )
     readme_prior_statuses = gate_artifacts.get(
         "checklist_blocked_by_prior_requirement_statuses_by_requirement_id"
@@ -2698,6 +2747,17 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "operator_action_immediate_action_ids": gate_artifacts.get(
             "operator_action_immediate_action_ids"
+        ),
+        "operator_action_immediate_actions_match_blocker_packet": (
+            gate_artifacts.get("operator_action_immediate_actions_match_blocker_packet")
+        ),
+        "operator_action_immediate_actions_missing_from_blocker_packet": (
+            gate_artifacts.get(
+                "operator_action_immediate_actions_missing_from_blocker_packet"
+            )
+        ),
+        "blocker_packet_actions_missing_from_operator_actions": gate_artifacts.get(
+            "blocker_packet_actions_missing_from_operator_actions"
         ),
         "operator_action_command_template_count": gate_artifacts.get(
             "operator_action_command_template_count"
