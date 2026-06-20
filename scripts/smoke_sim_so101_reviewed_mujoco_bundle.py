@@ -354,10 +354,15 @@ def inspect_mujoco_model(model_path: Path, target_frame: str | None) -> dict[str
     missing_joints = sorted(set(SO101_JOINTS) - set(joint_names))
     target_presence = target_frame_presence(mujoco, model, target_frame)
     joint_ranges = {}
+    joint_limited = {}
     for joint_name in SO101_JOINTS:
         joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
         if joint_id >= 0:
             joint_ranges[joint_name] = [float(value) for value in model.jnt_range[joint_id]]
+            joint_limited[joint_name] = bool(model.jnt_limited[joint_id])
+    missing_limited_joints = sorted(
+        joint_name for joint_name in SO101_JOINTS if joint_limited.get(joint_name) is not True
+    )
     return {
         "ok": not missing_joints and bool(target_presence["present"]),
         "status": "mujoco_model_loaded",
@@ -371,6 +376,8 @@ def inspect_mujoco_model(model_path: Path, target_frame: str | None) -> dict[str
         "missing_joints": missing_joints,
         "target_frame_presence": target_presence,
         "joint_ranges": joint_ranges,
+        "joint_limited": joint_limited,
+        "missing_limited_joints": missing_limited_joints,
     }
 
 
@@ -470,6 +477,46 @@ def joint_limit_model_consistency(
         "notes": [
             "Body-joint manifest limits are declared in degrees and compared to MuJoCo joint ranges after radians conversion.",
             "The gripper command range is not compared here because the manifest uses percent-style command limits while MuJoCo may use a slide-joint opening in meters.",
+        ],
+    }
+
+
+def mujoco_joint_limit_enablement(model_load: dict[str, Any]) -> dict[str, Any]:
+    joint_limited = model_load.get("joint_limited")
+    if not isinstance(joint_limited, dict):
+        return {
+            "ok": False,
+            "status": "mujoco_joint_limit_flags_unavailable",
+            "joint_limited": {},
+            "missing_limited_joints": list(SO101_JOINTS),
+            "diagnostics": ["mujoco_joint_limited_not_object"],
+        }
+
+    limited = {
+        joint_name: bool(joint_limited.get(joint_name))
+        for joint_name in SO101_JOINTS
+        if joint_name in joint_limited
+    }
+    missing_limited_joints = sorted(
+        joint_name for joint_name in SO101_JOINTS if limited.get(joint_name) is not True
+    )
+    return {
+        "ok": not missing_limited_joints,
+        "status": (
+            "so101_mujoco_joints_limited"
+            if not missing_limited_joints
+            else "so101_mujoco_joints_unlimited"
+        ),
+        "joint_limited": limited,
+        "missing_limited_joints": missing_limited_joints,
+        "limited_joint_count": sum(1 for value in limited.values() if value is True),
+        "required_joint_count": len(SO101_JOINTS),
+        "diagnostics": [
+            f"mujoco_joint_not_limited:{joint_name}"
+            for joint_name in missing_limited_joints
+        ],
+        "notes": [
+            "MuJoCo joint ranges must be enforced with jnt_limited before model-backed motion evidence is trusted.",
         ],
     }
 
@@ -938,6 +985,9 @@ def handoff_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 "motion_evidence_not_physical_so101_authority": summary.get(
                     "motion_evidence_not_physical_so101_authority"
                 ),
+                "mujoco_joint_limit_enablement": summary.get(
+                    "mujoco_joint_limit_enablement"
+                ),
             },
             "authority_status": summary.get("motion_authority_status"),
         },
@@ -1040,6 +1090,7 @@ def build_downstream_handoff(summary: dict[str, Any]) -> tuple[dict[str, Any], l
         },
         "mujoco_motion_inputs": {
             "mujoco_model_load": summary.get("mujoco_model_load"),
+            "mujoco_joint_limit_enablement": summary.get("mujoco_joint_limit_enablement"),
             "joint_limit_model_consistency": summary.get(
                 "joint_limit_model_consistency"
             ),
@@ -1213,9 +1264,11 @@ def build_ready_summary(
         "status": "not_attempted",
         "diagnostics": ["mujoco_model_load_not_ok"],
     }
+    joint_limit_enablement = mujoco_joint_limit_enablement(model_load)
     joint_limit_consistency = joint_limit_model_consistency(manifest_summary, model_load)
     motion_ok = (
         bool(model_load.get("ok"))
+        and bool(joint_limit_enablement.get("ok"))
         and bool(simrobot_motion.get("ok"))
         and bool(joint_limit_consistency.get("ok"))
     )
@@ -1234,6 +1287,8 @@ def build_ready_summary(
         missing_inputs.append("mujoco_model_load")
     if not simrobot_motion.get("ok"):
         missing_inputs.append("simrobot_mujoco_joint_motion")
+    if not joint_limit_enablement.get("ok"):
+        missing_inputs.append("mujoco_joint_limits_enabled")
     if not joint_limit_consistency.get("ok"):
         missing_inputs.append("joint_limit_model_consistency")
     manifest_open_work = handoff_open_work(manifest_summary)
@@ -1329,6 +1384,7 @@ def build_ready_summary(
         "require_ready_reviewed_model": bool(args.require_ready_reviewed_model),
         "dependencies": dependencies,
         "mujoco_model_load": model_load,
+        "mujoco_joint_limit_enablement": joint_limit_enablement,
         "joint_limit_model_consistency": joint_limit_consistency,
         "sim_robot_mujoco_sync": simrobot_motion,
         "missing_inputs": sorted(set(missing_inputs)),
@@ -1407,6 +1463,17 @@ def build_ready_summary(
             missing_inputs=None if joint_limit_consistency.get("ok") else ["joint_limit_model_consistency"],
             diagnostics=joint_limit_consistency.get("diagnostics"),
             notes="Body-joint bounds must match the loaded MuJoCo model before model-backed motion evidence is trusted.",
+        ),
+        checklist_row(
+            "mujoco_joint_limits_enabled",
+            "mujoco",
+            bool(joint_limit_enablement.get("ok")),
+            "MuJoCo jnt_limited",
+            joint_limit_enablement,
+            {"status": "so101_mujoco_joints_limited", "missing_limited_joints": []},
+            missing_inputs=None if joint_limit_enablement.get("ok") else ["mujoco_joint_limits_enabled"],
+            diagnostics=joint_limit_enablement.get("diagnostics"),
+            notes="SO-101 joint range metadata is insufficient unless MuJoCo enforces those limits.",
         ),
         checklist_row(
             "simrobot_motion",

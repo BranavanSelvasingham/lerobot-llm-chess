@@ -6,6 +6,7 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 import shutil
 import subprocess
 import sys
@@ -128,6 +129,32 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
     tiny_gripper_manifest_path = tiny_gripper_dir / "so101_model_bundle.tiny_gripper_range.json"
     write_json(tiny_gripper_manifest_path, tiny_gripper_payload)
 
+    unlimited_joint_dir = output_dir / "fixtures" / "unlimited_joint_bundle"
+    unlimited_joint_model_dir = unlimited_joint_dir / "model"
+    unlimited_joint_model_dir.mkdir(parents=True, exist_ok=True)
+    if ready_mesh_dir.exists():
+        shutil.copytree(ready_mesh_dir, unlimited_joint_model_dir / "meshes", dirs_exist_ok=True)
+    unlimited_joint_model_path = unlimited_joint_model_dir / "synthetic_so101_unlimited_joint.xml"
+    root = ET.fromstring(ready_model_path.read_text())
+    unlimited_joint_patched = False
+    for joint in root.iter("joint"):
+        if joint.attrib.get("name") == "shoulder_pan":
+            joint.set("limited", "false")
+            joint.set(
+                "range",
+                f"{-110.0 * math.pi / 180.0:.17g} {110.0 * math.pi / 180.0:.17g}",
+            )
+            unlimited_joint_patched = True
+            break
+    if not unlimited_joint_patched:
+        raise RuntimeError("failed_to_patch_unlimited_joint_fixture")
+    unlimited_joint_model_path.write_text(ET.tostring(root, encoding="unicode") + "\n")
+    unlimited_joint_payload = json_clone(ready_payload)
+    unlimited_joint_payload["model_path"] = str(normalize_path(unlimited_joint_model_path))
+    unlimited_joint_payload["model_sha256"] = sha256_file(unlimited_joint_model_path)
+    unlimited_joint_manifest_path = unlimited_joint_dir / "so101_model_bundle.unlimited_joint.json"
+    write_json(unlimited_joint_manifest_path, unlimited_joint_payload)
+
     unavailable_model_path = json_clone(ready_payload)
     unavailable_model_path["model_path"] = str(
         normalize_path(fixture_dir / "missing_reviewed_so101.xml")
@@ -230,6 +257,8 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
     return {
         "tiny_gripper_range_manifest_path": tiny_gripper_manifest_path,
         "tiny_gripper_range_model_path": tiny_gripper_model_path,
+        "unlimited_joint_manifest_path": unlimited_joint_manifest_path,
+        "unlimited_joint_model_path": unlimited_joint_model_path,
         "unavailable_model_path_manifest_path": unavailable_model_path_manifest_path,
         "nonfinite_joint_limits_manifest_path": nonfinite_joint_limits_path,
         "invalid_asset_roots_manifest_path": invalid_asset_roots_path,
@@ -358,6 +387,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "missing_inputs",
         "tcp_offset_status",
         "alignment_status",
+        "mujoco_joint_limit_enablement_status",
         "joint_limit_model_consistency_status",
         "expected_status",
         "summary_path",
@@ -1096,6 +1126,33 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "ready_manifest_unlimited_mujoco_joint_not_ready",
+            "manifest_path": fixtures["unlimited_joint_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 1,
+                "gate_ok": False,
+                "status": "reviewed_mujoco_bundle_motion_failed",
+                "ready_for_model_backed_ik": True,
+                "model_authority": (
+                    "hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_so101_model_authority_ready": False,
+                "hardware_free_regression_fixture_ready": True,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "hardware_free_fixture_motion_failed",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "missing_inputs_contains": ["mujoco_joint_limits_enabled"],
+                "mujoco_joint_limit_enablement_status": "so101_mujoco_joints_unlimited",
+                "mujoco_joint_limit_enablement_diagnostics_contains": [
+                    "mujoco_joint_not_limited:shoulder_pan"
+                ],
+                "joint_limit_model_consistency_status": "joint_limits_match_mujoco_model",
+            },
+        },
+        {
             "case_id": "ready_manifest_gripper_range_not_moving",
             "manifest_path": fixtures["tiny_gripper_range_manifest_path"],
             "require_ready": False,
@@ -1404,6 +1461,7 @@ def summarize_case(
         ("joint_limits_status", "joint_limits"),
         ("mesh_assets_status", "mesh_assets"),
         ("target_frame_status", "target_frame"),
+        ("mujoco_joint_limit_enablement_status", "mujoco_joint_limit_enablement"),
         ("joint_limit_model_consistency_status", "joint_limit_model_consistency"),
     ):
         if expect_key in expect:
@@ -1438,6 +1496,7 @@ def summarize_case(
         ("target_frame_diagnostics_contains", "target_frame"),
         ("tcp_offset_diagnostics_contains", "tcp_offset"),
         ("alignment_diagnostics_contains", "base_to_board_alignment"),
+        ("mujoco_joint_limit_enablement_diagnostics_contains", "mujoco_joint_limit_enablement"),
         ("joint_limit_model_consistency_diagnostics_contains", "joint_limit_model_consistency"),
     ):
         if diagnostics_key not in expect:
@@ -1868,6 +1927,12 @@ def summarize_case(
             "tcp_offset_diagnostics": (summary.get("tcp_offset") or {}).get("diagnostics"),
             "alignment_status": (summary.get("base_to_board_alignment") or {}).get("status"),
             "alignment_diagnostics": (summary.get("base_to_board_alignment") or {}).get("diagnostics"),
+            "mujoco_joint_limit_enablement_status": (
+                summary.get("mujoco_joint_limit_enablement") or {}
+            ).get("status"),
+            "mujoco_joint_limit_enablement_diagnostics": (
+                summary.get("mujoco_joint_limit_enablement") or {}
+            ).get("diagnostics"),
             "joint_limit_model_consistency_status": (
                 summary.get("joint_limit_model_consistency") or {}
             ).get("status"),
@@ -1951,6 +2016,9 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "missing_inputs": observations.get("missing_inputs"),
         "tcp_offset_status": observations.get("tcp_offset_status"),
         "alignment_status": observations.get("alignment_status"),
+        "mujoco_joint_limit_enablement_status": observations.get(
+            "mujoco_joint_limit_enablement_status"
+        ),
         "joint_limit_model_consistency_status": observations.get(
             "joint_limit_model_consistency_status"
         ),

@@ -70,6 +70,8 @@ When the manifest is ready, this gate must:
 - load the reviewed model with `mujoco.MjModel.from_xml_path`
 - find every expected SO-101 joint by name
 - find the manifest target frame in the MuJoCo model
+- require every expected SO-101 MuJoCo joint to enforce its range with
+  `jnt_limited`
 - compare the manifest body-joint limits against MuJoCo `jnt_range` values
 - instantiate `SimRobot` with the reviewed model path
 - verify the MuJoCo backend has no joint-state fallback
@@ -112,12 +114,15 @@ MuJoCo radians and covers `shoulder_pan`, `shoulder_lift`, `elbow_flex`,
 limits while MuJoCo gripper joints may be slide openings in meters. The SimRobot
 motion proof still checks the gripper separately by translating the commanded
 percentage through the loaded MuJoCo `gripper` joint range and requiring an
-actual before/after qpos delta. If any body
+actual before/after qpos delta. Matching range metadata is not enough: the gate
+also records `mujoco_joint_limit_enablement` and fails with
+`mujoco_joint_limits_enabled` in `missing_inputs` when any SO-101 joint has a
+range but MuJoCo reports `jnt_limited` false. If any body
 joint's declared bounds differ from the loaded model, the gate reports
 `status: "reviewed_mujoco_bundle_motion_failed"` with
 `joint_limit_model_consistency` in `missing_inputs`; this prevents a
 reviewed-looking manifest from trusting motion evidence for a model with
-different configured bounds.
+different configured bounds or non-enforced bounds.
 
 The positive path is covered without hardware by the focused forwarding smoke:
 
@@ -157,7 +162,10 @@ ready-looking manifest whose model still references a mesh that cannot be
 resolved from the model directory or declared asset roots; those cases must
 report `asset_roots` or `mesh_assets` as the blocker and avoid motion. It also
 includes a ready-manifest
-negative fixture whose MuJoCo
+negative fixture whose MuJoCo `shoulder_pan` joint keeps the same range but has
+`limited="false"`; that case must fail with
+`mujoco_joint_limits_enabled` while `joint_limit_model_consistency` still
+matches. The matrix also includes a ready-manifest negative fixture whose MuJoCo
 `gripper` joint has an effectively immobile qpos range. That case must keep
 `ready_for_model_backed_ik: true` from the manifest checker, but the motion gate
 must fail with `simrobot_mujoco_joint_motion` because the gripper's before/after

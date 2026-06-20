@@ -1133,6 +1133,7 @@ jobs:
               "invalid_out_of_range_base_to_board_transform_not_ready",
               "mismatched_model_sha_not_ready",
               "ready_manifest_mismatched_mujoco_joint_limits",
+              "ready_manifest_unlimited_mujoco_joint_not_ready",
               "ready_manifest_gripper_range_not_moving",
               "ready_summary_open_handoff_work_blocked",
               "ready_synthetic_fixture_motion_not_physical",
@@ -1397,6 +1398,17 @@ jobs:
           assert mismatched_limits["observations"]["reviewed_model_motion_checked"] is False, mismatched_limits
           assert mismatched_limits["observations"]["motion_authority_status"] == "hardware_free_fixture_motion_failed", mismatched_limits
           assert mismatched_limits["observations"]["hardware_free_fixture_motion_checked"] is False, mismatched_limits
+          unlimited_joint = by_case["ready_manifest_unlimited_mujoco_joint_not_ready"]
+          assert unlimited_joint["record"]["return_code"] == 1, unlimited_joint
+          assert unlimited_joint["observations"]["status"] == "reviewed_mujoco_bundle_motion_failed", unlimited_joint
+          assert unlimited_joint["observations"]["ready_for_model_backed_ik"] is True, unlimited_joint
+          assert unlimited_joint["observations"]["mujoco_joint_limit_enablement_status"] == "so101_mujoco_joints_unlimited", unlimited_joint
+          assert "mujoco_joint_limits_enabled" in unlimited_joint["observations"]["missing_inputs"], unlimited_joint
+          assert "mujoco_joint_not_limited:shoulder_pan" in unlimited_joint["observations"]["mujoco_joint_limit_enablement_diagnostics"], unlimited_joint
+          assert unlimited_joint["observations"]["joint_limit_model_consistency_status"] == "joint_limits_match_mujoco_model", unlimited_joint
+          assert unlimited_joint["observations"]["reviewed_model_motion_checked"] is False, unlimited_joint
+          assert unlimited_joint["observations"]["motion_authority_status"] == "hardware_free_fixture_motion_failed", unlimited_joint
+          assert unlimited_joint["observations"]["hardware_free_fixture_motion_checked"] is False, unlimited_joint
           tiny_gripper_range = by_case["ready_manifest_gripper_range_not_moving"]
           assert tiny_gripper_range["record"]["return_code"] == 1, tiny_gripper_range
           assert tiny_gripper_range["observations"]["status"] == "reviewed_mujoco_bundle_motion_failed", tiny_gripper_range
