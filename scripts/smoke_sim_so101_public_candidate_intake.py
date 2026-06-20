@@ -660,6 +660,40 @@ def candidate_model_observation_rows(summary: dict[str, Any]) -> list[dict[str, 
     return rows
 
 
+def selected_model_observation(summary: dict[str, Any]) -> dict[str, Any]:
+    observations = summary.get("candidate_review_observations")
+    observations = observations if isinstance(observations, dict) else {}
+    model_observations = observations.get("model_file_observations")
+    model_observations = (
+        model_observations if isinstance(model_observations, list) else []
+    )
+    selected_relative_path = summary.get("model_relative_path")
+    selected = next(
+        (
+            observation
+            for observation in model_observations
+            if isinstance(observation, dict)
+            and observation.get("relative_path") == selected_relative_path
+        ),
+        {},
+    )
+    selected = selected if isinstance(selected, dict) else {}
+    return {
+        "relative_path": selected.get("relative_path") or selected_relative_path,
+        "observed": bool(selected),
+        "parse_ok": selected.get("parse_ok") is True,
+        "parse_error": selected.get("parse_error"),
+        "root_tag": selected.get("root_tag"),
+        "model_name": selected.get("model_name"),
+        "joint_count": int(selected.get("joint_count") or 0),
+        "joint_limit_or_range_count": int(
+            selected.get("joint_limit_or_range_count") or 0
+        ),
+        "mesh_reference_count": int(selected.get("mesh_reference_count") or 0),
+        "authority_boundary": "candidate_selected_model_observation_not_authority",
+    }
+
+
 def candidate_source_lock(summary: dict[str, Any]) -> dict[str, Any]:
     upstream = summary.get("upstream")
     upstream = upstream if isinstance(upstream, dict) else {}
@@ -684,6 +718,7 @@ def candidate_source_lock(summary: dict[str, Any]) -> dict[str, Any]:
     upstream_commit_sha_valid = upstream.get("commit_sha_valid") is True
     model_present = summary.get("model_present") is True
     selected_model_supported = summary.get("selected_model_supported") is True
+    selected_observation = selected_model_observation(summary)
     model_sha_supplied = bool(summary.get("model_sha256_observed"))
     expected_count = int(summary.get("expected_file_count") or 0)
     present_expected = int(summary.get("present_expected_file_count") or 0)
@@ -730,6 +765,7 @@ def candidate_source_lock(summary: dict[str, Any]) -> dict[str, Any]:
             "sha256": summary.get("model_sha256_observed"),
             "supported": selected_model_supported,
             "status": summary.get("selected_model_status"),
+            "observation": selected_observation,
         },
         "selectable_model_relative_paths": list(SELECTABLE_MODEL_RELATIVE_PATHS),
         "expected_file_count": expected_count,

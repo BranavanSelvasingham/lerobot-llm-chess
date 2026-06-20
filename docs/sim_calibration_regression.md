@@ -479,9 +479,11 @@ artifacts keep `candidate_operator_intake_plan_not_authority` or
 file digest set with the selected supported model digest row marked for review,
 flatten parsed URDF/MJCF/scene metadata with scene, selectable variant, parsed
 selectable variant, and selected model row counts for reviewer inspection, and
-list the command templates, explicit clone/fetch/checkout/intake/checker command
-steps, plus flat external/vendor review requirements for either a local external
-checkout or a vendored locked bundle. The intake summary and artifact index
+copy the selected model parse observation into the source-lock handoff without
+granting model authority. They also list the command templates, explicit
+clone/fetch/checkout/intake/checker command steps, plus flat external/vendor
+review requirements for either a local external checkout or a vendored locked
+bundle. The intake summary and artifact index
 expose model-observation row counts, selected model observation row count, digest
 row counts, selected model digest row count, requirement row count, selected row
 count, unselected row count, selected row IDs, command-plan status, and selected

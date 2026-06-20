@@ -3315,6 +3315,26 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "candidate_intake_checked_source_lock_ready_for_review": checked_case.get(
             "candidate_source_lock_ready_for_review"
         ),
+        "candidate_intake_checked_source_lock_selected_model_observation_authority": (
+            checked_case.get(
+                "candidate_source_lock_selected_model_observation_authority"
+            )
+        ),
+        "candidate_intake_checked_source_lock_selected_model_observation_observed": (
+            checked_case.get(
+                "candidate_source_lock_selected_model_observation_observed"
+            )
+        ),
+        "candidate_intake_checked_source_lock_selected_model_observation_parse_ok": (
+            checked_case.get(
+                "candidate_source_lock_selected_model_observation_parse_ok"
+            )
+        ),
+        "candidate_intake_checked_source_lock_selected_model_observation_root_tag": (
+            checked_case.get(
+                "candidate_source_lock_selected_model_observation_root_tag"
+            )
+        ),
         "candidate_intake_checked_source_lock_digest_row_count": checked_case.get(
             "candidate_source_lock_digest_row_count"
         ),
@@ -3381,6 +3401,16 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         ),
         "candidate_intake_invalid_model_selection_source_lock_ready_for_review": (
             invalid_model_selection_case.get("candidate_source_lock_ready_for_review")
+        ),
+        "candidate_intake_invalid_model_selection_source_lock_selected_model_observation_observed": (
+            invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_observation_observed"
+            )
+        ),
+        "candidate_intake_invalid_model_selection_source_lock_selected_model_observation_parse_ok": (
+            invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_observation_parse_ok"
+            )
         ),
         "candidate_intake_invalid_model_selection_source_lock_selected_model_digest_row_count": (
             invalid_model_selection_case.get(

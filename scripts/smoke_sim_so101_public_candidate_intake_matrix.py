@@ -115,6 +115,12 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_source_lock_digest_model_authority",
         "candidate_source_lock_digest_row_count",
         "candidate_source_lock_selected_model_digest_row_count",
+        "candidate_source_lock_selected_model_observation_authority",
+        "candidate_source_lock_selected_model_observation_observed",
+        "candidate_source_lock_selected_model_observation_parse_ok",
+        "candidate_source_lock_selected_model_observation_root_tag",
+        "candidate_source_lock_selected_model_observation_joint_count",
+        "candidate_source_lock_selected_model_observation_mesh_reference_count",
         "candidate_operator_intake_plan_model_authority",
         "candidate_operator_intake_plan_status",
         "candidate_operator_intake_decision_status",
@@ -779,6 +785,38 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         errors.append(f"{case_id}.candidate_source_lock physical authority not false")
     if source_lock.get("ready_for_model_backed_ik") is not False:
         errors.append(f"{case_id}.candidate_source_lock.ready_for_model_backed_ik not false")
+    selected_model = source_lock.get("selected_model")
+    selected_model = selected_model if isinstance(selected_model, dict) else {}
+    selected_model_observation = selected_model.get("observation")
+    selected_model_observation = (
+        selected_model_observation
+        if isinstance(selected_model_observation, dict)
+        else {}
+    )
+    if expect["model_present"] and expected_selected_model_supported:
+        if selected_model_observation.get("authority_boundary") != (
+            "candidate_selected_model_observation_not_authority"
+        ):
+            errors.append(
+                f"{case_id}.candidate_source_lock selected model observation authority invalid"
+            )
+        if selected_model_observation.get("observed") is not True:
+            errors.append(
+                f"{case_id}.candidate_source_lock selected model observation missing"
+            )
+        if selected_model_observation.get("parse_ok") is not True:
+            errors.append(
+                f"{case_id}.candidate_source_lock selected model observation parse failed"
+            )
+        if selected_model_observation.get("root_tag") not in {"robot", "mujoco"}:
+            errors.append(
+                f"{case_id}.candidate_source_lock selected model observation root tag invalid"
+            )
+    elif expect["model_present"] and not expected_selected_model_supported:
+        if selected_model_observation.get("observed") is not False:
+            errors.append(
+                f"{case_id}.candidate_source_lock unsupported selected model should not be observed"
+            )
     expected_digest_row_count = int(summary.get("present_expected_file_count") or 0)
     expected_selected_digest_row_count = (
         1 if expect["model_present"] and expected_selected_model_supported else 0
@@ -806,8 +844,6 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
     if expected_source_lock_ready:
         if source_lock.get("file_digest_count") != summary.get("expected_file_count"):
             errors.append(f"{case_id}.candidate_source_lock.file_digest_count invalid")
-        selected_model = source_lock.get("selected_model")
-        selected_model = selected_model if isinstance(selected_model, dict) else {}
         if selected_model.get("sha256") != summary.get("model_sha256_observed"):
             errors.append(f"{case_id}.candidate_source_lock selected model digest mismatch")
     elif expect["model_present"] and not expected_selected_model_supported:
@@ -1208,6 +1244,24 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         ),
         "candidate_source_lock_selected_model_digest_row_count": summary.get(
             "candidate_source_lock_selected_model_digest_row_count"
+        ),
+        "candidate_source_lock_selected_model_observation_authority": (
+            selected_model_observation.get("authority_boundary")
+        ),
+        "candidate_source_lock_selected_model_observation_observed": (
+            selected_model_observation.get("observed")
+        ),
+        "candidate_source_lock_selected_model_observation_parse_ok": (
+            selected_model_observation.get("parse_ok")
+        ),
+        "candidate_source_lock_selected_model_observation_root_tag": (
+            selected_model_observation.get("root_tag")
+        ),
+        "candidate_source_lock_selected_model_observation_joint_count": (
+            selected_model_observation.get("joint_count")
+        ),
+        "candidate_source_lock_selected_model_observation_mesh_reference_count": (
+            selected_model_observation.get("mesh_reference_count")
         ),
         "candidate_operator_intake_plan_model_authority": summary.get(
             "candidate_operator_intake_plan_model_authority"

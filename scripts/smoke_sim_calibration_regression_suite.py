@@ -4117,6 +4117,26 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(case, dict)
             else None,
+            "candidate_source_lock_selected_model_observation_authority": case.get(
+                "candidate_source_lock_selected_model_observation_authority"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_observed": case.get(
+                "candidate_source_lock_selected_model_observation_observed"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_parse_ok": case.get(
+                "candidate_source_lock_selected_model_observation_parse_ok"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_root_tag": case.get(
+                "candidate_source_lock_selected_model_observation_root_tag"
+            )
+            if isinstance(case, dict)
+            else None,
             "candidate_source_lock_selected_model_digest_row_count": case.get(
                 "candidate_source_lock_selected_model_digest_row_count"
             )
@@ -4320,6 +4340,26 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(checked_case, dict)
             else None,
+            "candidate_source_lock_selected_model_observation_authority": checked_case.get(
+                "candidate_source_lock_selected_model_observation_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_observed": checked_case.get(
+                "candidate_source_lock_selected_model_observation_observed"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_parse_ok": checked_case.get(
+                "candidate_source_lock_selected_model_observation_parse_ok"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_root_tag": checked_case.get(
+                "candidate_source_lock_selected_model_observation_root_tag"
+            )
+            if isinstance(checked_case, dict)
+            else None,
             "candidate_source_lock_digest_model_authority": checked_case.get(
                 "candidate_source_lock_digest_model_authority"
             )
@@ -4512,6 +4552,16 @@ def so101_public_candidate_intake_matrix_section(
             else None,
             "candidate_model_observation_parsed_selectable_model_row_count": invalid_model_selection_case.get(
                 "candidate_model_observation_parsed_selectable_model_row_count"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_observed": invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_observation_observed"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_parse_ok": invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_observation_parse_ok"
             )
             if isinstance(invalid_model_selection_case, dict)
             else None,
