@@ -1600,6 +1600,7 @@ jobs:
               "ready_handoff_physical_truth_claim_rejected",
               "ready_handoff_missing_scene_gate_rejected",
               "ready_handoff_wrong_next_downstream_gate_rejected",
+              "ready_handoff_missing_model_identity_rejected",
               "ready_handoff_unlimited_joint_rejected",
               "required_ready_handoff_intake_still_development_scene",
               "ready_handoff_intake_still_development_scene",
@@ -1643,6 +1644,7 @@ jobs:
               "ready_handoff_physical_truth_claim_rejected",
               "ready_handoff_missing_scene_gate_rejected",
               "ready_handoff_wrong_next_downstream_gate_rejected",
+              "ready_handoff_missing_model_identity_rejected",
               "ready_handoff_unlimited_joint_rejected",
           }
           by_case = {case["case_id"]: case for case in summary["cases"]}
@@ -1724,6 +1726,13 @@ jobs:
           assert wrong_next_gate_handoff["reviewed_mujoco_handoff_priority_contract_ok"] is False, wrong_next_gate_handoff
           assert wrong_next_gate_handoff["reviewed_mujoco_handoff_next_downstream_gate_after_ready"] == "gymnasium_task_wiring", wrong_next_gate_handoff
           assert "provide_reviewed_mujoco_next_downstream_gate" in wrong_next_gate_handoff["reviewed_mujoco_handoff_blockers"], wrong_next_gate_handoff
+          missing_model_identity_handoff = by_case["ready_handoff_missing_model_identity_rejected"]["observations"]
+          assert missing_model_identity_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", missing_model_identity_handoff
+          assert missing_model_identity_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", missing_model_identity_handoff
+          assert missing_model_identity_handoff["reviewed_mujoco_handoff_contract_ok"] is False, missing_model_identity_handoff
+          assert missing_model_identity_handoff["reviewed_mujoco_handoff_ready"] is False, missing_model_identity_handoff
+          assert missing_model_identity_handoff["reviewed_mujoco_handoff_model_identity_contract_ok"] is False, missing_model_identity_handoff
+          assert "provide_reviewed_mujoco_model_identity_evidence" in missing_model_identity_handoff["reviewed_mujoco_handoff_blockers"], missing_model_identity_handoff
           unlimited_joint_handoff = by_case["ready_handoff_unlimited_joint_rejected"]["observations"]
           assert unlimited_joint_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", unlimited_joint_handoff
           assert unlimited_joint_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", unlimited_joint_handoff
