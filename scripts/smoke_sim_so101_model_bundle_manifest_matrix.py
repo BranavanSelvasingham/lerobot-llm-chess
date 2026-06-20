@@ -354,7 +354,9 @@ def assert_reviewed_manifest_template_contract(
         "authority": ["model_identity", "provenance", "license"],
         "target_frame_authority": ["target_frame"],
         "joint_limit_authority": ["joint_limits"],
+        "gripper_mapping_authority": ["gripper_mapping"],
         "mesh_asset_authority": ["mesh_assets"],
+        "collision_policy_authority": ["collision_policy"],
         "tcp_offset_authority": ["tcp_offset"],
         "base_to_board_alignment_authority": ["base_to_board_alignment"],
     }
@@ -377,7 +379,9 @@ def assert_reviewed_manifest_template_contract(
         "target_frame_authority",
         "joint_limits_deg",
         "joint_limit_authority",
+        "gripper_mapping_authority",
         "mesh_asset_authority",
+        "collision_policy_authority",
         "tcp_offset_m",
         "tcp_offset_authority",
         "base_to_board_transform",
@@ -406,7 +410,9 @@ def assert_reviewed_manifest_template_contract(
     expected_single_scope_fields = {
         "target_frame_authority": "target_frame",
         "joint_limit_authority": "joint_limits",
+        "gripper_mapping_authority": "gripper_mapping",
         "mesh_asset_authority": "mesh_assets",
+        "collision_policy_authority": "collision_policy",
         "tcp_offset_authority": "tcp_offset",
         "base_to_board_alignment_authority": "base_to_board_alignment",
     }
@@ -1034,6 +1040,16 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "weak_gripper_mapping_authority_not_ready",
+            "manifest_path": fixtures["weak_gripper_mapping_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "missing_inputs": ["gripper_mapping_authority"],
+                "next_actions": ["record_gripper_mapping_authority"],
+            },
+        },
+        {
             "case_id": "weak_mesh_asset_authority_not_ready",
             "manifest_path": fixtures["weak_mesh_manifest_path"],
             "expect": {
@@ -1041,6 +1057,16 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "ready": False,
                 "mesh_assets_status": "needs_review",
                 "missing_inputs": ["mesh_asset_authority"],
+            },
+        },
+        {
+            "case_id": "weak_collision_policy_authority_not_ready",
+            "manifest_path": fixtures["weak_collision_policy_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "missing_inputs": ["collision_policy_authority"],
+                "next_actions": ["record_collision_policy_authority"],
             },
         },
         {

@@ -633,7 +633,7 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
                 "requirement_id": "external_simulation_caveats_reviewed",
                 "title": "Review SO-ARM100 simulation caveats",
                 "required_evidence": "review record resolving the README gripper linear-joint mapping caveat and removed base collision mesh policy",
-                "manifest_or_review_field": "joint_limits_authority,collision_policy_review",
+                "manifest_or_review_field": "gripper_mapping_authority,collision_policy_authority",
             },
             {
                 "requirement_id": "external_reviewed_bundle_manifest_supplied",
@@ -671,7 +671,7 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
                 "requirement_id": "vendor_simulation_caveats_reviewed",
                 "title": "Review vendored simulation caveats",
                 "required_evidence": "review record resolving the README gripper linear-joint mapping caveat and removed base collision mesh policy for the vendored subset",
-                "manifest_or_review_field": "joint_limits_authority,collision_policy_review",
+                "manifest_or_review_field": "gripper_mapping_authority,collision_policy_authority",
             },
             {
                 "requirement_id": "vendor_reviewed_bundle_manifest_supplied",
@@ -1562,6 +1562,14 @@ def candidate_seeded_review_manifest_template(
                 "review_scope": "joint_limits",
                 "source": "<reviewed-joint-limit-record>",
             },
+            "gripper_mapping_authority": {
+                "gripper_mapping_authority_status": "reviewed",
+                "reviewed_by": "<reviewer-or-team>",
+                "reviewed_at": "<review-date-YYYY-MM-DD>",
+                "review_id": "<stable-gripper-mapping-review-artifact-id>",
+                "review_scope": "gripper_mapping",
+                "source": "<reviewed-gripper-linear-joint-mapping-record>",
+            },
             "mesh_asset_authority": {
                 "mesh_asset_authority_status": "reviewed",
                 "reviewed_by": "<reviewer-or-team>",
@@ -1569,6 +1577,14 @@ def candidate_seeded_review_manifest_template(
                 "review_id": "<stable-mesh-asset-review-artifact-id>",
                 "review_scope": "mesh_assets",
                 "source": "<reviewed-model-export-or-mesh-root-record>",
+            },
+            "collision_policy_authority": {
+                "collision_policy_authority_status": "reviewed",
+                "reviewed_by": "<reviewer-or-team>",
+                "reviewed_at": "<review-date-YYYY-MM-DD>",
+                "review_id": "<stable-collision-policy-review-artifact-id>",
+                "review_scope": "collision_policy",
+                "source": "<reviewed-base-collision-mesh-policy-record>",
             },
             "tcp_offset_m": {"x": "<meters>", "y": "<meters>", "z": "<meters>"},
             "tcp_offset_authority": {
@@ -1668,7 +1684,11 @@ def build_candidate_review_checklist(summary: dict[str, Any]) -> dict[str, Any]:
                 "missing_expected_relative_paths": missing_expected,
             },
             "required_review_scope": "mesh_assets",
-            "manifest_fields": ["asset_roots", "mesh_asset_authority"],
+            "manifest_fields": [
+                "asset_roots",
+                "mesh_asset_authority",
+                "collision_policy_authority",
+            ],
             "authority_boundary": "candidate_review_checklist_not_authority",
         },
         {
@@ -1742,7 +1762,11 @@ def build_candidate_review_checklist(summary: dict[str, Any]) -> dict[str, Any]:
                 ),
             },
             "required_review_scope": "joint_limits",
-            "manifest_fields": ["joint_limits_deg", "joint_limit_authority"],
+            "manifest_fields": [
+                "joint_limits_deg",
+                "joint_limit_authority",
+                "gripper_mapping_authority",
+            ],
             "authority_boundary": "candidate_review_checklist_not_authority",
         },
         {

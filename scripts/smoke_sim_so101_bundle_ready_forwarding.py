@@ -381,12 +381,28 @@ def manifest_payload(*, ready: bool, model_filename: str = "synthetic_so101.urdf
             "review_scope": "joint_limits",
             "scope": "hardware-free forwarding regression only",
         },
+        "gripper_mapping_authority": {
+            "gripper_mapping_authority_status": "synthetic_fixture_reviewed_for_automation_only",
+            "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
+            "reviewed_at": "2026-06-18",
+            "review_id": "bundle-ready-forwarding:gripper-mapping",
+            "review_scope": "gripper_mapping",
+            "scope": "hardware-free forwarding regression only",
+        },
         "mesh_asset_authority": {
             "mesh_asset_authority_status": "synthetic_fixture_reviewed_for_automation_only",
             "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
             "reviewed_at": "2026-06-18",
             "review_id": "bundle-ready-forwarding:mesh-assets",
             "review_scope": "mesh_assets",
+            "scope": "hardware-free forwarding regression only",
+        },
+        "collision_policy_authority": {
+            "collision_policy_authority_status": "synthetic_fixture_reviewed_for_automation_only",
+            "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
+            "reviewed_at": "2026-06-18",
+            "review_id": "bundle-ready-forwarding:collision-policy",
+            "review_scope": "collision_policy",
             "scope": "hardware-free forwarding regression only",
         },
         "tcp_offset_authority": {
@@ -457,7 +473,9 @@ def fixture_provenance_reviewed_authority_manifest_payload(model_filename: str) 
         ("authority", "source_authority_status"),
         ("target_frame_authority", "target_frame_authority_status"),
         ("joint_limit_authority", "joint_limit_authority_status"),
+        ("gripper_mapping_authority", "gripper_mapping_authority_status"),
         ("mesh_asset_authority", "mesh_asset_authority_status"),
+        ("collision_policy_authority", "collision_policy_authority_status"),
         ("tcp_offset_authority", "tcp_offset_authority_status"),
         ("base_to_board_alignment_authority", "base_to_board_alignment_authority_status"),
     ):
@@ -481,7 +499,9 @@ def reviewed_contract_manifest_payload(model_filename: str) -> dict[str, Any]:
         ("authority", "source_authority_status", None),
         ("target_frame_authority", "target_frame_authority_status", "target_frame"),
         ("joint_limit_authority", "joint_limit_authority_status", "joint_limits"),
+        ("gripper_mapping_authority", "gripper_mapping_authority_status", "gripper_mapping"),
         ("mesh_asset_authority", "mesh_asset_authority_status", "mesh_assets"),
+        ("collision_policy_authority", "collision_policy_authority_status", "collision_policy"),
         ("tcp_offset_authority", "tcp_offset_authority_status", "tcp_offset"),
         (
             "base_to_board_alignment_authority",
@@ -696,6 +716,18 @@ def conflicting_joint_limit_nested_alias_manifest_payload(model_filename: str) -
 def weak_mesh_asset_authority_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload.pop("mesh_asset_authority", None)
+    return payload
+
+
+def weak_gripper_mapping_authority_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload.pop("gripper_mapping_authority", None)
+    return payload
+
+
+def weak_collision_policy_authority_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload.pop("collision_policy_authority", None)
     return payload
 
 
@@ -928,7 +960,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     conflicting_joint_limit_nested_alias_dir = (
         fixture_dir / "conflicting_joint_limit_nested_alias_bundle"
     )
+    weak_gripper_mapping_dir = fixture_dir / "weak_gripper_mapping_bundle"
     weak_mesh_dir = fixture_dir / "weak_mesh_bundle"
+    weak_collision_policy_dir = fixture_dir / "weak_collision_policy_bundle"
     candidate_source_lock_only_mesh_dir = (
         fixture_dir / "candidate_source_lock_only_mesh_bundle"
     )
@@ -1004,7 +1038,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         unexpected_model_joint_dir,
         conflicting_joint_limit_alias_dir,
         conflicting_joint_limit_nested_alias_dir,
+        weak_gripper_mapping_dir,
         weak_mesh_dir,
+        weak_collision_policy_dir,
         candidate_source_lock_only_mesh_dir,
         conflicting_mesh_review_alias_dir,
         weak_target_frame_dir,
@@ -1134,8 +1170,16 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     conflicting_joint_limit_nested_alias_model_path.write_text(
         mjcf_with_mesh_reference()
     )
+    weak_gripper_mapping_model_path = (
+        weak_gripper_mapping_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    weak_gripper_mapping_model_path.write_text(mjcf_with_mesh_reference())
     weak_mesh_model_path = weak_mesh_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_mesh_model_path.write_text(mjcf_with_mesh_reference())
+    weak_collision_policy_model_path = (
+        weak_collision_policy_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    weak_collision_policy_model_path.write_text(mjcf_with_mesh_reference())
     candidate_source_lock_only_mesh_model_path = (
         candidate_source_lock_only_mesh_dir / "model" / "synthetic_so101_mujoco.xml"
     )
@@ -1312,7 +1356,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         conflicting_joint_limit_nested_alias_dir
         / "so101_model_bundle.conflicting_joint_limit_nested_alias.json"
     )
+    weak_gripper_mapping_manifest_path = (
+        weak_gripper_mapping_dir / "so101_model_bundle.weak_gripper_mapping.json"
+    )
     weak_mesh_manifest_path = weak_mesh_dir / "so101_model_bundle.weak_mesh_assets.json"
+    weak_collision_policy_manifest_path = (
+        weak_collision_policy_dir / "so101_model_bundle.weak_collision_policy.json"
+    )
     candidate_source_lock_only_mesh_manifest_path = (
         candidate_source_lock_only_mesh_dir
         / "so101_model_bundle.candidate_source_lock_only_mesh.json"
@@ -1585,9 +1635,23 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         conflicting_joint_limit_nested_alias_model_path,
     )
     write_manifest_json(
+        weak_gripper_mapping_manifest_path,
+        weak_gripper_mapping_authority_manifest_payload(
+            model_filename=weak_gripper_mapping_model_path.name
+        ),
+        weak_gripper_mapping_model_path,
+    )
+    write_manifest_json(
         weak_mesh_manifest_path,
         weak_mesh_asset_authority_manifest_payload(model_filename=weak_mesh_model_path.name),
         weak_mesh_model_path,
+    )
+    write_manifest_json(
+        weak_collision_policy_manifest_path,
+        weak_collision_policy_authority_manifest_payload(
+            model_filename=weak_collision_policy_model_path.name
+        ),
+        weak_collision_policy_model_path,
     )
     write_manifest_json(
         candidate_source_lock_only_mesh_manifest_path,
@@ -1765,7 +1829,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "conflicting_joint_limit_nested_alias_manifest_path": (
             conflicting_joint_limit_nested_alias_manifest_path
         ),
+        "weak_gripper_mapping_manifest_path": weak_gripper_mapping_manifest_path,
         "weak_mesh_manifest_path": weak_mesh_manifest_path,
+        "weak_collision_policy_manifest_path": weak_collision_policy_manifest_path,
         "candidate_source_lock_only_mesh_manifest_path": (
             candidate_source_lock_only_mesh_manifest_path
         ),

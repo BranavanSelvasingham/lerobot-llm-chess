@@ -113,6 +113,25 @@ REVIEWED_JOINT_LIMIT_STATUSES = {
     "model_bundle_reviewed",
 }
 JOINT_LIMIT_REQUIRED_REVIEW_SCOPE_IDS = ("joint_limits",)
+GRIPPER_MAPPING_REVIEW_FIELDS = (
+    "gripper_mapping_authority",
+    "gripper_mapping_review",
+    "gripper_linear_joint_mapping_review",
+    "gripper_mapping_metadata",
+)
+GRIPPER_MAPPING_STATUS_FIELDS = (
+    "gripper_mapping_authority_status",
+    "gripper_mapping_review_status",
+    "review_status",
+    "status",
+)
+REVIEWED_GRIPPER_MAPPING_STATUSES = {
+    "reviewed",
+    "operator_reviewed",
+    "gripper_mapping_reviewed",
+    "model_bundle_reviewed",
+}
+GRIPPER_MAPPING_REQUIRED_REVIEW_SCOPE_IDS = ("gripper_mapping",)
 AUTHORITY_STATUS_FIELDS = (
     "source_authority_status",
     "review_status",
@@ -140,7 +159,9 @@ REVIEW_SCOPE_DESCRIPTIONS = {
     "provenance": "The source/export path and provenance context were reviewed.",
     "license": "The license or redistribution basis was reviewed.",
     "joint_limits": "The SO-101 joint-limit values were reviewed.",
+    "gripper_mapping": "The SO-101 gripper actuator/linear-joint mapping caveat was reviewed.",
     "mesh_assets": "The mesh references and asset roots were reviewed.",
+    "collision_policy": "The SO-101 collision mesh policy, including removed base collisions, was reviewed.",
     "target_frame": "The MuJoCo/SO-101 target frame was reviewed.",
     "tcp_offset": "The TCP or gripper-tip offset was reviewed.",
     "base_to_board_alignment": "The base-to-board transform was reviewed.",
@@ -190,6 +211,7 @@ REVIEWED_AUTHORITY_STATUSES = {
 }
 SYNTHETIC_FIXTURE_AUTHORITY_STATUS = "synthetic_fixture_reviewed_for_automation_only"
 SYNTHETIC_FIXTURE_JOINT_LIMIT_STATUS = "synthetic_fixture_reviewed_for_automation_only"
+SYNTHETIC_FIXTURE_GRIPPER_MAPPING_STATUS = "synthetic_fixture_reviewed_for_automation_only"
 MODEL_SHA256_FIELDS = (
     "model_sha256",
     "model_file_sha256",
@@ -252,6 +274,26 @@ REVIEWED_MESH_ASSET_STATUSES = {
 }
 MESH_ASSET_REQUIRED_REVIEW_SCOPE_IDS = ("mesh_assets",)
 SYNTHETIC_FIXTURE_MESH_ASSET_STATUS = "synthetic_fixture_reviewed_for_automation_only"
+COLLISION_POLICY_REVIEW_FIELDS = (
+    "collision_policy_authority",
+    "collision_policy_review",
+    "base_collision_mesh_policy_review",
+    "collision_policy_metadata",
+)
+COLLISION_POLICY_STATUS_FIELDS = (
+    "collision_policy_authority_status",
+    "collision_policy_review_status",
+    "review_status",
+    "status",
+)
+REVIEWED_COLLISION_POLICY_STATUSES = {
+    "reviewed",
+    "operator_reviewed",
+    "collision_policy_reviewed",
+    "model_bundle_reviewed",
+}
+COLLISION_POLICY_REQUIRED_REVIEW_SCOPE_IDS = ("collision_policy",)
+SYNTHETIC_FIXTURE_COLLISION_POLICY_STATUS = "synthetic_fixture_reviewed_for_automation_only"
 ALIGNMENT_FIELDS = (
     "base_to_board_transform",
     "base_to_board_alignment",
@@ -319,8 +361,16 @@ REQUIRED_INPUTS = (
         "requirement": "Reviewed joint-limit authority covering every SO-101 joint.",
     },
     {
+        "input": "gripper_mapping_authority",
+        "requirement": "Reviewed gripper actuator/linear-joint mapping policy resolving the SO-ARM100 README caveat.",
+    },
+    {
         "input": "mesh_assets",
         "requirement": "At least one model mesh reference visible to asset preflight and resolved with no missing assets.",
+    },
+    {
+        "input": "collision_policy_authority",
+        "requirement": "Reviewed collision mesh policy resolving the SO-ARM100 removed-base-collision caveat.",
     },
     {
         "input": "target_frame",
@@ -348,8 +398,10 @@ NEXT_ACTION_ORDER = (
     "asset_roots",
     "mesh_assets",
     "mesh_asset_authority",
+    "collision_policy_authority",
     "joint_limits_deg",
     "joint_limit_authority",
+    "gripper_mapping_authority",
     "target_frame",
     "target_frame_authority",
     "tcp_offset_m",
@@ -418,6 +470,18 @@ NEXT_ACTIONS = {
         "gate": "reviewed_model_authority",
         "title": "Record reviewed joint-limit authority",
         "detail": "Add joint_limit_authority or an accepted joint-limit review field with review evidence.",
+    },
+    "gripper_mapping_authority": {
+        "action_id": "record_gripper_mapping_authority",
+        "gate": "reviewed_model_authority",
+        "title": "Record reviewed gripper mapping authority",
+        "detail": "Add gripper_mapping_authority or an accepted gripper mapping review field resolving the SO-ARM100 gripper linear-joint caveat.",
+    },
+    "collision_policy_authority": {
+        "action_id": "record_collision_policy_authority",
+        "gate": "reviewed_model_authority",
+        "title": "Record reviewed collision policy authority",
+        "detail": "Add collision_policy_authority or an accepted collision policy review field resolving the SO-ARM100 removed-base-collision caveat.",
     },
     "target_frame": {
         "action_id": "declare_target_frame",
@@ -2931,6 +2995,58 @@ def inspect_mesh_assets(contract: dict[str, Any], manifest: dict[str, Any] | Non
     }
 
 
+def inspect_gripper_mapping_review(manifest: dict[str, Any] | None) -> dict[str, Any]:
+    manifest = manifest if isinstance(manifest, dict) else {}
+    candidates = [
+        (field_name, manifest.get(field_name))
+        for field_name in GRIPPER_MAPPING_REVIEW_FIELDS
+        if field_name in manifest
+    ]
+    return inspect_review_metadata(
+        candidates,
+        status_fields=GRIPPER_MAPPING_STATUS_FIELDS,
+        accepted_statuses=REVIEWED_GRIPPER_MAPPING_STATUSES,
+        synthetic_status=SYNTHETIC_FIXTURE_GRIPPER_MAPPING_STATUS,
+        diagnostic_prefix="gripper_mapping_authority",
+        synthetic_scope_diagnostic="synthetic_gripper_mapping_scope_missing_hardware_free",
+        synthetic_note=(
+            "Synthetic fixture gripper mapping authority is accepted only for hardware-free "
+            "forwarding regression fixtures; it is not physical SO-101 gripper mapping truth."
+        ),
+        review_note=(
+            "Gripper mapping readiness requires accepted review status, reviewer identity, "
+            "a stable review artifact handle, and the gripper_mapping review scope."
+        ),
+        required_review_scope_ids=GRIPPER_MAPPING_REQUIRED_REVIEW_SCOPE_IDS,
+    )
+
+
+def inspect_collision_policy_review(manifest: dict[str, Any] | None) -> dict[str, Any]:
+    manifest = manifest if isinstance(manifest, dict) else {}
+    candidates = [
+        (field_name, manifest.get(field_name))
+        for field_name in COLLISION_POLICY_REVIEW_FIELDS
+        if field_name in manifest
+    ]
+    return inspect_review_metadata(
+        candidates,
+        status_fields=COLLISION_POLICY_STATUS_FIELDS,
+        accepted_statuses=REVIEWED_COLLISION_POLICY_STATUSES,
+        synthetic_status=SYNTHETIC_FIXTURE_COLLISION_POLICY_STATUS,
+        diagnostic_prefix="collision_policy_authority",
+        synthetic_scope_diagnostic="synthetic_collision_policy_scope_missing_hardware_free",
+        synthetic_note=(
+            "Synthetic fixture collision policy authority is accepted only for hardware-free "
+            "forwarding regression fixtures; it is not physical SO-101 collision policy truth."
+        ),
+        review_note=(
+            "Collision policy readiness requires accepted review status, reviewer identity, "
+            "a stable review artifact handle, and the collision_policy review scope."
+        ),
+        required_review_scope_ids=COLLISION_POLICY_REQUIRED_REVIEW_SCOPE_IDS,
+    )
+
+
 def mesh_asset_missing_inputs(mesh_assets: dict[str, Any]) -> list[str] | None:
     status = mesh_assets.get("status")
     if status == "present":
@@ -2947,6 +3063,14 @@ def joint_limit_missing_inputs(joint_limits: dict[str, Any]) -> list[str] | None
     if status == "needs_review":
         return ["joint_limit_authority"]
     return ["joint_limits_deg"]
+
+
+def gripper_mapping_missing_inputs(gripper_mapping: dict[str, Any]) -> list[str] | None:
+    return None if gripper_mapping.get("status") == "present" else ["gripper_mapping_authority"]
+
+
+def collision_policy_missing_inputs(collision_policy: dict[str, Any]) -> list[str] | None:
+    return None if collision_policy.get("status") == "present" else ["collision_policy_authority"]
 
 
 def tcp_offset_missing_inputs(tcp_offset: dict[str, Any]) -> list[str] | None:
@@ -2984,7 +3108,9 @@ def build_field_checks(
     authority: dict[str, Any],
     provenance: dict[str, Any],
     joint_limits: dict[str, Any],
+    gripper_mapping: dict[str, Any],
     mesh_assets: dict[str, Any],
+    collision_policy: dict[str, Any],
     target_frame: dict[str, Any],
     tcp_offset: dict[str, Any],
     alignment: dict[str, Any],
@@ -3037,10 +3163,22 @@ def build_field_checks(
             "diagnostics": joint_limits.get("diagnostics", []),
         },
         {
+            "requirement_id": "gripper_mapping_authority",
+            "ok": gripper_mapping["status"] == "present",
+            "missing_inputs": gripper_mapping_missing_inputs(gripper_mapping),
+            "diagnostics": gripper_mapping.get("diagnostics", []),
+        },
+        {
             "requirement_id": "mesh_assets",
             "ok": mesh_assets["status"] == "present",
             "missing_inputs": mesh_asset_missing_inputs(mesh_assets),
             "diagnostics": mesh_assets.get("diagnostics", []),
+        },
+        {
+            "requirement_id": "collision_policy_authority",
+            "ok": collision_policy["status"] == "present",
+            "missing_inputs": collision_policy_missing_inputs(collision_policy),
+            "diagnostics": collision_policy.get("diagnostics", []),
         },
         {
             "requirement_id": "target_frame",
@@ -3073,7 +3211,9 @@ def synthetic_fixture_authority_flags(
     authority: dict[str, Any],
     provenance: dict[str, Any],
     joint_limits: dict[str, Any],
+    gripper_mapping: dict[str, Any],
     mesh_assets: dict[str, Any],
+    collision_policy: dict[str, Any],
     target_frame: dict[str, Any],
     tcp_offset: dict[str, Any],
     alignment: dict[str, Any],
@@ -3082,7 +3222,9 @@ def synthetic_fixture_authority_flags(
         "authority": bool(authority.get("synthetic_fixture_only")),
         "provenance": bool(provenance.get("synthetic_fixture_only")),
         "joint_limits": bool((joint_limits.get("review") or {}).get("synthetic_fixture_only")),
+        "gripper_mapping": bool(gripper_mapping.get("synthetic_fixture_only")),
         "mesh_assets": bool((mesh_assets.get("review") or {}).get("synthetic_fixture_only")),
+        "collision_policy": bool(collision_policy.get("synthetic_fixture_only")),
         "target_frame": bool((target_frame.get("review") or {}).get("synthetic_fixture_only")),
         "tcp_offset": bool((tcp_offset.get("review") or {}).get("synthetic_fixture_only")),
         "base_to_board_alignment": bool((alignment.get("review") or {}).get("synthetic_fixture_only")),
@@ -3256,8 +3398,12 @@ def review_packet_manifest_fields(row_value: dict[str, Any]) -> list[str]:
         return ["provenance"]
     if requirement_id == "joint_limits_deg":
         return list(JOINT_LIMIT_FIELDS + JOINT_LIMIT_REVIEW_FIELDS)
+    if requirement_id == "gripper_mapping_authority":
+        return list(GRIPPER_MAPPING_REVIEW_FIELDS)
     if requirement_id == "mesh_assets":
         return ["asset_roots", *MESH_ASSET_REVIEW_FIELDS]
+    if requirement_id == "collision_policy_authority":
+        return list(COLLISION_POLICY_REVIEW_FIELDS)
     if requirement_id == "target_frame":
         return ["target_frame", *TARGET_FRAME_REVIEW_FIELDS]
     if requirement_id == "tcp_offset_m":
@@ -3656,6 +3802,24 @@ def build_review_requirements(summary: dict[str, Any]) -> dict[str, Any]:
         ),
         review_requirement_item(
             priority=6,
+            requirement_id="gripper_mapping",
+            gate="reviewed_model_authority",
+            manifest_fields=list(GRIPPER_MAPPING_REVIEW_FIELDS),
+            accepted_review_statuses=sorted(REVIEWED_GRIPPER_MAPPING_STATUSES),
+            required_review_scope_ids=list(GRIPPER_MAPPING_REQUIRED_REVIEW_SCOPE_IDS),
+            required_inputs=[
+                "gripper_mapping_authority.reviewed_by",
+                "gripper_mapping_authority.review_id or gripper_mapping_authority.review_url",
+                "review record resolving the SO-ARM100 gripper linear-joint mapping caveat",
+            ],
+            synthetic_fixture_status=SYNTHETIC_FIXTURE_GRIPPER_MAPPING_STATUS,
+            notes=(
+                "The public SO-ARM100 README says the gripper linear-joint mapping is not reflected "
+                "in current URDF/MuJoCo files, so a reviewed manifest must resolve that explicitly."
+            ),
+        ),
+        review_requirement_item(
+            priority=7,
             requirement_id="target_frame",
             gate="reviewed_model_authority",
             manifest_fields=["target_frame", *TARGET_FRAME_REVIEW_FIELDS],
@@ -3671,7 +3835,7 @@ def build_review_requirements(summary: dict[str, Any]) -> dict[str, Any]:
             notes="The simulator contract currently requires the reviewed target frame to be gripper_frame_link.",
         ),
         review_requirement_item(
-            priority=7,
+            priority=8,
             requirement_id="tcp_offset",
             gate="reviewed_model_authority",
             manifest_fields=list(TCP_OFFSET_FIELDS + TCP_OFFSET_REVIEW_FIELDS),
@@ -3687,7 +3851,7 @@ def build_review_requirements(summary: dict[str, Any]) -> dict[str, Any]:
             notes="TCP/gripper-tip offset must be calibrated and reviewed separately from target-frame selection.",
         ),
         review_requirement_item(
-            priority=8,
+            priority=9,
             requirement_id="base_to_board_alignment",
             gate="reviewed_model_authority",
             manifest_fields=list(ALIGNMENT_FIELDS + ALIGNMENT_REVIEW_FIELDS),
@@ -3704,7 +3868,25 @@ def build_review_requirements(summary: dict[str, Any]) -> dict[str, Any]:
             notes="Board registration must be a reviewed transform, not a placeholder.",
         ),
         review_requirement_item(
-            priority=9,
+            priority=10,
+            requirement_id="collision_policy",
+            gate="reviewed_model_authority",
+            manifest_fields=list(COLLISION_POLICY_REVIEW_FIELDS),
+            accepted_review_statuses=sorted(REVIEWED_COLLISION_POLICY_STATUSES),
+            required_review_scope_ids=list(COLLISION_POLICY_REQUIRED_REVIEW_SCOPE_IDS),
+            required_inputs=[
+                "collision_policy_authority.reviewed_by",
+                "collision_policy_authority.review_id or collision_policy_authority.review_url",
+                "review record resolving the SO-ARM100 removed-base-collision caveat",
+            ],
+            synthetic_fixture_status=SYNTHETIC_FIXTURE_COLLISION_POLICY_STATUS,
+            notes=(
+                "The public SO-ARM100 README says base collision meshes were removed due to collision "
+                "issues, so a reviewed manifest must record the selected collision policy explicitly."
+            ),
+        ),
+        review_requirement_item(
+            priority=11,
             requirement_id="model_contract_and_asset_preflight",
             gate="mujoco_scene_validity",
             manifest_fields=["model_path", "asset_roots", "target_frame"],
@@ -3806,6 +3988,14 @@ def reviewed_manifest_template_payload() -> dict[str, Any]:
             "review_scope": "joint_limits",
             "source": "<reviewed-joint-limit-record>",
         },
+        "gripper_mapping_authority": {
+            "gripper_mapping_authority_status": "reviewed",
+            "reviewed_by": "<reviewer-or-team>",
+            "reviewed_at": "<review-date-YYYY-MM-DD>",
+            "review_id": "<stable-gripper-mapping-review-artifact-id>",
+            "review_scope": "gripper_mapping",
+            "source": "<reviewed-gripper-linear-joint-mapping-record>",
+        },
         "mesh_asset_authority": {
             "mesh_asset_authority_status": "reviewed",
             "reviewed_by": "<reviewer-or-team>",
@@ -3813,6 +4003,14 @@ def reviewed_manifest_template_payload() -> dict[str, Any]:
             "review_id": "<stable-mesh-asset-review-artifact-id>",
             "review_scope": "mesh_assets",
             "source": "<reviewed-model-export-or-mesh-root-record>",
+        },
+        "collision_policy_authority": {
+            "collision_policy_authority_status": "reviewed",
+            "reviewed_by": "<reviewer-or-team>",
+            "reviewed_at": "<review-date-YYYY-MM-DD>",
+            "review_id": "<stable-collision-policy-review-artifact-id>",
+            "review_scope": "collision_policy",
+            "source": "<reviewed-base-collision-mesh-policy-record>",
         },
         "tcp_offset_m": {"x": "<meters>", "y": "<meters>", "z": "<meters>"},
         "tcp_offset_authority": {
@@ -3866,7 +4064,9 @@ def build_reviewed_manifest_template(summary: dict[str, Any]) -> dict[str, Any]:
             "authority": ["model_identity", "provenance", "license"],
             "target_frame_authority": ["target_frame"],
             "joint_limit_authority": ["joint_limits"],
+            "gripper_mapping_authority": ["gripper_mapping"],
             "mesh_asset_authority": ["mesh_assets"],
+            "collision_policy_authority": ["collision_policy"],
             "tcp_offset_authority": ["tcp_offset"],
             "base_to_board_alignment_authority": ["base_to_board_alignment"],
         },
@@ -3980,7 +4180,9 @@ def build_checklist_rows(
     authority: dict[str, Any],
     provenance: dict[str, Any],
     joint_limits: dict[str, Any],
+    gripper_mapping: dict[str, Any],
     mesh_assets: dict[str, Any],
+    collision_policy: dict[str, Any],
     target_frame: dict[str, Any],
     tcp_offset: dict[str, Any],
     alignment: dict[str, Any],
@@ -4079,6 +4281,18 @@ def build_checklist_rows(
             "The reviewed bundle must declare limit authority for every SO-101 joint before model-backed IK is trusted.",
         ),
         row(
+            "gripper_mapping_authority",
+            "joint_contract",
+            "ok" if gripper_mapping["status"] == "present" else "action_required",
+            "warning",
+            f"manifest.{'|'.join(GRIPPER_MAPPING_REVIEW_FIELDS)}",
+            gripper_mapping,
+            {"review_authority": True, "required_review_scope": "gripper_mapping"},
+            gripper_mapping_missing_inputs(gripper_mapping),
+            gripper_mapping.get("diagnostics", []),
+            "Readiness requires an explicit reviewed resolution for the SO-ARM100 gripper linear-joint mapping caveat.",
+        ),
+        row(
             "mesh_assets",
             "mesh_assets",
             "ok" if mesh_assets["status"] == "present" else "action_required",
@@ -4094,6 +4308,18 @@ def build_checklist_rows(
             mesh_asset_missing_inputs(mesh_assets),
             mesh_assets.get("diagnostics", []),
             "Readiness requires resolved model mesh references plus reviewed mesh/asset-root authority.",
+        ),
+        row(
+            "collision_policy_authority",
+            "mesh_assets",
+            "ok" if collision_policy["status"] == "present" else "action_required",
+            "warning",
+            f"manifest.{'|'.join(COLLISION_POLICY_REVIEW_FIELDS)}",
+            collision_policy,
+            {"review_authority": True, "required_review_scope": "collision_policy"},
+            collision_policy_missing_inputs(collision_policy),
+            collision_policy.get("diagnostics", []),
+            "Readiness requires an explicit reviewed resolution for the SO-ARM100 removed-base-collision caveat.",
         ),
         row(
             "target_frame",
@@ -4364,7 +4590,9 @@ def build_summary(
     alignment = inspect_alignment(manifest)
     contract = run_contract_checker(python_path, output_dir, model_path, asset_roots, target_frame)
     joint_limits = inspect_joint_limits(manifest)
+    gripper_mapping = inspect_gripper_mapping_review(manifest)
     mesh_assets = inspect_mesh_assets(contract, manifest)
+    collision_policy = inspect_collision_policy_review(manifest)
     field_checks = build_field_checks(
         manifest_request,
         model_path,
@@ -4373,7 +4601,9 @@ def build_summary(
         authority,
         provenance,
         joint_limits,
+        gripper_mapping,
         mesh_assets,
+        collision_policy,
         target_frame,
         tcp_offset,
         alignment,
@@ -4391,7 +4621,9 @@ def build_summary(
         authority,
         provenance,
         joint_limits,
+        gripper_mapping,
         mesh_assets,
+        collision_policy,
         target_frame,
         tcp_offset,
         alignment,
@@ -4455,7 +4687,9 @@ def build_summary(
         "authority": authority,
         "provenance": provenance,
         "joint_limits": joint_limits,
+        "gripper_mapping": gripper_mapping,
         "mesh_assets": mesh_assets,
+        "collision_policy": collision_policy,
         "target_frame": target_frame,
         "tcp_offset": tcp_offset,
         "base_to_board_alignment": alignment,
@@ -4479,7 +4713,9 @@ def build_summary(
         authority,
         provenance,
         joint_limits,
+        gripper_mapping,
         mesh_assets,
+        collision_policy,
         target_frame,
         tcp_offset,
         alignment,
