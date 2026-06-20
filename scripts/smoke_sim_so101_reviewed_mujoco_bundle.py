@@ -1585,6 +1585,7 @@ def main() -> int:
     downstream_handoff, downstream_handoff_rows = build_downstream_handoff(summary)
     summary.update(
         {
+            "downstream_handoff_schema": downstream_handoff["schema"],
             "downstream_handoff_status": downstream_handoff["status"],
             "downstream_handoff_model_authority": downstream_handoff[
                 "model_authority"

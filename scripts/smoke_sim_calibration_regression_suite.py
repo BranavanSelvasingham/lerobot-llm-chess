@@ -139,6 +139,9 @@ SO101_TRAINING_READINESS_GATE_README_NAME = "README.md"
 SO101_TRAINING_ROLLOUTS_DIR_NAME = "so101_training_rollouts"
 SO101_TRAINING_ROLLOUTS_SUMMARY_NAME = "so101_training_rollouts_summary.json"
 REVIEWED_SO101_MODEL_AUTHORITY = "reviewed_so101_model_bundle_manifest"
+SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_SCHEMA = (
+    "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1"
+)
 SO101_CONTROL_JOINT_IDS = (
     "shoulder_pan",
     "shoulder_lift",
@@ -3535,6 +3538,7 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "hardware_free_fixture_motion_checked",
         "motion_evidence_not_physical_so101_authority",
         "motion_authority",
+        "downstream_handoff_schema",
         "downstream_handoff_status",
         "downstream_handoff_model_authority",
         "downstream_handoff_ready",
@@ -6009,6 +6013,7 @@ def so101_board_pick_authority_contract(
 def so101_reviewed_mujoco_downstream_handoff_contract(
     reviewed_mujoco_bundle: dict[str, Any],
 ) -> dict[str, Any]:
+    schema = reviewed_mujoco_bundle.get("downstream_handoff_schema")
     item_ids = reviewed_mujoco_bundle.get("downstream_handoff_item_ids")
     item_ids = [str(item) for item in item_ids] if isinstance(item_ids, list) else []
     missing_item_ids = sorted(
@@ -6138,6 +6143,8 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
         )
     )
     blockers: list[str] = []
+    if schema != SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_SCHEMA:
+        blockers.append("provide_current_reviewed_mujoco_downstream_handoff_schema")
     if reviewed_mujoco_bundle.get("downstream_handoff_model_authority") != (
         "downstream_handoff_not_authority"
     ):
@@ -6200,6 +6207,8 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
         "raw_ready": raw_ready,
         "fixture_handoff_ready_not_physical_so101_authority": fixture_contract_ready,
         "raw_fixture_handoff_ready_not_physical_so101_authority": fixture_ready,
+        "schema": schema,
+        "expected_schema": SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_SCHEMA,
         "status": status,
         "model_authority": reviewed_mujoco_bundle.get(
             "downstream_handoff_model_authority"
@@ -6610,6 +6619,12 @@ def so101_training_readiness_gate_section(
         "reviewed_mujoco_downstream_handoff_ready": (
             reviewed_mujoco_downstream_handoff_ready
         ),
+        "reviewed_mujoco_downstream_handoff_schema": (
+            downstream_handoff_contract.get("schema")
+        ),
+        "reviewed_mujoco_downstream_handoff_expected_schema": (
+            downstream_handoff_contract.get("expected_schema")
+        ),
         "reviewed_mujoco_downstream_handoff_model_authority": (
             downstream_handoff_contract.get("model_authority")
         ),
@@ -6852,6 +6867,24 @@ def write_so101_training_readiness_gate_artifacts(
             "notes": "Serious policy training must wait for reviewed SO-101 model authority.",
         },
         {
+            "requirement_id": "reviewed_mujoco_downstream_handoff_schema_current",
+            "category": "mujoco_scene_validity",
+            "status": "ok"
+            if gate.get("reviewed_mujoco_downstream_handoff_schema")
+            == gate.get("reviewed_mujoco_downstream_handoff_expected_schema")
+            else "action_required",
+            "observed_value": str(
+                gate.get("reviewed_mujoco_downstream_handoff_schema")
+            ),
+            "expected_value": str(
+                gate.get("reviewed_mujoco_downstream_handoff_expected_schema")
+            ),
+            "blockers": "; ".join(
+                gate.get("reviewed_mujoco_downstream_handoff_contract_blockers") or []
+            ),
+            "notes": "The aggregate training gate fails closed on stale or missing reviewed MuJoCo handoff schemas.",
+        },
+        {
             "requirement_id": "reviewed_mujoco_downstream_handoff_ready",
             "category": "mujoco_scene_validity",
             "status": "ok"
@@ -7015,6 +7048,9 @@ def write_so101_training_readiness_gate_artifacts(
                 "- Reviewed MuJoCo downstream handoff contract: "
                 f"`{gate.get('reviewed_mujoco_downstream_handoff_contract_status')}` / "
                 f"`{markdown_bool(gate.get('reviewed_mujoco_downstream_handoff_contract_ok'))}`",
+                "- Reviewed MuJoCo downstream handoff schema: "
+                f"`{gate.get('reviewed_mujoco_downstream_handoff_schema')}` "
+                f"(expected `{gate.get('reviewed_mujoco_downstream_handoff_expected_schema')}`)",
                 "- Reviewed MuJoCo downstream handoff raw ready: "
                 f"`{markdown_bool(gate.get('reviewed_mujoco_downstream_handoff_raw_ready'))}`",
                 "- Reviewed MuJoCo downstream handoff ready: "

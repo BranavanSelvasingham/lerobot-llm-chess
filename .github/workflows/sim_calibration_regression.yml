@@ -1557,6 +1557,7 @@ jobs:
               "required_handoff_not_ready_rejected",
               "required_fixture_handoff_rejected",
               "forged_ready_handoff_without_physical_motion_rejected",
+              "ready_handoff_schema_mismatch_rejected",
               "incomplete_ready_handoff_rejected",
               "ready_handoff_with_missing_input_rejected",
               "ready_handoff_with_pending_action_rejected",
@@ -1598,6 +1599,7 @@ jobs:
               "required_handoff_not_ready_rejected",
               "required_fixture_handoff_rejected",
               "forged_ready_handoff_without_physical_motion_rejected",
+              "ready_handoff_schema_mismatch_rejected",
               "incomplete_ready_handoff_rejected",
               "ready_handoff_with_missing_input_rejected",
               "ready_handoff_with_pending_action_rejected",
@@ -1627,6 +1629,13 @@ jobs:
           assert forged_handoff["reviewed_mujoco_handoff_contract_ok"] is False, forged_handoff
           assert forged_handoff["reviewed_mujoco_handoff_ready"] is False, forged_handoff
           assert forged_handoff["reviewed_mujoco_handoff_physical_motion_checked"] is False, forged_handoff
+          stale_schema_handoff = by_case["ready_handoff_schema_mismatch_rejected"]["observations"]
+          assert stale_schema_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", stale_schema_handoff
+          assert stale_schema_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", stale_schema_handoff
+          assert stale_schema_handoff["reviewed_mujoco_handoff_contract_ok"] is False, stale_schema_handoff
+          assert stale_schema_handoff["reviewed_mujoco_handoff_ready"] is False, stale_schema_handoff
+          assert stale_schema_handoff["reviewed_mujoco_handoff_schema"] == "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v0", stale_schema_handoff
+          assert "provide_current_reviewed_mujoco_downstream_handoff_schema" in stale_schema_handoff["reviewed_mujoco_handoff_blockers"], stale_schema_handoff
           incomplete_handoff = by_case["incomplete_ready_handoff_rejected"]["observations"]
           assert incomplete_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", incomplete_handoff
           assert incomplete_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", incomplete_handoff
@@ -2283,6 +2292,7 @@ jobs:
               "reviewed_authority_fixture_handoff_not_training_ready",
               "reviewed_authority_raw_handoff_ready_without_physical_motion_rejected",
               "reviewed_authority_handoff_ready_with_unlimited_joint_rejected",
+              "reviewed_authority_handoff_schema_mismatch_rejected",
               "reviewed_authority_incomplete_handoff_items_rejected",
               "reviewed_authority_handoff_ready_with_missing_input_rejected",
               "reviewed_authority_handoff_ready_with_pending_action_rejected",
@@ -2360,6 +2370,13 @@ jobs:
           assert unlimited_joint_handoff["reviewed_mujoco_downstream_handoff_joint_limit_enablement_status"] == "so101_mujoco_joints_unlimited", unlimited_joint_handoff
           assert unlimited_joint_handoff["reviewed_mujoco_downstream_handoff_missing_limited_joints"] == ["shoulder_pan"], unlimited_joint_handoff
           assert "provide_reviewed_mujoco_joint_limit_enablement_evidence" in unlimited_joint_handoff["reviewed_mujoco_downstream_handoff_contract_blockers"], unlimited_joint_handoff
+          stale_schema_handoff = by_case["reviewed_authority_handoff_schema_mismatch_rejected"]["gate"]
+          assert stale_schema_handoff["reviewed_mujoco_downstream_handoff_raw_ready"] is True, stale_schema_handoff
+          assert stale_schema_handoff["reviewed_mujoco_downstream_handoff_contract_ok"] is False, stale_schema_handoff
+          assert stale_schema_handoff["reviewed_mujoco_downstream_handoff_ready"] is False, stale_schema_handoff
+          assert stale_schema_handoff["reviewed_mujoco_downstream_handoff_schema"] == "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v0", stale_schema_handoff
+          assert stale_schema_handoff["reviewed_mujoco_downstream_handoff_expected_schema"] == "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1", stale_schema_handoff
+          assert "provide_current_reviewed_mujoco_downstream_handoff_schema" in stale_schema_handoff["reviewed_mujoco_downstream_handoff_contract_blockers"], stale_schema_handoff
           incomplete_handoff = by_case["reviewed_authority_incomplete_handoff_items_rejected"]["gate"]
           assert incomplete_handoff["reviewed_mujoco_downstream_handoff_contract_ok"] is False, incomplete_handoff
           assert incomplete_handoff["reviewed_mujoco_downstream_handoff_ready"] is False, incomplete_handoff

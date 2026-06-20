@@ -144,6 +144,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_handoff_contract_ok",
         "reviewed_mujoco_handoff_ready",
         "reviewed_mujoco_handoff_model_authority",
+        "reviewed_mujoco_handoff_schema",
         "reviewed_mujoco_handoff_observed_evidence_is_authority",
         "reviewed_mujoco_handoff_physical_truth_claimed",
         "reviewed_mujoco_handoff_motion_authority_status",
@@ -201,6 +202,7 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
         "ready_with_physical_truth_claim",
         "ready_missing_scene_gate",
         "ready_with_unlimited_joint",
+        "schema_mismatch_ready",
     }
     fixture_ready = state == "fixture"
     status = (
@@ -403,6 +405,25 @@ def case_specs() -> list[dict[str, Any]]:
             "expected_handoff_intake_status": "handoff_contract_invalid",
             "expected_handoff_ready": False,
             "expected_handoff_contract_ok": False,
+        },
+        {
+            "case_id": "ready_handoff_schema_mismatch_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": False,
+            "handoff_state": "schema_mismatch_ready",
+            "require_handoff": True,
+            "expected_status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "expected_handoff_intake_status": "handoff_contract_invalid",
+            "expected_handoff_ready": False,
+            "expected_handoff_contract_ok": False,
+            "expected_handoff_schema": (
+                "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v0"
+            ),
+            "expected_handoff_blockers_contain": [
+                "provide_current_reviewed_mujoco_downstream_handoff_schema"
+            ],
         },
         {
             "case_id": "incomplete_ready_handoff_rejected",
@@ -671,6 +692,9 @@ def summarize_case(
         "reviewed_mujoco_handoff_ready": summary.get(
             "reviewed_mujoco_handoff_ready"
         ),
+        "reviewed_mujoco_handoff_schema": summary.get(
+            "reviewed_mujoco_handoff_schema"
+        ),
         "reviewed_mujoco_handoff_model_authority": summary.get(
             "reviewed_mujoco_handoff_model_authority"
         ),
@@ -930,6 +954,13 @@ def summarize_case(
             observations["reviewed_mujoco_handoff_ready"],
             spec["expected_handoff_ready"],
         )
+    if "expected_handoff_schema" in spec:
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_schema",
+            observations["reviewed_mujoco_handoff_schema"],
+            spec["expected_handoff_schema"],
+        )
     if "expected_handoff_missing_inputs" in spec:
         add_error(
             errors,
@@ -956,6 +987,7 @@ def summarize_case(
                 "ready_with_physical_truth_claim",
                 "ready_missing_scene_gate",
                 "ready_with_unlimited_joint",
+                "schema_mismatch_ready",
             }
             else list(EXPECTED_DOWNSTREAM_HANDOFF_GATES)
         )
@@ -1155,6 +1187,9 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "reviewed_mujoco_handoff_ready": observations.get(
             "reviewed_mujoco_handoff_ready"
+        ),
+        "reviewed_mujoco_handoff_schema": observations.get(
+            "reviewed_mujoco_handoff_schema"
         ),
         "reviewed_mujoco_handoff_model_authority": observations.get(
             "reviewed_mujoco_handoff_model_authority"

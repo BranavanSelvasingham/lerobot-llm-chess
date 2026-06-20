@@ -20,6 +20,7 @@ from smoke_sim_calibration_regression_suite import (  # noqa: E402
     SO101_BOARD_PICK_REQUIRED_STAGE_SEQUENCE,
     SO101_CONTROL_JOINT_IDS,
     REVIEWED_SO101_MODEL_AUTHORITY,
+    SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_SCHEMA,
     SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_ITEM_IDS,
     SO101_TRAINING_PRIORITY_STAGE_IDS,
     so101_training_readiness_gate_section,
@@ -73,6 +74,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_model_physical_motion_checked",
         "reviewed_mujoco_downstream_handoff_contract_ok",
         "reviewed_mujoco_downstream_handoff_contract_status",
+        "reviewed_mujoco_downstream_handoff_schema",
+        "reviewed_mujoco_downstream_handoff_expected_schema",
         "reviewed_mujoco_downstream_handoff_raw_ready",
         "reviewed_mujoco_downstream_handoff_ready",
         "reviewed_mujoco_downstream_handoff_status",
@@ -415,6 +418,9 @@ def reviewed_mujoco_bundle_state(
     observed_evidence_is_authority: bool = False,
     development_fixture_evidence_not_physical_truth: bool = True,
     joint_limit_enablement: dict[str, Any] | None = None,
+    downstream_handoff_schema: str | None = (
+        SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_SCHEMA
+    ),
 ) -> dict[str, Any]:
     physical_motion_checked = (
         handoff_ready if physical_motion_checked is None else physical_motion_checked
@@ -480,6 +486,7 @@ def reviewed_mujoco_bundle_state(
             if fixture_handoff_ready
             else "waiting_for_reviewed_bundle_authority"
         ),
+        "downstream_handoff_schema": downstream_handoff_schema,
         "downstream_handoff_ready": handoff_ready,
         "downstream_handoff_model_authority": "downstream_handoff_not_authority",
         "downstream_handoff_observed_evidence_is_authority": (
@@ -665,6 +672,13 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         handoff_ready=True,
         joint_limit_enablement=mujoco_joint_limit_enablement_state(
             missing_limited_joints=["shoulder_pan"]
+        ),
+    )
+    handoff_ready_with_stale_schema = reviewed_mujoco_bundle_state(
+        summaries / "reviewed_mujoco_bundle_ready_stale_schema.json",
+        handoff_ready=True,
+        downstream_handoff_schema=(
+            "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v0"
         ),
     )
     handoff_incomplete_items = reviewed_mujoco_bundle_state(
@@ -867,6 +881,43 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 ],
                 "blockers_contain": [
                     "provide_reviewed_mujoco_joint_limit_enablement_evidence"
+                ],
+                "next_priority_gate": "mujoco_scene_validity",
+            },
+        },
+        {
+            "case_id": "reviewed_authority_handoff_schema_mismatch_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready_with_stale_schema,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "reviewed_motion": True,
+                "reviewed_downstream_handoff": False,
+                "reviewed_downstream_handoff_contract": False,
+                "reviewed_handoff_schema": (
+                    "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v0"
+                ),
+                "reviewed_handoff_expected_schema": (
+                    SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_SCHEMA
+                ),
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "handoff_contract_blockers_contain": [
+                    "provide_current_reviewed_mujoco_downstream_handoff_schema"
+                ],
+                "blockers_contain": [
+                    "provide_current_reviewed_mujoco_downstream_handoff_schema"
                 ],
                 "next_priority_gate": "mujoco_scene_validity",
             },
@@ -1725,6 +1776,20 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             gate.get("reviewed_mujoco_downstream_handoff_contract_ok"),
             expect["reviewed_downstream_handoff_contract"],
         )
+    if "reviewed_handoff_schema" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_downstream_handoff_schema",
+            gate.get("reviewed_mujoco_downstream_handoff_schema"),
+            expect["reviewed_handoff_schema"],
+        )
+    if "reviewed_handoff_expected_schema" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_downstream_handoff_expected_schema",
+            gate.get("reviewed_mujoco_downstream_handoff_expected_schema"),
+            expect["reviewed_handoff_expected_schema"],
+        )
     if "reviewed_downstream_fixture_handoff" in expect:
         add_error(
             errors,
@@ -2104,6 +2169,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "reviewed_mujoco_downstream_handoff_contract_status": gate.get(
             "reviewed_mujoco_downstream_handoff_contract_status"
         ),
+        "reviewed_mujoco_downstream_handoff_schema": gate.get(
+            "reviewed_mujoco_downstream_handoff_schema"
+        ),
+        "reviewed_mujoco_downstream_handoff_expected_schema": gate.get(
+            "reviewed_mujoco_downstream_handoff_expected_schema"
+        ),
         "reviewed_mujoco_downstream_handoff_raw_ready": gate.get(
             "reviewed_mujoco_downstream_handoff_raw_ready"
         ),
@@ -2280,7 +2351,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "- `priority_gate_queue` preserves reviewed authority, reviewed MuJoCo handoff and scene validity, Gymnasium task wiring, scripted pick/place, then training rollout order.",
             "- Each case writes `so101_training_readiness_gate_priority_queue.csv` so the prioritized missing-gate order is reviewable without parsing nested JSON.",
             "- Draft, development, and fixture-only model-authority labels are rejected even when raw readiness booleans are true.",
-            "- Reviewed-MuJoCo downstream handoff readiness requires a complete summary-level handoff contract; raw-ready, fixture-only, incomplete, or physical-truth-claiming handoffs cannot unblock training.",
+            "- Reviewed-MuJoCo downstream handoff readiness requires a complete current-schema summary-level handoff contract; raw-ready, fixture-only, stale-schema, incomplete, or physical-truth-claiming handoffs cannot unblock training.",
             "- Board-pick readiness requires detailed source-start, contact, lift, transfer, place, release, final-board-contact, and target-tolerance evidence without physical SO-101 truth or policy-training authority overclaims.",
             "- Reviewed rollout readiness requires status `ok`, reviewed-policy-ready authority status, `policy_training` use, policy-authority evidence, and no serious-policy blockers.",
             "- Use this smoke to protect training-readiness gate logic. Use reviewed SO-101 model-backed pick/place and rollout evidence before serious training.",
