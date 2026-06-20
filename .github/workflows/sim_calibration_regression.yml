@@ -4486,7 +4486,7 @@ jobs:
               assert training_readiness_gate["board_pick_phase_evidence_ready"] is True, training_readiness_gate
               assert training_readiness_gate["board_pick_authority_status"] == "board_pick_not_reviewed_model_authority", training_readiness_gate
               assert "use_reviewed_so101_model_authority_for_board_pick" in training_readiness_gate["board_pick_authority_blockers"], training_readiness_gate
-              assert "repeat_board_source_pick_place_with_reviewed_model_backed_ik" in training_readiness_gate["board_pick_authority_blockers"], training_readiness_gate
+              assert "repeat_board_pick_with_reviewed_model_backed_ik" in training_readiness_gate["board_pick_authority_blockers"], training_readiness_gate
               assert "remove_seeded_source_pose_from_board_pick" in training_readiness_gate["board_pick_authority_blockers"], training_readiness_gate
               assert training_readiness_gate["rollout_policy_training_authority_ready"] is False, training_readiness_gate
           training_readiness_artifacts = training_readiness_gate["artifacts"]

@@ -960,7 +960,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "board_authority_status": "board_pick_not_reviewed_model_authority",
                 "board_authority_blockers_contain": [
                     "use_reviewed_so101_model_authority_for_board_pick",
-                    "repeat_board_source_pick_place_with_reviewed_model_backed_ik",
+                    "repeat_board_pick_with_reviewed_model_backed_ik",
                     "remove_seeded_source_pose_from_board_pick",
                 ],
                 "board_detail": True,
@@ -2597,6 +2597,25 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         add_error(errors, "next_priority_action_ids", gate.get("next_priority_action_ids"), [])
     elif not gate.get("next_priority_action_ids"):
         errors.append("next_priority_action_ids: expected non-empty list")
+    elif expect.get("next_priority_gate") == "scripted_contact_grasp_pick_place":
+        next_actions = gate.get("next_priority_action_ids")
+        next_actions = next_actions if isinstance(next_actions, list) else []
+        board_retry_required = (
+            "repeat_board_pick_with_reviewed_model_backed_ik"
+            in (gate.get("board_pick_authority_blockers") or [])
+            or "repeat_board_pick_with_reviewed_model_backed_ik"
+            in (gate.get("board_pick_next_required_action_ids") or [])
+        )
+        if board_retry_required and "repeat_board_pick_with_reviewed_model_backed_ik" not in next_actions:
+            errors.append(
+                "next_priority_action_ids: expected canonical board-pick retry action "
+                f"in {next_actions!r}"
+            )
+        if "repeat_board_source_pick_place_with_reviewed_model_backed_ik" in next_actions:
+            errors.append(
+                "next_priority_action_ids: stale board-source retry action should not appear "
+                f"in {next_actions!r}"
+            )
     if "blockers_exact" in expect:
         add_error(errors, "blockers", gate.get("blockers"), expect["blockers_exact"])
     expect_contains(

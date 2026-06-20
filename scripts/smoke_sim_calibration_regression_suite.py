@@ -6703,7 +6703,7 @@ def so101_board_pick_authority_contract(
     if not reviewed_model_authority_ready:
         blockers.append("use_reviewed_so101_model_authority_for_board_pick")
     if not ready_for_model_backed_ik:
-        blockers.append("repeat_board_source_pick_place_with_reviewed_model_backed_ik")
+        blockers.append("repeat_board_pick_with_reviewed_model_backed_ik")
     if seeded_source_pose:
         blockers.append("remove_seeded_source_pose_from_board_pick")
     if manual_pose_after_reset:
@@ -6746,6 +6746,29 @@ def so101_board_pick_authority_contract(
         "policy_authority_claimed": policy_authority_claimed,
         "detailed_evidence_ready": detailed_evidence_ready,
     }
+
+
+def so101_board_pick_priority_action_ids(
+    board_pick: dict[str, Any],
+    board_pick_authority_contract: dict[str, Any],
+) -> list[str]:
+    next_action_ids = unique_string_values(board_pick.get("next_required_action_ids") or [])
+    repeat_action_ids = [
+        action_id
+        for action_id in next_action_ids
+        if action_id == "repeat_board_pick_with_reviewed_model_backed_ik"
+    ]
+    if repeat_action_ids:
+        return repeat_action_ids
+    blockers = unique_string_values(board_pick_authority_contract.get("blockers") or [])
+    repeat_blockers = [
+        blocker
+        for blocker in blockers
+        if blocker == "repeat_board_pick_with_reviewed_model_backed_ik"
+    ]
+    if repeat_blockers:
+        return repeat_blockers
+    return blockers or next_action_ids or ["repeat_board_pick_with_reviewed_model_backed_ik"]
 
 
 def so101_reviewed_mujoco_downstream_handoff_contract(
@@ -7229,6 +7252,10 @@ def so101_training_priority_gate_queue(
         board_pick,
         detailed_evidence_ready=board_pick_detailed_evidence_ready,
     )
+    board_pick_priority_action_ids = so101_board_pick_priority_action_ids(
+        board_pick,
+        board_pick_authority_contract,
+    )
     reviewed_model_backed_board_pick_place = (
         board_pick_authority_contract.get("ready") is True
     )
@@ -7318,9 +7345,7 @@ def so101_training_priority_gate_queue(
             "required_state": "reviewed_model_backed_board_source_pick_place",
             "training_ready": scripted_pick_place_training_ready,
             "automation_evidence_ready": scripted_pick_place_automation_ready,
-            "next_action_ids": [
-                "repeat_board_source_pick_place_with_reviewed_model_backed_ik"
-            ],
+            "next_action_ids": board_pick_priority_action_ids,
             "evidence_artifact_paths": [
                 _summary_path(contact_probe),
                 _summary_path(grasp_probe),
