@@ -4827,7 +4827,73 @@ def so101_reviewed_model_authority_gate_section(
     source_inventory: dict[str, Any],
     bundle_manifest: dict[str, Any],
     reviewed_mujoco_bundle: dict[str, Any],
+    public_candidate_intake_matrix: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    public_candidate_intake_matrix = (
+        public_candidate_intake_matrix
+        if isinstance(public_candidate_intake_matrix, dict)
+        else {}
+    )
+    public_candidate_checked = public_candidate_intake_matrix.get(
+        "candidate_intake_checked"
+    )
+    public_candidate_checked = (
+        public_candidate_checked if isinstance(public_candidate_checked, dict) else {}
+    )
+    public_candidate_child_records = public_candidate_intake_matrix.get("child_records")
+    public_candidate_child_records = (
+        public_candidate_child_records
+        if isinstance(public_candidate_child_records, list)
+        else []
+    )
+    public_candidate_checked_record = next(
+        (
+            record
+            for record in public_candidate_child_records
+            if isinstance(record, dict)
+            and record.get("case_id") == "candidate_intake_checked"
+        ),
+        {},
+    )
+    public_candidate_checked_artifacts = public_candidate_checked_record.get("artifacts")
+    public_candidate_checked_artifacts = (
+        public_candidate_checked_artifacts
+        if isinstance(public_candidate_checked_artifacts, dict)
+        else {}
+    )
+    public_candidate_source_lock_handoff = {
+        "status": (
+            "candidate_source_lock_ready_for_review"
+            if public_candidate_checked.get("candidate_source_lock_ready_for_review")
+            is True
+            else "candidate_source_lock_not_ready_for_review"
+        ),
+        "model_authority": public_candidate_checked.get(
+            "candidate_source_lock_model_authority"
+        )
+        or "candidate_source_lock_not_authority",
+        "ready_for_review": public_candidate_checked.get(
+            "candidate_source_lock_ready_for_review"
+        )
+        is True,
+        "source_lock_json_path": public_candidate_checked_artifacts.get(
+            "candidate_source_lock_json"
+        ),
+        "review_manifest_template_path": public_candidate_checked.get(
+            "direct_manifest_path"
+        ),
+        "candidate_intake_matrix_summary_path": public_candidate_intake_matrix.get(
+            "summary_path"
+        ),
+        "candidate_intake_matrix_status": public_candidate_intake_matrix.get("status"),
+        "physical_so101_authority_ready": False,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "notes": [
+            "The public candidate source lock is review handoff context only.",
+            "It does not satisfy source authority, reviewed bundle authority, or reviewed MuJoCo motion.",
+        ],
+    }
     source_authority_status_ready = (
         source_inventory.get("source_authority_gate_status") == "source_authority_ready"
     )
@@ -5361,6 +5427,16 @@ def so101_reviewed_model_authority_gate_section(
         "source_bundle_consistency_ready": source_bundle_consistency_ready,
         "source_bundle_consistency_status": source_bundle_consistency.get("status"),
         "source_bundle_consistency": source_bundle_consistency,
+        "public_candidate_source_lock_handoff": public_candidate_source_lock_handoff,
+        "public_candidate_source_lock_ready_for_review": (
+            public_candidate_source_lock_handoff["ready_for_review"]
+        ),
+        "public_candidate_source_lock_json_path": (
+            public_candidate_source_lock_handoff["source_lock_json_path"]
+        ),
+        "public_candidate_review_manifest_template_path": (
+            public_candidate_source_lock_handoff["review_manifest_template_path"]
+        ),
         "reviewed_mujoco_motion_bundle_consistency_ready": (
             reviewed_mujoco_motion_bundle_consistency_ready
         ),
@@ -5412,6 +5488,14 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
     source_bundle_consistency = gate.get("source_bundle_consistency")
     source_bundle_consistency = (
         source_bundle_consistency if isinstance(source_bundle_consistency, dict) else {}
+    )
+    public_candidate_source_lock_handoff = gate.get(
+        "public_candidate_source_lock_handoff"
+    )
+    public_candidate_source_lock_handoff = (
+        public_candidate_source_lock_handoff
+        if isinstance(public_candidate_source_lock_handoff, dict)
+        else {}
     )
     source_bundle_consistency_ready = gate.get("source_bundle_consistency_ready") is True
     consistency_status = source_bundle_consistency.get("status")
@@ -5534,6 +5618,23 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
                 "Scan or supply candidate SO-101 model-source roots, then review "
                 "provenance/license/source authority and rerun the source inventory "
                 "with authoritative path/root plus review metadata."
+            ),
+            "public_candidate_source_lock_status": (
+                public_candidate_source_lock_handoff.get("status")
+            ),
+            "public_candidate_source_lock_ready_for_review": (
+                public_candidate_source_lock_handoff.get("ready_for_review")
+            ),
+            "public_candidate_source_lock_json_path": (
+                public_candidate_source_lock_handoff.get("source_lock_json_path")
+            ),
+            "public_candidate_review_manifest_template_path": (
+                public_candidate_source_lock_handoff.get(
+                    "review_manifest_template_path"
+                )
+            ),
+            "public_candidate_source_lock_model_authority": (
+                public_candidate_source_lock_handoff.get("model_authority")
             ),
         },
         {
@@ -6056,6 +6157,21 @@ def so101_reviewed_model_authority_operator_actions(
                     item.get("blocked_by_prior_requirement_statuses") or {}
                 ),
                 "operator_action": item.get("operator_action"),
+                "public_candidate_source_lock_status": item.get(
+                    "public_candidate_source_lock_status"
+                ),
+                "public_candidate_source_lock_ready_for_review": item.get(
+                    "public_candidate_source_lock_ready_for_review"
+                ),
+                "public_candidate_source_lock_json_path": item.get(
+                    "public_candidate_source_lock_json_path"
+                ),
+                "public_candidate_review_manifest_template_path": item.get(
+                    "public_candidate_review_manifest_template_path"
+                ),
+                "public_candidate_source_lock_model_authority": item.get(
+                    "public_candidate_source_lock_model_authority"
+                ),
                 "development_fixture_evidence_not_physical_so101_truth": item.get(
                     "development_fixture_evidence_not_physical_so101_truth"
                 )
@@ -6554,6 +6670,11 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "reviewed_mujoco_motion_model_path",
         "reviewed_mujoco_motion_model_declared_sha256",
         "reviewed_mujoco_motion_model_observed_sha256",
+        "public_candidate_source_lock_status",
+        "public_candidate_source_lock_ready_for_review",
+        "public_candidate_source_lock_json_path",
+        "public_candidate_review_manifest_template_path",
+        "public_candidate_source_lock_model_authority",
         "evidence_artifact_path",
         "blockers",
         "operator_action",
@@ -6577,6 +6698,11 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "blocked_by_prior_requirement_ids",
         "blocked_by_prior_requirement_statuses",
         "operator_action",
+        "public_candidate_source_lock_status",
+        "public_candidate_source_lock_ready_for_review",
+        "public_candidate_source_lock_json_path",
+        "public_candidate_review_manifest_template_path",
+        "public_candidate_source_lock_model_authority",
         "development_fixture_evidence_not_physical_so101_truth",
     )
     with operator_actions_csv_path.open("w", newline="") as handle:
@@ -9333,6 +9459,7 @@ def main() -> int:
         so101_source_inventory_section,
         so101_bundle_manifest_section,
         so101_reviewed_mujoco_bundle_section,
+        so101_public_candidate_intake_matrix_section_row,
     )
     so101_reviewed_authority_gate = write_so101_reviewed_model_authority_gate_artifacts(
         output_dir,

@@ -3429,6 +3429,18 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
         "source_bundle_consistency_ready": gate.get("source_bundle_consistency_ready"),
         "source_bundle_consistency_status": gate.get("source_bundle_consistency_status"),
         "source_bundle_consistency": gate.get("source_bundle_consistency"),
+        "public_candidate_source_lock_handoff": gate.get(
+            "public_candidate_source_lock_handoff"
+        ),
+        "public_candidate_source_lock_ready_for_review": gate.get(
+            "public_candidate_source_lock_ready_for_review"
+        ),
+        "public_candidate_source_lock_json_path": gate.get(
+            "public_candidate_source_lock_json_path"
+        ),
+        "public_candidate_review_manifest_template_path": gate.get(
+            "public_candidate_review_manifest_template_path"
+        ),
         "reviewed_mujoco_motion_bundle_consistency_ready": gate.get(
             "reviewed_mujoco_motion_bundle_consistency_ready"
         ),
