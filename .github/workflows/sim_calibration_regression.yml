@@ -4925,6 +4925,9 @@ jobs:
               assert isinstance(metrics.get("operator_action_immediate_action_count"), int), metrics
               assert isinstance(metrics.get("operator_action_immediate_action_ids"), list), metrics
               assert metrics.get("operator_action_immediate_action_ids") == metrics.get("blocker_packet_next_action_ids"), metrics
+              assert metrics.get("operator_action_immediate_actions_match_blocker_packet") is True, metrics
+              assert metrics.get("operator_action_immediate_actions_missing_from_blocker_packet") == [], metrics
+              assert metrics.get("blocker_packet_actions_missing_from_operator_actions") == [], metrics
               assert isinstance(metrics.get("operator_action_command_template_count"), int), metrics
               assert metrics.get("operator_action_command_template_count") == metrics.get("operator_action_count"), metrics
               assert isinstance(metrics.get("operator_action_command_scopes"), list), metrics

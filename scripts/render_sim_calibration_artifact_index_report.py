@@ -1348,6 +1348,11 @@ def so101_reviewed_model_authority_gate_row(artifact: dict[str, Any]) -> list[An
         metrics.get("operator_action_count", ""),
         metrics.get("operator_action_immediate_action_count", ""),
         compact_list(metrics.get("operator_action_immediate_action_ids")),
+        metrics.get("operator_action_immediate_actions_match_blocker_packet", ""),
+        compact_list(
+            metrics.get("operator_action_immediate_actions_missing_from_blocker_packet")
+        ),
+        compact_list(metrics.get("blocker_packet_actions_missing_from_operator_actions")),
         metrics.get("operator_action_command_template_count", ""),
         compact_list(metrics.get("operator_action_command_scopes")),
         compact_mapping(metrics.get("checklist_status_by_requirement_id")),
@@ -3042,6 +3047,9 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Operator Actions",
                 "Immediate Actions",
                 "Immediate Action IDs",
+                "Immediate Actions Match Packet",
+                "Immediate Missing From Packet",
+                "Packet Missing From Operator",
                 "Command Templates",
                 "Command Scopes",
                 "Checklist Statuses",

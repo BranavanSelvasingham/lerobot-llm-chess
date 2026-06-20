@@ -5862,6 +5862,22 @@ def so101_reviewed_model_authority_operator_actions(
         for action in actions
         if action.get("status") == "action_required" and action.get("next_action_id")
     ]
+    blocker_packet_next_action_ids = unique_string_values(
+        blocker_packet.get("next_action_ids")
+        if isinstance(blocker_packet.get("next_action_ids"), list)
+        else []
+    )
+    immediate_action_ids = unique_string_values(immediate_action_ids)
+    immediate_actions_missing_from_blocker_packet = [
+        action_id
+        for action_id in immediate_action_ids
+        if action_id not in blocker_packet_next_action_ids
+    ]
+    blocker_packet_actions_missing_from_operator_actions = [
+        action_id
+        for action_id in blocker_packet_next_action_ids
+        if action_id not in immediate_action_ids
+    ]
     return {
         "schema": "lerobot.sim.so101_reviewed_model_authority_operator_actions.v1",
         "ok": True,
@@ -5885,10 +5901,20 @@ def so101_reviewed_model_authority_operator_actions(
         ),
         "blocker_packet_status": blocker_packet.get("status"),
         "blocker_packet_model_authority": blocker_packet.get("model_authority"),
-        "blocker_packet_next_action_ids": blocker_packet.get("next_action_ids") or [],
+        "blocker_packet_next_action_ids": blocker_packet_next_action_ids,
         "action_count": len(actions),
         "immediate_action_count": len(immediate_action_ids),
         "immediate_action_ids": immediate_action_ids,
+        "immediate_actions_match_blocker_packet": (
+            not immediate_actions_missing_from_blocker_packet
+            and not blocker_packet_actions_missing_from_operator_actions
+        ),
+        "immediate_actions_missing_from_blocker_packet": (
+            immediate_actions_missing_from_blocker_packet
+        ),
+        "blocker_packet_actions_missing_from_operator_actions": (
+            blocker_packet_actions_missing_from_operator_actions
+        ),
         "blocked_by_prior_requirements_count": len(
             [
                 action
@@ -6037,6 +6063,15 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "operator_action_immediate_action_ids": operator_actions[
             "immediate_action_ids"
         ],
+        "operator_action_immediate_actions_match_blocker_packet": operator_actions[
+            "immediate_actions_match_blocker_packet"
+        ],
+        "operator_action_immediate_actions_missing_from_blocker_packet": (
+            operator_actions["immediate_actions_missing_from_blocker_packet"]
+        ),
+        "blocker_packet_actions_missing_from_operator_actions": (
+            operator_actions["blocker_packet_actions_missing_from_operator_actions"]
+        ),
         "operator_action_command_template_count": operator_actions[
             "command_template_count"
         ],
@@ -6405,6 +6440,12 @@ def write_so101_reviewed_model_authority_gate_artifacts(
                 f"- Operator action rows: `{operator_actions_csv_path}`",
                 "- Operator action status: "
                 f"`{payload.get('operator_action_status')}`",
+                "- Operator immediate actions match blocker packet: "
+                f"`{markdown_bool(payload.get('operator_action_immediate_actions_match_blocker_packet'))}`",
+                "- Operator actions missing from blocker packet: "
+                f"`{markdown_list_value(payload.get('operator_action_immediate_actions_missing_from_blocker_packet'))}`",
+                "- Blocker packet actions missing from operator actions: "
+                f"`{markdown_list_value(payload.get('blocker_packet_actions_missing_from_operator_actions'))}`",
                 "- Operator action command scopes: "
                 f"`{markdown_list_value(payload.get('operator_action_command_scopes'))}`",
                 "",

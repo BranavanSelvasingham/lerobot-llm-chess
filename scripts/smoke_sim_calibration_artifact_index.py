@@ -3218,6 +3218,17 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
             "operator_action_immediate_action_ids"
         )
         or [],
+        "operator_action_immediate_actions_match_blocker_packet": gate.get(
+            "operator_action_immediate_actions_match_blocker_packet"
+        ),
+        "operator_action_immediate_actions_missing_from_blocker_packet": gate.get(
+            "operator_action_immediate_actions_missing_from_blocker_packet"
+        )
+        or [],
+        "blocker_packet_actions_missing_from_operator_actions": gate.get(
+            "blocker_packet_actions_missing_from_operator_actions"
+        )
+        or [],
         "operator_action_command_template_count": gate.get(
             "operator_action_command_template_count"
         ),
