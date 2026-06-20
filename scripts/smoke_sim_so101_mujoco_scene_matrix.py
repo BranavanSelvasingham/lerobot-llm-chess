@@ -57,6 +57,7 @@ EXPECTED_DOWNSTREAM_HANDOFF_GATES: tuple[str, ...] = (
     "reviewed_model_backed_contact_grasp_pick_place",
 )
 NEXT_DOWNSTREAM_GATE_AFTER_READY = EXPECTED_DOWNSTREAM_HANDOFF_GATES[0]
+SYNTHETIC_REVIEWED_MODEL_SHA256 = "a" * 64
 
 
 def parse_args() -> argparse.Namespace:
@@ -152,6 +153,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_handoff_motion_authority_status",
         "reviewed_mujoco_handoff_physical_motion_checked",
         "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked",
+        "reviewed_mujoco_handoff_model_identity_contract_ok",
+        "reviewed_mujoco_handoff_model_identity_status",
+        "reviewed_mujoco_handoff_model_identity_matches",
+        "reviewed_mujoco_handoff_model_path",
         "reviewed_mujoco_handoff_joint_limit_enablement_ok",
         "reviewed_mujoco_handoff_joint_limit_enablement_status",
         "reviewed_mujoco_handoff_missing_limited_joints",
@@ -210,10 +215,15 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
         "ready_with_physical_truth_claim",
         "ready_missing_scene_gate",
         "ready_wrong_next_downstream_gate",
+        "ready_missing_model_identity",
         "ready_with_unlimited_joint",
         "schema_mismatch_ready",
     }
     fixture_ready = state == "fixture"
+    identity_ready = ready or fixture_ready or state in {
+        "forged_ready_without_physical_motion",
+        "incomplete_ready",
+    }
     status = (
         "physical_reviewed_mujoco_handoff_ready"
         if ready
@@ -238,6 +248,33 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
         else "hardware_free_fixture_motion_checked_not_physical_so101_authority"
         if fixture_ready
         else "not_checked_manifest_not_ready",
+        "reviewed_model_identity_contract_ok": identity_ready,
+        "reviewed_model_identity_status": "present" if identity_ready else None,
+        "reviewed_model_identity_matches": identity_ready,
+        "reviewed_model_path": "/tmp/synthetic-reviewed-so101.xml"
+        if identity_ready
+        else None,
+        "reviewed_model_declared_sha256": SYNTHETIC_REVIEWED_MODEL_SHA256
+        if identity_ready
+        else None,
+        "reviewed_model_observed_sha256": SYNTHETIC_REVIEWED_MODEL_SHA256
+        if identity_ready
+        else None,
+        "reviewed_model_identity": {
+            "schema": "lerobot.sim.so101_reviewed_model_identity_checkpoint.v1",
+            "contract_ok": identity_ready,
+            "status": "present" if identity_ready else None,
+            "model_path": "/tmp/synthetic-reviewed-so101.xml"
+            if identity_ready
+            else None,
+            "declared_sha256": SYNTHETIC_REVIEWED_MODEL_SHA256
+            if identity_ready
+            else None,
+            "observed_sha256": SYNTHETIC_REVIEWED_MODEL_SHA256
+            if identity_ready
+            else None,
+            "matches": identity_ready,
+        },
         "mujoco_motion_inputs": {
             "mujoco_joint_limit_enablement": {
                 "ok": True,
@@ -336,6 +373,22 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
         ]
     elif state == "ready_wrong_next_downstream_gate":
         payload["next_downstream_gate_after_ready"] = "gymnasium_task_wiring"
+    elif state == "ready_missing_model_identity":
+        payload["reviewed_model_identity_contract_ok"] = False
+        payload["reviewed_model_identity_status"] = None
+        payload["reviewed_model_identity_matches"] = False
+        payload["reviewed_model_path"] = None
+        payload["reviewed_model_declared_sha256"] = None
+        payload["reviewed_model_observed_sha256"] = None
+        payload["reviewed_model_identity"] = {
+            "schema": "lerobot.sim.so101_reviewed_model_identity_checkpoint.v1",
+            "contract_ok": False,
+            "status": None,
+            "model_path": None,
+            "declared_sha256": None,
+            "observed_sha256": None,
+            "matches": False,
+        }
     elif state == "ready_with_unlimited_joint":
         enablement = payload["mujoco_motion_inputs"]["mujoco_joint_limit_enablement"]
         enablement["ok"] = False
@@ -553,6 +606,23 @@ def case_specs() -> list[dict[str, Any]]:
             ],
         },
         {
+            "case_id": "ready_handoff_missing_model_identity_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": False,
+            "handoff_state": "ready_missing_model_identity",
+            "require_handoff": True,
+            "expected_status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "expected_handoff_intake_status": "handoff_contract_invalid",
+            "expected_handoff_ready": False,
+            "expected_handoff_contract_ok": False,
+            "expected_handoff_model_identity_contract_ok": False,
+            "expected_handoff_blockers_contain": [
+                "provide_reviewed_mujoco_model_identity_evidence"
+            ],
+        },
+        {
             "case_id": "ready_handoff_unlimited_joint_rejected",
             "source_square": "e4",
             "target_square": "e5",
@@ -746,6 +816,18 @@ def summarize_case(
         ),
         "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked": summary.get(
             "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked"
+        ),
+        "reviewed_mujoco_handoff_model_identity_contract_ok": summary.get(
+            "reviewed_mujoco_handoff_model_identity_contract_ok"
+        ),
+        "reviewed_mujoco_handoff_model_identity_status": summary.get(
+            "reviewed_mujoco_handoff_model_identity_status"
+        ),
+        "reviewed_mujoco_handoff_model_identity_matches": summary.get(
+            "reviewed_mujoco_handoff_model_identity_matches"
+        ),
+        "reviewed_mujoco_handoff_model_path": summary.get(
+            "reviewed_mujoco_handoff_model_path"
         ),
         "reviewed_mujoco_handoff_joint_limit_enablement_ok": summary.get(
             "reviewed_mujoco_handoff_joint_limit_enablement_ok"
@@ -1039,6 +1121,7 @@ def summarize_case(
                 "ready_with_physical_truth_claim",
                 "ready_missing_scene_gate",
                 "ready_wrong_next_downstream_gate",
+                "ready_missing_model_identity",
                 "ready_with_unlimited_joint",
                 "schema_mismatch_ready",
             }
@@ -1107,6 +1190,29 @@ def summarize_case(
             f"{case_id}.reviewed_mujoco_handoff_priority_contract_ok",
             observations["reviewed_mujoco_handoff_priority_contract_ok"],
             spec.get("expected_handoff_priority_contract_ok", True),
+        )
+        expected_model_identity_contract_ok = spec.get(
+            "expected_handoff_model_identity_contract_ok",
+            handoff_state
+            in {
+                "ready",
+                "fixture",
+                "forged_ready_without_physical_motion",
+                "incomplete_ready",
+                "ready_with_missing_input",
+                "ready_with_pending_action",
+                "ready_with_physical_truth_claim",
+                "ready_missing_scene_gate",
+                "ready_wrong_next_downstream_gate",
+                "ready_with_unlimited_joint",
+                "schema_mismatch_ready",
+            },
+        )
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_model_identity_contract_ok",
+            observations["reviewed_mujoco_handoff_model_identity_contract_ok"],
+            expected_model_identity_contract_ok,
         )
     expect_contains(
         errors,
@@ -1310,6 +1416,18 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked": observations.get(
             "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked"
+        ),
+        "reviewed_mujoco_handoff_model_identity_contract_ok": observations.get(
+            "reviewed_mujoco_handoff_model_identity_contract_ok"
+        ),
+        "reviewed_mujoco_handoff_model_identity_status": observations.get(
+            "reviewed_mujoco_handoff_model_identity_status"
+        ),
+        "reviewed_mujoco_handoff_model_identity_matches": observations.get(
+            "reviewed_mujoco_handoff_model_identity_matches"
+        ),
+        "reviewed_mujoco_handoff_model_path": observations.get(
+            "reviewed_mujoco_handoff_model_path"
         ),
         "reviewed_mujoco_handoff_joint_limit_enablement_ok": observations.get(
             "reviewed_mujoco_handoff_joint_limit_enablement_ok"

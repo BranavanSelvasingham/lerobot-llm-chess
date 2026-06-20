@@ -68,11 +68,14 @@ handoffs must also preserve
 `next_downstream_gate_after_ready: "mujoco_scene_validity"`,
 `blocks_downstream_gates_until_ready: true`, and
 `ready_does_not_imply_policy_training_ready: true`. Ready
-or fixture-ready handoffs must also carry
+or fixture-ready handoffs must also carry a present/matching
+`reviewed_model_identity_contract_ok` checkpoint with reviewed model path and
+declared/observed SHA-256 evidence, plus
 `mujoco_motion_inputs.mujoco_joint_limit_enablement` with
 `status: "so101_mujoco_joints_limited"` and no missing limited SO-101 joints.
 Fixture motion, incomplete ready payloads, forged ready flags, missing
-downstream gate entries, missing/enforced joint-limit evidence, or handoffs that
+downstream gate entries, missing model-identity evidence,
+missing/enforced joint-limit evidence, or handoffs that
 point the next downstream gate away from `mujoco_scene_validity` or claim
 authority/physical SO-101 truth fail closed when the handoff is required.
 

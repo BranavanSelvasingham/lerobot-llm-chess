@@ -889,6 +889,38 @@ def handoff_status(summary: dict[str, Any]) -> str:
     return "waiting_for_reviewed_bundle_authority"
 
 
+def model_identity_checkpoint(summary: dict[str, Any]) -> dict[str, Any]:
+    model_path = summary.get("model_path")
+    model_path = model_path if isinstance(model_path, dict) else {}
+    model_identity = summary.get("model_identity")
+    model_identity = model_identity if isinstance(model_identity, dict) else {}
+    declared_sha256 = model_identity.get("declared_sha256")
+    observed_sha256 = model_identity.get("observed_sha256")
+    path = model_path.get("path")
+    contract_ok = (
+        isinstance(path, str)
+        and bool(path)
+        and model_identity.get("status") == "present"
+        and model_identity.get("matches") is True
+        and isinstance(declared_sha256, str)
+        and isinstance(observed_sha256, str)
+        and bool(declared_sha256)
+        and declared_sha256 == observed_sha256
+    )
+    return {
+        "schema": "lerobot.sim.so101_reviewed_model_identity_checkpoint.v1",
+        "contract_ok": contract_ok,
+        "status": model_identity.get("status"),
+        "model_path": path,
+        "declared_sha256": declared_sha256,
+        "observed_sha256": observed_sha256,
+        "matches": model_identity.get("matches") is True,
+        "diagnostics": model_identity.get("diagnostics") or [],
+        "source": "manifest.model_path|manifest.model_sha256|resolved_model_file_sha256",
+        "caveat": "This identity checkpoint only binds downstream handoffs to the reviewed bundle file; it is not physical SO-101 authority by itself.",
+    }
+
+
 def handoff_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
     open_work = handoff_open_work(summary)
     physical_ready = (
@@ -1029,6 +1061,7 @@ def handoff_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
 
 def build_downstream_handoff(summary: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     open_work = handoff_open_work(summary)
+    identity_checkpoint = model_identity_checkpoint(summary)
     summary_missing_inputs = unique_string_values(summary.get("missing_inputs"))
     summary_pending_action_ids = pending_action_ids(summary)
     expected_open_work_blockers = []
@@ -1097,6 +1130,13 @@ def build_downstream_handoff(summary: dict[str, Any]) -> tuple[dict[str, Any], l
             "motion_evidence_not_physical_so101_authority"
         ),
         "motion_authority_status": summary.get("motion_authority_status"),
+        "reviewed_model_identity_contract_ok": identity_checkpoint["contract_ok"],
+        "reviewed_model_identity_status": identity_checkpoint["status"],
+        "reviewed_model_identity_matches": identity_checkpoint["matches"],
+        "reviewed_model_path": identity_checkpoint["model_path"],
+        "reviewed_model_declared_sha256": identity_checkpoint["declared_sha256"],
+        "reviewed_model_observed_sha256": identity_checkpoint["observed_sha256"],
+        "reviewed_model_identity": identity_checkpoint,
         "physical_so101_model_authority_ready": summary.get(
             "physical_so101_model_authority_ready"
         ),
@@ -1558,6 +1598,8 @@ def write_readme(path: Path, summary: dict[str, Any], rows: list[dict[str, Any]]
         f"- `motion_evidence_not_physical_so101_authority`: `{str(summary.get('motion_evidence_not_physical_so101_authority')).lower()}`",
         f"- `downstream_handoff_status`: `{summary.get('downstream_handoff_status')}`",
         f"- `downstream_handoff_ready`: `{str(summary.get('downstream_handoff_ready')).lower()}`",
+        f"- `downstream_handoff_model_identity_contract_ok`: `{str(summary.get('downstream_handoff_model_identity_contract_ok')).lower()}`",
+        f"- `downstream_handoff_model_identity_status`: `{summary.get('downstream_handoff_model_identity_status')}`",
         f"- `ready_handoff_has_open_work`: `{str(summary.get('ready_handoff_has_open_work')).lower()}`",
         f"- `downstream_priority_gate_id`: `{summary.get('downstream_priority_gate_id')}`",
         f"- `downstream_priority_gate_order`: `{', '.join(summary.get('downstream_priority_gate_order') or [])}`",
@@ -1645,6 +1687,24 @@ def main() -> int:
             "downstream_handoff_status": downstream_handoff["status"],
             "downstream_handoff_model_authority": downstream_handoff[
                 "model_authority"
+            ],
+            "downstream_handoff_model_identity_contract_ok": downstream_handoff[
+                "reviewed_model_identity_contract_ok"
+            ],
+            "downstream_handoff_model_identity_status": downstream_handoff[
+                "reviewed_model_identity_status"
+            ],
+            "downstream_handoff_model_identity_matches": downstream_handoff[
+                "reviewed_model_identity_matches"
+            ],
+            "downstream_handoff_model_path": downstream_handoff[
+                "reviewed_model_path"
+            ],
+            "downstream_handoff_declared_model_sha256": downstream_handoff[
+                "reviewed_model_declared_sha256"
+            ],
+            "downstream_handoff_observed_model_sha256": downstream_handoff[
+                "reviewed_model_observed_sha256"
             ],
             "downstream_handoff_ready": downstream_handoff[
                 "downstream_handoff_ready"

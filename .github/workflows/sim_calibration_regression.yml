@@ -3111,6 +3111,7 @@ jobs:
               assert reviewed_mujoco_bundle["motion_evidence_not_physical_so101_authority"] is False, reviewed_mujoco_bundle
               assert reviewed_mujoco_bundle["downstream_handoff_status"] == "waiting_for_reviewed_bundle_authority", reviewed_mujoco_bundle
               assert reviewed_mujoco_bundle["downstream_handoff_ready"] is False, reviewed_mujoco_bundle
+              assert reviewed_mujoco_bundle["downstream_handoff_model_identity_contract_ok"] is False, reviewed_mujoco_bundle
               assert reviewed_mujoco_bundle["fixture_handoff_ready_not_physical_so101_authority"] is False, reviewed_mujoco_bundle
           reviewed_mujoco_artifacts = reviewed_mujoco_bundle["artifacts"]
           for key in (
@@ -3130,6 +3131,9 @@ jobs:
           assert handoff["model_authority"] == "downstream_handoff_not_authority", handoff
           assert handoff["status"] == reviewed_mujoco_bundle["downstream_handoff_status"], handoff
           assert handoff["downstream_handoff_ready"] == reviewed_mujoco_bundle["downstream_handoff_ready"], handoff
+          assert handoff["reviewed_model_identity_contract_ok"] == reviewed_mujoco_bundle["downstream_handoff_model_identity_contract_ok"], handoff
+          assert handoff["reviewed_model_identity_status"] == reviewed_mujoco_bundle["downstream_handoff_model_identity_status"], handoff
+          assert handoff["reviewed_model_path"] == reviewed_mujoco_bundle["downstream_handoff_model_path"], handoff
           assert handoff["observed_evidence_is_authority"] is False, handoff
           assert handoff["physical_so101_truth_claimed"] is False, handoff
           assert handoff["development_fixture_evidence_not_physical_so101_truth"] is True, handoff
@@ -3975,6 +3979,9 @@ jobs:
           ), training_readiness_gate
           assert training_readiness_gate["reviewed_mujoco_downstream_handoff_status"] == reviewed_mujoco_bundle["downstream_handoff_status"], training_readiness_gate
           assert training_readiness_gate["reviewed_mujoco_downstream_handoff_model_authority"] == reviewed_mujoco_bundle["downstream_handoff_model_authority"], training_readiness_gate
+          assert training_readiness_gate["reviewed_mujoco_downstream_handoff_model_identity_contract_ok"] == reviewed_mujoco_bundle["downstream_handoff_model_identity_contract_ok"], training_readiness_gate
+          assert training_readiness_gate["reviewed_mujoco_downstream_handoff_model_identity_status"] == reviewed_mujoco_bundle["downstream_handoff_model_identity_status"], training_readiness_gate
+          assert training_readiness_gate["reviewed_mujoco_downstream_handoff_model_path"] == reviewed_mujoco_bundle["downstream_handoff_model_path"], training_readiness_gate
           assert training_readiness_gate["reviewed_mujoco_downstream_handoff_physical_truth_claimed"] is False, training_readiness_gate
           assert training_readiness_gate["reviewed_mujoco_downstream_handoff_observed_evidence_is_authority"] is False, training_readiness_gate
           assert "downstream_gate_handoff" in training_readiness_gate["reviewed_mujoco_downstream_handoff_item_ids"], training_readiness_gate
@@ -4928,6 +4935,10 @@ jobs:
                   "downstream_handoff_not_authority",
                   None,
               }, metrics
+              assert metrics.get("downstream_handoff_model_identity_contract_ok") in {True, False, None}, metrics
+              assert metrics.get("downstream_handoff_model_identity_status") in {"missing", "present", None}, metrics
+              if metrics.get("downstream_handoff_ready") is True or metrics.get("fixture_handoff_ready_not_physical_so101_authority") is True:
+                  assert metrics.get("downstream_handoff_model_identity_contract_ok") is True, metrics
               assert metrics.get("downstream_handoff_ready") in {True, False, None}, metrics
               assert metrics.get("fixture_handoff_ready_not_physical_so101_authority") in {True, False, None}, metrics
               assert metrics.get("downstream_handoff_observed_evidence_is_authority") in {False, None}, metrics
@@ -5063,6 +5074,8 @@ jobs:
                   assert metrics.get("reviewed_mujoco_downstream_handoff_contract_ok") is True, metrics
                   assert metrics.get("reviewed_mujoco_downstream_handoff_raw_ready") is True, metrics
                   assert metrics.get("reviewed_mujoco_downstream_handoff_model_authority") == "downstream_handoff_not_authority", metrics
+                  assert metrics.get("reviewed_mujoco_downstream_handoff_model_identity_contract_ok") is True, metrics
+                  assert metrics.get("reviewed_mujoco_downstream_handoff_model_identity_status") == "present", metrics
                   assert metrics.get("reviewed_mujoco_downstream_handoff_joint_limit_enablement_ok") is True, metrics
                   assert metrics.get("reviewed_mujoco_downstream_handoff_joint_limit_enablement_status") == "so101_mujoco_joints_limited", metrics
                   assert metrics.get("reviewed_mujoco_downstream_handoff_missing_limited_joints") == [], metrics

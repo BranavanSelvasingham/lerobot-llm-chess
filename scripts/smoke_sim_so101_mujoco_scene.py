@@ -163,6 +163,12 @@ def handoff_intake_result(
     fixture_motion_checked: bool = False,
     motion_evidence_not_physical: Any = None,
     physical_model_authority_ready: Any = None,
+    model_identity_contract_ok: bool = False,
+    model_identity_status: Any = None,
+    model_identity_matches: Any = None,
+    reviewed_model_path: Any = None,
+    reviewed_model_declared_sha256: Any = None,
+    reviewed_model_observed_sha256: Any = None,
     joint_limit_enablement_ok: bool = False,
     joint_limit_enablement_status: Any = None,
     missing_limited_joints: list[str] | None = None,
@@ -206,6 +212,18 @@ def handoff_intake_result(
         ),
         "reviewed_mujoco_handoff_physical_so101_model_authority_ready": (
             physical_model_authority_ready
+        ),
+        "reviewed_mujoco_handoff_model_identity_contract_ok": (
+            model_identity_contract_ok
+        ),
+        "reviewed_mujoco_handoff_model_identity_status": model_identity_status,
+        "reviewed_mujoco_handoff_model_identity_matches": model_identity_matches,
+        "reviewed_mujoco_handoff_model_path": reviewed_model_path,
+        "reviewed_mujoco_handoff_declared_model_sha256": (
+            reviewed_model_declared_sha256
+        ),
+        "reviewed_mujoco_handoff_observed_model_sha256": (
+            reviewed_model_observed_sha256
         ),
         "reviewed_mujoco_handoff_joint_limit_enablement_ok": (
             joint_limit_enablement_ok
@@ -371,6 +389,56 @@ def reviewed_handoff_intake(
     motion_evidence_not_physical = payload.get(
         "motion_evidence_not_physical_so101_authority"
     )
+    calibration_inputs = payload.get("calibration_inputs")
+    calibration_inputs = (
+        calibration_inputs if isinstance(calibration_inputs, dict) else {}
+    )
+    nested_model_path = calibration_inputs.get("model_path")
+    nested_model_path = nested_model_path if isinstance(nested_model_path, dict) else {}
+    nested_model_identity = calibration_inputs.get("model_identity")
+    nested_model_identity = (
+        nested_model_identity if isinstance(nested_model_identity, dict) else {}
+    )
+    reviewed_model_identity = payload.get("reviewed_model_identity")
+    reviewed_model_identity = (
+        reviewed_model_identity if isinstance(reviewed_model_identity, dict) else {}
+    )
+    reviewed_model_path = payload.get("reviewed_model_path") or reviewed_model_identity.get(
+        "model_path"
+    ) or nested_model_path.get("path")
+    reviewed_model_declared_sha256 = (
+        payload.get("reviewed_model_declared_sha256")
+        or reviewed_model_identity.get("declared_sha256")
+        or nested_model_identity.get("declared_sha256")
+    )
+    reviewed_model_observed_sha256 = (
+        payload.get("reviewed_model_observed_sha256")
+        or reviewed_model_identity.get("observed_sha256")
+        or nested_model_identity.get("observed_sha256")
+    )
+    reviewed_model_identity_status = (
+        payload.get("reviewed_model_identity_status")
+        or reviewed_model_identity.get("status")
+        or nested_model_identity.get("status")
+    )
+    reviewed_model_identity_matches = (
+        payload.get("reviewed_model_identity_matches")
+        if "reviewed_model_identity_matches" in payload
+        else reviewed_model_identity.get("matches")
+        if "matches" in reviewed_model_identity
+        else nested_model_identity.get("matches")
+    )
+    reviewed_model_identity_contract_ok = (
+        payload.get("reviewed_model_identity_contract_ok") is True
+        and isinstance(reviewed_model_path, str)
+        and bool(reviewed_model_path)
+        and reviewed_model_identity_status == "present"
+        and reviewed_model_identity_matches is True
+        and isinstance(reviewed_model_declared_sha256, str)
+        and isinstance(reviewed_model_observed_sha256, str)
+        and bool(reviewed_model_declared_sha256)
+        and reviewed_model_declared_sha256 == reviewed_model_observed_sha256
+    )
     mujoco_motion_inputs = payload.get("mujoco_motion_inputs")
     mujoco_motion_inputs = (
         mujoco_motion_inputs if isinstance(mujoco_motion_inputs, dict) else {}
@@ -430,6 +498,7 @@ def reviewed_handoff_intake(
         and priority_contract_ok
         and not ready_handoff_has_open_work
         and (not (raw_ready or fixture_ready) or joint_limit_enablement_ok)
+        and (not (raw_ready or fixture_ready) or reviewed_model_identity_contract_ok)
         and physical_ready_contract_ok
         and fixture_contract_ok
     )
@@ -477,6 +546,8 @@ def reviewed_handoff_intake(
         blockers.append("resolve_ready_reviewed_mujoco_handoff_pending_actions")
     if (raw_ready or fixture_ready) and not joint_limit_enablement_ok:
         blockers.append("provide_reviewed_mujoco_joint_limit_enablement_evidence")
+    if (raw_ready or fixture_ready) and not reviewed_model_identity_contract_ok:
+        blockers.append("provide_reviewed_mujoco_model_identity_evidence")
     if raw_ready and not physical_ready_contract_ok:
         blockers.append("repair_physical_reviewed_mujoco_handoff_readiness_flags")
     if fixture_ready and not fixture_contract_ok:
@@ -506,6 +577,12 @@ def reviewed_handoff_intake(
         fixture_motion_checked=fixture_motion_checked,
         motion_evidence_not_physical=motion_evidence_not_physical,
         physical_model_authority_ready=physical_model_authority_ready,
+        model_identity_contract_ok=reviewed_model_identity_contract_ok,
+        model_identity_status=reviewed_model_identity_status,
+        model_identity_matches=reviewed_model_identity_matches,
+        reviewed_model_path=reviewed_model_path,
+        reviewed_model_declared_sha256=reviewed_model_declared_sha256,
+        reviewed_model_observed_sha256=reviewed_model_observed_sha256,
         joint_limit_enablement_ok=joint_limit_enablement_ok,
         joint_limit_enablement_status=joint_limit_enablement_status,
         missing_limited_joints=missing_limited_joints,

@@ -2245,6 +2245,16 @@ def collect_so101_mujoco_smoke_artifacts(
         or [],
         "downstream_handoff_status": smoke.get("downstream_handoff_status"),
         "downstream_handoff_model_authority": smoke.get("downstream_handoff_model_authority"),
+        "downstream_handoff_model_identity_contract_ok": smoke.get(
+            "downstream_handoff_model_identity_contract_ok"
+        ),
+        "downstream_handoff_model_identity_status": smoke.get(
+            "downstream_handoff_model_identity_status"
+        ),
+        "downstream_handoff_model_identity_matches": smoke.get(
+            "downstream_handoff_model_identity_matches"
+        ),
+        "downstream_handoff_model_path": smoke.get("downstream_handoff_model_path"),
         "downstream_handoff_ready": smoke.get("downstream_handoff_ready"),
         "fixture_handoff_ready_not_physical_so101_authority": smoke.get(
             "fixture_handoff_ready_not_physical_so101_authority"
@@ -2297,6 +2307,18 @@ def collect_so101_mujoco_smoke_artifacts(
         ),
         "reviewed_mujoco_handoff_model_authority": smoke.get(
             "reviewed_mujoco_handoff_model_authority"
+        ),
+        "reviewed_mujoco_handoff_model_identity_contract_ok": smoke.get(
+            "reviewed_mujoco_handoff_model_identity_contract_ok"
+        ),
+        "reviewed_mujoco_handoff_model_identity_status": smoke.get(
+            "reviewed_mujoco_handoff_model_identity_status"
+        ),
+        "reviewed_mujoco_handoff_model_identity_matches": smoke.get(
+            "reviewed_mujoco_handoff_model_identity_matches"
+        ),
+        "reviewed_mujoco_handoff_model_path": smoke.get(
+            "reviewed_mujoco_handoff_model_path"
         ),
         "reviewed_mujoco_handoff_physical_truth_claimed": smoke.get(
             "reviewed_mujoco_handoff_physical_truth_claimed"
@@ -3221,6 +3243,18 @@ def collect_so101_training_readiness_gate_artifacts(
         ),
         "reviewed_mujoco_downstream_handoff_model_authority": gate.get(
             "reviewed_mujoco_downstream_handoff_model_authority"
+        ),
+        "reviewed_mujoco_downstream_handoff_model_identity_contract_ok": gate.get(
+            "reviewed_mujoco_downstream_handoff_model_identity_contract_ok"
+        ),
+        "reviewed_mujoco_downstream_handoff_model_identity_status": gate.get(
+            "reviewed_mujoco_downstream_handoff_model_identity_status"
+        ),
+        "reviewed_mujoco_downstream_handoff_model_identity_matches": gate.get(
+            "reviewed_mujoco_downstream_handoff_model_identity_matches"
+        ),
+        "reviewed_mujoco_downstream_handoff_model_path": gate.get(
+            "reviewed_mujoco_downstream_handoff_model_path"
         ),
         "reviewed_mujoco_downstream_handoff_physical_truth_claimed": gate.get(
             "reviewed_mujoco_downstream_handoff_physical_truth_claimed"

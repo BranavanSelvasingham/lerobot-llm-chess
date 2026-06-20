@@ -388,6 +388,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "downstream_handoff_json_schema",
         "downstream_handoff_status",
         "downstream_handoff_ready",
+        "downstream_handoff_model_identity_contract_ok",
+        "downstream_handoff_model_identity_status",
+        "downstream_handoff_model_identity_matches",
+        "downstream_handoff_model_path",
         "downstream_handoff_open_work_contract_ok",
         "downstream_handoff_open_work_contract_schema",
         "downstream_handoff_open_work_contract_missing_inputs_match_summary",
@@ -1799,6 +1803,24 @@ def summarize_case(
         )
         add_error(
             errors,
+            f"{case_id}.downstream_handoff_json.model_identity_contract_ok",
+            downstream_handoff.get("reviewed_model_identity_contract_ok"),
+            summary.get("downstream_handoff_model_identity_contract_ok"),
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.model_identity_status",
+            downstream_handoff.get("reviewed_model_identity_status"),
+            summary.get("downstream_handoff_model_identity_status"),
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.model_path",
+            downstream_handoff.get("reviewed_model_path"),
+            summary.get("downstream_handoff_model_path"),
+        )
+        add_error(
+            errors,
             f"{case_id}.downstream_handoff_json.gates_unblocked",
             downstream_handoff.get("gates_unblocked_when_physical_handoff_ready"),
             list(EXPECTED_DOWNSTREAM_HANDOFF_GATES),
@@ -2038,6 +2060,18 @@ def summarize_case(
             else None,
             "downstream_handoff_status": summary.get("downstream_handoff_status"),
             "downstream_handoff_ready": summary.get("downstream_handoff_ready"),
+            "downstream_handoff_model_identity_contract_ok": summary.get(
+                "downstream_handoff_model_identity_contract_ok"
+            ),
+            "downstream_handoff_model_identity_status": summary.get(
+                "downstream_handoff_model_identity_status"
+            ),
+            "downstream_handoff_model_identity_matches": summary.get(
+                "downstream_handoff_model_identity_matches"
+            ),
+            "downstream_handoff_model_path": summary.get(
+                "downstream_handoff_model_path"
+            ),
             "downstream_handoff_open_work_contract_ok": (
                 downstream_handoff.get("handoff_open_work_contract_ok")
                 if isinstance(downstream_handoff, dict)
@@ -2193,6 +2227,16 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "downstream_handoff_status": observations.get("downstream_handoff_status"),
         "downstream_handoff_ready": observations.get("downstream_handoff_ready"),
+        "downstream_handoff_model_identity_contract_ok": observations.get(
+            "downstream_handoff_model_identity_contract_ok"
+        ),
+        "downstream_handoff_model_identity_status": observations.get(
+            "downstream_handoff_model_identity_status"
+        ),
+        "downstream_handoff_model_identity_matches": observations.get(
+            "downstream_handoff_model_identity_matches"
+        ),
+        "downstream_handoff_model_path": observations.get("downstream_handoff_model_path"),
         "downstream_handoff_open_work_contract_ok": observations.get(
             "downstream_handoff_open_work_contract_ok"
         ),

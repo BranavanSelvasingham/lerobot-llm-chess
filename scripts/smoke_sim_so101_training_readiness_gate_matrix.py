@@ -84,6 +84,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_downstream_handoff_status",
         "reviewed_mujoco_downstream_handoff_model_authority",
         "reviewed_mujoco_downstream_handoff_physical_truth_claimed",
+        "reviewed_mujoco_downstream_handoff_model_identity_contract_ok",
+        "reviewed_mujoco_downstream_handoff_model_identity_status",
+        "reviewed_mujoco_downstream_handoff_model_identity_matches",
+        "reviewed_mujoco_downstream_handoff_model_path",
         "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority",
         "reviewed_mujoco_downstream_handoff_physical_motion_checked",
         "reviewed_mujoco_downstream_handoff_hardware_free_fixture_motion_checked",
@@ -413,6 +417,7 @@ def reviewed_mujoco_bundle_state(
     *,
     handoff_ready: bool,
     fixture_handoff_ready: bool = False,
+    model_identity_contract_ok: bool | None = None,
     status: str | None = None,
     physical_motion_checked: bool | None = None,
     fixture_motion_checked: bool | None = None,
@@ -443,6 +448,8 @@ def reviewed_mujoco_bundle_state(
     )
     if reviewed_motion_checked is None:
         reviewed_motion_checked = physical_motion_checked or fixture_motion_checked
+    if model_identity_contract_ok is None:
+        model_identity_contract_ok = handoff_ready or fixture_handoff_ready
     physical_model_authority_ready = (
         handoff_ready
         if physical_model_authority_ready is None
@@ -500,6 +507,22 @@ def reviewed_mujoco_bundle_state(
         "downstream_handoff_schema": downstream_handoff_schema,
         "downstream_handoff_ready": handoff_ready,
         "downstream_handoff_model_authority": "downstream_handoff_not_authority",
+        "downstream_handoff_model_identity_contract_ok": model_identity_contract_ok,
+        "downstream_handoff_model_identity_status": (
+            "present" if model_identity_contract_ok else None
+        ),
+        "downstream_handoff_model_identity_matches": model_identity_contract_ok,
+        "downstream_handoff_model_path": (
+            "/tmp/synthetic-reviewed-so101.xml"
+            if model_identity_contract_ok
+            else None
+        ),
+        "downstream_handoff_declared_model_sha256": (
+            "a" * 64 if model_identity_contract_ok else None
+        ),
+        "downstream_handoff_observed_model_sha256": (
+            "a" * 64 if model_identity_contract_ok else None
+        ),
         "downstream_handoff_observed_evidence_is_authority": (
             observed_evidence_is_authority
         ),
@@ -702,6 +725,11 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         downstream_handoff_schema=(
             "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v0"
         ),
+    )
+    handoff_ready_missing_model_identity = reviewed_mujoco_bundle_state(
+        summaries / "reviewed_mujoco_bundle_ready_missing_model_identity.json",
+        handoff_ready=True,
+        model_identity_contract_ok=False,
     )
     handoff_incomplete_items = reviewed_mujoco_bundle_state(
         summaries / "reviewed_mujoco_bundle_incomplete_items.json",
@@ -940,6 +968,38 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 ],
                 "blockers_contain": [
                     "provide_current_reviewed_mujoco_downstream_handoff_schema"
+                ],
+                "next_priority_gate": "mujoco_scene_validity",
+            },
+        },
+        {
+            "case_id": "reviewed_authority_handoff_missing_model_identity_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready_missing_model_identity,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "reviewed_motion": True,
+                "reviewed_downstream_handoff": False,
+                "reviewed_downstream_handoff_contract": False,
+                "reviewed_handoff_model_identity_contract_ok": False,
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "handoff_contract_blockers_contain": [
+                    "provide_reviewed_mujoco_model_identity_evidence"
+                ],
+                "blockers_contain": [
+                    "provide_reviewed_mujoco_model_identity_evidence"
                 ],
                 "next_priority_gate": "mujoco_scene_validity",
             },
@@ -1798,6 +1858,15 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             gate.get("reviewed_mujoco_downstream_handoff_contract_ok"),
             expect["reviewed_downstream_handoff_contract"],
         )
+    if "reviewed_handoff_model_identity_contract_ok" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_downstream_handoff_model_identity_contract_ok",
+            gate.get(
+                "reviewed_mujoco_downstream_handoff_model_identity_contract_ok"
+            ),
+            expect["reviewed_handoff_model_identity_contract_ok"],
+        )
     if "reviewed_handoff_schema" in expect:
         add_error(
             errors,
@@ -2276,6 +2345,18 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "reviewed_mujoco_downstream_handoff_model_authority": gate.get(
             "reviewed_mujoco_downstream_handoff_model_authority"
+        ),
+        "reviewed_mujoco_downstream_handoff_model_identity_contract_ok": gate.get(
+            "reviewed_mujoco_downstream_handoff_model_identity_contract_ok"
+        ),
+        "reviewed_mujoco_downstream_handoff_model_identity_status": gate.get(
+            "reviewed_mujoco_downstream_handoff_model_identity_status"
+        ),
+        "reviewed_mujoco_downstream_handoff_model_identity_matches": gate.get(
+            "reviewed_mujoco_downstream_handoff_model_identity_matches"
+        ),
+        "reviewed_mujoco_downstream_handoff_model_path": gate.get(
+            "reviewed_mujoco_downstream_handoff_model_path"
         ),
         "reviewed_mujoco_downstream_handoff_physical_truth_claimed": gate.get(
             "reviewed_mujoco_downstream_handoff_physical_truth_claimed"

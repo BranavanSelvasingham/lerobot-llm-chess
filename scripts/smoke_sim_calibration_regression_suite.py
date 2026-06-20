@@ -3525,6 +3525,12 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked",
         "reviewed_mujoco_handoff_motion_evidence_not_physical_so101_authority",
         "reviewed_mujoco_handoff_physical_so101_model_authority_ready",
+        "reviewed_mujoco_handoff_model_identity_contract_ok",
+        "reviewed_mujoco_handoff_model_identity_status",
+        "reviewed_mujoco_handoff_model_identity_matches",
+        "reviewed_mujoco_handoff_model_path",
+        "reviewed_mujoco_handoff_declared_model_sha256",
+        "reviewed_mujoco_handoff_observed_model_sha256",
         "reviewed_mujoco_handoff_joint_limit_enablement_ok",
         "reviewed_mujoco_handoff_joint_limit_enablement_status",
         "reviewed_mujoco_handoff_missing_limited_joints",
@@ -3562,6 +3568,12 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "downstream_handoff_schema",
         "downstream_handoff_status",
         "downstream_handoff_model_authority",
+        "downstream_handoff_model_identity_contract_ok",
+        "downstream_handoff_model_identity_status",
+        "downstream_handoff_model_identity_matches",
+        "downstream_handoff_model_path",
+        "downstream_handoff_declared_model_sha256",
+        "downstream_handoff_observed_model_sha256",
         "downstream_handoff_ready",
         "fixture_handoff_ready_not_physical_so101_authority",
         "downstream_handoff_observed_evidence_is_authority",
@@ -6178,6 +6190,32 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
     physical_model_authority_ready = (
         reviewed_mujoco_bundle.get("physical_so101_model_authority_ready") is True
     )
+    handoff_model_identity_status = reviewed_mujoco_bundle.get(
+        "downstream_handoff_model_identity_status"
+    )
+    handoff_model_identity_matches = (
+        reviewed_mujoco_bundle.get("downstream_handoff_model_identity_matches")
+        is True
+    )
+    handoff_model_path = reviewed_mujoco_bundle.get("downstream_handoff_model_path")
+    handoff_model_declared_sha256 = reviewed_mujoco_bundle.get(
+        "downstream_handoff_declared_model_sha256"
+    )
+    handoff_model_observed_sha256 = reviewed_mujoco_bundle.get(
+        "downstream_handoff_observed_model_sha256"
+    )
+    handoff_model_identity_contract_ok = (
+        reviewed_mujoco_bundle.get("downstream_handoff_model_identity_contract_ok")
+        is True
+        and isinstance(handoff_model_path, str)
+        and bool(handoff_model_path)
+        and handoff_model_identity_status == "present"
+        and handoff_model_identity_matches
+        and isinstance(handoff_model_declared_sha256, str)
+        and isinstance(handoff_model_observed_sha256, str)
+        and bool(handoff_model_declared_sha256)
+        and handoff_model_declared_sha256 == handoff_model_observed_sha256
+    )
     motion_evidence_not_physical = (
         reviewed_mujoco_bundle.get(
             "motion_evidence_not_physical_so101_authority"
@@ -6342,6 +6380,8 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
         blockers.append("resolve_ready_reviewed_mujoco_handoff_pending_actions")
     if (raw_ready or fixture_ready) and not ready_joint_limit_enablement_contract_ok:
         blockers.append("provide_reviewed_mujoco_joint_limit_enablement_evidence")
+    if (raw_ready or fixture_ready) and not handoff_model_identity_contract_ok:
+        blockers.append("provide_reviewed_mujoco_model_identity_evidence")
     if raw_ready and not physical_ready_contract_ok:
         blockers.append("repair_physical_reviewed_mujoco_handoff_readiness_flags")
     if fixture_ready and not fixture_contract_ok:
@@ -6411,6 +6451,12 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
         "reviewed_model_motion_checked": reviewed_model_motion_checked,
         "motion_authority_status": motion_authority_status,
         "physical_so101_model_authority_ready": physical_model_authority_ready,
+        "model_identity_contract_ok": handoff_model_identity_contract_ok,
+        "model_identity_status": handoff_model_identity_status,
+        "model_identity_matches": handoff_model_identity_matches,
+        "model_path": handoff_model_path,
+        "model_declared_sha256": handoff_model_declared_sha256,
+        "model_observed_sha256": handoff_model_observed_sha256,
         "motion_evidence_not_physical_so101_authority": motion_evidence_not_physical,
         "joint_limit_enablement_ok": joint_limit_enablement_ok,
         "joint_limit_enablement_status": joint_limit_enablement_status,
@@ -6823,6 +6869,18 @@ def so101_training_readiness_gate_section(
         ),
         "reviewed_mujoco_downstream_handoff_model_authority": (
             downstream_handoff_contract.get("model_authority")
+        ),
+        "reviewed_mujoco_downstream_handoff_model_identity_contract_ok": (
+            downstream_handoff_contract.get("model_identity_contract_ok")
+        ),
+        "reviewed_mujoco_downstream_handoff_model_identity_status": (
+            downstream_handoff_contract.get("model_identity_status")
+        ),
+        "reviewed_mujoco_downstream_handoff_model_identity_matches": (
+            downstream_handoff_contract.get("model_identity_matches")
+        ),
+        "reviewed_mujoco_downstream_handoff_model_path": (
+            downstream_handoff_contract.get("model_path")
         ),
         "reviewed_mujoco_downstream_handoff_observed_evidence_is_authority": (
             downstream_handoff_contract.get("observed_evidence_is_authority")

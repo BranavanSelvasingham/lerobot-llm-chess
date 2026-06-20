@@ -96,6 +96,11 @@ gates must consume. It always reports
 true only when physical reviewed model authority and MuJoCo/SimRobot motion are
 both true; fixture-positive runs instead report
 `fixture_handoff_ready_not_physical_so101_authority: true`.
+Raw-ready and fixture-ready handoffs must also carry
+`reviewed_model_identity_contract_ok: true` with the reviewed model path,
+declared SHA-256, observed SHA-256, `model_identity.status: "present"`, and
+`matches: true`; scene and training-readiness consumers reject handoffs that
+claim readiness without that model identity checkpoint.
 Downstream consumers must also reject any raw-ready or fixture-ready handoff
 that still carries non-empty `missing_inputs`, `next_required_for_goal`, or
 `next_required_action_ids`. A ready-shaped handoff with open work is
