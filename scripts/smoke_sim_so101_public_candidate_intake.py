@@ -1181,6 +1181,9 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `candidate_operator_intake_plan_status`: `{summary['candidate_operator_intake_plan_status']}`",
         f"- `candidate_operator_intake_decision_status`: `{summary['candidate_operator_intake_decision_status']}`",
         f"- `candidate_operator_intake_selected_option`: `{summary['candidate_operator_intake_plan'].get('selected_intake_option_id') or 'none'}`",
+        f"- `candidate_operator_intake_requirement_model_authority`: `{summary['candidate_operator_intake_requirement_model_authority']}`",
+        f"- `candidate_operator_intake_requirement_row_count`: `{summary['candidate_operator_intake_requirement_row_count']}`",
+        f"- `candidate_operator_intake_selected_requirement_row_count`: `{summary['candidate_operator_intake_selected_requirement_row_count']}`",
         f"- `candidate_seeded_review_manifest_template_model_authority`: `{summary['candidate_seeded_review_manifest_template_model_authority']}`",
         f"- `parsed_model_file_count`: `{summary['candidate_review_observations']['parsed_model_file_count']}`",
         f"- `expected_file_count`: `{summary['expected_file_count']}`",
@@ -1291,6 +1294,29 @@ def main() -> int:
         "decision_status"
     ]
     summary["candidate_operator_intake_plan"] = operator_intake_plan
+    operator_requirement_rows = candidate_operator_intake_requirement_rows(
+        operator_intake_plan
+    )
+    selected_operator_requirement_rows = [
+        row for row in operator_requirement_rows if row.get("selected") is True
+    ]
+    summary["candidate_operator_intake_requirement_model_authority"] = (
+        "candidate_operator_intake_requirement_not_authority"
+    )
+    summary["candidate_operator_intake_requirement_row_count"] = len(
+        operator_requirement_rows
+    )
+    summary["candidate_operator_intake_selected_requirement_row_count"] = len(
+        selected_operator_requirement_rows
+    )
+    summary["candidate_operator_intake_unselected_requirement_row_count"] = (
+        len(operator_requirement_rows) - len(selected_operator_requirement_rows)
+    )
+    summary["candidate_operator_intake_selected_requirement_row_ids"] = [
+        str(row["requirement_id"])
+        for row in selected_operator_requirement_rows
+        if row.get("requirement_id")
+    ]
     write_json(summary_path, summary)
     write_json(source_lock_path, source_lock)
     write_json(draft_path, summary["candidate_manifest_draft"])
@@ -1306,7 +1332,7 @@ def main() -> int:
     write_json(operator_plan_path, operator_intake_plan)
     write_csv(
         operator_requirements_csv_path,
-        candidate_operator_intake_requirement_rows(operator_intake_plan),
+        operator_requirement_rows,
         OPERATOR_REQUIREMENT_FIELDNAMES,
     )
     write_csv(
@@ -1362,6 +1388,18 @@ def main() -> int:
                 "candidate_operator_intake_selected_option": summary[
                     "candidate_operator_intake_plan"
                 ].get("selected_intake_option_id"),
+                "candidate_operator_intake_requirement_model_authority": summary[
+                    "candidate_operator_intake_requirement_model_authority"
+                ],
+                "candidate_operator_intake_requirement_row_count": summary[
+                    "candidate_operator_intake_requirement_row_count"
+                ],
+                "candidate_operator_intake_selected_requirement_row_count": summary[
+                    "candidate_operator_intake_selected_requirement_row_count"
+                ],
+                "candidate_operator_intake_selected_requirement_row_ids": summary[
+                    "candidate_operator_intake_selected_requirement_row_ids"
+                ],
                 "candidate_seeded_review_manifest_template_model_authority": summary[
                     "candidate_seeded_review_manifest_template_model_authority"
                 ],

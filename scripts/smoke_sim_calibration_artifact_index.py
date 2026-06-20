@@ -3295,6 +3295,25 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "candidate_intake_checked_operator_intake_option_count": checked_case.get(
             "candidate_operator_intake_option_count"
         ),
+        "candidate_intake_checked_operator_intake_requirement_model_authority": (
+            checked_case.get("candidate_operator_intake_requirement_model_authority")
+        ),
+        "candidate_intake_checked_operator_intake_requirement_row_count": (
+            checked_case.get("candidate_operator_intake_requirement_row_count")
+        ),
+        "candidate_intake_checked_operator_intake_selected_requirement_row_count": (
+            checked_case.get(
+                "candidate_operator_intake_selected_requirement_row_count"
+            )
+        ),
+        "candidate_intake_checked_operator_intake_unselected_requirement_row_count": (
+            checked_case.get(
+                "candidate_operator_intake_unselected_requirement_row_count"
+            )
+        ),
+        "candidate_intake_checked_operator_intake_selected_requirement_row_ids": (
+            checked_case.get("candidate_operator_intake_selected_requirement_row_ids")
+        ),
         "candidate_intake_checked_external_decision_status": external_decision_case.get(
             "status"
         ),

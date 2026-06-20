@@ -4932,6 +4932,11 @@ jobs:
               assert metrics.get("ready_for_policy_training") is False, metrics
               assert metrics.get("candidate_intake_checked_operator_intake_plan_model_authority") == "candidate_operator_intake_plan_not_authority", metrics
               assert metrics.get("candidate_intake_checked_operator_intake_decision_status") == "vendor_or_external_intake_not_declared", metrics
+              assert metrics.get("candidate_intake_checked_operator_intake_requirement_model_authority") == "candidate_operator_intake_requirement_not_authority", metrics
+              assert metrics.get("candidate_intake_checked_operator_intake_requirement_row_count") == 9, metrics
+              assert metrics.get("candidate_intake_checked_operator_intake_selected_requirement_row_count") == 0, metrics
+              assert metrics.get("candidate_intake_checked_operator_intake_unselected_requirement_row_count") == 9, metrics
+              assert metrics.get("candidate_intake_checked_operator_intake_selected_requirement_row_ids") == [], metrics
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_plan_model_authority") == "candidate_operator_intake_plan_not_authority", metrics
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_decision_status") == "candidate_intake_decision_recorded_not_authority", metrics
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_option") == "external_pinned_source_root", metrics

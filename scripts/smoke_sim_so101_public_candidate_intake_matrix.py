@@ -109,6 +109,11 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_operator_intake_option_count",
         "candidate_operator_intake_selected_requirement_count",
         "candidate_operator_intake_selected_requirement_ids",
+        "candidate_operator_intake_requirement_model_authority",
+        "candidate_operator_intake_requirement_row_count",
+        "candidate_operator_intake_selected_requirement_row_count",
+        "candidate_operator_intake_unselected_requirement_row_count",
+        "candidate_operator_intake_selected_requirement_row_ids",
         "candidate_review_checklist_model_authority",
         "candidate_review_checklist_row_count",
         "candidate_seeded_review_manifest_template_model_authority",
@@ -615,6 +620,45 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
             f"{case_id}.candidate_operator_intake_plan.selected_option_review_requirement_ids "
             f"expected {expected_requirement_ids!r}, got {selected_requirement_ids!r}"
         )
+    if (
+        summary.get("candidate_operator_intake_requirement_model_authority")
+        != "candidate_operator_intake_requirement_not_authority"
+    ):
+        errors.append(
+            f"{case_id}.candidate_operator_intake_requirement_model_authority invalid"
+        )
+    expected_requirement_row_count = 9
+    if summary.get("candidate_operator_intake_requirement_row_count") != expected_requirement_row_count:
+        errors.append(
+            f"{case_id}.candidate_operator_intake_requirement_row_count invalid"
+        )
+    if (
+        summary.get("candidate_operator_intake_selected_requirement_row_count")
+        != expected_requirement_count
+    ):
+        errors.append(
+            f"{case_id}.candidate_operator_intake_selected_requirement_row_count invalid"
+        )
+    if (
+        summary.get("candidate_operator_intake_unselected_requirement_row_count")
+        != expected_requirement_row_count - expected_requirement_count
+    ):
+        errors.append(
+            f"{case_id}.candidate_operator_intake_unselected_requirement_row_count invalid"
+        )
+    selected_requirement_row_ids = summary.get(
+        "candidate_operator_intake_selected_requirement_row_ids"
+    )
+    selected_requirement_row_ids = (
+        selected_requirement_row_ids
+        if isinstance(selected_requirement_row_ids, list)
+        else []
+    )
+    if selected_requirement_row_ids != expected_requirement_ids:
+        errors.append(
+            f"{case_id}.candidate_operator_intake_selected_requirement_row_ids "
+            f"expected {expected_requirement_ids!r}, got {selected_requirement_row_ids!r}"
+        )
     if operator_plan.get("ready_for_model_backed_ik") is not False:
         errors.append(f"{case_id}.candidate_operator_intake_plan.ready_for_model_backed_ik not false")
     if operator_plan.get("ready_for_policy_training") is not False:
@@ -809,6 +853,21 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
             "selected_option_review_requirement_count"
         ),
         "candidate_operator_intake_selected_requirement_ids": selected_requirement_ids,
+        "candidate_operator_intake_requirement_model_authority": summary.get(
+            "candidate_operator_intake_requirement_model_authority"
+        ),
+        "candidate_operator_intake_requirement_row_count": summary.get(
+            "candidate_operator_intake_requirement_row_count"
+        ),
+        "candidate_operator_intake_selected_requirement_row_count": summary.get(
+            "candidate_operator_intake_selected_requirement_row_count"
+        ),
+        "candidate_operator_intake_unselected_requirement_row_count": summary.get(
+            "candidate_operator_intake_unselected_requirement_row_count"
+        ),
+        "candidate_operator_intake_selected_requirement_row_ids": (
+            selected_requirement_row_ids
+        ),
         "candidate_review_checklist_model_authority": summary.get(
             "candidate_review_checklist_model_authority"
         ),
