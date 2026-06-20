@@ -83,6 +83,8 @@ The summary must report:
 - `model_authority: "development_scaffold_not_reviewed"`
 - `observed_evidence_is_physical_so101_authority: false`
 - `observed_evidence_is_policy_training_authority: false`
+- `development_fixture_evidence_not_physical_so101_truth: true`
+- `development_fixture_evidence_not_policy_training_truth: true`
 - `ready_for_model_backed_ik: false`
 - `ready_for_policy_training: false`
 - `serious_policy_training_blockers` includes `reviewed_model_backed_board_source_pick_place`

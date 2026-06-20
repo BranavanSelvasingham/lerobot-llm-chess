@@ -3958,6 +3958,9 @@ jobs:
           assert so101_mujoco_scene["status"] == "ok", so101_mujoco_scene
           assert so101_mujoco_scene["model_authority"] == "development_scaffold_not_reviewed", so101_mujoco_scene
           assert so101_mujoco_scene["observed_evidence_is_physical_so101_authority"] is False, so101_mujoco_scene
+          assert so101_mujoco_scene["observed_evidence_is_policy_training_authority"] is False, so101_mujoco_scene
+          assert so101_mujoco_scene["development_fixture_evidence_not_physical_so101_truth"] is True, so101_mujoco_scene
+          assert so101_mujoco_scene["development_fixture_evidence_not_policy_training_truth"] is True, so101_mujoco_scene
           assert so101_mujoco_scene["ready_for_model_backed_ik"] is False, so101_mujoco_scene
           assert so101_mujoco_scene["ready_for_policy_training"] is False, so101_mujoco_scene
           assert so101_mujoco_scene["mujoco_scene_validity_status"] == "development_scene_validated_not_physical_authority", so101_mujoco_scene
@@ -4012,6 +4015,10 @@ jobs:
           assert so101_chess_env["ok"] is True, so101_chess_env
           assert so101_chess_env["status"] == "ok", so101_chess_env
           assert so101_chess_env["model_authority"] == "development_scaffold_not_reviewed", so101_chess_env
+          assert so101_chess_env["observed_evidence_is_physical_so101_authority"] is False, so101_chess_env
+          assert so101_chess_env["observed_evidence_is_policy_training_authority"] is False, so101_chess_env
+          assert so101_chess_env["development_fixture_evidence_not_physical_so101_truth"] is True, so101_chess_env
+          assert so101_chess_env["development_fixture_evidence_not_policy_training_truth"] is True, so101_chess_env
           assert so101_chess_env["ready_for_model_backed_ik"] is False, so101_chess_env
           assert so101_chess_env["ready_for_policy_training"] is False, so101_chess_env
           assert so101_chess_env["mujoco_backend_required"] is True, so101_chess_env
@@ -4041,6 +4048,13 @@ jobs:
           so101_env_resets = summary["so101_env_resets"]
           assert so101_env_resets["ok"] is True, so101_env_resets
           assert so101_env_resets["status"] == "ok", so101_env_resets
+          assert so101_env_resets["model_authority"] == "development_scaffold_not_reviewed", so101_env_resets
+          assert so101_env_resets["observed_evidence_is_physical_so101_authority"] is False, so101_env_resets
+          assert so101_env_resets["observed_evidence_is_policy_training_authority"] is False, so101_env_resets
+          assert so101_env_resets["development_fixture_evidence_not_physical_so101_truth"] is True, so101_env_resets
+          assert so101_env_resets["development_fixture_evidence_not_policy_training_truth"] is True, so101_env_resets
+          assert so101_env_resets["ready_for_model_backed_ik"] is False, so101_env_resets
+          assert so101_env_resets["ready_for_policy_training"] is False, so101_env_resets
           assert so101_env_resets["all_resets_ok"] is True, so101_env_resets
           assert so101_env_resets["all_mujoco_fallback_free"] is True, so101_env_resets
           assert isinstance(so101_env_resets["reset_count"], int) and so101_env_resets["reset_count"] > 0, so101_env_resets
@@ -4170,6 +4184,8 @@ jobs:
           assert so101_training_rollouts["model_authority"] == "development_scaffold_not_reviewed", so101_training_rollouts
           assert so101_training_rollouts["observed_evidence_is_physical_so101_authority"] is False, so101_training_rollouts
           assert so101_training_rollouts["observed_evidence_is_policy_training_authority"] is False, so101_training_rollouts
+          assert so101_training_rollouts["development_fixture_evidence_not_physical_so101_truth"] is True, so101_training_rollouts
+          assert so101_training_rollouts["development_fixture_evidence_not_policy_training_truth"] is True, so101_training_rollouts
           assert so101_training_rollouts["ready_for_model_backed_ik"] is False, so101_training_rollouts
           assert so101_training_rollouts["all_scripted_pick_place_complete"] is True, so101_training_rollouts
           assert so101_training_rollouts["all_mujoco_fallback_free"] is True, so101_training_rollouts

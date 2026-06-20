@@ -21,6 +21,12 @@ The summary exposes `gymnasium_task_wiring_status`,
 backend modes are distinguishable in CI. The smoke fails closed when the
 environment configuration is invalid or when the scripted pick/place episode
 does not complete inside the configured step budget.
+Runnable development cases must also keep
+`observed_evidence_is_physical_so101_authority: false`,
+`observed_evidence_is_policy_training_authority: false`,
+`development_fixture_evidence_not_physical_so101_truth: true`,
+`development_fixture_evidence_not_policy_training_truth: true`,
+`ready_for_model_backed_ik: false`, and `ready_for_policy_training: false`.
 Runnable cases also record the Gymnasium-facing action and observation contract:
 a six-value `float32` action space for the SO-101 controlled joints,
 observation-space keys, reset/final observation keys, shapes, dtypes, and any
