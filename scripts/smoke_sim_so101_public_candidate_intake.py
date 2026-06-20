@@ -110,6 +110,23 @@ SOURCE_LOCK_DIGEST_FIELDNAMES = (
     "digest_role",
     "authority_boundary",
 )
+MODEL_OBSERVATION_FIELDNAMES = (
+    "relative_path",
+    "path",
+    "exists",
+    "parse_ok",
+    "parse_error",
+    "root_tag",
+    "model_name",
+    "joint_count",
+    "joint_limit_or_range_count",
+    "mesh_reference_count",
+    "selectable_model",
+    "selected_model",
+    "joint_names",
+    "mesh_references",
+    "authority_boundary",
+)
 
 
 def command_string(parts: list[str]) -> str:
@@ -596,6 +613,48 @@ def candidate_source_lock_digest_rows(
                     else "expected_candidate_file_digest"
                 ),
                 "authority_boundary": "candidate_source_lock_digest_not_authority",
+            }
+        )
+    return rows
+
+
+def candidate_model_observation_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
+    observations = summary.get("candidate_review_observations")
+    observations = observations if isinstance(observations, dict) else {}
+    model_observations = observations.get("model_file_observations")
+    model_observations = (
+        model_observations if isinstance(model_observations, list) else []
+    )
+    selected_relative_path = summary.get("model_relative_path")
+    rows: list[dict[str, Any]] = []
+    for observation in model_observations:
+        if not isinstance(observation, dict):
+            continue
+        relative_path = observation.get("relative_path")
+        rows.append(
+            {
+                "relative_path": relative_path,
+                "path": observation.get("path"),
+                "exists": observation.get("exists"),
+                "parse_ok": observation.get("parse_ok"),
+                "parse_error": observation.get("parse_error"),
+                "root_tag": observation.get("root_tag"),
+                "model_name": observation.get("model_name"),
+                "joint_count": observation.get("joint_count"),
+                "joint_limit_or_range_count": observation.get(
+                    "joint_limit_or_range_count"
+                ),
+                "mesh_reference_count": observation.get("mesh_reference_count"),
+                "selectable_model": relative_path in SELECTABLE_MODEL_RELATIVE_PATHS,
+                "selected_model": bool(
+                    relative_path
+                    and selected_relative_path
+                    and relative_path == selected_relative_path
+                    and relative_path in SELECTABLE_MODEL_RELATIVE_PATHS
+                ),
+                "joint_names": observation.get("joint_names") or [],
+                "mesh_references": observation.get("mesh_references") or [],
+                "authority_boundary": "candidate_model_observation_not_authority",
             }
         )
     return rows
@@ -1490,6 +1549,9 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `model_sha256_observed`: `{summary.get('model_sha256_observed') or 'none'}`",
         f"- `candidate_review_observations_model_authority`: `{summary['candidate_review_observations_model_authority']}`",
         f"- `candidate_review_observations_ready_for_model_backed_ik`: `{str(summary['candidate_review_observations']['ready_for_model_backed_ik']).lower()}`",
+        f"- `candidate_model_observation_model_authority`: `{summary['candidate_model_observation_model_authority']}`",
+        f"- `candidate_model_observation_row_count`: `{summary['candidate_model_observation_row_count']}`",
+        f"- `candidate_model_observation_selected_model_row_count`: `{summary['candidate_model_observation_selected_model_row_count']}`",
         f"- `candidate_source_lock_model_authority`: `{summary['candidate_source_lock_model_authority']}`",
         f"- `candidate_source_lock_status`: `{summary['candidate_source_lock']['status']}`",
         f"- `candidate_source_lock_ready_for_review`: `{str(summary['candidate_source_lock']['source_lock_ready_for_review']).lower()}`",
@@ -1513,6 +1575,7 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `files_csv`: `{summary['artifacts']['files_csv']}`",
         f"- `candidate_source_lock_json`: `{summary['artifacts']['candidate_source_lock_json']}`",
         f"- `candidate_source_lock_digests_csv`: `{summary['artifacts']['candidate_source_lock_digests_csv']}`",
+        f"- `candidate_model_file_observations_csv`: `{summary['artifacts']['candidate_model_file_observations_csv']}`",
         f"- `candidate_manifest_draft_json`: `{summary['artifacts']['candidate_manifest_draft_json']}`",
         f"- `candidate_seeded_review_manifest_template_json`: `{summary['artifacts']['candidate_seeded_review_manifest_template_json']}`",
         f"- `candidate_direct_review_manifest_template_json`: `{summary['artifacts']['candidate_direct_review_manifest_template_json']}`",
@@ -1537,6 +1600,8 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "## Candidate Review Observations",
             "",
             "The `candidate_review_observations` section records README caveats and XML/URDF metadata for reviewer intake only. It is not reviewed physical SO-101 model authority.",
+            "",
+            "The `candidate_model_file_observations` CSV flattens parsed candidate URDF/MJCF/scene metadata and marks selectable model variants for review. It is not reviewed physical SO-101 model authority.",
             "",
             "## Candidate Source Lock",
             "",
@@ -1576,6 +1641,9 @@ def main() -> int:
     source_lock_digests_csv_path = (
         output_dir / "so101_public_candidate_source_lock_digests.csv"
     )
+    model_observations_csv_path = (
+        output_dir / "so101_public_candidate_model_file_observations.csv"
+    )
     draft_path = output_dir / "so101_public_candidate_manifest_draft.json"
     seeded_template_path = (
         output_dir / "so101_public_candidate_seeded_review_manifest_template.json"
@@ -1598,6 +1666,7 @@ def main() -> int:
         "files_csv": str(files_csv_path),
         "candidate_source_lock_json": str(source_lock_path),
         "candidate_source_lock_digests_csv": str(source_lock_digests_csv_path),
+        "candidate_model_file_observations_csv": str(model_observations_csv_path),
         "candidate_manifest_draft_json": str(draft_path),
         "candidate_seeded_review_manifest_template_json": str(seeded_template_path),
         "candidate_direct_review_manifest_template_json": str(direct_template_path),
@@ -1611,6 +1680,17 @@ def main() -> int:
         "readme_md": str(readme_path),
     }
     summary = build_summary(args, artifacts)
+    model_observation_rows = candidate_model_observation_rows(summary)
+    selected_model_observation_rows = [
+        row for row in model_observation_rows if row.get("selected_model") is True
+    ]
+    summary["candidate_model_observation_model_authority"] = (
+        "candidate_model_observation_not_authority"
+    )
+    summary["candidate_model_observation_row_count"] = len(model_observation_rows)
+    summary["candidate_model_observation_selected_model_row_count"] = len(
+        selected_model_observation_rows
+    )
     source_lock = candidate_source_lock(summary)
     summary["candidate_source_lock_model_authority"] = source_lock["model_authority"]
     summary["candidate_source_lock"] = source_lock
@@ -1669,6 +1749,11 @@ def main() -> int:
         if row.get("requirement_id")
     ]
     write_json(summary_path, summary)
+    write_csv(
+        model_observations_csv_path,
+        model_observation_rows,
+        MODEL_OBSERVATION_FIELDNAMES,
+    )
     write_json(source_lock_path, source_lock)
     write_csv(
         source_lock_digests_csv_path,
@@ -1725,6 +1810,15 @@ def main() -> int:
                 "model_sha256_observed": summary["model_sha256_observed"],
                 "candidate_review_observations_model_authority": summary[
                     "candidate_review_observations_model_authority"
+                ],
+                "candidate_model_observation_model_authority": summary[
+                    "candidate_model_observation_model_authority"
+                ],
+                "candidate_model_observation_row_count": summary[
+                    "candidate_model_observation_row_count"
+                ],
+                "candidate_model_observation_selected_model_row_count": summary[
+                    "candidate_model_observation_selected_model_row_count"
                 ],
                 "candidate_source_lock_model_authority": summary[
                     "candidate_source_lock_model_authority"

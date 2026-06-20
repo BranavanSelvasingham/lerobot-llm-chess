@@ -103,6 +103,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "model_sha256_observed",
         "model_authority",
         "candidate_review_observations_model_authority",
+        "candidate_model_observation_model_authority",
+        "candidate_model_observation_row_count",
+        "candidate_model_observation_selected_model_row_count",
         "candidate_source_lock_model_authority",
         "candidate_source_lock_status",
         "candidate_source_lock_ready_for_review",
@@ -604,6 +607,25 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         summary.get("candidate_review_observations_model_authority"),
         "candidate_review_observations_not_authority",
     )
+    expected_model_observation_row_count = 5 if expect["parsed_model_file_count"] else 0
+    expected_selected_model_observation_row_count = (
+        1 if expect["model_present"] and expected_selected_model_supported else 0
+    )
+    check(
+        "candidate_model_observation_model_authority",
+        summary.get("candidate_model_observation_model_authority"),
+        "candidate_model_observation_not_authority",
+    )
+    check(
+        "candidate_model_observation_row_count",
+        summary.get("candidate_model_observation_row_count"),
+        expected_model_observation_row_count,
+    )
+    check(
+        "candidate_model_observation_selected_model_row_count",
+        summary.get("candidate_model_observation_selected_model_row_count"),
+        expected_selected_model_observation_row_count,
+    )
     check("ready_for_model_backed_ik", summary.get("ready_for_model_backed_ik"), False)
     check(
         "observed_evidence_is_physical_so101_authority",
@@ -657,6 +679,7 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "candidate_manifest_draft_json",
         "candidate_source_lock_json",
         "candidate_source_lock_digests_csv",
+        "candidate_model_file_observations_csv",
         "candidate_seeded_review_manifest_template_json",
         "candidate_direct_review_manifest_template_json",
         "candidate_review_checklist_json",
@@ -1127,6 +1150,15 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "model_authority": summary.get("model_authority"),
         "candidate_review_observations_model_authority": summary.get(
             "candidate_review_observations_model_authority"
+        ),
+        "candidate_model_observation_model_authority": summary.get(
+            "candidate_model_observation_model_authority"
+        ),
+        "candidate_model_observation_row_count": summary.get(
+            "candidate_model_observation_row_count"
+        ),
+        "candidate_model_observation_selected_model_row_count": summary.get(
+            "candidate_model_observation_selected_model_row_count"
         ),
         "candidate_source_lock_model_authority": summary.get(
             "candidate_source_lock_model_authority"

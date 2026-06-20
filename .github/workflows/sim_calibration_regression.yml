@@ -392,6 +392,9 @@ jobs:
           assert incomplete["status"] == "candidate_intake_incomplete", incomplete
           assert "assets/wrist_roll_pitch_so101_v2.stl" in incomplete["missing_expected_relative_paths"], incomplete
           assert incomplete["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", incomplete
+          assert incomplete["candidate_model_observation_model_authority"] == "candidate_model_observation_not_authority", incomplete
+          assert incomplete["candidate_model_observation_row_count"] == 5, incomplete
+          assert incomplete["candidate_model_observation_selected_model_row_count"] == 1, incomplete
           assert incomplete["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", incomplete
           assert incomplete["candidate_review_checklist_row_count"] == 8, incomplete
           assert incomplete["candidate_source_lock_digest_model_authority"] == "candidate_source_lock_digest_not_authority", incomplete
@@ -418,6 +421,8 @@ jobs:
           assert invalid_model["model_present"] is True, invalid_model
           assert invalid_model["selected_model_supported"] is False, invalid_model
           assert invalid_model["selected_model_status"] == "selected_model_not_supported", invalid_model
+          assert invalid_model["candidate_model_observation_row_count"] == 5, invalid_model
+          assert invalid_model["candidate_model_observation_selected_model_row_count"] == 0, invalid_model
           assert invalid_model["candidate_source_lock_status"] == "candidate_source_lock_incomplete", invalid_model
           assert invalid_model["candidate_source_lock_ready_for_review"] is False, invalid_model
           assert invalid_model["candidate_source_lock_digest_row_count"] == 20, invalid_model
@@ -456,6 +461,9 @@ jobs:
           assert complete["upstream_commit_sha_valid"] is True, complete
           assert complete["upstream_commit_status"] == "upstream_commit_sha_pinned", complete
           assert complete["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", complete
+          assert complete["candidate_model_observation_model_authority"] == "candidate_model_observation_not_authority", complete
+          assert complete["candidate_model_observation_row_count"] == 5, complete
+          assert complete["candidate_model_observation_selected_model_row_count"] == 1, complete
           assert complete["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", complete
           assert complete["candidate_review_checklist_row_count"] == 8, complete
           assert complete["candidate_source_lock_digest_model_authority"] == "candidate_source_lock_digest_not_authority", complete
@@ -519,6 +527,7 @@ jobs:
           for case in summary["cases"]:
               assert case["model_authority"] == "public_candidate_intake_not_authority", case
               assert case["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", case
+              assert case["candidate_model_observation_model_authority"] == "candidate_model_observation_not_authority", case
               assert case["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", case
               assert case["candidate_review_checklist_row_count"] == 8, case
               assert case["candidate_source_lock_digest_model_authority"] == "candidate_source_lock_digest_not_authority", case

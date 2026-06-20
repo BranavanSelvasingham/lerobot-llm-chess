@@ -3289,6 +3289,12 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "candidate_intake_checked_review_checklist_model_authority": checked_case.get(
             "candidate_review_checklist_model_authority"
         ),
+        "candidate_intake_checked_model_observation_row_count": checked_case.get(
+            "candidate_model_observation_row_count"
+        ),
+        "candidate_intake_checked_model_observation_selected_model_row_count": (
+            checked_case.get("candidate_model_observation_selected_model_row_count")
+        ),
         "candidate_intake_checked_source_lock_model_authority": checked_case.get(
             "candidate_source_lock_model_authority"
         ),
@@ -3348,6 +3354,11 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         ),
         "candidate_intake_invalid_model_selection_selected_model_status": (
             invalid_model_selection_case.get("selected_model_status")
+        ),
+        "candidate_intake_invalid_model_selection_model_observation_selected_model_row_count": (
+            invalid_model_selection_case.get(
+                "candidate_model_observation_selected_model_row_count"
+            )
         ),
         "candidate_intake_invalid_model_selection_source_lock_status": (
             invalid_model_selection_case.get("candidate_source_lock_status")
@@ -3606,6 +3617,20 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
             source=(
                 "so101_public_candidate_intake_matrix.child_records."
                 f"{case_id}.artifacts.candidate_source_lock_digests_csv"
+            ),
+            metrics=case_metrics,
+        )
+        add_path(
+            artifacts,
+            category="so101_public_candidate_intake_matrix",
+            label=f"so101_public_candidate_intake_matrix:{case_id}:model_file_observations",
+            value=record_artifacts.get("candidate_model_file_observations_csv"),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=(
+                "so101_public_candidate_intake_matrix.child_records."
+                f"{case_id}.artifacts.candidate_model_file_observations_csv"
             ),
             metrics=case_metrics,
         )

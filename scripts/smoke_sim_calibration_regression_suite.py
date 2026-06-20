@@ -4072,6 +4072,21 @@ def so101_public_candidate_intake_matrix_section(
             "selected_model_status": case.get("selected_model_status")
             if isinstance(case, dict)
             else None,
+            "candidate_model_observation_model_authority": case.get(
+                "candidate_model_observation_model_authority"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_model_observation_row_count": case.get(
+                "candidate_model_observation_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_model_observation_selected_model_row_count": case.get(
+                "candidate_model_observation_selected_model_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
             "candidate_source_lock_ready_for_review": case.get(
                 "candidate_source_lock_ready_for_review"
             )
@@ -4230,6 +4245,21 @@ def so101_public_candidate_intake_matrix_section(
             if isinstance(checked_case, dict)
             else None,
             "selected_model_status": checked_case.get("selected_model_status")
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_model_observation_model_authority": checked_case.get(
+                "candidate_model_observation_model_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_model_observation_row_count": checked_case.get(
+                "candidate_model_observation_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_model_observation_selected_model_row_count": checked_case.get(
+                "candidate_model_observation_selected_model_row_count"
+            )
             if isinstance(checked_case, dict)
             else None,
             "present_expected_file_count": checked_case.get("present_expected_file_count")
@@ -4442,6 +4472,11 @@ def so101_public_candidate_intake_matrix_section(
             else None,
             "selected_model_status": invalid_model_selection_case.get(
                 "selected_model_status"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_model_observation_selected_model_row_count": invalid_model_selection_case.get(
+                "candidate_model_observation_selected_model_row_count"
             )
             if isinstance(invalid_model_selection_case, dict)
             else None,
