@@ -4075,6 +4075,15 @@ def so101_model_bundle_manifest_section(
             "review_packet_needs_operator_review_item_ids"
         ),
         "review_packet_action_ids": bundle.get("review_packet_action_ids"),
+        "review_packet_actions_match_next_required": bundle.get(
+            "review_packet_actions_match_next_required"
+        ),
+        "review_packet_actions_missing_from_next_required": bundle.get(
+            "review_packet_actions_missing_from_next_required"
+        ),
+        "next_required_actions_missing_from_review_packet": bundle.get(
+            "next_required_actions_missing_from_review_packet"
+        ),
         "review_packet_observed_evidence_is_authority": bundle.get(
             "review_packet_observed_evidence_is_authority"
         ),
@@ -4109,6 +4118,15 @@ def so101_model_bundle_manifest_section(
         "bundle_intake_model_authority": bundle.get("bundle_intake_model_authority"),
         "bundle_intake_action_count": bundle.get("bundle_intake_action_count"),
         "bundle_intake_action_ids": bundle.get("bundle_intake_action_ids"),
+        "bundle_intake_actions_match_next_required": bundle.get(
+            "bundle_intake_actions_match_next_required"
+        ),
+        "bundle_intake_actions_missing_from_next_required": bundle.get(
+            "bundle_intake_actions_missing_from_next_required"
+        ),
+        "next_required_actions_missing_from_bundle_intake": bundle.get(
+            "next_required_actions_missing_from_bundle_intake"
+        ),
         "bundle_intake_observed_evidence_is_authority": bundle.get(
             "bundle_intake_observed_evidence_is_authority"
         ),

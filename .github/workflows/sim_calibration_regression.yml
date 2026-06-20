@@ -3146,6 +3146,9 @@ jobs:
           assert isinstance(bundle_manifest["review_packet_needs_operator_review_item_ids"], list), bundle_manifest
           assert isinstance(bundle_manifest["review_packet_action_ids"], list), bundle_manifest
           assert bundle_manifest["review_packet_action_ids"] == bundle_manifest["next_required_action_ids"], bundle_manifest
+          assert bundle_manifest["review_packet_actions_match_next_required"] is True, bundle_manifest
+          assert bundle_manifest["review_packet_actions_missing_from_next_required"] == [], bundle_manifest
+          assert bundle_manifest["next_required_actions_missing_from_review_packet"] == [], bundle_manifest
           assert bundle_manifest["review_packet_observed_evidence_is_authority"] is False, bundle_manifest
           assert bundle_manifest["review_packet_development_fixture_evidence_not_physical_so101_truth"] is True, bundle_manifest
           assert bundle_manifest["review_requirements_status"] == "review_requirements_for_so101_model_bundle", bundle_manifest
@@ -3182,6 +3185,9 @@ jobs:
           assert isinstance(bundle_manifest["bundle_intake_action_count"], int), bundle_manifest
           assert isinstance(bundle_manifest["bundle_intake_action_ids"], list), bundle_manifest
           assert bundle_manifest["bundle_intake_action_ids"] == bundle_manifest["next_required_action_ids"], bundle_manifest
+          assert bundle_manifest["bundle_intake_actions_match_next_required"] is True, bundle_manifest
+          assert bundle_manifest["bundle_intake_actions_missing_from_next_required"] == [], bundle_manifest
+          assert bundle_manifest["next_required_actions_missing_from_bundle_intake"] == [], bundle_manifest
           assert bundle_manifest["bundle_intake_action_count"] == len(bundle_manifest["bundle_intake_action_ids"]), bundle_manifest
           assert bundle_manifest["bundle_intake_observed_evidence_is_authority"] is False, bundle_manifest
           assert bundle_manifest["bundle_intake_physical_so101_truth_claimed"] is False, bundle_manifest
@@ -5157,6 +5163,9 @@ jobs:
               assert isinstance(metrics.get("review_packet_item_ids"), list) and metrics.get("review_packet_item_ids"), metrics
               assert isinstance(metrics.get("review_packet_action_ids"), list), metrics
               assert metrics.get("review_packet_action_ids") == metrics.get("next_required_action_ids"), metrics
+              assert metrics.get("review_packet_actions_match_next_required") is True, metrics
+              assert metrics.get("review_packet_actions_missing_from_next_required") == [], metrics
+              assert metrics.get("next_required_actions_missing_from_review_packet") == [], metrics
               assert metrics.get("review_packet_observed_evidence_is_authority") is False, metrics
               assert metrics.get("review_packet_development_fixture_evidence_not_physical_so101_truth") is True, metrics
               assert metrics.get("bundle_intake_status") in {
@@ -5169,6 +5178,9 @@ jobs:
               assert isinstance(metrics.get("bundle_intake_action_count"), int), metrics
               assert isinstance(metrics.get("bundle_intake_action_ids"), list), metrics
               assert metrics.get("bundle_intake_action_ids") == metrics.get("next_required_action_ids"), metrics
+              assert metrics.get("bundle_intake_actions_match_next_required") is True, metrics
+              assert metrics.get("bundle_intake_actions_missing_from_next_required") == [], metrics
+              assert metrics.get("next_required_actions_missing_from_bundle_intake") == [], metrics
               assert metrics.get("bundle_intake_action_count") == len(metrics.get("bundle_intake_action_ids")), metrics
               assert metrics.get("bundle_intake_observed_evidence_is_authority") is False, metrics
               assert metrics.get("bundle_intake_physical_so101_truth_claimed") is False, metrics
@@ -6169,6 +6181,12 @@ jobs:
               f"- `model_identity_status`: `{summary['so101_model_bundle_manifest']['model_identity']['status']}`",
               f"- `model_identity_matches`: `{summary['so101_model_bundle_manifest']['model_identity']['matches']}`",
               f"- `next_required_action_ids`: `{[action.get('action_id') for action in summary['so101_model_bundle_manifest']['next_required_for_goal']]}`",
+              f"- `review_packet_actions_match_next_required`: `{summary['so101_model_bundle_manifest']['review_packet_actions_match_next_required']}`",
+              f"- `review_packet_actions_missing_from_next_required`: `{summary['so101_model_bundle_manifest']['review_packet_actions_missing_from_next_required']}`",
+              f"- `next_required_actions_missing_from_review_packet`: `{summary['so101_model_bundle_manifest']['next_required_actions_missing_from_review_packet']}`",
+              f"- `bundle_intake_actions_match_next_required`: `{summary['so101_model_bundle_manifest']['bundle_intake_actions_match_next_required']}`",
+              f"- `bundle_intake_actions_missing_from_next_required`: `{summary['so101_model_bundle_manifest']['bundle_intake_actions_missing_from_next_required']}`",
+              f"- `next_required_actions_missing_from_bundle_intake`: `{summary['so101_model_bundle_manifest']['next_required_actions_missing_from_bundle_intake']}`",
               f"- `manifest_path`: `{summary['so101_model_bundle_manifest']['manifest_request']['path']}`",
               f"- `model_path`: `{summary['so101_model_bundle_manifest']['model_path']['path']}`",
               f"- `asset_roots`: `{summary['so101_model_bundle_manifest']['asset_roots']['asset_roots']}`",

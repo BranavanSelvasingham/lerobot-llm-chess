@@ -2555,6 +2555,15 @@ def collect_so101_model_bundle_manifest_artifacts(
             "review_packet_needs_operator_review_item_ids"
         ),
         "review_packet_action_ids": bundle.get("review_packet_action_ids"),
+        "review_packet_actions_match_next_required": bundle.get(
+            "review_packet_actions_match_next_required"
+        ),
+        "review_packet_actions_missing_from_next_required": bundle.get(
+            "review_packet_actions_missing_from_next_required"
+        ),
+        "next_required_actions_missing_from_review_packet": bundle.get(
+            "next_required_actions_missing_from_review_packet"
+        ),
         "review_packet_observed_evidence_is_authority": bundle.get(
             "review_packet_observed_evidence_is_authority"
         ),
@@ -2586,6 +2595,15 @@ def collect_so101_model_bundle_manifest_artifacts(
         "bundle_intake_model_authority": bundle.get("bundle_intake_model_authority"),
         "bundle_intake_action_count": bundle.get("bundle_intake_action_count"),
         "bundle_intake_action_ids": bundle.get("bundle_intake_action_ids") or [],
+        "bundle_intake_actions_match_next_required": bundle.get(
+            "bundle_intake_actions_match_next_required"
+        ),
+        "bundle_intake_actions_missing_from_next_required": bundle.get(
+            "bundle_intake_actions_missing_from_next_required"
+        ),
+        "next_required_actions_missing_from_bundle_intake": bundle.get(
+            "next_required_actions_missing_from_bundle_intake"
+        ),
         "bundle_intake_observed_evidence_is_authority": bundle.get(
             "bundle_intake_observed_evidence_is_authority"
         ),
@@ -2751,6 +2769,24 @@ def collect_so101_model_bundle_manifest_artifacts(
         "readme_md_path": artifact_paths.get("readme_md"),
         "manifest_request": manifest_request,
         "ready_for_model_backed_ik": bundle.get("ready_for_model_backed_ik"),
+        "review_packet_actions_match_next_required": bundle.get(
+            "review_packet_actions_match_next_required"
+        ),
+        "review_packet_actions_missing_from_next_required": bundle.get(
+            "review_packet_actions_missing_from_next_required"
+        ),
+        "next_required_actions_missing_from_review_packet": bundle.get(
+            "next_required_actions_missing_from_review_packet"
+        ),
+        "bundle_intake_actions_match_next_required": bundle.get(
+            "bundle_intake_actions_match_next_required"
+        ),
+        "bundle_intake_actions_missing_from_next_required": bundle.get(
+            "bundle_intake_actions_missing_from_next_required"
+        ),
+        "next_required_actions_missing_from_bundle_intake": bundle.get(
+            "next_required_actions_missing_from_bundle_intake"
+        ),
         "model_path": model_path,
         "asset_roots": asset_roots,
         "joint_limits": joint_limits,

@@ -793,7 +793,9 @@ also exports and asserts `review_packet_actions_match_next_required`,
 `bundle_intake_actions_missing_from_next_required`, and
 `next_required_actions_missing_from_bundle_intake` so the review packet and
 bundle-intake checklist stay synchronized with the manifest's ordered next
-required actions.
+required actions. The integrated suite summary, artifact index metrics,
+rendered artifact report, workflow summary, and CI summary assertions carry the
+same fields.
 
 The standalone model-bundle probe matrix writes
 `so101_model_bundle_probe_matrix_summary.json`, `.csv`, and `README.md`. It
