@@ -320,9 +320,17 @@ def run_seeded_template_manifest_preview(
             "reason": "candidate_seeded_review_manifest_template_unavailable",
         }
 
-    direct_manifest_path = case_dir / "so101_public_candidate_seeded_review_manifest.direct.json"
+    artifacts = summary.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    direct_artifact_path = artifacts.get("candidate_direct_review_manifest_template_json")
+    direct_manifest_path = (
+        Path(direct_artifact_path)
+        if isinstance(direct_artifact_path, str)
+        else case_dir / "so101_public_candidate_review_manifest_template.direct.json"
+    )
     preview_dir = case_dir / "so101_public_candidate_seeded_review_manifest_checker_preview"
-    write_json(direct_manifest_path, manifest_template)
+    if not direct_manifest_path.is_file():
+        write_json(direct_manifest_path, manifest_template)
     command = [
         executable_arg(python_path),
         str(MANIFEST_CHECKER_PATH),
@@ -417,6 +425,7 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "files_csv",
         "candidate_manifest_draft_json",
         "candidate_seeded_review_manifest_template_json",
+        "candidate_direct_review_manifest_template_json",
         "candidate_review_checklist_json",
         "candidate_review_checklist_csv",
         "readme_md",

@@ -198,6 +198,7 @@ The public-candidate intake smoke writes
 `so101_public_candidate_intake_files.csv`,
 `so101_public_candidate_manifest_draft.json`,
 `so101_public_candidate_seeded_review_manifest_template.json`,
+`so101_public_candidate_review_manifest_template.direct.json`,
 `so101_public_candidate_review_checklist.json`,
 `so101_public_candidate_review_checklist.csv`, and `README.md`.
 It hashes the local candidate files and records the pinned upstream commit as
@@ -224,9 +225,11 @@ all placeholders with reviewed values, then run
 `scripts/smoke_sim_so101_model_bundle_manifest.py --manifest-path <reviewed-manifest>`
 and require `physical_so101_model_authority_ready: true` before using it for
 model-backed IK or downstream simulation claims.
-The focused matrix extracts each seeded template's nested `manifest_template`,
-runs the regular bundle-manifest checker against that extracted JSON, and
-requires the checker to keep `ready_for_model_backed_ik: false`,
+The direct template file contains only the nested manifest object, so it can be
+edited and passed directly to the manifest checker after review instead of
+manually extracting `manifest_template` from the wrapper JSON.
+The focused matrix runs the regular bundle-manifest checker against that direct
+template JSON and requires the checker to keep `ready_for_model_backed_ik: false`,
 `physical_so101_model_authority_ready: false`, and missing reviewed inputs such
 as `model_sha256` and `authority`. That preview proves the handoff fails closed
 until a reviewer replaces candidate observations and placeholders with reviewed

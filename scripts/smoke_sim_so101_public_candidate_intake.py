@@ -806,6 +806,7 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `files_csv`: `{summary['artifacts']['files_csv']}`",
         f"- `candidate_manifest_draft_json`: `{summary['artifacts']['candidate_manifest_draft_json']}`",
         f"- `candidate_seeded_review_manifest_template_json`: `{summary['artifacts']['candidate_seeded_review_manifest_template_json']}`",
+        f"- `candidate_direct_review_manifest_template_json`: `{summary['artifacts']['candidate_direct_review_manifest_template_json']}`",
         f"- `candidate_review_checklist_json`: `{summary['artifacts']['candidate_review_checklist_json']}`",
         f"- `candidate_review_checklist_csv`: `{summary['artifacts']['candidate_review_checklist_csv']}`",
         "",
@@ -829,6 +830,8 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "",
             "The `candidate_seeded_review_manifest_template` artifact follows the reviewed bundle manifest shape but keeps placeholder authority fields and remains non-authoritative until a reviewer replaces observations with reviewed values and the manifest checker reports physical authority ready.",
             "",
+            "The `candidate_direct_review_manifest_template_json` artifact contains only the nested manifest template object so a reviewer can edit that file directly and pass it to `scripts/smoke_sim_so101_model_bundle_manifest.py --manifest-path` after replacing placeholders.",
+            "",
             "## Candidate Review Checklist",
             "",
             "The `candidate_review_checklist` JSON/CSV is the operator queue for replacing public-candidate observations with reviewed bundle-manifest fields. It is not model authority.",
@@ -847,6 +850,9 @@ def main() -> int:
     seeded_template_path = (
         output_dir / "so101_public_candidate_seeded_review_manifest_template.json"
     )
+    direct_template_path = (
+        output_dir / "so101_public_candidate_review_manifest_template.direct.json"
+    )
     review_checklist_path = output_dir / "so101_public_candidate_review_checklist.json"
     review_checklist_csv_path = output_dir / "so101_public_candidate_review_checklist.csv"
     readme_path = output_dir / "README.md"
@@ -855,6 +861,7 @@ def main() -> int:
         "files_csv": str(files_csv_path),
         "candidate_manifest_draft_json": str(draft_path),
         "candidate_seeded_review_manifest_template_json": str(seeded_template_path),
+        "candidate_direct_review_manifest_template_json": str(direct_template_path),
         "candidate_review_checklist_json": str(review_checklist_path),
         "candidate_review_checklist_csv": str(review_checklist_csv_path),
         "readme_md": str(readme_path),
@@ -870,6 +877,10 @@ def main() -> int:
     write_json(
         seeded_template_path,
         summary["candidate_seeded_review_manifest_template"],
+    )
+    write_json(
+        direct_template_path,
+        summary["candidate_seeded_review_manifest_template"]["manifest_template"],
     )
     write_json(review_checklist_path, candidate_review_checklist)
     write_csv(
