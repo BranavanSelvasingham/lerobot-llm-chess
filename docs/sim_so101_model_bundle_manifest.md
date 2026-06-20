@@ -154,7 +154,9 @@ fields. A nonexistent manifest path reports
 `status: "model_bundle_manifest_parse_error"`. The parser rejects
 non-standard JSON constants such as raw `NaN`, `Infinity`, and `-Infinity`;
 use quoted diagnostic strings only when a negative fixture intentionally tests
-field-level numeric validation.
+field-level numeric validation. The focused manifest matrix keeps these as
+separate boundaries: raw constants must fail at parse time, while quoted
+non-finite calibration values must fail the TCP or base-to-board field checks.
 
 Every summary also reports `model_authority`,
 `physical_authority_gate_status`, `physical_authority_blockers`,

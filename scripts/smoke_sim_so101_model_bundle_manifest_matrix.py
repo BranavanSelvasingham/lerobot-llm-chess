@@ -431,6 +431,19 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "raw_nonstandard_json_constant_parse_error",
+            "manifest_path": fixtures["raw_nonstandard_json_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_parse_error",
+                "ready": False,
+                "model_authority": "reviewed_bundle_required",
+                "physical_ready": False,
+                "fixture_ready": False,
+                "missing_inputs": ["--manifest-path"],
+                "next_actions": ["supply_reviewed_so101_model_bundle_manifest"],
+            },
+        },
+        {
             "case_id": "ready_synthetic_fixture_manifest_not_physical_authority",
             "manifest_path": fixtures["ready_manifest_path"],
             "expect": {

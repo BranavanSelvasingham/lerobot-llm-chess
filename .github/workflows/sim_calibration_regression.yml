@@ -458,6 +458,7 @@ jobs:
           assert summary["openai_skipped"] is True, summary
           assert summary["case_ids"] == [
               "missing_manifest_nonfailing",
+              "raw_nonstandard_json_constant_parse_error",
               "ready_synthetic_fixture_manifest_not_physical_authority",
               "missing_model_file_not_ready",
               "placeholder_alignment_manifest_not_ready",
@@ -490,6 +491,10 @@ jobs:
           assert missing["status"] == "model_bundle_manifest_not_supplied", missing
           assert missing["ready_for_model_backed_ik"] is False, missing
           assert "supply_reviewed_so101_model_bundle_manifest" in missing["next_required_action_ids"], missing
+          raw_nonstandard_json = by_case["raw_nonstandard_json_constant_parse_error"]["observations"]
+          assert raw_nonstandard_json["status"] == "model_bundle_manifest_parse_error", raw_nonstandard_json
+          assert raw_nonstandard_json["ready_for_model_backed_ik"] is False, raw_nonstandard_json
+          assert "supply_reviewed_so101_model_bundle_manifest" in raw_nonstandard_json["next_required_action_ids"], raw_nonstandard_json
           ready_fixture = by_case["ready_synthetic_fixture_manifest_not_physical_authority"]["observations"]
           assert ready_fixture["ready_for_model_backed_ik"] is True, ready_fixture
           assert ready_fixture["model_authority"] == "hardware_free_regression_fixture_not_physical_so101_authority", ready_fixture
@@ -5123,6 +5128,10 @@ jobs:
           ), model_bundle_manifest_matrix
           assert (
               "invalid_reviewed_at_not_ready"
+              in model_bundle_manifest_matrix["case_ids"]
+          ), model_bundle_manifest_matrix
+          assert (
+              "raw_nonstandard_json_constant_parse_error"
               in model_bundle_manifest_matrix["case_ids"]
           ), model_bundle_manifest_matrix
           assert (

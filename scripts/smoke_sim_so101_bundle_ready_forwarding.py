@@ -609,6 +609,7 @@ def nonfinite_alignment_transform_manifest_payload(model_filename: str) -> dict[
 
 def create_fixtures(output_dir: Path) -> dict[str, Path]:
     fixture_dir = output_dir / "fixtures"
+    raw_nonstandard_json_dir = fixture_dir / "raw_nonstandard_json_bundle"
     bundle_dir = fixture_dir / "ready_bundle"
     missing_model_file_dir = fixture_dir / "missing_model_file_bundle"
     mismatched_model_sha_dir = fixture_dir / "mismatched_model_sha_bundle"
@@ -639,6 +640,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     nonfinite_alignment_dir = fixture_dir / "nonfinite_alignment_bundle"
     explicit_dir = fixture_dir / "explicit_cli"
 
+    raw_nonstandard_json_dir.mkdir(parents=True, exist_ok=True)
     for root in (
         bundle_dir,
         missing_model_file_dir,
@@ -748,6 +750,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     explicit_model_path.write_text(synthetic_urdf(include_mesh=False))
     placeholder_model_path = placeholder_dir / "model" / "synthetic_so101.urdf"
 
+    raw_nonstandard_json_manifest_path = (
+        raw_nonstandard_json_dir / "so101_model_bundle.raw_nonstandard_json_constant.json"
+    )
     ready_manifest_path = bundle_dir / "so101_model_bundle.ready.json"
     missing_model_file_manifest_path = (
         missing_model_file_dir / "so101_model_bundle.missing_model_file.json"
@@ -796,6 +801,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     invalid_alignment_manifest_path = invalid_alignment_dir / "so101_model_bundle.invalid_alignment.json"
     nonfinite_alignment_manifest_path = (
         nonfinite_alignment_dir / "so101_model_bundle.nonfinite_alignment.json"
+    )
+    raw_nonstandard_json_manifest_path.write_text(
+        '{"model_path": "synthetic_so101_mujoco.xml", "tcp_offset_m": {"x": NaN, "y": 0.0, "z": 0.075}}\n'
     )
     write_manifest_json(
         ready_manifest_path,
@@ -941,6 +949,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     )
 
     return {
+        "raw_nonstandard_json_manifest_path": raw_nonstandard_json_manifest_path,
         "ready_manifest_path": ready_manifest_path,
         "missing_model_file_manifest_path": missing_model_file_manifest_path,
         "mismatched_model_sha_manifest_path": mismatched_model_sha_manifest_path,
