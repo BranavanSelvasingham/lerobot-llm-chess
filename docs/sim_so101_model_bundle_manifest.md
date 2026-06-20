@@ -300,7 +300,11 @@ is recorded in `so101_model_bundle_manifest.forwarding`.
 ## Manifest Shape
 
 The manifest is JSON only. Relative `model_path` and `asset_roots` values are
-resolved from the manifest directory.
+resolved from the manifest directory. `model_path` must resolve to an existing
+file with a supported robot-model suffix (`.urdf`, `.xml`, `.mjcf`, or
+`.xacro`). A matching SHA-256 digest on another file type is still rejected as
+`model_path.status: "unsupported_suffix"` and cannot become model-backed IK
+evidence.
 
 ```json
 {

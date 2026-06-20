@@ -27,6 +27,7 @@ REVIEWED_MANIFEST_TEMPLATE_SCHEMA = (
 DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "so101_model_bundle_manifest"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_CHECKER_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_contract.py"
+SUPPORTED_MODEL_SUFFIXES = (".mjcf", ".urdf", ".xacro", ".xml")
 EXPECTED_TARGET_FRAME = "gripper_frame_link"
 EXPECTED_SO101_JOINTS = (
     "shoulder_pan",
@@ -1090,26 +1091,41 @@ def inspect_model_path(manifest: dict[str, Any] | None, manifest_dir: Path | Non
             "path": None,
             "exists": False,
             "is_file": False,
+            "suffix": None,
+            "supported_suffix": False,
+            "supported_suffixes": list(SUPPORTED_MODEL_SUFFIXES),
             "sha256": None,
             "diagnostics": ["model_path_missing"],
         }
 
     raw = str(manifest["model_path"])
     resolved = resolve_manifest_relative(raw, manifest_dir)
+    suffix = resolved.suffix.lower()
     exists = resolved.exists()
     is_file = resolved.is_file()
+    supported_suffix = suffix in SUPPORTED_MODEL_SUFFIXES
     diagnostics: list[str] = []
     if not exists:
         diagnostics.append("model_path_unavailable")
     elif not is_file:
         diagnostics.append("model_path_not_file")
+    elif not supported_suffix:
+        diagnostics.append(f"model_path_unsupported_suffix:{suffix or '<none>'}")
+    if is_file and supported_suffix:
+        status = "present"
+    elif is_file:
+        status = "unsupported_suffix"
+    else:
+        status = "unavailable"
     return {
-        "status": "present" if is_file else "unavailable",
+        "status": status,
         "raw": raw,
         "path": str(resolved),
         "exists": exists,
         "is_file": is_file,
-        "suffix": resolved.suffix.lower(),
+        "suffix": suffix,
+        "supported_suffix": supported_suffix,
+        "supported_suffixes": list(SUPPORTED_MODEL_SUFFIXES),
         "sha256": sha256_file(resolved),
         "diagnostics": diagnostics,
     }

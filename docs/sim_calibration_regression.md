@@ -291,6 +291,10 @@ The model-source inventory and bundle manifest checker reject placeholder review
 evidence. Non-empty values such as `TODO`, `TBD`, `unknown`, or `placeholder`
 are recorded as diagnostics and do not satisfy source-authority, joint-limit,
 mesh-asset, target-frame, TCP-offset, or base-to-board authority readiness.
+The bundle manifest checker also rejects reviewed-looking `model_path` values
+with unsupported suffixes. The selected file must be a supported URDF/XML/MJCF
+or Xacro robot model; a matching SHA-256 digest on a `.txt` or other non-model
+file still leaves `ready_for_model_backed_ik: false`.
 
 To supply a reviewed bundle to the suite:
 

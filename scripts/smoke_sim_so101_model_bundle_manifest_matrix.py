@@ -95,6 +95,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "physical_authority_contract_errors",
         "physical_authority_contract_fixture_ready_not_physical_so101_authority",
         "model_path_status",
+        "model_path_suffix",
+        "model_path_supported_suffix",
+        "model_path_diagnostics",
         "model_identity_status",
         "authority_status",
         "provenance_status",
@@ -512,6 +515,33 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                     "select_reviewed_so101_model_path",
                     "record_reviewed_so101_model_file_sha256",
                     "resolve_so101_mesh_assets",
+                    "clear_model_contract_and_asset_preflight",
+                ],
+            },
+        },
+        {
+            "case_id": "unsupported_model_suffix_not_ready",
+            "manifest_path": fixtures["unsupported_suffix_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_authority": (
+                    "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": False,
+                "model_path_status": "unsupported_suffix",
+                "model_path_supported_suffix": False,
+                "model_path_diagnostics_contains": [
+                    "model_path_unsupported_suffix:.txt",
+                ],
+                "model_identity_status": "present",
+                "missing_inputs": [
+                    "model_path",
+                    "non_blocking_contract_checker_result",
+                ],
+                "next_actions": [
+                    "select_reviewed_so101_model_path",
                     "clear_model_contract_and_asset_preflight",
                 ],
             },
@@ -1228,6 +1258,30 @@ def summarize_case(
             actual,
             expect["joint_limit_unexpected_joints"],
         )
+    if "model_path_supported_suffix" in expect:
+        model_path = summary.get("model_path")
+        actual = (
+            model_path.get("supported_suffix")
+            if isinstance(model_path, dict)
+            else None
+        )
+        add_error(
+            errors,
+            f"{case_id}.model_path_supported_suffix",
+            actual,
+            expect["model_path_supported_suffix"],
+        )
+    if "model_path_diagnostics_contains" in expect:
+        model_path = summary.get("model_path")
+        diagnostics = (
+            model_path.get("diagnostics") if isinstance(model_path, dict) else []
+        )
+        expect_contains(
+            errors,
+            f"{case_id}.model_path.diagnostics",
+            diagnostics,
+            expect["model_path_diagnostics_contains"],
+        )
     if "joint_limits_diagnostics_contains" in expect:
         joint_limits = summary.get("joint_limits")
         diagnostics = (
@@ -1429,6 +1483,13 @@ def summarize_case(
                 )
             ),
             "model_path_status": nested_status(summary, "model_path"),
+            "model_path_suffix": (summary.get("model_path") or {}).get("suffix"),
+            "model_path_supported_suffix": (summary.get("model_path") or {}).get(
+                "supported_suffix"
+            ),
+            "model_path_diagnostics": (summary.get("model_path") or {}).get(
+                "diagnostics"
+            ),
             "model_identity_status": nested_status(summary, "model_identity"),
             "authority_status": nested_status(summary, "authority"),
             "provenance_status": nested_status(summary, "provenance"),

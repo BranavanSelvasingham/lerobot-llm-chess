@@ -738,6 +738,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     raw_nonstandard_json_dir = fixture_dir / "raw_nonstandard_json_bundle"
     bundle_dir = fixture_dir / "ready_bundle"
     missing_model_file_dir = fixture_dir / "missing_model_file_bundle"
+    unsupported_suffix_dir = fixture_dir / "unsupported_suffix_bundle"
     mismatched_model_sha_dir = fixture_dir / "mismatched_model_sha_bundle"
     conflicting_model_sha_alias_dir = fixture_dir / "conflicting_model_sha_alias_bundle"
     placeholder_dir = fixture_dir / "placeholder_bundle"
@@ -793,6 +794,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     for root in (
         bundle_dir,
         missing_model_file_dir,
+        unsupported_suffix_dir,
         mismatched_model_sha_dir,
         conflicting_model_sha_alias_dir,
         placeholder_dir,
@@ -840,6 +842,12 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
 
     ready_model_path = bundle_dir / "model" / "synthetic_so101_mujoco.xml"
     ready_model_path.write_text(mjcf_with_mesh_reference())
+    unsupported_suffix_model_path = (
+        unsupported_suffix_dir / "model" / "synthetic_so101_not_robot.txt"
+    )
+    unsupported_suffix_model_path.write_text(
+        "This fixture intentionally is not a URDF, MJCF, XML, or Xacro model.\n"
+    )
     mismatched_model_sha_model_path = (
         mismatched_model_sha_dir / "model" / "synthetic_so101_mujoco.xml"
     )
@@ -983,6 +991,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     missing_model_file_manifest_path = (
         missing_model_file_dir / "so101_model_bundle.missing_model_file.json"
     )
+    unsupported_suffix_manifest_path = (
+        unsupported_suffix_dir / "so101_model_bundle.unsupported_suffix.json"
+    )
     mismatched_model_sha_manifest_path = (
         mismatched_model_sha_dir / "so101_model_bundle.mismatched_model_sha.json"
     )
@@ -1090,6 +1101,11 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     )
     missing_model_file_payload["model_sha256"] = "1" * 64
     write_json(missing_model_file_manifest_path, missing_model_file_payload)
+    write_manifest_json(
+        unsupported_suffix_manifest_path,
+        manifest_payload(ready=True, model_filename=unsupported_suffix_model_path.name),
+        unsupported_suffix_model_path,
+    )
     write_json(
         mismatched_model_sha_manifest_path,
         mismatched_model_sha_manifest_payload(
@@ -1321,6 +1337,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "raw_nonstandard_json_manifest_path": raw_nonstandard_json_manifest_path,
         "ready_manifest_path": ready_manifest_path,
         "missing_model_file_manifest_path": missing_model_file_manifest_path,
+        "unsupported_suffix_manifest_path": unsupported_suffix_manifest_path,
         "mismatched_model_sha_manifest_path": mismatched_model_sha_manifest_path,
         "conflicting_model_sha_alias_manifest_path": (
             conflicting_model_sha_alias_manifest_path
@@ -1375,6 +1392,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
             conflicting_alignment_nested_alias_manifest_path
         ),
         "ready_model_path": ready_model_path,
+        "unsupported_suffix_model_path": unsupported_suffix_model_path,
         "mismatched_model_sha_model_path": mismatched_model_sha_model_path,
         "conflicting_model_sha_alias_model_path": (
             conflicting_model_sha_alias_model_path
