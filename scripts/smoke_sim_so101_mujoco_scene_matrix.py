@@ -150,6 +150,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_handoff_schema",
         "reviewed_mujoco_handoff_observed_evidence_is_authority",
         "reviewed_mujoco_handoff_physical_truth_claimed",
+        "reviewed_mujoco_handoff_policy_training_authority_claimed",
         "reviewed_mujoco_handoff_motion_authority_status",
         "reviewed_mujoco_handoff_physical_motion_checked",
         "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked",
@@ -213,6 +214,7 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
         "ready_with_missing_input",
         "ready_with_pending_action",
         "ready_with_physical_truth_claim",
+        "ready_with_policy_training_claim",
         "ready_missing_scene_gate",
         "ready_wrong_next_downstream_gate",
         "ready_missing_model_identity",
@@ -293,6 +295,7 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
         "fixture_handoff_ready_not_physical_so101_authority": fixture_ready,
         "observed_evidence_is_authority": False,
         "physical_so101_truth_claimed": False,
+        "policy_training_authority_claimed": False,
         "development_fixture_evidence_not_physical_so101_truth": True,
         "gates_unblocked_when_physical_handoff_ready": list(
             EXPECTED_DOWNSTREAM_HANDOFF_GATES
@@ -366,6 +369,8 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
     elif state == "ready_with_physical_truth_claim":
         payload["observed_evidence_is_authority"] = True
         payload["physical_so101_truth_claimed"] = True
+    elif state == "ready_with_policy_training_claim":
+        payload["policy_training_authority_claimed"] = True
     elif state == "ready_missing_scene_gate":
         payload["gates_unblocked_when_physical_handoff_ready"] = [
             "gymnasium_task_wiring",
@@ -564,6 +569,23 @@ def case_specs() -> list[dict[str, Any]]:
             "expected_handoff_blockers_contain": [
                 "mark_downstream_handoff_as_non_authority_snapshot",
                 "remove_physical_so101_truth_claim_from_downstream_handoff",
+            ],
+        },
+        {
+            "case_id": "ready_handoff_policy_training_claim_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": False,
+            "handoff_state": "ready_with_policy_training_claim",
+            "require_handoff": True,
+            "expected_status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "expected_handoff_intake_status": "handoff_contract_invalid",
+            "expected_handoff_ready": False,
+            "expected_handoff_contract_ok": False,
+            "expected_handoff_policy_training_authority_claimed": True,
+            "expected_handoff_blockers_contain": [
+                "remove_policy_training_authority_claim_from_downstream_handoff"
             ],
         },
         {
@@ -807,6 +829,9 @@ def summarize_case(
         ),
         "reviewed_mujoco_handoff_physical_truth_claimed": summary.get(
             "reviewed_mujoco_handoff_physical_truth_claimed"
+        ),
+        "reviewed_mujoco_handoff_policy_training_authority_claimed": summary.get(
+            "reviewed_mujoco_handoff_policy_training_authority_claimed"
         ),
         "reviewed_mujoco_handoff_motion_authority_status": summary.get(
             "reviewed_mujoco_handoff_motion_authority_status"
@@ -1119,6 +1144,7 @@ def summarize_case(
                 "ready_with_missing_input",
                 "ready_with_pending_action",
                 "ready_with_physical_truth_claim",
+                "ready_with_policy_training_claim",
                 "ready_missing_scene_gate",
                 "ready_wrong_next_downstream_gate",
                 "ready_missing_model_identity",
@@ -1202,6 +1228,7 @@ def summarize_case(
                 "ready_with_missing_input",
                 "ready_with_pending_action",
                 "ready_with_physical_truth_claim",
+                "ready_with_policy_training_claim",
                 "ready_missing_scene_gate",
                 "ready_wrong_next_downstream_gate",
                 "ready_with_unlimited_joint",
@@ -1238,6 +1265,12 @@ def summarize_case(
             f"{case_id}.reviewed_mujoco_handoff_physical_truth_claimed",
             observations["reviewed_mujoco_handoff_physical_truth_claimed"],
             spec.get("expected_handoff_physical_truth_claimed", False),
+        )
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_policy_training_authority_claimed",
+            observations["reviewed_mujoco_handoff_policy_training_authority_claimed"],
+            spec.get("expected_handoff_policy_training_authority_claimed", False),
         )
     if "expected_handoff_joint_limit_enablement_ok" in spec:
         add_error(
@@ -1408,6 +1441,9 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "reviewed_mujoco_handoff_physical_truth_claimed": observations.get(
             "reviewed_mujoco_handoff_physical_truth_claimed"
         ),
+        "reviewed_mujoco_handoff_policy_training_authority_claimed": observations.get(
+            "reviewed_mujoco_handoff_policy_training_authority_claimed"
+        ),
         "reviewed_mujoco_handoff_motion_authority_status": observations.get(
             "reviewed_mujoco_handoff_motion_authority_status"
         ),
@@ -1529,6 +1565,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "",
             "- All cases use generated `development_scaffold_not_reviewed` MJCF.",
             "- Reviewed handoff cases exercise intake/fail-closed behavior only; the generated scene still does not use a reviewed robot model.",
+            "- Reviewed handoffs that claim policy-training authority must fail closed before scene generation.",
             "- Passing cases prove MuJoCo loading, joint sync, target marker/site presence, and Gymnasium loop plumbing only.",
             "- `ready_for_model_backed_ik` and `ready_for_policy_training` must remain false.",
         ]

@@ -77,7 +77,8 @@ Fixture motion, incomplete ready payloads, forged ready flags, missing
 downstream gate entries, missing model-identity evidence,
 missing/enforced joint-limit evidence, or handoffs that
 point the next downstream gate away from `mujoco_scene_validity` or claim
-authority/physical SO-101 truth fail closed when the handoff is required.
+authority, physical SO-101 truth, or policy-training authority fail closed when
+the handoff is required.
 
 Invalid scene requests fail closed with artifacts instead of a traceback. For
 example, an invalid chess square or identical source/target square writes
@@ -100,7 +101,8 @@ and non-positive max-step cases, fail-closed required handoff cases for
 not-ready, fixture-only, forged-ready, and incomplete-ready handoffs, ready
 handoffs with open review work, and ready
 handoffs that claim authority/physical SO-101 truth, omit enforced SO-101
-joint-limit evidence, or drift the next downstream gate away from
+truth or policy-training authority, omit enforced SO-101 joint-limit evidence,
+or drift the next downstream gate away from
 `mujoco_scene_validity`, plus valid optional and required ready-handoff intake
 cases that still keep the generated scene development-only,
 while keeping every case labeled as non-authoritative development scaffolding.

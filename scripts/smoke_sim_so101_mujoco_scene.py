@@ -153,6 +153,7 @@ def handoff_intake_result(
     model_authority: Any = None,
     observed_evidence_is_authority: Any = None,
     physical_truth_claimed: Any = None,
+    policy_training_authority_claimed: Any = None,
     fixture_ready: bool = False,
     item_ids: list[str] | None = None,
     blockers: list[str] | None = None,
@@ -199,6 +200,9 @@ def handoff_intake_result(
             observed_evidence_is_authority
         ),
         "reviewed_mujoco_handoff_physical_truth_claimed": physical_truth_claimed,
+        "reviewed_mujoco_handoff_policy_training_authority_claimed": (
+            policy_training_authority_claimed
+        ),
         "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": (
             fixture_ready
         ),
@@ -386,6 +390,7 @@ def reviewed_handoff_intake(
     )
     motion_authority_status = payload.get("motion_authority_status")
     physical_model_authority_ready = payload.get("physical_so101_model_authority_ready")
+    policy_training_authority_claimed = payload.get("policy_training_authority_claimed")
     motion_evidence_not_physical = payload.get(
         "motion_evidence_not_physical_so101_authority"
     )
@@ -487,6 +492,7 @@ def reviewed_handoff_intake(
         and payload.get("model_authority") == DOWNSTREAM_HANDOFF_MODEL_AUTHORITY
         and payload.get("observed_evidence_is_authority") is False
         and payload.get("physical_so101_truth_claimed") is False
+        and policy_training_authority_claimed is False
         and payload.get("development_fixture_evidence_not_physical_so101_truth") is True
         and item_count_ok
         and not missing_item_ids
@@ -518,6 +524,8 @@ def reviewed_handoff_intake(
         blockers.append("mark_downstream_handoff_as_non_authority_snapshot")
     if payload.get("physical_so101_truth_claimed") is True:
         blockers.append("remove_physical_so101_truth_claim_from_downstream_handoff")
+    if policy_training_authority_claimed is not False:
+        blockers.append("remove_policy_training_authority_claim_from_downstream_handoff")
     if payload.get("development_fixture_evidence_not_physical_so101_truth") is not True:
         blockers.append("mark_downstream_handoff_development_fixture_boundary")
     if payload.get("schema") != DOWNSTREAM_HANDOFF_SCHEMA:
@@ -567,6 +575,7 @@ def reviewed_handoff_intake(
         model_authority=payload.get("model_authority"),
         observed_evidence_is_authority=payload.get("observed_evidence_is_authority"),
         physical_truth_claimed=payload.get("physical_so101_truth_claimed"),
+        policy_training_authority_claimed=policy_training_authority_claimed,
         fixture_ready=fixture_ready,
         item_ids=item_ids,
         blockers=blockers,
