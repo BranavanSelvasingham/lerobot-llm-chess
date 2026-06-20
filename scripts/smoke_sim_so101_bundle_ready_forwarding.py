@@ -619,6 +619,30 @@ def nonfinite_alignment_transform_manifest_payload(model_filename: str) -> dict[
     return payload
 
 
+def conflicting_alignment_alias_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["base_to_board_alignment"] = {
+        "translation_m": {"x": 0.20, "y": -0.175, "z": 0.09},
+        "rotation_rpy_rad": {"roll": 0.0, "pitch": 0.0, "yaw": 0.0},
+    }
+    return payload
+
+
+def conflicting_alignment_nested_alias_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["base_to_board_transform"]["position_m"] = {
+        "x": 0.20,
+        "y": -0.175,
+        "z": 0.09,
+    }
+    payload["base_to_board_transform"]["rpy_rad"] = {
+        "roll": 0.0,
+        "pitch": 0.0,
+        "yaw": 0.25,
+    }
+    return payload
+
+
 def create_fixtures(output_dir: Path) -> dict[str, Path]:
     fixture_dir = output_dir / "fixtures"
     raw_nonstandard_json_dir = fixture_dir / "raw_nonstandard_json_bundle"
@@ -652,6 +676,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_alignment_dir = fixture_dir / "weak_alignment_bundle"
     invalid_alignment_dir = fixture_dir / "invalid_alignment_bundle"
     nonfinite_alignment_dir = fixture_dir / "nonfinite_alignment_bundle"
+    conflicting_alignment_alias_dir = fixture_dir / "conflicting_alignment_alias_bundle"
+    conflicting_alignment_nested_alias_dir = (
+        fixture_dir / "conflicting_alignment_nested_alias_bundle"
+    )
     explicit_dir = fixture_dir / "explicit_cli"
 
     raw_nonstandard_json_dir.mkdir(parents=True, exist_ok=True)
@@ -684,6 +712,8 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_alignment_dir,
         invalid_alignment_dir,
         nonfinite_alignment_dir,
+        conflicting_alignment_alias_dir,
+        conflicting_alignment_nested_alias_dir,
     ):
         (root / "model").mkdir(parents=True, exist_ok=True)
         (root / "model" / "meshes").mkdir(parents=True, exist_ok=True)
@@ -768,6 +798,18 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         nonfinite_alignment_dir / "model" / "synthetic_so101_mujoco.xml"
     )
     nonfinite_alignment_model_path.write_text(mjcf_with_mesh_reference())
+    conflicting_alignment_alias_model_path = (
+        conflicting_alignment_alias_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    conflicting_alignment_alias_model_path.write_text(mjcf_with_mesh_reference())
+    conflicting_alignment_nested_alias_model_path = (
+        conflicting_alignment_nested_alias_dir
+        / "model"
+        / "synthetic_so101_mujoco.xml"
+    )
+    conflicting_alignment_nested_alias_model_path.write_text(
+        mjcf_with_mesh_reference()
+    )
 
     explicit_dir.mkdir(parents=True, exist_ok=True)
     explicit_model_path = explicit_dir / "explicit_cli_so101.urdf"
@@ -833,6 +875,14 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     invalid_alignment_manifest_path = invalid_alignment_dir / "so101_model_bundle.invalid_alignment.json"
     nonfinite_alignment_manifest_path = (
         nonfinite_alignment_dir / "so101_model_bundle.nonfinite_alignment.json"
+    )
+    conflicting_alignment_alias_manifest_path = (
+        conflicting_alignment_alias_dir
+        / "so101_model_bundle.conflicting_alignment_alias.json"
+    )
+    conflicting_alignment_nested_alias_manifest_path = (
+        conflicting_alignment_nested_alias_dir
+        / "so101_model_bundle.conflicting_alignment_nested_alias.json"
     )
     raw_nonstandard_json_manifest_path.write_text(
         '{"model_path": "synthetic_so101_mujoco.xml", "tcp_offset_m": {"x": NaN, "y": 0.0, "z": 0.075}}\n'
@@ -993,6 +1043,20 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         ),
         nonfinite_alignment_model_path,
     )
+    write_manifest_json(
+        conflicting_alignment_alias_manifest_path,
+        conflicting_alignment_alias_manifest_payload(
+            model_filename=conflicting_alignment_alias_model_path.name
+        ),
+        conflicting_alignment_alias_model_path,
+    )
+    write_manifest_json(
+        conflicting_alignment_nested_alias_manifest_path,
+        conflicting_alignment_nested_alias_manifest_payload(
+            model_filename=conflicting_alignment_nested_alias_model_path.name
+        ),
+        conflicting_alignment_nested_alias_model_path,
+    )
 
     return {
         "raw_nonstandard_json_manifest_path": raw_nonstandard_json_manifest_path,
@@ -1028,6 +1092,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "weak_alignment_manifest_path": weak_alignment_manifest_path,
         "invalid_alignment_manifest_path": invalid_alignment_manifest_path,
         "nonfinite_alignment_manifest_path": nonfinite_alignment_manifest_path,
+        "conflicting_alignment_alias_manifest_path": conflicting_alignment_alias_manifest_path,
+        "conflicting_alignment_nested_alias_manifest_path": (
+            conflicting_alignment_nested_alias_manifest_path
+        ),
         "ready_model_path": ready_model_path,
         "mismatched_model_sha_model_path": mismatched_model_sha_model_path,
         "conflicting_model_sha_alias_model_path": (
@@ -1059,6 +1127,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "weak_alignment_model_path": weak_alignment_model_path,
         "invalid_alignment_model_path": invalid_alignment_model_path,
         "nonfinite_alignment_model_path": nonfinite_alignment_model_path,
+        "conflicting_alignment_alias_model_path": conflicting_alignment_alias_model_path,
+        "conflicting_alignment_nested_alias_model_path": (
+            conflicting_alignment_nested_alias_model_path
+        ),
         "explicit_model_path": explicit_model_path,
     }
 

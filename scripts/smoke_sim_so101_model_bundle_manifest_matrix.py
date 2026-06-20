@@ -810,6 +810,28 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "conflicting_alignment_alias_not_ready",
+            "manifest_path": fixtures["conflicting_alignment_alias_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "alignment_status": "invalid",
+                "missing_inputs": ["base_to_board_transform"],
+            },
+        },
+        {
+            "case_id": "conflicting_alignment_nested_alias_not_ready",
+            "manifest_path": fixtures[
+                "conflicting_alignment_nested_alias_manifest_path"
+            ],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "alignment_status": "invalid",
+                "missing_inputs": ["base_to_board_transform"],
+            },
+        },
+        {
             "case_id": "mismatched_model_sha_not_ready",
             "manifest_path": fixtures["mismatched_model_sha_manifest_path"],
             "expect": {
@@ -1142,6 +1164,15 @@ def summarize_case(
                 summary.get("tcp_offset") or {}
             ).get("tcp_offset_alias_conflict"),
             "alignment_status": nested_status(summary, "base_to_board_alignment"),
+            "alignment_alias_conflict": (
+                summary.get("base_to_board_alignment") or {}
+            ).get("alignment_alias_conflict"),
+            "top_level_alignment_alias_conflict": (
+                summary.get("base_to_board_alignment") or {}
+            ).get("top_level_alignment_alias_conflict"),
+            "nested_alignment_alias_conflict": (
+                summary.get("base_to_board_alignment") or {}
+            ).get("nested_alignment_alias_conflict"),
             "contract_checker_status": (summary.get("contract_checker") or {}).get(
                 "status"
             ),
@@ -1255,6 +1286,13 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "tcp_offset_status": obs.get("tcp_offset_status"),
         "tcp_offset_alias_conflict": obs.get("tcp_offset_alias_conflict"),
         "alignment_status": obs.get("alignment_status"),
+        "alignment_alias_conflict": obs.get("alignment_alias_conflict"),
+        "top_level_alignment_alias_conflict": obs.get(
+            "top_level_alignment_alias_conflict"
+        ),
+        "nested_alignment_alias_conflict": obs.get(
+            "nested_alignment_alias_conflict"
+        ),
         "contract_checker_status": obs.get("contract_checker_status"),
         "authority_review_open_work_fields": obs.get(
             "authority_review_open_work_fields"

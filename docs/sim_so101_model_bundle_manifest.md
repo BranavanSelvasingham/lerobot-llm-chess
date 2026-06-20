@@ -376,6 +376,14 @@ resolved from the manifest directory.
 }
 ```
 
+Accepted base-to-board alignment aliases are `base_to_board_transform` and
+`base_to_board_alignment`. If both are present, every non-empty alias must
+resolve to the same finite translation and roll/pitch/yaw rotation. Within an
+alignment transform, accepted translation aliases are `translation_m`,
+`translation`, and `position_m`; accepted rotation aliases are
+`rotation_rpy_rad`, `rotation_rpy`, and `rpy_rad`. Conflicting top-level or
+nested alignment aliases are not readiness evidence.
+
 Accepted TCP aliases are `tcp_offset_m`, `gripper_tip_offset_m`,
 `target_frame_to_tcp_m`, and `tool_center_point_offset_m`. If more than one
 alias is present, every non-empty alias must resolve to the same finite vector

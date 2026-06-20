@@ -1016,10 +1016,10 @@ def vector3_status(value: Any) -> dict[str, Any]:
     return vector_status(value, ("x", "y", "z"))
 
 
-def vector3_components(value: Any) -> list[float] | None:
+def vector_components(value: Any, axes: tuple[str, str, str]) -> list[float] | None:
     if isinstance(value, dict):
         try:
-            return [float(value[axis]) for axis in ("x", "y", "z")]
+            return [float(value[axis]) for axis in axes]
         except (KeyError, TypeError, ValueError):
             return None
     if isinstance(value, list) and len(value) == 3:
@@ -1028,6 +1028,10 @@ def vector3_components(value: Any) -> list[float] | None:
         except (TypeError, ValueError):
             return None
     return None
+
+
+def vector3_components(value: Any) -> list[float] | None:
+    return vector_components(value, ("x", "y", "z"))
 
 
 def vectors_equivalent(
@@ -1935,27 +1939,73 @@ def alignment_transform_status(value: Any) -> dict[str, Any]:
         return {
             "valid": False,
             "value": value,
+            "translation_alias_conflict": False,
+            "rotation_alias_conflict": False,
+            "alias_conflict": False,
             "diagnostics": ["base_to_board_transform_not_object"],
         }
 
+    translation_fields = ("translation_m", "translation", "position_m")
+    rotation_fields = ("rotation_rpy_rad", "rotation_rpy", "rpy_rad")
     translation_field, translation_value = find_first_field(
         value,
-        ("translation_m", "translation", "position_m"),
+        translation_fields,
     )
     rotation_field, rotation_value = find_first_field(
         value,
-        ("rotation_rpy_rad", "rotation_rpy", "rpy_rad"),
+        rotation_fields,
     )
     diagnostics: list[str] = []
     normalized: dict[str, Any] = {}
     if translation_field is None:
         diagnostics.append("base_to_board_translation_missing")
     else:
+        translation_aliases = []
+        for alias_field in translation_fields:
+            alias_value = value.get(alias_field)
+            if not non_empty(alias_value):
+                continue
+            alias_vector = vector3_status(alias_value)
+            translation_aliases.append(
+                {
+                    "field": alias_field,
+                    "value": alias_vector["value"],
+                    "valid": alias_vector["valid"],
+                    "diagnostics": alias_vector["diagnostics"],
+                }
+            )
         translation = vector3_status(translation_value)
         translation_norm_m = vector_norm(translation["value"]) if translation["valid"] else None
+        invalid_translation_alias_fields = [
+            alias["field"] for alias in translation_aliases if not alias["valid"]
+        ]
+        if invalid_translation_alias_fields:
+            diagnostics.extend(
+                f"translation:base_to_board_translation_alias_invalid:{alias_field}"
+                for alias_field in invalid_translation_alias_fields
+            )
+        normalized_translation_vectors = []
+        for alias in translation_aliases:
+            if not alias["valid"]:
+                continue
+            components = vector3_components(alias["value"])
+            if components is not None:
+                normalized_translation_vectors.append(components)
+        unique_translation_vectors: list[list[float]] = []
+        for components in normalized_translation_vectors:
+            if not any(
+                vectors_equivalent(components, existing)
+                for existing in unique_translation_vectors
+            ):
+                unique_translation_vectors.append(components)
+        translation_alias_conflict = len(unique_translation_vectors) > 1
+        if translation_alias_conflict:
+            diagnostics.append("translation:base_to_board_translation_alias_conflict")
         normalized["translation"] = {
             "field": translation_field,
             "value": translation["value"],
+            "aliases": translation_aliases,
+            "alias_conflict": translation_alias_conflict,
             "norm_m": translation_norm_m,
             "max_norm_m": MAX_BASE_TO_BOARD_TRANSLATION_NORM_M,
         }
@@ -1968,18 +2018,68 @@ def alignment_transform_status(value: Any) -> dict[str, Any]:
                 "translation:base_to_board_translation_norm_exceeds_limit:"
                 f"{translation_norm_m:.6g}>{MAX_BASE_TO_BOARD_TRANSLATION_NORM_M:.6g}"
             )
+    translation_alias_conflict = bool(
+        (normalized.get("translation") or {}).get("alias_conflict")
+    )
     if rotation_field is None:
         diagnostics.append("base_to_board_rotation_rpy_missing")
     else:
+        rotation_aliases = []
+        for alias_field in rotation_fields:
+            alias_value = value.get(alias_field)
+            if not non_empty(alias_value):
+                continue
+            alias_vector = vector_status(alias_value, ("roll", "pitch", "yaw"))
+            rotation_aliases.append(
+                {
+                    "field": alias_field,
+                    "value": alias_vector["value"],
+                    "valid": alias_vector["valid"],
+                    "diagnostics": alias_vector["diagnostics"],
+                }
+            )
         rotation = vector_status(rotation_value, ("roll", "pitch", "yaw"))
+        invalid_rotation_alias_fields = [
+            alias["field"] for alias in rotation_aliases if not alias["valid"]
+        ]
+        if invalid_rotation_alias_fields:
+            diagnostics.extend(
+                f"rotation_rpy:base_to_board_rotation_alias_invalid:{alias_field}"
+                for alias_field in invalid_rotation_alias_fields
+            )
+        normalized_rotation_vectors = []
+        for alias in rotation_aliases:
+            if not alias["valid"]:
+                continue
+            components = vector_components(alias["value"], ("roll", "pitch", "yaw"))
+            if components is not None:
+                normalized_rotation_vectors.append(components)
+        unique_rotation_vectors: list[list[float]] = []
+        for components in normalized_rotation_vectors:
+            if not any(
+                vectors_equivalent(components, existing)
+                for existing in unique_rotation_vectors
+            ):
+                unique_rotation_vectors.append(components)
+        rotation_alias_conflict = len(unique_rotation_vectors) > 1
+        if rotation_alias_conflict:
+            diagnostics.append("rotation_rpy:base_to_board_rotation_alias_conflict")
         normalized["rotation_rpy"] = {
             "field": rotation_field,
             "value": rotation["value"],
+            "aliases": rotation_aliases,
+            "alias_conflict": rotation_alias_conflict,
         }
         diagnostics.extend(f"rotation_rpy:{diagnostic}" for diagnostic in rotation["diagnostics"])
+    rotation_alias_conflict = bool(
+        (normalized.get("rotation_rpy") or {}).get("alias_conflict")
+    )
     return {
         "valid": not diagnostics,
         "value": normalized if normalized else value,
+        "translation_alias_conflict": translation_alias_conflict,
+        "rotation_alias_conflict": rotation_alias_conflict,
+        "alias_conflict": translation_alias_conflict or rotation_alias_conflict,
         "diagnostics": diagnostics,
     }
 
@@ -2011,29 +2111,94 @@ def inspect_alignment_review(
     )
 
 
+def alignment_transform_components(transform: dict[str, Any]) -> list[float] | None:
+    if not transform.get("valid"):
+        return None
+    value = transform.get("value")
+    if not isinstance(value, dict):
+        return None
+    translation_value = (value.get("translation") or {}).get("value")
+    rotation_value = (value.get("rotation_rpy") or {}).get("value")
+    translation = vector3_components(translation_value)
+    rotation = vector_components(rotation_value, ("roll", "pitch", "yaw"))
+    if translation is None or rotation is None:
+        return None
+    return translation + rotation
+
+
 def inspect_alignment(manifest: dict[str, Any] | None) -> dict[str, Any]:
     if not manifest:
         return {
             "status": "missing",
             "field": None,
             "value": None,
+            "alignment_aliases": [],
+            "alignment_alias_conflict": False,
             "placeholder_field": None,
             "placeholder_value": None,
             "diagnostics": ["base_to_board_transform_missing"],
         }
 
-    field_name, value = find_first_field(manifest, ALIGNMENT_FIELDS)
-    if field_name is not None and non_empty(value):
+    alignment_aliases = []
+    for alias_field in ALIGNMENT_FIELDS:
+        alias_value = manifest.get(alias_field)
+        if not non_empty(alias_value):
+            continue
+        alias_transform = alignment_transform_status(alias_value)
+        alignment_aliases.append(
+            {
+                "field": alias_field,
+                "valid": alias_transform["valid"],
+                "value": alias_transform["value"],
+                "alias_conflict": alias_transform.get("alias_conflict", False),
+                "diagnostics": alias_transform["diagnostics"],
+            }
+        )
+    if alignment_aliases:
+        field_name = alignment_aliases[0]["field"]
+        value = manifest.get(field_name)
         transform = alignment_transform_status(value)
         review = inspect_alignment_review(manifest, field_name, value)
         diagnostics = list(transform["diagnostics"])
-        if transform["valid"] and review["status"] != "present":
+        invalid_alias_fields = [
+            alias["field"] for alias in alignment_aliases if not alias["valid"]
+        ]
+        if invalid_alias_fields:
+            diagnostics.extend(
+                f"base_to_board_alignment_alias_invalid:{alias_field}"
+                for alias_field in invalid_alias_fields
+            )
+        normalized_alias_transforms = []
+        for alias in alignment_aliases:
+            components = alignment_transform_components(alias)
+            if components is not None:
+                normalized_alias_transforms.append(components)
+        unique_alias_transforms: list[list[float]] = []
+        for components in normalized_alias_transforms:
+            if not any(
+                vectors_equivalent(components, existing)
+                for existing in unique_alias_transforms
+            ):
+                unique_alias_transforms.append(components)
+        top_level_alias_conflict = len(unique_alias_transforms) > 1
+        nested_alias_conflict = any(
+            bool(alias.get("alias_conflict")) for alias in alignment_aliases
+        )
+        alias_conflict = top_level_alias_conflict or nested_alias_conflict
+        if top_level_alias_conflict:
+            diagnostics.append("base_to_board_alignment_alias_conflict")
+        value_valid = bool(transform["valid"] and not invalid_alias_fields and not alias_conflict)
+        if value_valid and review["status"] != "present":
             diagnostics.extend(review.get("diagnostics", []))
         return {
-            "status": "present" if not diagnostics else "needs_review" if transform["valid"] else "invalid",
+            "status": "present" if not diagnostics else "needs_review" if value_valid else "invalid",
             "field": field_name,
             "value": value,
             "transform": transform,
+            "alignment_aliases": alignment_aliases,
+            "alignment_alias_conflict": alias_conflict,
+            "top_level_alignment_alias_conflict": top_level_alias_conflict,
+            "nested_alignment_alias_conflict": nested_alias_conflict,
             "review": review,
             "review_status": review.get("status"),
             "review_diagnostics": review.get("diagnostics", []),
@@ -2042,12 +2207,15 @@ def inspect_alignment(manifest: dict[str, Any] | None) -> dict[str, Any]:
             "diagnostics": diagnostics,
         }
 
+    field_name, value = find_first_field(manifest, ALIGNMENT_FIELDS)
     placeholder_field, placeholder_value = find_first_field(manifest, ALIGNMENT_PLACEHOLDER_FIELDS)
     if placeholder_field is not None and non_empty(placeholder_value):
         return {
             "status": "placeholder_only",
             "field": None,
             "value": None,
+            "alignment_aliases": [],
+            "alignment_alias_conflict": False,
             "placeholder_field": placeholder_field,
             "placeholder_value": placeholder_value,
             "diagnostics": ["alignment_placeholder_declared_without_transform"],
@@ -2057,6 +2225,8 @@ def inspect_alignment(manifest: dict[str, Any] | None) -> dict[str, Any]:
         "status": "missing",
         "field": None,
         "value": value,
+        "alignment_aliases": [],
+        "alignment_alias_conflict": False,
         "placeholder_field": placeholder_field,
         "placeholder_value": placeholder_value,
         "diagnostics": ["base_to_board_transform_missing"],
