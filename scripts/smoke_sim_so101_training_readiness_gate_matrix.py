@@ -84,6 +84,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_downstream_handoff_status",
         "reviewed_mujoco_downstream_handoff_model_authority",
         "reviewed_mujoco_downstream_handoff_physical_truth_claimed",
+        "reviewed_mujoco_downstream_handoff_policy_training_authority_claimed",
+        "reviewed_mujoco_downstream_handoff_development_fixture_evidence_not_policy_training_truth",
         "reviewed_mujoco_downstream_handoff_model_identity_contract_ok",
         "reviewed_mujoco_downstream_handoff_model_identity_status",
         "reviewed_mujoco_downstream_handoff_model_identity_matches",
@@ -431,8 +433,11 @@ def reviewed_mujoco_bundle_state(
     next_required_for_goal: list[Any] | None = None,
     next_required_action_ids: list[str] | None = None,
     physical_truth_claimed: bool = False,
+    policy_training_authority_claimed: bool = False,
     observed_evidence_is_authority: bool = False,
+    observed_evidence_is_policy_training_authority: bool = False,
     development_fixture_evidence_not_physical_truth: bool = True,
+    development_fixture_evidence_not_policy_training_truth: bool = True,
     joint_limit_enablement: dict[str, Any] | None = None,
     downstream_handoff_schema: str | None = (
         SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_SCHEMA
@@ -527,8 +532,14 @@ def reviewed_mujoco_bundle_state(
             observed_evidence_is_authority
         ),
         "downstream_handoff_physical_so101_truth_claimed": physical_truth_claimed,
+        "downstream_handoff_policy_training_authority_claimed": (
+            policy_training_authority_claimed
+        ),
         "downstream_handoff_development_fixture_evidence_not_physical_so101_truth": (
             development_fixture_evidence_not_physical_truth
+        ),
+        "downstream_handoff_development_fixture_evidence_not_policy_training_truth": (
+            development_fixture_evidence_not_policy_training_truth
         ),
         "downstream_handoff_item_count": item_count,
         "downstream_handoff_item_ids": item_ids,
@@ -543,6 +554,10 @@ def reviewed_mujoco_bundle_state(
         ),
         "blocks_downstream_gates_until_ready": True,
         "ready_does_not_imply_policy_training_ready": True,
+        "ready_for_policy_training": False,
+        "observed_evidence_is_policy_training_authority": (
+            observed_evidence_is_policy_training_authority
+        ),
         "missing_inputs": missing_inputs,
         "next_required_for_goal": next_required_for_goal,
         "next_required_action_ids": next_required_action_ids,
@@ -759,6 +774,11 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         summaries / "reviewed_mujoco_bundle_physical_truth_claimed.json",
         handoff_ready=True,
         physical_truth_claimed=True,
+    )
+    handoff_policy_training_authority_claimed = reviewed_mujoco_bundle_state(
+        summaries / "reviewed_mujoco_bundle_policy_training_authority_claimed.json",
+        handoff_ready=True,
+        policy_training_authority_claimed=True,
     )
     return [
         {
@@ -1141,6 +1161,37 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 ],
                 "blockers_contain": [
                     "remove_physical_so101_truth_claim_from_downstream_handoff"
+                ],
+                "next_priority_gate": "mujoco_scene_validity",
+            },
+        },
+        {
+            "case_id": "reviewed_authority_handoff_policy_training_authority_claim_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_policy_training_authority_claimed,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "reviewed_downstream_handoff": False,
+                "reviewed_downstream_handoff_contract": False,
+                "reviewed_handoff_policy_training_authority_claimed": True,
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "handoff_contract_blockers_contain": [
+                    "remove_policy_training_authority_claim_from_downstream_handoff"
+                ],
+                "blockers_contain": [
+                    "remove_policy_training_authority_claim_from_downstream_handoff"
                 ],
                 "next_priority_gate": "mujoco_scene_validity",
             },
@@ -1958,6 +2009,25 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
     )
     add_error(
         errors,
+        "reviewed_mujoco_downstream_handoff_policy_training_authority_claimed",
+        gate.get(
+            "reviewed_mujoco_downstream_handoff_policy_training_authority_claimed"
+        ),
+        expect.get("reviewed_handoff_policy_training_authority_claimed", False),
+    )
+    add_error(
+        errors,
+        "reviewed_mujoco_downstream_handoff_development_fixture_evidence_not_policy_training_truth",
+        gate.get(
+            "reviewed_mujoco_downstream_handoff_development_fixture_evidence_not_policy_training_truth"
+        ),
+        expect.get(
+            "reviewed_handoff_development_fixture_evidence_not_policy_training_truth",
+            True,
+        ),
+    )
+    add_error(
+        errors,
         "reviewed_model_backed_board_source_pick_place",
         gate.get("reviewed_model_backed_board_source_pick_place"),
         expect["board_pick"],
@@ -2360,6 +2430,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "reviewed_mujoco_downstream_handoff_physical_truth_claimed": gate.get(
             "reviewed_mujoco_downstream_handoff_physical_truth_claimed"
+        ),
+        "reviewed_mujoco_downstream_handoff_policy_training_authority_claimed": gate.get(
+            "reviewed_mujoco_downstream_handoff_policy_training_authority_claimed"
+        ),
+        "reviewed_mujoco_downstream_handoff_development_fixture_evidence_not_policy_training_truth": gate.get(
+            "reviewed_mujoco_downstream_handoff_development_fixture_evidence_not_policy_training_truth"
         ),
         "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority": gate.get(
             "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority"
