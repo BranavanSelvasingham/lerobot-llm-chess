@@ -126,10 +126,16 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "missing_inputs",
         "next_required_action_ids",
         "review_packet_status",
+        "review_packet_actions_match_next_required",
+        "review_packet_actions_missing_from_next_required",
+        "next_required_actions_missing_from_review_packet",
         "review_requirements_status",
         "review_requirements_url_fields",
         "bundle_intake_status",
         "bundle_intake_action_ids",
+        "bundle_intake_actions_match_next_required",
+        "bundle_intake_actions_missing_from_next_required",
+        "next_required_actions_missing_from_bundle_intake",
         "bundle_intake_related_requirement_ids_by_action_id",
         "bundle_intake_field_check_diagnostics_by_action_id",
         "contract_preflight_intake_manifest_fields",
@@ -1262,6 +1268,8 @@ def summarize_case(
     )
     review_requirements = summary.get("review_requirements")
     review_requirements = review_requirements if isinstance(review_requirements, dict) else {}
+    review_packet = summary.get("review_packet")
+    review_packet = review_packet if isinstance(review_packet, dict) else {}
     review_requirements_url_fields = assert_review_requirements_url_policy(
         errors,
         case_id,
@@ -1549,6 +1557,90 @@ def summarize_case(
         next_required_action_ids,
         expect.get("next_actions", []),
     )
+    add_error(
+        errors,
+        f"{case_id}.review_packet_actions_match_next_required",
+        summary.get("review_packet_actions_match_next_required"),
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_packet_actions_missing_from_next_required",
+        summary.get("review_packet_actions_missing_from_next_required"),
+        [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.next_required_actions_missing_from_review_packet",
+        summary.get("next_required_actions_missing_from_review_packet"),
+        [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_packet.next_required_action_ids",
+        (review_packet or {}).get("next_required_action_ids"),
+        next_required_action_ids,
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_packet.review_actions_match_next_required",
+        (review_packet or {}).get("review_actions_match_next_required"),
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_packet.review_actions_missing_from_next_required",
+        (review_packet or {}).get("review_actions_missing_from_next_required"),
+        [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_packet.next_required_actions_missing_from_review_packet",
+        (review_packet or {}).get("next_required_actions_missing_from_review_packet"),
+        [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.bundle_intake.action_ids",
+        bundle_intake.get("action_ids"),
+        next_required_action_ids,
+    )
+    add_error(
+        errors,
+        f"{case_id}.bundle_intake_actions_match_next_required",
+        summary.get("bundle_intake_actions_match_next_required"),
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.bundle_intake_actions_missing_from_next_required",
+        summary.get("bundle_intake_actions_missing_from_next_required"),
+        [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.next_required_actions_missing_from_bundle_intake",
+        summary.get("next_required_actions_missing_from_bundle_intake"),
+        [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.bundle_intake.actions_match_next_required",
+        bundle_intake.get("actions_match_next_required"),
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.bundle_intake.actions_missing_from_next_required",
+        bundle_intake.get("actions_missing_from_next_required"),
+        [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.bundle_intake.next_required_actions_missing_from_bundle_intake",
+        bundle_intake.get("next_required_actions_missing_from_bundle_intake"),
+        [],
+    )
     if isinstance(next_required_action_ids, list) and next_required_action_ids:
         for action_id in next_required_action_ids:
             action = bundle_intake_action_by_id(bundle_intake, str(action_id))
@@ -1636,8 +1728,6 @@ def summarize_case(
                 expect["review_invalid_fields"],
             )
 
-    review_packet = summary.get("review_packet")
-    review_packet = review_packet if isinstance(review_packet, dict) else {}
     if summary.get("ready_for_model_backed_ik") is True:
         add_error(
             errors,
@@ -1823,10 +1913,28 @@ def summarize_case(
             "missing_inputs": missing_inputs,
             "next_required_action_ids": next_required_action_ids,
             "review_packet_status": summary.get("review_packet_status"),
+            "review_packet_actions_match_next_required": summary.get(
+                "review_packet_actions_match_next_required"
+            ),
+            "review_packet_actions_missing_from_next_required": summary.get(
+                "review_packet_actions_missing_from_next_required"
+            ),
+            "next_required_actions_missing_from_review_packet": summary.get(
+                "next_required_actions_missing_from_review_packet"
+            ),
             "review_requirements_status": review_requirements.get("status"),
             "review_requirements_url_fields": review_requirements_url_fields,
             "bundle_intake_status": bundle_intake.get("status"),
             "bundle_intake_action_ids": bundle_intake.get("action_ids"),
+            "bundle_intake_actions_match_next_required": summary.get(
+                "bundle_intake_actions_match_next_required"
+            ),
+            "bundle_intake_actions_missing_from_next_required": summary.get(
+                "bundle_intake_actions_missing_from_next_required"
+            ),
+            "next_required_actions_missing_from_bundle_intake": summary.get(
+                "next_required_actions_missing_from_bundle_intake"
+            ),
             "bundle_intake_related_requirement_ids_by_action_id": {
                 action.get("action_id"): action.get("related_requirement_ids")
                 for action in bundle_intake.get("actions") or []
@@ -1955,10 +2063,28 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "missing_inputs": obs.get("missing_inputs"),
         "next_required_action_ids": obs.get("next_required_action_ids"),
         "review_packet_status": obs.get("review_packet_status"),
+        "review_packet_actions_match_next_required": obs.get(
+            "review_packet_actions_match_next_required"
+        ),
+        "review_packet_actions_missing_from_next_required": obs.get(
+            "review_packet_actions_missing_from_next_required"
+        ),
+        "next_required_actions_missing_from_review_packet": obs.get(
+            "next_required_actions_missing_from_review_packet"
+        ),
         "review_requirements_status": obs.get("review_requirements_status"),
         "review_requirements_url_fields": obs.get("review_requirements_url_fields"),
         "bundle_intake_status": obs.get("bundle_intake_status"),
         "bundle_intake_action_ids": obs.get("bundle_intake_action_ids"),
+        "bundle_intake_actions_match_next_required": obs.get(
+            "bundle_intake_actions_match_next_required"
+        ),
+        "bundle_intake_actions_missing_from_next_required": obs.get(
+            "bundle_intake_actions_missing_from_next_required"
+        ),
+        "next_required_actions_missing_from_bundle_intake": obs.get(
+            "next_required_actions_missing_from_bundle_intake"
+        ),
         "bundle_intake_related_requirement_ids_by_action_id": obs.get(
             "bundle_intake_related_requirement_ids_by_action_id"
         ),

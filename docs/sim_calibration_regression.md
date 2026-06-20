@@ -785,7 +785,15 @@ provenance, unexpected/non-finite/reversed joint-limit entries, wrong target
 frame, invalid TCP/alignment payloads, and mismatched model SHA. Ready fixture
 cases exercise the manifest state machine only; synthetic fixtures must keep
 `physical_so101_model_authority_ready: false`, and the generated reviewed
-contract fixture is not a reviewed physical SO-101 asset.
+contract fixture is not a reviewed physical SO-101 asset. The focused matrix
+also exports and asserts `review_packet_actions_match_next_required`,
+`review_packet_actions_missing_from_next_required`,
+`next_required_actions_missing_from_review_packet`,
+`bundle_intake_actions_match_next_required`,
+`bundle_intake_actions_missing_from_next_required`, and
+`next_required_actions_missing_from_bundle_intake` so the review packet and
+bundle-intake checklist stay synchronized with the manifest's ordered next
+required actions.
 
 The standalone model-bundle probe matrix writes
 `so101_model_bundle_probe_matrix_summary.json`, `.csv`, and `README.md`. It
@@ -1005,14 +1013,21 @@ For the SO-101 model bundle manifest contract, CI also requires a deterministic
 manifest review packet: `so101_model_bundle_manifest_review_packet.json` and
 `.csv`, with `review_packet_model_authority: "review_packet_not_authority"`,
 `review_packet_observed_evidence_is_authority: false`, item/action metadata,
-and the fixture-not-physical-truth caveat.
+`review_packet_actions_match_next_required: true`, empty
+`review_packet_actions_missing_from_next_required`, empty
+`next_required_actions_missing_from_review_packet`, and the
+fixture-not-physical-truth caveat.
 
 CI also requires `so101_model_bundle_manifest_intake_checklist.json` and
 `.csv`, with `bundle_intake_model_authority` set to
 `"bundle_manifest_intake_not_authority"`, false observed-evidence and
 physical-truth flags, action IDs matching `next_required_action_ids`, and
 command templates for rerunning the manifest checker after the reviewed bundle
-manifest is supplied or updated.
+manifest is supplied or updated. The checklist also exposes
+`bundle_intake_actions_match_next_required: true`, empty
+`bundle_intake_actions_missing_from_next_required`, and empty
+`next_required_actions_missing_from_bundle_intake` so operator follow-up cannot
+drift from the manifest blocker packet.
 
 For the SO-101 model bundle manifest contract, CI also requires
 `physical_authority_gate_status` and `physical_authority_blockers`. The blocker
@@ -1033,7 +1048,10 @@ The model bundle manifest summary and artifact-index metrics must expose
 `supply_reviewed_so101_model_bundle_manifest`, keeping reviewed SO-101 model
 authority ahead of downstream policy work. The manifest review packet must keep
 `review_packet_action_ids` in that same priority order rather than sorting them
-alphabetically, so operator review follows the gate sequence.
+alphabetically, so operator review follows the gate sequence. The review packet
+and bundle-intake checklist must both report synchronized action IDs with empty
+two-way missing-action lists before their artifacts are trusted as operator
+guidance.
 
 The artifact contract also includes dedicated `so101_mujoco_scene`,
 `so101_chess_env`, `so101_env_resets`, `so101_mujoco_contact_probe`,

@@ -580,6 +580,30 @@ def unique_strings(values: list[str]) -> list[str]:
     return unique
 
 
+def normalize_action_ids(values: list[Any]) -> list[str]:
+    return unique_strings(
+        [str(value) for value in values if value is not None and str(value)]
+    )
+
+
+def action_id_sync(source_ids: list[Any], target_ids: list[Any]) -> dict[str, Any]:
+    source = normalize_action_ids(source_ids)
+    target = normalize_action_ids(target_ids)
+    source_missing_from_target = [
+        action_id for action_id in source if action_id not in target
+    ]
+    target_missing_from_source = [
+        action_id for action_id in target if action_id not in source
+    ]
+    return {
+        "match": not source_missing_from_target and not target_missing_from_source,
+        "source_ids": source,
+        "target_ids": target,
+        "source_missing_from_target": source_missing_from_target,
+        "target_missing_from_source": target_missing_from_source,
+    }
+
+
 def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as handle:
@@ -3250,6 +3274,12 @@ def build_review_packet(
         for action in summary["next_required_for_goal"]
         if action.get("action_id") in row_action_ids
     ]
+    next_required_action_ids = [
+        action["action_id"]
+        for action in summary["next_required_for_goal"]
+        if isinstance(action.get("action_id"), str) and action["action_id"]
+    ]
+    review_action_sync = action_id_sync(review_action_ids, next_required_action_ids)
     packet = {
         "schema": REVIEW_PACKET_SCHEMA,
         "ok": True,
@@ -3269,7 +3299,15 @@ def build_review_packet(
             for row_value in packet_rows
             if row_value["status"] == "needs_operator_review"
         ],
+        "next_required_action_ids": next_required_action_ids,
         "review_action_ids": review_action_ids,
+        "review_actions_match_next_required": review_action_sync["match"],
+        "review_actions_missing_from_next_required": review_action_sync[
+            "source_missing_from_target"
+        ],
+        "next_required_actions_missing_from_review_packet": review_action_sync[
+            "target_missing_from_source"
+        ],
         "review_items": packet_rows,
         "observed_evidence_is_authority": False,
         "development_fixture_evidence_not_physical_so101_truth": True,
@@ -3804,6 +3842,14 @@ def build_bundle_manifest_intake_checklist(summary: dict[str, Any]) -> dict[str,
                 "field_check_context": field_check_context,
             }
         )
+    action_ids = [
+        action["action_id"]
+        for action in actions
+        if isinstance(action.get("action_id"), str) and action["action_id"]
+    ]
+    next_required_action_ids = summary.get("next_required_action_ids") or []
+    next_required_action_ids = normalize_action_ids(next_required_action_ids)
+    intake_action_sync = action_id_sync(action_ids, next_required_action_ids)
     return {
         "schema": BUNDLE_INTAKE_SCHEMA,
         "ok": True,
@@ -3832,6 +3878,14 @@ def build_bundle_manifest_intake_checklist(summary: dict[str, Any]) -> dict[str,
         "next_required_for_goal": summary.get("next_required_for_goal") or [],
         "next_required_action_ids": summary.get("next_required_action_ids") or [],
         "action_count": len(actions),
+        "action_ids": action_ids,
+        "actions_match_next_required": intake_action_sync["match"],
+        "actions_missing_from_next_required": intake_action_sync[
+            "source_missing_from_target"
+        ],
+        "next_required_actions_missing_from_bundle_intake": intake_action_sync[
+            "target_missing_from_source"
+        ],
         "actions": actions,
         "observed_evidence_is_authority": False,
         "physical_so101_truth_claimed": False,
@@ -4085,6 +4139,9 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         f"- `checklist_csv`: `{summary['artifacts']['checklist_csv']}`",
         f"- `review_packet_status`: `{summary.get('review_packet_status')}`",
         f"- `review_packet_item_count`: `{summary.get('review_packet_item_count')}`",
+        f"- `review_packet_actions_match_next_required`: `{str(summary.get('review_packet_actions_match_next_required')).lower()}`",
+        f"- `review_packet_actions_missing_from_next_required`: `{'; '.join(summary.get('review_packet_actions_missing_from_next_required') or []) if summary.get('review_packet_actions_missing_from_next_required') else 'none'}`",
+        f"- `next_required_actions_missing_from_review_packet`: `{'; '.join(summary.get('next_required_actions_missing_from_review_packet') or []) if summary.get('next_required_actions_missing_from_review_packet') else 'none'}`",
         f"- `review_packet_json`: `{summary['artifacts'].get('review_packet_json')}`",
         f"- `review_packet_csv`: `{summary['artifacts'].get('review_packet_csv')}`",
         f"- `review_requirements_status`: `{summary.get('review_requirements_status')}`",
@@ -4095,6 +4152,9 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         f"- `bundle_intake_status`: `{summary.get('bundle_intake_status')}`",
         f"- `bundle_intake_model_authority`: `{summary.get('bundle_intake_model_authority')}`",
         f"- `bundle_intake_action_ids`: `{', '.join(summary.get('bundle_intake_action_ids') or []) if summary.get('bundle_intake_action_ids') else 'none'}`",
+        f"- `bundle_intake_actions_match_next_required`: `{str(summary.get('bundle_intake_actions_match_next_required')).lower()}`",
+        f"- `bundle_intake_actions_missing_from_next_required`: `{'; '.join(summary.get('bundle_intake_actions_missing_from_next_required') or []) if summary.get('bundle_intake_actions_missing_from_next_required') else 'none'}`",
+        f"- `next_required_actions_missing_from_bundle_intake`: `{'; '.join(summary.get('next_required_actions_missing_from_bundle_intake') or []) if summary.get('next_required_actions_missing_from_bundle_intake') else 'none'}`",
         f"- `bundle_intake_checklist_json`: `{summary['artifacts'].get('bundle_intake_checklist_json')}`",
         f"- `bundle_intake_checklist_csv`: `{summary['artifacts'].get('bundle_intake_checklist_csv')}`",
         f"- `reviewed_manifest_template_status`: `{summary.get('reviewed_manifest_template_status')}`",
@@ -4412,7 +4472,19 @@ def main() -> int:
             "review_packet_needs_operator_review_item_ids": review_packet[
                 "needs_operator_review_item_ids"
             ],
+            "review_packet_next_required_action_ids": review_packet[
+                "next_required_action_ids"
+            ],
             "review_packet_action_ids": review_packet["review_action_ids"],
+            "review_packet_actions_match_next_required": review_packet[
+                "review_actions_match_next_required"
+            ],
+            "review_packet_actions_missing_from_next_required": review_packet[
+                "review_actions_missing_from_next_required"
+            ],
+            "next_required_actions_missing_from_review_packet": review_packet[
+                "next_required_actions_missing_from_review_packet"
+            ],
             "review_packet_observed_evidence_is_authority": review_packet[
                 "observed_evidence_is_authority"
             ],
@@ -4463,10 +4535,18 @@ def main() -> int:
                 "model_authority"
             ],
             "bundle_intake_action_count": bundle_intake_checklist["action_count"],
-            "bundle_intake_action_ids": [
-                action["action_id"]
-                for action in bundle_intake_checklist.get("actions") or []
+            "bundle_intake_action_ids": bundle_intake_checklist["action_ids"],
+            "bundle_intake_actions_match_next_required": bundle_intake_checklist[
+                "actions_match_next_required"
             ],
+            "bundle_intake_actions_missing_from_next_required": (
+                bundle_intake_checklist["actions_missing_from_next_required"]
+            ),
+            "next_required_actions_missing_from_bundle_intake": (
+                bundle_intake_checklist[
+                    "next_required_actions_missing_from_bundle_intake"
+                ]
+            ),
             "bundle_intake_observed_evidence_is_authority": (
                 bundle_intake_checklist["observed_evidence_is_authority"]
             ),
@@ -4539,8 +4619,26 @@ def main() -> int:
                 "review_packet_status": summary["review_packet_status"],
                 "review_packet_item_count": summary["review_packet_item_count"],
                 "review_packet_action_ids": summary["review_packet_action_ids"],
+                "review_packet_actions_match_next_required": summary[
+                    "review_packet_actions_match_next_required"
+                ],
+                "review_packet_actions_missing_from_next_required": summary[
+                    "review_packet_actions_missing_from_next_required"
+                ],
+                "next_required_actions_missing_from_review_packet": summary[
+                    "next_required_actions_missing_from_review_packet"
+                ],
                 "bundle_intake_status": summary["bundle_intake_status"],
                 "bundle_intake_action_ids": summary["bundle_intake_action_ids"],
+                "bundle_intake_actions_match_next_required": summary[
+                    "bundle_intake_actions_match_next_required"
+                ],
+                "bundle_intake_actions_missing_from_next_required": summary[
+                    "bundle_intake_actions_missing_from_next_required"
+                ],
+                "next_required_actions_missing_from_bundle_intake": summary[
+                    "next_required_actions_missing_from_bundle_intake"
+                ],
                 "reviewed_manifest_template_status": summary[
                     "reviewed_manifest_template_status"
                 ],
