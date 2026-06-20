@@ -92,6 +92,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_downstream_handoff_contract_blockers",
         "reviewed_model_backed_board_source_pick_place",
         "board_pick_reviewed_model_authority_ready",
+        "board_pick_authority_status",
+        "board_pick_authority_blockers",
         "board_pick_detailed_evidence_ready",
         "board_pick_phase_evidence_ready",
         "board_pick_stage_sequence_ready",
@@ -683,6 +685,12 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": False,
                 "board_pick": False,
                 "board_authority": False,
+                "board_authority_status": "board_pick_not_reviewed_model_authority",
+                "board_authority_blockers_contain": [
+                    "use_reviewed_so101_model_authority_for_board_pick",
+                    "repeat_board_source_pick_place_with_reviewed_model_backed_ik",
+                    "remove_seeded_source_pose_from_board_pick",
+                ],
                 "board_detail": True,
                 "rollout_authority": False,
                 "development_caveat": True,
@@ -992,6 +1000,10 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": False,
                 "board_authority": False,
+                "board_authority_status": "board_pick_not_reviewed_model_authority",
+                "board_authority_blockers_contain": [
+                    "use_reviewed_so101_model_authority_for_board_pick",
+                ],
                 "board_detail": True,
                 "rollout_raw": True,
                 "rollout_authority": True,
@@ -1066,6 +1078,10 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": False,
                 "board_authority": False,
+                "board_authority_status": "board_pick_not_reviewed_model_authority",
+                "board_authority_blockers_contain": [
+                    "use_reviewed_so101_model_authority_for_board_pick",
+                ],
                 "board_detail": True,
                 "rollout_raw": True,
                 "rollout_authority": True,
@@ -1094,6 +1110,10 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": False,
                 "board_authority": True,
+                "board_authority_status": "board_pick_seeded_source_pose_not_reviewed_ik",
+                "board_authority_blockers_contain": [
+                    "remove_seeded_source_pose_from_board_pick",
+                ],
                 "board_detail": True,
                 "rollout_raw": True,
                 "rollout_authority": True,
@@ -1123,6 +1143,11 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": False,
                 "board_authority": True,
+                "board_authority_status": "board_pick_manual_piece_pose_after_reset",
+                "board_authority_blockers_contain": [
+                    "provide_complete_board_pick_detailed_evidence",
+                    "remove_manual_piece_pose_after_reset_from_board_pick",
+                ],
                 "board_detail": False,
                 "board_phase_ready": True,
                 "board_stage_sequence_ready": False,
@@ -1148,6 +1173,10 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": False,
                 "board_authority": True,
+                "board_authority_status": "board_pick_detailed_evidence_incomplete",
+                "board_authority_blockers_contain": [
+                    "provide_complete_board_pick_detailed_evidence",
+                ],
                 "board_detail": False,
                 "rollout_raw": True,
                 "rollout_authority": True,
@@ -1171,6 +1200,10 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": False,
                 "board_authority": True,
+                "board_authority_status": "board_pick_detailed_evidence_incomplete",
+                "board_authority_blockers_contain": [
+                    "provide_complete_board_pick_detailed_evidence",
+                ],
                 "board_detail": False,
                 "rollout_raw": True,
                 "rollout_authority": True,
@@ -1194,6 +1227,10 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": False,
                 "board_authority": True,
+                "board_authority_status": "board_pick_detailed_evidence_incomplete",
+                "board_authority_blockers_contain": [
+                    "provide_complete_board_pick_detailed_evidence",
+                ],
                 "board_detail": False,
                 "rollout_raw": True,
                 "rollout_authority": True,
@@ -1217,6 +1254,10 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": False,
                 "board_authority": True,
+                "board_authority_status": "board_pick_detailed_evidence_incomplete",
+                "board_authority_blockers_contain": [
+                    "provide_complete_board_pick_detailed_evidence",
+                ],
                 "board_detail": False,
                 "board_phase_ready": False,
                 "rollout_raw": True,
@@ -1241,6 +1282,10 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": False,
                 "board_authority": True,
+                "board_authority_status": "board_pick_detailed_evidence_incomplete",
+                "board_authority_blockers_contain": [
+                    "provide_complete_board_pick_detailed_evidence",
+                ],
                 "board_detail": False,
                 "board_phase_ready": True,
                 "board_stage_sequence_ready": False,
@@ -1266,6 +1311,10 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": False,
                 "board_authority": True,
+                "board_authority_status": "board_pick_detailed_evidence_incomplete",
+                "board_authority_blockers_contain": [
+                    "provide_complete_board_pick_detailed_evidence",
+                ],
                 "board_detail": False,
                 "board_phase_ready": True,
                 "board_place_z_within_tolerance": False,
@@ -1291,6 +1340,10 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": False,
                 "board_authority": True,
+                "board_authority_status": "board_pick_detailed_evidence_incomplete",
+                "board_authority_blockers_contain": [
+                    "provide_complete_board_pick_detailed_evidence",
+                ],
                 "board_detail": False,
                 "board_phase_ready": True,
                 "board_place_z_within_tolerance": False,
@@ -1516,6 +1569,8 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": True,
                 "board_authority": True,
+                "board_authority_status": "reviewed_model_backed_board_source_pick_place_verified",
+                "board_authority_blockers_exact": [],
                 "board_detail": True,
                 "rollout_raw": True,
                 "rollout_authority": True,
@@ -1672,6 +1727,26 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         "board_pick_reviewed_model_authority_ready",
         gate.get("board_pick_reviewed_model_authority_ready"),
         expect["board_authority"],
+    )
+    if "board_authority_status" in expect:
+        add_error(
+            errors,
+            "board_pick_authority_status",
+            gate.get("board_pick_authority_status"),
+            expect["board_authority_status"],
+        )
+    if "board_authority_blockers_exact" in expect:
+        add_error(
+            errors,
+            "board_pick_authority_blockers",
+            gate.get("board_pick_authority_blockers"),
+            expect["board_authority_blockers_exact"],
+        )
+    expect_contains(
+        errors,
+        "board_pick_authority_blockers",
+        gate.get("board_pick_authority_blockers"),
+        expect.get("board_authority_blockers_contain", []),
     )
     if "board_detail" in expect:
         add_error(
@@ -1963,6 +2038,8 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "board_pick_reviewed_model_authority_ready": gate.get(
             "board_pick_reviewed_model_authority_ready"
         ),
+        "board_pick_authority_status": gate.get("board_pick_authority_status"),
+        "board_pick_authority_blockers": gate.get("board_pick_authority_blockers"),
         "board_pick_detailed_evidence_ready": gate.get("board_pick_detailed_evidence_ready"),
         "board_pick_phase_evidence_ready": gate.get("board_pick_phase_evidence_ready"),
         "board_pick_stage_sequence_ready": gate.get("board_pick_stage_sequence_ready"),
@@ -2031,13 +2108,13 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         "",
         "## Cases",
         "",
-        "| Case | Status | Ready | Next Gate | Handoff Contract | Handoff | Board Pick | Rollout Authority | Fixture Caveat | Blockers |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Case | Status | Ready | Next Gate | Handoff Contract | Handoff | Board Pick | Board Authority Status | Rollout Authority | Fixture Caveat | Blockers |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for case in summary["cases"]:
         gate = case["gate"]
         lines.append(
-            "| `{case_id}` | `{status}` | `{ready}` | `{next_gate}` | `{handoff_contract}` | `{handoff}` | `{board}` | `{rollout}` | `{fixture}` | `{blockers}` |".format(
+            "| `{case_id}` | `{status}` | `{ready}` | `{next_gate}` | `{handoff_contract}` | `{handoff}` | `{board}` | `{board_status}` | `{rollout}` | `{fixture}` | `{blockers}` |".format(
                 case_id=case["case_id"],
                 status=case["status"],
                 ready=gate.get("ready"),
@@ -2047,6 +2124,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
                 ),
                 handoff=gate.get("reviewed_mujoco_downstream_handoff_ready"),
                 board=gate.get("reviewed_model_backed_board_source_pick_place"),
+                board_status=gate.get("board_pick_authority_status"),
                 rollout=gate.get("rollout_policy_training_authority_ready"),
                 fixture=gate.get("development_fixture_evidence_not_policy_training_truth"),
                 blockers=", ".join(gate.get("blockers") or []),

@@ -2339,6 +2339,8 @@ jobs:
           assert draft["board_pick_reviewed_model_authority_ready"] is False, draft
           assert draft["board_pick_detailed_evidence_ready"] is True, draft
           assert draft["reviewed_model_backed_board_source_pick_place"] is False, draft
+          assert draft["board_pick_authority_status"] == "board_pick_not_reviewed_model_authority", draft
+          assert "use_reviewed_so101_model_authority_for_board_pick" in draft["board_pick_authority_blockers"], draft
           raw_dev = by_case["rollout_raw_ready_development_authority_rejected"]["gate"]
           assert raw_dev["rollout_ready_for_policy_training"] is True, raw_dev
           assert raw_dev["rollout_policy_training_authority_ready"] is False, raw_dev
@@ -2376,6 +2378,8 @@ jobs:
           assert seeded["board_pick_reviewed_model_authority_ready"] is True, seeded
           assert seeded["board_pick_detailed_evidence_ready"] is True, seeded
           assert seeded["reviewed_model_backed_board_source_pick_place"] is False, seeded
+          assert seeded["board_pick_authority_status"] == "board_pick_seeded_source_pose_not_reviewed_ik", seeded
+          assert "remove_seeded_source_pose_from_board_pick" in seeded["board_pick_authority_blockers"], seeded
           manual = by_case["board_manual_reset_pose_reviewed_authority_rejected"]["gate"]
           assert manual["board_pick_reviewed_model_authority_ready"] is True, manual
           assert manual["board_pick_detailed_evidence_ready"] is False, manual
@@ -2384,12 +2388,16 @@ jobs:
           assert manual["board_pick_manual_piece_pose_used_after_reset"] is True, manual
           assert manual["board_pick_manual_piece_pose_after_reset_stage_ids"] == ["transfer_to_target_without_manual_piece_pose"], manual
           assert manual["reviewed_model_backed_board_source_pick_place"] is False, manual
+          assert manual["board_pick_authority_status"] == "board_pick_manual_piece_pose_after_reset", manual
+          assert "remove_manual_piece_pose_after_reset_from_board_pick" in manual["board_pick_authority_blockers"], manual
           assert manual["ready"] is False, manual
           missing_release = by_case["board_missing_release_detail_reviewed_authority_rejected"]["gate"]
           assert missing_release["board_pick_reviewed_model_authority_ready"] is True, missing_release
           assert missing_release["board_pick_detailed_evidence_ready"] is False, missing_release
           assert missing_release["board_pick_release_contact_cleared_after_retreat"] is False, missing_release
           assert missing_release["reviewed_model_backed_board_source_pick_place"] is False, missing_release
+          assert missing_release["board_pick_authority_status"] == "board_pick_detailed_evidence_incomplete", missing_release
+          assert "provide_complete_board_pick_detailed_evidence" in missing_release["board_pick_authority_blockers"], missing_release
           assert missing_release["ready"] is False, missing_release
           missing_final_contact = by_case["board_missing_final_contact_reviewed_authority_rejected"]["gate"]
           assert missing_final_contact["board_pick_reviewed_model_authority_ready"] is True, missing_final_contact
@@ -2443,6 +2451,8 @@ jobs:
           assert ready["reviewed_mujoco_downstream_handoff_ready"] is True, ready
           assert ready["reviewed_mujoco_downstream_handoff_physical_motion_checked"] is True, ready
           assert ready["reviewed_mujoco_downstream_handoff_joint_limit_enablement_ok"] is True, ready
+          assert ready["board_pick_authority_status"] == "reviewed_model_backed_board_source_pick_place_verified", ready
+          assert ready["board_pick_authority_blockers"] == [], ready
           assert ready["reviewed_mujoco_downstream_handoff_joint_limit_enablement_status"] == "so101_mujoco_joints_limited", ready
           assert ready["reviewed_mujoco_downstream_handoff_missing_limited_joints"] == [], ready
           assert ready["reviewed_mujoco_downstream_handoff_physical_truth_claimed"] is False, ready
@@ -3826,6 +3836,10 @@ jobs:
               assert training_readiness_gate["board_pick_reviewed_model_authority_ready"] is False, training_readiness_gate
               assert training_readiness_gate["board_pick_detailed_evidence_ready"] is True, training_readiness_gate
               assert training_readiness_gate["board_pick_phase_evidence_ready"] is True, training_readiness_gate
+              assert training_readiness_gate["board_pick_authority_status"] == "board_pick_not_reviewed_model_authority", training_readiness_gate
+              assert "use_reviewed_so101_model_authority_for_board_pick" in training_readiness_gate["board_pick_authority_blockers"], training_readiness_gate
+              assert "repeat_board_source_pick_place_with_reviewed_model_backed_ik" in training_readiness_gate["board_pick_authority_blockers"], training_readiness_gate
+              assert "remove_seeded_source_pose_from_board_pick" in training_readiness_gate["board_pick_authority_blockers"], training_readiness_gate
               assert training_readiness_gate["rollout_policy_training_authority_ready"] is False, training_readiness_gate
           training_readiness_artifacts = training_readiness_gate["artifacts"]
           for key in ("summary_json", "checklist_csv", "readme_md"):
@@ -4809,6 +4823,17 @@ jobs:
               assert isinstance(metrics.get("reviewed_mujoco_downstream_handoff_missing_item_ids"), list), metrics
               assert metrics.get("reviewed_model_backed_board_source_pick_place") in {True, False, None}, metrics
               assert metrics.get("board_pick_reviewed_model_authority_ready") in {True, False, None}, metrics
+              assert metrics.get("board_pick_authority_status") in {
+                  None,
+                  "reviewed_model_backed_board_source_pick_place_verified",
+                  "board_pick_not_reviewed_model_authority",
+                  "board_pick_not_model_backed_ik",
+                  "board_pick_seeded_source_pose_not_reviewed_ik",
+                  "board_pick_manual_piece_pose_after_reset",
+                  "board_pick_detailed_evidence_incomplete",
+                  "board_pick_authority_contract_blocked",
+              }, metrics
+              assert isinstance(metrics.get("board_pick_authority_blockers"), list), metrics
               assert metrics.get("board_pick_detailed_evidence_ready") in {True, False, None}, metrics
               assert metrics.get("rollout_ready_for_policy_training") in {True, False, None}, metrics
               assert metrics.get("rollout_policy_training_authority_ready") in {True, False, None}, metrics

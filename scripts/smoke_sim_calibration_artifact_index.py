@@ -3211,6 +3211,9 @@ def collect_so101_training_readiness_gate_artifacts(
         "board_pick_reviewed_model_authority_ready": gate.get(
             "board_pick_reviewed_model_authority_ready"
         ),
+        "board_pick_authority_status": gate.get("board_pick_authority_status"),
+        "board_pick_authority_blockers": gate.get("board_pick_authority_blockers")
+        or [],
         "board_pick_detailed_evidence_ready": gate.get(
             "board_pick_detailed_evidence_ready"
         ),

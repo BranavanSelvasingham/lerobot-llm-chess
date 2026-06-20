@@ -1045,6 +1045,7 @@ A passing summary should show:
   `reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority`,
   `reviewed_model_backed_board_source_pick_place`,
   `board_pick_reviewed_model_authority_ready`,
+  `board_pick_authority_status`, `board_pick_authority_blockers`,
   `board_pick_detailed_evidence_ready`,
   `board_pick_phase_evidence_ready`, `board_pick_stage_sequence_ready`,
   `board_pick_stage_sequence_contract_ok`,
@@ -1061,6 +1062,10 @@ A passing summary should show:
   contact, final target XY error within tolerance, and the ordered
   reset/lower/close/lift/transfer/lower/release/retreat stage contract instead
   of trusting a single broad board-pick boolean.
+  `board_pick_authority_status` must explain why detailed board-source
+  pick/place remains blocked from reviewed authority, including draft or
+  development model authority, missing model-backed IK, seeded source poses,
+  manual piece poses after reset, or incomplete detailed phase/stage evidence.
   `rollout_policy_training_authority_ready`
   must require rollout `status: "ok"`, `training_authority_status:
   "reviewed_policy_training_rollouts_ready"`, `rollout_use: "policy_training"`,

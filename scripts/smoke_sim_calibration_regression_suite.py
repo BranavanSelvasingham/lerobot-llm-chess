@@ -5936,6 +5936,58 @@ def so101_board_pick_detailed_evidence_ready(board_pick: dict[str, Any]) -> bool
     )
 
 
+def so101_board_pick_authority_contract(
+    board_pick: dict[str, Any],
+    *,
+    detailed_evidence_ready: bool,
+) -> dict[str, Any]:
+    reviewed_model_authority_ready = (
+        board_pick.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
+    )
+    ready_for_model_backed_ik = board_pick.get("ready_for_model_backed_ik") is True
+    seeded_source_pose = board_pick.get("robot_pose_seeded_for_source_fixture") is True
+    manual_pose_after_reset = board_pick.get("manual_piece_pose_used_after_reset") is True
+
+    blockers: list[str] = []
+    if not detailed_evidence_ready:
+        blockers.append("provide_complete_board_pick_detailed_evidence")
+    if not reviewed_model_authority_ready:
+        blockers.append("use_reviewed_so101_model_authority_for_board_pick")
+    if not ready_for_model_backed_ik:
+        blockers.append("repeat_board_source_pick_place_with_reviewed_model_backed_ik")
+    if seeded_source_pose:
+        blockers.append("remove_seeded_source_pose_from_board_pick")
+    if manual_pose_after_reset:
+        blockers.append("remove_manual_piece_pose_after_reset_from_board_pick")
+
+    ready = not blockers
+    if ready:
+        status = "reviewed_model_backed_board_source_pick_place_verified"
+    elif not reviewed_model_authority_ready:
+        status = "board_pick_not_reviewed_model_authority"
+    elif not ready_for_model_backed_ik:
+        status = "board_pick_not_model_backed_ik"
+    elif seeded_source_pose:
+        status = "board_pick_seeded_source_pose_not_reviewed_ik"
+    elif manual_pose_after_reset:
+        status = "board_pick_manual_piece_pose_after_reset"
+    elif not detailed_evidence_ready:
+        status = "board_pick_detailed_evidence_incomplete"
+    else:
+        status = "board_pick_authority_contract_blocked"
+
+    return {
+        "ready": ready,
+        "status": status,
+        "blockers": blockers,
+        "reviewed_model_authority_ready": reviewed_model_authority_ready,
+        "ready_for_model_backed_ik": ready_for_model_backed_ik,
+        "seeded_source_pose": seeded_source_pose,
+        "manual_piece_pose_after_reset": manual_pose_after_reset,
+        "detailed_evidence_ready": detailed_evidence_ready,
+    }
+
+
 def so101_reviewed_mujoco_downstream_handoff_contract(
     reviewed_mujoco_bundle: dict[str, Any],
 ) -> dict[str, Any]:
@@ -6223,12 +6275,12 @@ def so101_training_priority_gate_queue(
     board_pick_detailed_evidence_ready = so101_board_pick_detailed_evidence_ready(
         board_pick
     )
+    board_pick_authority_contract = so101_board_pick_authority_contract(
+        board_pick,
+        detailed_evidence_ready=board_pick_detailed_evidence_ready,
+    )
     reviewed_model_backed_board_pick_place = (
-        board_pick_detailed_evidence_ready
-        and board_pick.get("ready_for_model_backed_ik") is True
-        and board_pick_reviewed_model_authority_ready
-        and board_pick.get("robot_pose_seeded_for_source_fixture") is not True
-        and board_pick.get("manual_piece_pose_used_after_reset") is False
+        board_pick_authority_contract.get("ready") is True
     )
     scripted_pick_place_automation_ready = (
         contact_automation_ready
@@ -6445,12 +6497,12 @@ def so101_training_readiness_gate_section(
     board_pick_detailed_evidence_ready = so101_board_pick_detailed_evidence_ready(
         board_pick
     )
+    board_pick_authority_contract = so101_board_pick_authority_contract(
+        board_pick,
+        detailed_evidence_ready=board_pick_detailed_evidence_ready,
+    )
     reviewed_model_backed_board_pick_place = (
-        board_pick_detailed_evidence_ready
-        and board_pick.get("ready_for_model_backed_ik") is True
-        and board_pick_reviewed_model_authority_ready
-        and board_pick.get("robot_pose_seeded_for_source_fixture") is not True
-        and board_pick.get("manual_piece_pose_used_after_reset") is False
+        board_pick_authority_contract.get("ready") is True
     )
     rollout_policy_training_authority_ready = (
         training_rollouts.get("ready_for_policy_training") is True
@@ -6619,6 +6671,8 @@ def so101_training_readiness_gate_section(
         "board_pick_status": board_pick.get("status"),
         "board_pick_model_authority": board_pick.get("model_authority"),
         "board_pick_reviewed_model_authority_ready": board_pick_reviewed_model_authority_ready,
+        "board_pick_authority_status": board_pick_authority_contract.get("status"),
+        "board_pick_authority_blockers": board_pick_authority_contract.get("blockers"),
         "board_pick_detailed_evidence_ready": board_pick_detailed_evidence_ready,
         "board_pick_ready_for_model_backed_ik": board_pick.get("ready_for_model_backed_ik"),
         "board_pick_source_pick_started_at_source": board_pick.get(
@@ -6788,6 +6842,18 @@ def write_so101_training_readiness_gate_artifacts(
             "notes": "Development seeded board-source pick/place does not close the reviewed model-backed pick/place gate.",
         },
         {
+            "requirement_id": "board_pick_authority_contract",
+            "category": "scripted_pick_place_evidence",
+            "status": "ok"
+            if gate.get("board_pick_authority_status")
+            == "reviewed_model_backed_board_source_pick_place_verified"
+            else "action_required",
+            "observed_value": str(gate.get("board_pick_authority_status")),
+            "expected_value": "reviewed_model_backed_board_source_pick_place_verified",
+            "blockers": "; ".join(gate.get("board_pick_authority_blockers") or []),
+            "notes": "This explains why detailed board-pick evidence is still not reviewed-model-backed pick/place authority.",
+        },
+        {
             "requirement_id": "policy_training_rollouts_ready",
             "category": "training_rollouts",
             "status": "ok"
@@ -6899,6 +6965,10 @@ def write_so101_training_readiness_gate_artifacts(
                 f"`{markdown_bool(gate.get('reviewed_model_backed_board_source_pick_place'))}`",
                 "- Board-pick reviewed model authority ready: "
                 f"`{markdown_bool(gate.get('board_pick_reviewed_model_authority_ready'))}`",
+                "- Board-pick authority status: "
+                f"`{gate.get('board_pick_authority_status')}`",
+                "- Board-pick authority blockers: "
+                f"`{markdown_list_value(gate.get('board_pick_authority_blockers'))}`",
                 "- Board-pick detailed evidence ready: "
                 f"`{markdown_bool(gate.get('board_pick_detailed_evidence_ready'))}`",
                 "- Board-pick phase evidence ready: "
