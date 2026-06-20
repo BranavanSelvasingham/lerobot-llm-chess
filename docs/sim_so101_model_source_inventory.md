@@ -178,6 +178,11 @@ git -C /private/tmp/SO-ARM100 checkout <pinned-so-arm100-commit-sha>
 Then run the existing hardware-free gates against the local pinned checkout:
 
 ```bash
+python scripts/smoke_sim_so101_public_candidate_intake.py \
+  --source-root /private/tmp/SO-ARM100/Simulation/SO101 \
+  --upstream-commit <pinned-so-arm100-commit-sha> \
+  --output-dir /private/tmp/lerobot_sim/soarm100_so101_public_candidate_intake
+
 python scripts/smoke_sim_so101_model_source_inventory.py \
   --root /private/tmp/SO-ARM100/Simulation/SO101 \
   --output-dir /private/tmp/lerobot_sim/soarm100_so101_source_inventory_candidate
@@ -187,6 +192,16 @@ python scripts/smoke_sim_so101_model_bundle_probe.py \
   --asset-root /private/tmp/SO-ARM100/Simulation/SO101 \
   --output-dir /private/tmp/lerobot_sim/soarm100_so101_bundle_probe_candidate
 ```
+
+The public-candidate intake smoke writes
+`so101_public_candidate_intake_summary.json`,
+`so101_public_candidate_intake_files.csv`,
+`so101_public_candidate_manifest_draft.json`, and `README.md`. It hashes the
+local candidate files and records the pinned upstream commit as intake evidence
+only. Its manifest draft uses `model_sha256_observed` rather than a reviewed
+`model_sha256`, keeps `authority` and `provenance` empty, and always reports
+`ready_for_model_backed_ik: false`; copy those observed values into the real
+bundle manifest only after review.
 
 If the source is later declared authoritative, rerun the inventory with
 `--authoritative-path` for exactly one reviewed URDF/MJCF file plus
