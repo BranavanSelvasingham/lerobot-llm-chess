@@ -450,6 +450,16 @@ policy-training authority flags. Placeholder command values must be replaced
 with reviewed source, model bundle, calibration, and review evidence before a
 rerun can become authority evidence.
 
+A public upstream candidate source now exists at
+`https://github.com/TheRobotStudio/SO-ARM100/tree/main/Simulation/SO101`.
+Default CI still leaves the repo-local model-source scan empty unless a caller
+sets `SO101_MODEL_SOURCE_ROOTS` or vendors the assets, but the source-inventory
+artifacts list this upstream as a known candidate intake pointer. Pin an
+immutable upstream commit, scan the local checkout with
+`SO101_MODEL_SOURCE_ROOTS`, and then record source authority, file digests,
+mesh authority, joint-limit/TCP/base-board review, and bundle-manifest
+validation before treating it as reviewed physical SO-101 truth.
+
 To guard the source-authority state machine without hardware or repo-local
 SO-101 assets, run the focused source-authority matrix smoke:
 

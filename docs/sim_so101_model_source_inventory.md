@@ -153,6 +153,67 @@ treated as model-backed IK readiness evidence.
 
 By default the inventory scans repo-local roots: `models/`, `assets/`, `SO101/`, `src/`, `docs/`, `archive/`, `data/`, and the repo root. Missing roots are reported as roots with `exists: false`; they are not errors.
 
+## Public SO-ARM100/SO101 Candidate Intake
+
+There is a public upstream candidate bundle at
+`https://github.com/TheRobotStudio/SO-ARM100/tree/main/Simulation/SO101`.
+Treat it as a candidate source only until this repository records an import or
+operator-intake decision, an immutable upstream commit, file digests, license
+and provenance review, joint-limit/TCP/base-board review, and bundle-manifest
+validation. The upstream `Simulation/SO101` README describes URDF and MuJoCo
+files generated with `onshape-to-robot`, relative mesh paths, removed base
+collision meshes, and a caveat that LeRobot's `0` closed to `100` open gripper
+linear-joint mapping is not yet reflected in the current URDF/MuJoCo files.
+
+Operator intake should pin the source before scanning it. Either vendor a
+reviewed copy into the repository or keep the checkout outside the repository
+and record the exact commit in the review artifact:
+
+```bash
+git clone https://github.com/TheRobotStudio/SO-ARM100 /private/tmp/SO-ARM100
+git -C /private/tmp/SO-ARM100 rev-parse HEAD
+git -C /private/tmp/SO-ARM100 checkout <pinned-so-arm100-commit-sha>
+```
+
+Then run the existing hardware-free gates against the local pinned checkout:
+
+```bash
+python scripts/smoke_sim_so101_model_source_inventory.py \
+  --root /private/tmp/SO-ARM100/Simulation/SO101 \
+  --output-dir /private/tmp/lerobot_sim/soarm100_so101_source_inventory_candidate
+
+python scripts/smoke_sim_so101_model_bundle_probe.py \
+  --model-path /private/tmp/SO-ARM100/Simulation/SO101/so101_new_calib.urdf \
+  --asset-root /private/tmp/SO-ARM100/Simulation/SO101 \
+  --output-dir /private/tmp/lerobot_sim/soarm100_so101_bundle_probe_candidate
+```
+
+If the source is later declared authoritative, rerun the inventory with
+`--authoritative-path` for exactly one reviewed URDF/MJCF file plus
+`--authority-source-reference`, `--authority-license-basis`, all three required
+`--authority-review-scope` values, reviewer identity, and a stable review
+artifact handle. Do not use `--authoritative-root` on `Simulation/SO101` unless
+the root has been narrowed to one selected model file; the folder contains new
+and old calibration variants plus scene/support XML files.
+
+Local candidate evidence from 2026-06-20 used upstream commit
+`fda892cba81032c46c40976a48c9ceadbf40a9ca` as an intake snapshot only:
+
+- Source inventory against `Simulation/SO101` found `candidate_count: 6`,
+  `likely_candidate_count: 4`, and `direct_contract_candidate_count: 2`, with
+  `so101_new_calib.urdf` recommended and SHA-256
+  `3a65d2d35e68a8d2f0c2cc176d19b884506543c93ba72980145b80abe276022c`.
+- The source-authority gate stayed blocked with
+  `source_authority_gate_status: "source_authority_blocked_missing_authoritative_model"`
+  and `source_intake_model_authority: "source_intake_not_authority"`.
+- The bundle probe on `so101_new_calib.urdf` resolved mesh references
+  (`asset_preflight_missing_asset_count: 0`) and observed complete unreviewed
+  joint limits, but stayed `candidate_manifest_needs_review` with
+  `ready_for_model_backed_ik: false` because `model_sha256`, authority,
+  provenance, mesh authority, target-frame authority, TCP offset, base-to-board
+  transform, reviewed joint limits, and a non-blocking contract result still
+  need review.
+
 To inspect an external or installed model location without importing assets:
 
 ```bash

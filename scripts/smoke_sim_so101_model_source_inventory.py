@@ -142,11 +142,71 @@ SOURCE_AUTHORITY_REVIEW_SCOPE_DESCRIPTIONS = {
     "license": "License or redistribution basis for using the model source in this repository was reviewed.",
 }
 
+KNOWN_PUBLIC_SO101_CANDIDATE_SOURCES = (
+    {
+        "source_id": "therobotstudio_soarm100_simulation_so101",
+        "name": "TheRobotStudio/SO-ARM100 Simulation/SO101",
+        "repository_url": "https://github.com/TheRobotStudio/SO-ARM100",
+        "simulation_overview_url": "https://github.com/TheRobotStudio/SO-ARM100/tree/main/Simulation",
+        "source_tree_url": "https://github.com/TheRobotStudio/SO-ARM100/tree/main/Simulation/SO101",
+        "source_path": "Simulation/SO101",
+        "candidate_files": [
+            "Simulation/SO101/so101_new_calib.urdf",
+            "Simulation/SO101/so101_old_calib.urdf",
+            "Simulation/SO101/so101_new_calib.xml",
+            "Simulation/SO101/so101_old_calib.xml",
+            "Simulation/SO101/scene.xml",
+            "Simulation/SO101/joints_properties.xml",
+            "Simulation/SO101/assets/",
+        ],
+        "source_notes": [
+            "Public candidate upstream bundle only; fetch or vendor at a pinned commit before review.",
+            "README says URDF and MJCF files were generated with onshape-to-robot and mesh paths were changed to relative paths.",
+            "README says base collision meshes were removed due to collision issues.",
+            "README says LeRobot gripper linear-joint mapping is not yet reflected in the current URDF/MuJoCo files.",
+        ],
+        "authority_boundary": (
+            "This source is not reviewed physical SO-101 authority until a pinned commit, "
+            "file digests, license/provenance review, joint/TCP/base-board review, and "
+            "bundle-manifest validation are recorded."
+        ),
+        "operator_intake": {
+            "pin_source": (
+                "Resolve and record an immutable commit SHA before scanning or vendoring "
+                "Simulation/SO101."
+            ),
+            "scan_command_template": [
+                "python",
+                "scripts/smoke_sim_so101_model_source_inventory.py",
+                "--root",
+                "<local-SO-ARM100-checkout>/Simulation/SO101",
+                "--output-dir",
+                "/private/tmp/lerobot_sim/soarm100_so101_source_inventory_candidate",
+            ],
+            "probe_command_template": [
+                "python",
+                "scripts/smoke_sim_so101_model_bundle_probe.py",
+                "--model-path",
+                "<local-SO-ARM100-checkout>/Simulation/SO101/so101_new_calib.urdf",
+                "--asset-root",
+                "<local-SO-ARM100-checkout>/Simulation/SO101",
+                "--output-dir",
+                "/private/tmp/lerobot_sim/soarm100_so101_bundle_probe_candidate",
+            ],
+        },
+    },
+)
+
 SOURCE_INVENTORY_ACTIONS = {
     "scan_or_supply_so101_model_source_root": {
         "gate": "reviewed_model_authority",
         "title": "Scan or supply a local SO-101 model-source root",
-        "detail": "Run the inventory with --root or --extra-root pointing at candidate SO-101 URDF/MJCF/Xacro sources.",
+        "detail": (
+            "Run the inventory with --root or --extra-root pointing at candidate "
+            "SO-101 URDF/MJCF/Xacro sources. A known public candidate is "
+            "TheRobotStudio/SO-ARM100 Simulation/SO101; fetch or vendor it at a "
+            "pinned commit before scanning."
+        ),
     },
     "review_and_declare_authoritative_so101_model_source": {
         "gate": "reviewed_model_authority",
@@ -189,6 +249,10 @@ SOURCE_INVENTORY_ACTIONS = {
         "detail": "Provide the manifest to smoke_sim_so101_model_bundle_manifest.py so readiness can be checked together with meshes, authority, TCP, and board alignment.",
     },
 }
+
+
+def known_public_so101_candidate_sources() -> list[dict[str, Any]]:
+    return [dict(source) for source in KNOWN_PUBLIC_SO101_CANDIDATE_SOURCES]
 
 
 def source_inventory_next_required(
@@ -1663,6 +1727,8 @@ def build_source_intake_checklist(summary: dict[str, Any]) -> dict[str, Any]:
         "next_required_action_ids": summary.get("next_required_action_ids") or [],
         "recommended_candidate": recommended_candidate_context,
         "recommended_contract_check": summary.get("recommended_contract_check"),
+        "known_public_candidate_sources": summary.get("known_public_candidate_sources")
+        or [],
         "action_count": len(actions),
         "actions": actions,
         "observed_evidence_is_authority": False,
@@ -2061,6 +2127,7 @@ def build_summary(
         ),
         source_authority_review_ready=authority_review["ready"],
     )
+    public_candidate_sources = known_public_so101_candidate_sources()
 
     summary = {
         "schema": SCHEMA,
@@ -2149,6 +2216,8 @@ def build_summary(
         "roots": roots,
         "candidates": candidates,
         "recommended_contract_check": recommended_contract_check,
+        "known_public_candidate_source_count": len(public_candidate_sources),
+        "known_public_candidate_sources": public_candidate_sources,
         "next_required_for_goal": next_required_for_goal,
         "next_required_action_ids": action_ids(next_required_for_goal),
         "diagnostics": diagnostics,
@@ -2402,6 +2471,31 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
     lines.extend(
         [
             "",
+            "## Known Public Candidate Sources",
+            "",
+            (
+                "These sources are operator intake pointers only. Fetch or vendor them "
+                "at a pinned commit, then run the inventory and bundle probe before "
+                "declaring source authority."
+            ),
+            "",
+        ]
+    )
+    public_sources = summary.get("known_public_candidate_sources") or []
+    if not public_sources:
+        lines.append("- none")
+    for source in public_sources:
+        lines.append(f"- `{source.get('source_id')}`: {source.get('name')}")
+        lines.append(f"  - Repository: `{source.get('repository_url')}`")
+        lines.append(f"  - Source tree: `{source.get('source_tree_url')}`")
+        lines.append(f"  - Source path: `{source.get('source_path')}`")
+        lines.append(f"  - Authority boundary: {source.get('authority_boundary')}")
+        notes = source.get("source_notes") or []
+        if notes:
+            lines.append(f"  - Notes: {'; '.join(str(note) for note in notes)}")
+    lines.extend(
+        [
+            "",
             "## Review Packet",
             "",
             (
@@ -2572,6 +2666,9 @@ def main() -> int:
                 "likely_candidate_count": summary["likely_candidate_count"],
                 "direct_contract_candidate_count": summary["direct_contract_candidate_count"],
                 "authoritative_candidate_count": summary["authoritative_candidate_count"],
+                "known_public_candidate_source_count": summary[
+                    "known_public_candidate_source_count"
+                ],
                 "source_authority_review_status": summary["source_authority_review_status"],
                 "source_authority_review_ready": summary["source_authority_review_ready"],
                 "source_authority_review_scope_ready": summary[

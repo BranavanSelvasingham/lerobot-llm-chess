@@ -3839,6 +3839,11 @@ def so101_model_source_inventory_section(
             if recommended_contract_check
             else None
         ),
+        "known_public_candidate_source_count": inventory.get(
+            "known_public_candidate_source_count"
+        ),
+        "known_public_candidate_sources": inventory.get("known_public_candidate_sources")
+        or [],
         "next_required_for_goal": inventory.get("next_required_for_goal") or [],
         "next_required_action_ids": inventory.get("next_required_action_ids") or [],
         "review_packet_status": inventory.get("review_packet_status"),
