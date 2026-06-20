@@ -1974,6 +1974,7 @@ jobs:
               "failed_board_pick_prerequisite_fails_closed",
               "incomplete_final_board_pick_prerequisite_fails_closed",
               "forged_authority_board_pick_prerequisite_fails_closed",
+              "missing_stage_sequence_board_pick_prerequisite_fails_closed",
               "short_budget_records_incomplete_rollout",
               "invalid_task_syntax_fails_closed",
               "invalid_source_square_task_fails_closed",
@@ -1990,6 +1991,7 @@ jobs:
               "failed_board_pick_prerequisite_fails_closed",
               "incomplete_final_board_pick_prerequisite_fails_closed",
               "forged_authority_board_pick_prerequisite_fails_closed",
+              "missing_stage_sequence_board_pick_prerequisite_fails_closed",
               "short_budget_records_incomplete_rollout",
               "invalid_task_syntax_fails_closed",
               "invalid_source_square_task_fails_closed",
@@ -2037,6 +2039,12 @@ jobs:
           assert "observed_evidence_is_physical_so101_authority" in forged["observations"]["board_pick_failed_checks"], forged
           assert "observed_evidence_is_policy_training_authority" in forged["observations"]["board_pick_failed_checks"], forged
           assert forged["observations"]["development_prerequisites_satisfied"] is False, forged
+          missing_stage = by_case["missing_stage_sequence_board_pick_prerequisite_fails_closed"]
+          assert missing_stage["record"]["return_code"] == 1, missing_stage
+          assert missing_stage["observations"]["ok"] is False, missing_stage
+          assert missing_stage["observations"]["board_pick_prerequisite_status"] == "development_board_pick_prerequisite_failed", missing_stage
+          assert "stage_sequence_contract" in missing_stage["observations"]["board_pick_failed_checks"], missing_stage
+          assert missing_stage["observations"]["development_prerequisites_satisfied"] is False, missing_stage
           short = by_case["short_budget_records_incomplete_rollout"]
           assert short["record"]["return_code"] == 1, short
           assert short["observations"]["ok"] is False, short
@@ -2092,6 +2100,7 @@ jobs:
               "failed_board_pick_prerequisite_fails_closed",
               "incomplete_final_board_pick_prerequisite_fails_closed",
               "forged_authority_board_pick_prerequisite_fails_closed",
+              "missing_stage_sequence_board_pick_prerequisite_fails_closed",
               "short_budget_records_incomplete_rollout",
           ):
               obs = by_case[case_id]["observations"]
@@ -2147,6 +2156,7 @@ jobs:
               "board_missing_final_contact_reviewed_authority_rejected",
               "board_target_tolerance_reviewed_authority_rejected",
               "board_missing_phase_evidence_reviewed_authority_rejected",
+              "board_missing_stage_sequence_reviewed_authority_rejected",
               "board_z_tolerance_missing_reviewed_authority_rejected",
               "board_z_tolerance_reviewed_authority_rejected",
               "rollout_raw_ready_development_authority_rejected",
@@ -2269,8 +2279,11 @@ jobs:
           assert seeded["reviewed_model_backed_board_source_pick_place"] is False, seeded
           manual = by_case["board_manual_reset_pose_reviewed_authority_rejected"]["gate"]
           assert manual["board_pick_reviewed_model_authority_ready"] is True, manual
-          assert manual["board_pick_detailed_evidence_ready"] is True, manual
+          assert manual["board_pick_detailed_evidence_ready"] is False, manual
+          assert manual["board_pick_phase_evidence_ready"] is True, manual
+          assert manual["board_pick_stage_sequence_ready"] is False, manual
           assert manual["board_pick_manual_piece_pose_used_after_reset"] is True, manual
+          assert manual["board_pick_manual_piece_pose_after_reset_stage_ids"] == ["transfer_to_target_without_manual_piece_pose"], manual
           assert manual["reviewed_model_backed_board_source_pick_place"] is False, manual
           assert manual["ready"] is False, manual
           missing_release = by_case["board_missing_release_detail_reviewed_authority_rejected"]["gate"]
@@ -2299,6 +2312,15 @@ jobs:
           assert missing_phase["board_pick_phase_count"] == 0, missing_phase
           assert missing_phase["reviewed_model_backed_board_source_pick_place"] is False, missing_phase
           assert missing_phase["ready"] is False, missing_phase
+          missing_stage = by_case["board_missing_stage_sequence_reviewed_authority_rejected"]["gate"]
+          assert missing_stage["board_pick_reviewed_model_authority_ready"] is True, missing_stage
+          assert missing_stage["board_pick_detailed_evidence_ready"] is False, missing_stage
+          assert missing_stage["board_pick_phase_evidence_ready"] is True, missing_stage
+          assert missing_stage["board_pick_stage_sequence_ready"] is False, missing_stage
+          assert missing_stage["board_pick_stage_sequence_contract_ok"] is False, missing_stage
+          assert missing_stage["board_pick_missing_stage_ids"] == ["retreat_after_release_without_manual_piece_pose"], missing_stage
+          assert missing_stage["reviewed_model_backed_board_source_pick_place"] is False, missing_stage
+          assert missing_stage["ready"] is False, missing_stage
           missing_z = by_case["board_z_tolerance_missing_reviewed_authority_rejected"]["gate"]
           assert missing_z["board_pick_reviewed_model_authority_ready"] is True, missing_z
           assert missing_z["board_pick_detailed_evidence_ready"] is False, missing_z
@@ -2324,6 +2346,10 @@ jobs:
           assert ready["reviewed_mujoco_downstream_handoff_physical_truth_claimed"] is False, ready
           assert ready["board_pick_detailed_evidence_ready"] is True, ready
           assert ready["board_pick_phase_evidence_ready"] is True, ready
+          assert ready["board_pick_stage_sequence_ready"] is True, ready
+          assert ready["board_pick_stage_sequence_contract_ok"] is True, ready
+          assert ready["board_pick_missing_stage_ids"] == [], ready
+          assert ready["board_pick_manual_piece_pose_after_reset_stage_ids"] == [], ready
           assert ready["board_pick_final_place_z_within_tolerance"] is True, ready
           assert ready["rollout_status"] == "ok", ready
           assert ready["rollout_training_authority_status"] == "reviewed_policy_training_rollouts_ready", ready
@@ -3617,6 +3643,9 @@ jobs:
           assert board_pick_prerequisite["status"] == "development_board_pick_prerequisite_verified", board_pick_prerequisite
           assert board_pick_prerequisite["board_source_pick_place_verified"] is True, board_pick_prerequisite
           assert board_pick_prerequisite["manual_piece_pose_used_after_reset"] is False, board_pick_prerequisite
+          assert board_pick_prerequisite["stage_sequence_contract_ok"] is True, board_pick_prerequisite
+          assert board_pick_prerequisite["stage_sequence_contract_errors"] == [], board_pick_prerequisite
+          assert board_pick_prerequisite["manual_piece_pose_after_reset_stage_ids"] == [], board_pick_prerequisite
           assert board_pick_prerequisite["robot_pose_seeded_for_source_fixture"] is True, board_pick_prerequisite
 
           training_readiness_gate = summary["so101_training_readiness_gate"]
@@ -3652,6 +3681,7 @@ jobs:
           assert isinstance(training_readiness_gate["board_pick_reviewed_model_authority_ready"], bool), training_readiness_gate
           assert isinstance(training_readiness_gate["board_pick_detailed_evidence_ready"], bool), training_readiness_gate
           assert isinstance(training_readiness_gate["board_pick_phase_evidence_ready"], bool), training_readiness_gate
+          assert isinstance(training_readiness_gate["board_pick_stage_sequence_ready"], bool), training_readiness_gate
           assert training_readiness_gate["board_pick_phase_ids"] == [
               "source_reset",
               "two_finger_grasp",
@@ -3663,6 +3693,11 @@ jobs:
           assert training_readiness_gate["board_pick_phase_count"] == 5, training_readiness_gate
           assert training_readiness_gate["board_pick_all_required_phases_verified"] is True, training_readiness_gate
           assert training_readiness_gate["board_pick_phase_evidence_count"] == 5, training_readiness_gate
+          assert training_readiness_gate["board_pick_stage_sequence_contract_ok"] is True, training_readiness_gate
+          assert training_readiness_gate["board_pick_stage_sequence_order_ok"] is True, training_readiness_gate
+          assert training_readiness_gate["board_pick_missing_stage_ids"] == [], training_readiness_gate
+          assert training_readiness_gate["board_pick_unexpected_stage_ids"] == [], training_readiness_gate
+          assert training_readiness_gate["board_pick_manual_piece_pose_after_reset_stage_ids"] == [], training_readiness_gate
           assert training_readiness_gate["board_pick_final_place_z_error_m"] <= training_readiness_gate["board_pick_place_z_tolerance_m"], training_readiness_gate
           assert training_readiness_gate["board_pick_final_place_z_within_tolerance"] is True, training_readiness_gate
           assert isinstance(training_readiness_gate["rollout_policy_training_authority_ready"], bool), training_readiness_gate

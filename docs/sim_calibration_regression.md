@@ -607,16 +607,18 @@ and not policy-ready.
 It also runs the focused
 `so101_training_rollouts_matrix` smoke to prove valid development prerequisites
 allow debug imitation rollouts while missing/failed board-pick prerequisites,
-incomplete final board contact or target-tolerance evidence, and too-short
-rollout budgets fail closed without becoming policy-training authority. The
+incomplete final board contact or target-tolerance evidence, missing board-pick
+stage-sequence evidence, and too-short rollout budgets fail closed without
+becoming policy-training authority. The
 same matrix requires malformed rollout tasks, invalid chess squares, identical
 source/target task squares, and non-positive step budgets to fail closed without
 generating model XML or manifests; invalid source-square and invalid
 target-square rollout requests are checked separately. It also runs the focused
 `so101_training_readiness_gate_matrix` contract smoke to prove development,
-draft, fixture-seeded, manually reset-pose-corrected, raw-rollout-ready, and
-all-ready injected states do not cross the serious-training boundary without
-reviewed model authority. The
+draft, fixture-seeded, manually reset-pose-corrected, missing stage-sequence,
+raw-rollout-ready, and all-ready injected states do not cross the
+serious-training boundary without reviewed model authority and ordered
+manual-pose-free board-pick stages. The
 workflow asserts the motion-authority fields so hardware-free fixture motion remains labeled as
 automation coverage, not reviewed physical SO-101 truth. TCP/gripper offset,
 base-to-board alignment, and board-source pickup with reviewed model-backed IK
@@ -1032,7 +1034,10 @@ A passing summary should show:
   `reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority`,
   `reviewed_model_backed_board_source_pick_place`,
   `board_pick_reviewed_model_authority_ready`,
-  `board_pick_detailed_evidence_ready`, raw
+  `board_pick_detailed_evidence_ready`,
+  `board_pick_phase_evidence_ready`, `board_pick_stage_sequence_ready`,
+  `board_pick_stage_sequence_contract_ok`,
+  `board_pick_observed_stage_sequence`, raw
   `rollout_ready_for_policy_training`, computed
   `rollout_policy_training_authority_ready`, `rollout_status`,
   `rollout_training_authority_status`, `rollout_use`,
@@ -1042,8 +1047,10 @@ A passing summary should show:
   summary/checklist/README artifact paths. `board_pick_detailed_evidence_ready`
   must require source-start, two-finger contact, lift, board-contact clearance,
   transfer, placement without manual pose, release contact cleared, final board
-  contact, and final target XY error within tolerance instead of trusting a
-  single broad board-pick boolean. `rollout_policy_training_authority_ready`
+  contact, final target XY error within tolerance, and the ordered
+  reset/lower/close/lift/transfer/lower/release/retreat stage contract instead
+  of trusting a single broad board-pick boolean.
+  `rollout_policy_training_authority_ready`
   must require rollout `status: "ok"`, `training_authority_status:
   "reviewed_policy_training_rollouts_ready"`, `rollout_use: "policy_training"`,
   true policy-authority evidence, and no serious-policy blockers. The focused

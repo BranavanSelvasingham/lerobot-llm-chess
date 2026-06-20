@@ -31,6 +31,7 @@ The matrix writes `so101_training_rollouts_matrix_summary.json`,
 default development rollout curriculum, missing and failed board-pick
 prerequisite fail-closed behavior, a broad-true board-pick prerequisite that
 omits final placement evidence, a forged-authority board-pick prerequisite, a
+board-pick prerequisite that omits the ordered stage-sequence contract, a
 short-budget incomplete rollout, and invalid rollout task requests. Invalid task cases, such as malformed
 `SOURCE:TARGET` pairs, invalid chess squares, identical source/target squares,
 or non-positive step budgets, must write summary, JSONL, CSV, and README
@@ -39,7 +40,11 @@ checks invalid source-square and invalid target-square requests separately. It
 must keep `observed_evidence_is_policy_training_authority: false` and
 `ready_for_policy_training: false`; a development board-pick prerequisite that
 claims physical or policy-training authority must fail closed before rollout
-evidence is trusted.
+evidence is trusted. A prerequisite with passing aggregate pick/place booleans
+must also expose the expected reset/lower/close/lift/transfer/lower/release/
+retreat stage sequence, empty missing/unexpected stage lists, empty
+`stage_sequence_contract_errors`, and empty
+`manual_piece_pose_after_reset_stage_ids`.
 
 Each JSONL transition contains:
 
@@ -69,6 +74,7 @@ The summary must report:
 - `episode_count` greater than zero
 - `transition_count` greater than zero
 - `development_prerequisites_satisfied: true`
+- `board_pick_prerequisite.required_checks.stage_sequence_contract: true`
 - `training_authority_status: "development_rollouts_prerequisites_verified_not_policy_ready"`
 - `model_authority: "development_scaffold_not_reviewed"`
 - `observed_evidence_is_physical_so101_authority: false`

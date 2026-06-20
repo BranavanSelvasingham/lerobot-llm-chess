@@ -41,6 +41,17 @@ SO101_JOINTS: tuple[str, ...] = (
     "wrist_roll",
     "gripper",
 )
+BOARD_PICK_REQUIRED_STAGE_SEQUENCE: tuple[str, ...] = (
+    "source_reset_piece_on_board",
+    "lower_open_at_source",
+    "close_on_source_piece_forward",
+    "close_on_source_piece_after_settle",
+    "lift_from_source_without_manual_piece_pose",
+    "transfer_to_target_without_manual_piece_pose",
+    "lower_to_target_without_manual_piece_pose",
+    "release_on_target_without_manual_piece_pose",
+    "retreat_after_release_without_manual_piece_pose",
+)
 
 
 def json_number(value: Any) -> float | None:
@@ -213,6 +224,16 @@ def inspect_board_pick_prerequisite(path: Path) -> dict[str, Any]:
             and final_target_xy_error_m <= target_xy_tolerance_m
         ),
         "manual_piece_pose_used_after_reset": summary.get("manual_piece_pose_used_after_reset") is False,
+        "stage_sequence_contract": (
+            summary.get("required_stage_sequence") == list(BOARD_PICK_REQUIRED_STAGE_SEQUENCE)
+            and summary.get("observed_stage_sequence") == list(BOARD_PICK_REQUIRED_STAGE_SEQUENCE)
+            and summary.get("missing_stage_ids") == []
+            and summary.get("unexpected_stage_ids") == []
+            and summary.get("stage_sequence_order_ok") is True
+            and summary.get("stage_sequence_contract_ok") is True
+            and summary.get("stage_sequence_contract_errors") == []
+            and summary.get("manual_piece_pose_after_reset_stage_ids") == []
+        ),
         "robot_pose_seeded_for_source_fixture": summary.get("robot_pose_seeded_for_source_fixture") is True,
     }
     missing = [key for key, ok in required_checks.items() if not ok]
@@ -233,6 +254,16 @@ def inspect_board_pick_prerequisite(path: Path) -> dict[str, Any]:
             ),
             "board_source_pick_place_verified": summary.get("board_source_pick_place_verified"),
             "manual_piece_pose_used_after_reset": summary.get("manual_piece_pose_used_after_reset"),
+            "required_stage_sequence": summary.get("required_stage_sequence"),
+            "observed_stage_sequence": summary.get("observed_stage_sequence"),
+            "missing_stage_ids": summary.get("missing_stage_ids"),
+            "unexpected_stage_ids": summary.get("unexpected_stage_ids"),
+            "stage_sequence_order_ok": summary.get("stage_sequence_order_ok"),
+            "stage_sequence_contract_ok": summary.get("stage_sequence_contract_ok"),
+            "stage_sequence_contract_errors": summary.get("stage_sequence_contract_errors"),
+            "manual_piece_pose_after_reset_stage_ids": summary.get(
+                "manual_piece_pose_after_reset_stage_ids"
+            ),
             "robot_pose_seeded_for_source_fixture": summary.get("robot_pose_seeded_for_source_fixture"),
             "final_target_xy_error_m": summary.get("final_target_xy_error_m"),
             "target_xy_tolerance_m": summary.get("target_xy_tolerance_m"),

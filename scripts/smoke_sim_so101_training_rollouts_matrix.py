@@ -18,6 +18,17 @@ SCHEMA = "lerobot.sim.so101_training_rollouts_matrix.v1"
 BOARD_PICK_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_mujoco_board_pick_probe.py"
 ROLLOUT_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_training_rollouts.py"
 BOARD_PICK_SUMMARY_NAME = "so101_mujoco_board_pick_probe_summary.json"
+BOARD_PICK_REQUIRED_STAGE_SEQUENCE = (
+    "source_reset_piece_on_board",
+    "lower_open_at_source",
+    "close_on_source_piece_forward",
+    "close_on_source_piece_after_settle",
+    "lift_from_source_without_manual_piece_pose",
+    "transfer_to_target_without_manual_piece_pose",
+    "lower_to_target_without_manual_piece_pose",
+    "release_on_target_without_manual_piece_pose",
+    "retreat_after_release_without_manual_piece_pose",
+)
 ROLLOUT_SUMMARY_NAME = "so101_training_rollouts_summary.json"
 
 
@@ -248,12 +259,50 @@ def write_forged_authority_board_pick_prerequisite(path: Path) -> None:
     write_json(path, payload)
 
 
+def write_missing_stage_sequence_board_pick_prerequisite(path: Path) -> None:
+    payload = {
+        "schema": "lerobot.sim.so101_training_rollouts_matrix.missing_stage_sequence_board_pick_prerequisite.v1",
+        "ok": True,
+        "status": "development_board_source_pick_place_verified",
+        "model_authority": "development_scaffold_not_reviewed",
+        "observed_evidence_is_physical_so101_authority": False,
+        "observed_evidence_is_policy_training_authority": False,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "board_source_pick_place_verified": True,
+        "source_pick_started_at_source": True,
+        "close_two_finger_contact_observed": True,
+        "lift_verified": True,
+        "board_contact_cleared_during_lift": True,
+        "transfer_verified": True,
+        "place_without_manual_piece_pose_verified": True,
+        "release_contact_cleared_after_retreat": True,
+        "final_board_contact_observed": True,
+        "final_target_xy_error_m": 0.002,
+        "target_xy_tolerance_m": 0.01,
+        "manual_piece_pose_used_after_reset": False,
+        "robot_pose_seeded_for_source_fixture": True,
+        "required_stage_sequence": list(BOARD_PICK_REQUIRED_STAGE_SEQUENCE),
+        "observed_stage_sequence": list(BOARD_PICK_REQUIRED_STAGE_SEQUENCE[:-1]),
+        "missing_stage_ids": [BOARD_PICK_REQUIRED_STAGE_SEQUENCE[-1]],
+        "unexpected_stage_ids": [],
+        "stage_sequence_order_ok": False,
+        "stage_sequence_contract_ok": False,
+        "stage_sequence_contract_errors": ["observed_stage_sequence_mismatch"],
+        "manual_piece_pose_after_reset_stage_ids": [],
+        "source_square": "e4",
+        "target_square": "e5",
+    }
+    write_json(path, payload)
+
+
 def case_specs(
     output_dir: Path,
     valid_prerequisite: Path,
     failed_prerequisite: Path,
     incomplete_final_prerequisite: Path,
     forged_authority_prerequisite: Path,
+    missing_stage_sequence_prerequisite: Path,
 ) -> list[dict[str, Any]]:
     return [
         {
@@ -350,6 +399,28 @@ def case_specs(
                 "ready_for_policy_training",
                 "observed_evidence_is_physical_so101_authority",
                 "observed_evidence_is_policy_training_authority",
+            ],
+            "expected_all_complete": True,
+            "expected_release_synced": True,
+            "expected_episode_count": 1,
+            "expect_transition_count_positive": True,
+            "expected_model_authority": "development_scaffold_not_reviewed",
+            "expected_rollout_use": "debug_imitation_curriculum_only",
+            "expected_all_fallback_free": True,
+            "expected_model_artifacts": True,
+        },
+        {
+            "case_id": "missing_stage_sequence_board_pick_prerequisite_fails_closed",
+            "prerequisite_path": missing_stage_sequence_prerequisite,
+            "tasks": ["e4:e5"],
+            "max_steps": 96,
+            "expected_return_code": 1,
+            "expected_status": "failed_prerequisite_or_rollout_check",
+            "expected_rollout_ok": False,
+            "expected_development_prerequisites_satisfied": False,
+            "expected_board_pick_prerequisite_status": "development_board_pick_prerequisite_failed",
+            "expected_board_pick_failed_checks_contain": [
+                "stage_sequence_contract",
             ],
             "expected_all_complete": True,
             "expected_release_synced": True,
@@ -778,6 +849,12 @@ def main() -> int:
         output_dir / "prerequisites" / "forged_authority_board_pick_summary.json"
     )
     write_forged_authority_board_pick_prerequisite(forged_authority_prerequisite)
+    missing_stage_sequence_prerequisite = (
+        output_dir / "prerequisites" / "missing_stage_sequence_board_pick_summary.json"
+    )
+    write_missing_stage_sequence_board_pick_prerequisite(
+        missing_stage_sequence_prerequisite
+    )
 
     valid_prerequisite = Path(prereq_record["summary_path"])
     cases = [
@@ -788,6 +865,7 @@ def main() -> int:
             failed_prerequisite,
             incomplete_final_prerequisite,
             forged_authority_prerequisite,
+            missing_stage_sequence_prerequisite,
         )
     ]
     ok = all(case["ok"] for case in cases) and prereq_summary.get("ok") is True

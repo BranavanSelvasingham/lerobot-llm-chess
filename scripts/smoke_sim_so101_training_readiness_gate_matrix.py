@@ -17,6 +17,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 from smoke_sim_calibration_regression_suite import (  # noqa: E402
     SO101_BOARD_PICK_REQUIRED_PHASE_IDS,
+    SO101_BOARD_PICK_REQUIRED_STAGE_SEQUENCE,
     REVIEWED_SO101_MODEL_AUTHORITY,
     SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_ITEM_IDS,
     SO101_TRAINING_PRIORITY_STAGE_IDS,
@@ -88,10 +89,18 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "board_pick_reviewed_model_authority_ready",
         "board_pick_detailed_evidence_ready",
         "board_pick_phase_evidence_ready",
+        "board_pick_stage_sequence_ready",
         "board_pick_phase_ids",
         "board_pick_failed_phase_ids",
         "board_pick_phase_count",
         "board_pick_all_required_phases_verified",
+        "board_pick_stage_sequence_contract_ok",
+        "board_pick_stage_sequence_order_ok",
+        "board_pick_observed_stage_sequence",
+        "board_pick_missing_stage_ids",
+        "board_pick_unexpected_stage_ids",
+        "board_pick_stage_sequence_contract_errors",
+        "board_pick_manual_piece_pose_after_reset_stage_ids",
         "board_pick_final_place_z_error_m",
         "board_pick_place_z_tolerance_m",
         "board_pick_final_place_z_within_tolerance",
@@ -165,11 +174,34 @@ def board_pick_state(
     seeded_source_pose: bool,
     manual_piece_pose_after_reset: bool = False,
     verified: bool = True,
+    stage_sequence_verified: bool = True,
 ) -> dict[str, Any]:
     final_target_xy_error_m = 0.002 if verified else 0.05
     target_xy_tolerance_m = 0.01
     final_place_z_error_m = 0.001 if verified else 0.02
     place_z_tolerance_m = 0.005
+    observed_stage_sequence = (
+        list(SO101_BOARD_PICK_REQUIRED_STAGE_SEQUENCE)
+        if stage_sequence_verified
+        else list(SO101_BOARD_PICK_REQUIRED_STAGE_SEQUENCE[:-1])
+    )
+    missing_stage_ids = (
+        []
+        if stage_sequence_verified
+        else [SO101_BOARD_PICK_REQUIRED_STAGE_SEQUENCE[-1]]
+    )
+    manual_stage_ids = (
+        ["transfer_to_target_without_manual_piece_pose"]
+        if manual_piece_pose_after_reset
+        else []
+    )
+    stage_sequence_contract_errors: list[str] = []
+    if not stage_sequence_verified:
+        stage_sequence_contract_errors.append("observed_stage_sequence_mismatch")
+    if manual_stage_ids:
+        stage_sequence_contract_errors.append(
+            "manual_piece_pose_after_reset_detected"
+        )
     return {
         "status": (
             "reviewed_model_backed_board_source_pick_place_verified"
@@ -200,6 +232,14 @@ def board_pick_state(
         "pick_place_failed_phase_ids": [] if verified else list(SO101_BOARD_PICK_REQUIRED_PHASE_IDS),
         "pick_place_phase_count": len(SO101_BOARD_PICK_REQUIRED_PHASE_IDS),
         "pick_place_all_required_phases_verified": verified,
+        "required_stage_sequence": list(SO101_BOARD_PICK_REQUIRED_STAGE_SEQUENCE),
+        "observed_stage_sequence": observed_stage_sequence,
+        "missing_stage_ids": missing_stage_ids,
+        "unexpected_stage_ids": [],
+        "stage_sequence_order_ok": stage_sequence_verified,
+        "stage_sequence_contract_ok": not stage_sequence_contract_errors,
+        "stage_sequence_contract_errors": stage_sequence_contract_errors,
+        "manual_piece_pose_after_reset_stage_ids": manual_stage_ids,
         "ready_for_model_backed_ik": ready_for_model_backed_ik,
         "model_authority": model_authority,
         "robot_pose_seeded_for_source_fixture": seeded_source_pose,
@@ -470,6 +510,13 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         "pick_place_phase_count": 0,
         "pick_place_all_required_phases_verified": False,
     }
+    board_reviewed_missing_stage_sequence = board_pick_state(
+        summaries / "board_reviewed_missing_stage_sequence.json",
+        model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+        ready_for_model_backed_ik=True,
+        seeded_source_pose=False,
+        stage_sequence_verified=False,
+    )
     board_reviewed_z_tolerance_missing = {
         **board_pick_state(
             summaries / "board_reviewed_z_tolerance_missing.json",
@@ -991,7 +1038,9 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "reviewed_authority": True,
                 "board_pick": False,
                 "board_authority": True,
-                "board_detail": True,
+                "board_detail": False,
+                "board_phase_ready": True,
+                "board_stage_sequence_ready": False,
                 "rollout_raw": True,
                 "rollout_authority": True,
                 "development_caveat": True,
@@ -1085,6 +1134,31 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "board_authority": True,
                 "board_detail": False,
                 "board_phase_ready": False,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "blockers_contain": ["reviewed_model_backed_board_source_pick_place"],
+                "next_priority_gate": "scripted_contact_grasp_pick_place",
+            },
+        },
+        {
+            "case_id": "board_missing_stage_sequence_reviewed_authority_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed_missing_stage_sequence,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": False,
+                "board_authority": True,
+                "board_detail": False,
+                "board_phase_ready": True,
+                "board_stage_sequence_ready": False,
                 "rollout_raw": True,
                 "rollout_authority": True,
                 "development_caveat": True,
@@ -1505,6 +1579,12 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             )
             add_error(
                 errors,
+                "board_pick_stage_sequence_ready",
+                gate.get("board_pick_stage_sequence_ready"),
+                True,
+            )
+            add_error(
+                errors,
                 "board_pick_phase_ids",
                 gate.get("board_pick_phase_ids"),
                 list(SO101_BOARD_PICK_REQUIRED_PHASE_IDS),
@@ -1533,12 +1613,37 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
                 gate.get("board_pick_final_place_z_within_tolerance"),
                 True,
             )
+            add_error(
+                errors,
+                "board_pick_observed_stage_sequence",
+                gate.get("board_pick_observed_stage_sequence"),
+                list(SO101_BOARD_PICK_REQUIRED_STAGE_SEQUENCE),
+            )
+            add_error(
+                errors,
+                "board_pick_missing_stage_ids",
+                gate.get("board_pick_missing_stage_ids"),
+                [],
+            )
+            add_error(
+                errors,
+                "board_pick_manual_piece_pose_after_reset_stage_ids",
+                gate.get("board_pick_manual_piece_pose_after_reset_stage_ids"),
+                [],
+            )
     if "board_phase_ready" in expect:
         add_error(
             errors,
             "board_pick_phase_evidence_ready",
             gate.get("board_pick_phase_evidence_ready"),
             expect["board_phase_ready"],
+        )
+    if "board_stage_sequence_ready" in expect:
+        add_error(
+            errors,
+            "board_pick_stage_sequence_ready",
+            gate.get("board_pick_stage_sequence_ready"),
+            expect["board_stage_sequence_ready"],
         )
     if "board_place_z_within_tolerance" in expect:
         add_error(
@@ -1738,11 +1843,29 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "board_pick_detailed_evidence_ready": gate.get("board_pick_detailed_evidence_ready"),
         "board_pick_phase_evidence_ready": gate.get("board_pick_phase_evidence_ready"),
+        "board_pick_stage_sequence_ready": gate.get("board_pick_stage_sequence_ready"),
         "board_pick_phase_ids": gate.get("board_pick_phase_ids"),
         "board_pick_failed_phase_ids": gate.get("board_pick_failed_phase_ids"),
         "board_pick_phase_count": gate.get("board_pick_phase_count"),
         "board_pick_all_required_phases_verified": gate.get(
             "board_pick_all_required_phases_verified"
+        ),
+        "board_pick_stage_sequence_contract_ok": gate.get(
+            "board_pick_stage_sequence_contract_ok"
+        ),
+        "board_pick_stage_sequence_order_ok": gate.get(
+            "board_pick_stage_sequence_order_ok"
+        ),
+        "board_pick_observed_stage_sequence": gate.get(
+            "board_pick_observed_stage_sequence"
+        ),
+        "board_pick_missing_stage_ids": gate.get("board_pick_missing_stage_ids"),
+        "board_pick_unexpected_stage_ids": gate.get("board_pick_unexpected_stage_ids"),
+        "board_pick_stage_sequence_contract_errors": gate.get(
+            "board_pick_stage_sequence_contract_errors"
+        ),
+        "board_pick_manual_piece_pose_after_reset_stage_ids": gate.get(
+            "board_pick_manual_piece_pose_after_reset_stage_ids"
         ),
         "board_pick_final_place_z_error_m": gate.get("board_pick_final_place_z_error_m"),
         "board_pick_place_z_tolerance_m": gate.get("board_pick_place_z_tolerance_m"),

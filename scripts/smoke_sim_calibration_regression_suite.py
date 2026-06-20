@@ -164,6 +164,17 @@ SO101_BOARD_PICK_REQUIRED_PHASE_IDS = (
     "transfer_toward_target",
     "release_place",
 )
+SO101_BOARD_PICK_REQUIRED_STAGE_SEQUENCE = (
+    "source_reset_piece_on_board",
+    "lower_open_at_source",
+    "close_on_source_piece_forward",
+    "close_on_source_piece_after_settle",
+    "lift_from_source_without_manual_piece_pose",
+    "transfer_to_target_without_manual_piece_pose",
+    "lower_to_target_without_manual_piece_pose",
+    "release_on_target_without_manual_piece_pose",
+    "retreat_after_release_without_manual_piece_pose",
+)
 BASELINE_CORNERS = [[32, 338], [594, 340], [540, 20], [86, 12]]
 PERTURBED_CORNERS = [[34, 337], [592, 342], [538, 22], [88, 14]]
 
@@ -5856,6 +5867,30 @@ def so101_board_pick_phase_evidence_ready(board_pick: dict[str, Any]) -> bool:
     return True
 
 
+def so101_board_pick_stage_sequence_ready(board_pick: dict[str, Any]) -> bool:
+    required_sequence = _json_string_list(board_pick.get("required_stage_sequence"))
+    observed_sequence = _json_string_list(board_pick.get("observed_stage_sequence"))
+    missing_stage_ids = _json_string_list(board_pick.get("missing_stage_ids"))
+    unexpected_stage_ids = _json_string_list(board_pick.get("unexpected_stage_ids"))
+    manual_pose_after_reset_stage_ids = _json_string_list(
+        board_pick.get("manual_piece_pose_after_reset_stage_ids")
+    )
+    stage_contract_errors = _json_string_list(
+        board_pick.get("stage_sequence_contract_errors")
+    )
+    expected_sequence = list(SO101_BOARD_PICK_REQUIRED_STAGE_SEQUENCE)
+    return (
+        required_sequence == expected_sequence
+        and observed_sequence == expected_sequence
+        and missing_stage_ids == []
+        and unexpected_stage_ids == []
+        and board_pick.get("stage_sequence_order_ok") is True
+        and board_pick.get("stage_sequence_contract_ok") is True
+        and stage_contract_errors == []
+        and manual_pose_after_reset_stage_ids == []
+    )
+
+
 def so101_board_pick_detailed_evidence_ready(board_pick: dict[str, Any]) -> bool:
     final_target_xy_error_m = _json_number(board_pick.get("final_target_xy_error_m"))
     target_xy_tolerance_m = _json_number(board_pick.get("target_xy_tolerance_m"))
@@ -5884,6 +5919,7 @@ def so101_board_pick_detailed_evidence_ready(board_pick: dict[str, Any]) -> bool
         and final_target_within_tolerance
         and final_place_z_within_tolerance
         and so101_board_pick_phase_evidence_ready(board_pick)
+        and so101_board_pick_stage_sequence_ready(board_pick)
     )
 
 
@@ -6562,6 +6598,9 @@ def so101_training_readiness_gate_section(
         "board_pick_phase_evidence_ready": so101_board_pick_phase_evidence_ready(
             board_pick
         ),
+        "board_pick_stage_sequence_ready": so101_board_pick_stage_sequence_ready(
+            board_pick
+        ),
         "board_pick_phase_ids": board_pick.get("pick_place_phase_ids"),
         "board_pick_failed_phase_ids": board_pick.get("pick_place_failed_phase_ids"),
         "board_pick_phase_count": board_pick.get("pick_place_phase_count"),
@@ -6571,6 +6610,20 @@ def so101_training_readiness_gate_section(
         "board_pick_phase_evidence_count": len(board_pick.get("pick_place_phase_evidence"))
         if isinstance(board_pick.get("pick_place_phase_evidence"), list)
         else None,
+        "board_pick_required_stage_sequence": board_pick.get("required_stage_sequence"),
+        "board_pick_observed_stage_sequence": board_pick.get("observed_stage_sequence"),
+        "board_pick_missing_stage_ids": board_pick.get("missing_stage_ids"),
+        "board_pick_unexpected_stage_ids": board_pick.get("unexpected_stage_ids"),
+        "board_pick_stage_sequence_order_ok": board_pick.get("stage_sequence_order_ok"),
+        "board_pick_stage_sequence_contract_ok": board_pick.get(
+            "stage_sequence_contract_ok"
+        ),
+        "board_pick_stage_sequence_contract_errors": board_pick.get(
+            "stage_sequence_contract_errors"
+        ),
+        "board_pick_manual_piece_pose_after_reset_stage_ids": board_pick.get(
+            "manual_piece_pose_after_reset_stage_ids"
+        ),
         "board_pick_robot_pose_seeded_for_source_fixture": board_pick.get(
             "robot_pose_seeded_for_source_fixture"
         ),
