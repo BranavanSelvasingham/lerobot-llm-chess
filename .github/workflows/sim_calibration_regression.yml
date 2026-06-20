@@ -4918,6 +4918,12 @@ jobs:
               and "candidate_intake_checked_vendor_decision" in row.get("metrics", {}).get("case_ids", [])
               for row in artifacts_by_category["so101_public_candidate_intake_matrix"]
           ), artifacts_by_category["so101_public_candidate_intake_matrix"]
+          assert any(
+              row.get("label") == "so101_public_candidate_intake_matrix:candidate_intake_checked:operator_intake_requirements"
+              and row.get("kind") == "csv"
+              and row.get("exists") is True
+              for row in artifacts_by_category["so101_public_candidate_intake_matrix"]
+          ), artifacts_by_category["so101_public_candidate_intake_matrix"]
           for row in artifacts_by_category["so101_public_candidate_intake_matrix"]:
               metrics = row.get("metrics", {})
               assert metrics.get("model_authority") == "public_candidate_intake_matrix_not_authority", metrics

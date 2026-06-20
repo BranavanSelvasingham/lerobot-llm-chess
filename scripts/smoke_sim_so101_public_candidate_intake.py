@@ -84,6 +84,15 @@ REVIEW_CHECKLIST_FIELDNAMES = (
     "manifest_fields",
     "authority_boundary",
 )
+OPERATOR_REQUIREMENT_FIELDNAMES = (
+    "option_id",
+    "selected",
+    "requirement_id",
+    "title",
+    "required_evidence",
+    "manifest_or_review_field",
+    "authority_boundary",
+)
 
 
 def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
@@ -294,6 +303,43 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
             "Reviewed authority still requires a reviewed bundle manifest and passing reviewed MuJoCo motion evidence.",
         ],
     }
+
+
+def candidate_operator_intake_requirement_rows(
+    operator_intake_plan: dict[str, Any],
+) -> list[dict[str, Any]]:
+    option_review_requirements = operator_intake_plan.get("option_review_requirements")
+    option_review_requirements = (
+        option_review_requirements
+        if isinstance(option_review_requirements, dict)
+        else {}
+    )
+    selected_option = operator_intake_plan.get("selected_intake_option_id")
+    rows: list[dict[str, Any]] = []
+    for option_id in INTAKE_DECISION_CHOICES:
+        if option_id == UNDECLARED_INTAKE_DECISION:
+            continue
+        requirements = option_review_requirements.get(option_id)
+        requirements = requirements if isinstance(requirements, list) else []
+        for requirement in requirements:
+            if not isinstance(requirement, dict):
+                continue
+            rows.append(
+                {
+                    "option_id": option_id,
+                    "selected": option_id == selected_option,
+                    "requirement_id": requirement.get("requirement_id"),
+                    "title": requirement.get("title"),
+                    "required_evidence": requirement.get("required_evidence"),
+                    "manifest_or_review_field": requirement.get(
+                        "manifest_or_review_field"
+                    ),
+                    "authority_boundary": (
+                        "candidate_operator_intake_requirement_not_authority"
+                    ),
+                }
+            )
+    return rows
 
 
 def candidate_source_lock(summary: dict[str, Any]) -> dict[str, Any]:
@@ -1149,6 +1195,7 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `candidate_review_checklist_json`: `{summary['artifacts']['candidate_review_checklist_json']}`",
         f"- `candidate_review_checklist_csv`: `{summary['artifacts']['candidate_review_checklist_csv']}`",
         f"- `candidate_operator_intake_plan_json`: `{summary['artifacts']['candidate_operator_intake_plan_json']}`",
+        f"- `candidate_operator_intake_requirements_csv`: `{summary['artifacts']['candidate_operator_intake_requirements_csv']}`",
         "",
         "## Next Required Actions",
         "",
@@ -1173,6 +1220,8 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "## Candidate Operator Intake Plan",
             "",
             "The `candidate_operator_intake_plan` JSON records the unresolved vendor-vs-external-source decision, required inputs, command templates, and review flow. It does not clone, vendor, copy, or promote assets to reviewed physical SO-101 authority.",
+            "",
+            "The `candidate_operator_intake_requirements` CSV flattens the external and vendored requirement rows for review tracking. Selected rows only reflect the recorded operator decision and remain non-authoritative.",
             "",
             "## Candidate-Seeded Reviewed Manifest Template",
             "",
@@ -1205,6 +1254,9 @@ def main() -> int:
     review_checklist_path = output_dir / "so101_public_candidate_review_checklist.json"
     review_checklist_csv_path = output_dir / "so101_public_candidate_review_checklist.csv"
     operator_plan_path = output_dir / "so101_public_candidate_operator_intake_plan.json"
+    operator_requirements_csv_path = (
+        output_dir / "so101_public_candidate_operator_intake_requirements.csv"
+    )
     readme_path = output_dir / "README.md"
     artifacts = {
         "summary_json": str(summary_path),
@@ -1216,6 +1268,9 @@ def main() -> int:
         "candidate_review_checklist_json": str(review_checklist_path),
         "candidate_review_checklist_csv": str(review_checklist_csv_path),
         "candidate_operator_intake_plan_json": str(operator_plan_path),
+        "candidate_operator_intake_requirements_csv": str(
+            operator_requirements_csv_path
+        ),
         "readme_md": str(readme_path),
     }
     summary = build_summary(args, artifacts)
@@ -1249,6 +1304,11 @@ def main() -> int:
     )
     write_json(review_checklist_path, candidate_review_checklist)
     write_json(operator_plan_path, operator_intake_plan)
+    write_csv(
+        operator_requirements_csv_path,
+        candidate_operator_intake_requirement_rows(operator_intake_plan),
+        OPERATOR_REQUIREMENT_FIELDNAMES,
+    )
     write_csv(
         review_checklist_csv_path,
         candidate_review_checklist["rows"],

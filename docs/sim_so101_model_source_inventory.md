@@ -201,7 +201,8 @@ The public-candidate intake smoke writes
 `so101_public_candidate_seeded_review_manifest_template.json`,
 `so101_public_candidate_review_manifest_template.direct.json`,
 `so101_public_candidate_review_checklist.json`,
-`so101_public_candidate_review_checklist.csv`, and `README.md`.
+`so101_public_candidate_review_checklist.csv`,
+`so101_public_candidate_operator_intake_requirements.csv`, and `README.md`.
 It hashes the local candidate files and records the pinned upstream commit as
 intake evidence only. The source-lock JSON is the compact review handoff for
 that candidate: upstream commit, selected model path/digest, expected file

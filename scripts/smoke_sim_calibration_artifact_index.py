@@ -3429,6 +3429,20 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
             ),
             metrics=case_metrics,
         )
+        add_path(
+            artifacts,
+            category="so101_public_candidate_intake_matrix",
+            label=f"so101_public_candidate_intake_matrix:{case_id}:operator_intake_requirements",
+            value=record_artifacts.get("candidate_operator_intake_requirements_csv"),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=(
+                "so101_public_candidate_intake_matrix.child_records."
+                f"{case_id}.artifacts.candidate_operator_intake_requirements_csv"
+            ),
+            metrics=case_metrics,
+        )
         preview = record.get("seeded_template_manifest_preview")
         preview = preview if isinstance(preview, dict) else {}
         add_path(

@@ -516,6 +516,7 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "candidate_review_checklist_json",
         "candidate_review_checklist_csv",
         "candidate_operator_intake_plan_json",
+        "candidate_operator_intake_requirements_csv",
         "readme_md",
     ):
         artifact_path = artifacts.get(artifact_key)
