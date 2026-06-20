@@ -16,7 +16,7 @@ The script writes:
 - `so101_model_source_intake_checklist.csv`
 - `README.md`
 
-It exits `0` even when no candidates exist. In that state the JSON reports `ok: true`, `status: "missing_authoritative_model"`, `candidate_count: 0`, `authoritative_candidate_count: 0`, `source_authority_gate_status: "source_authority_blocked_missing_authoritative_model"`, a `source_authority_blockers` list for the missing source-authority work, a `missing_authoritative_model` diagnostic listing the source inputs still required, and `next_required_for_goal`/`next_required_action_ids` entries that keep the operator sequence explicit.
+It exits `0` even when no candidates exist. In that state the JSON reports `ok: true`, `status: "missing_authoritative_model"`, `candidate_count: 0`, `authoritative_candidate_count: 0`, `model_authority: "model_source_inventory_not_authority"`, false `observed_evidence_is_physical_so101_authority`, false `observed_evidence_is_policy_training_authority`, true development-fixture caveats for physical and policy truth, false physical-authority/model-backed-IK/policy-training readiness, `source_authority_gate_status: "source_authority_blocked_missing_authoritative_model"`, a `source_authority_blockers` list for the missing source-authority work, a `missing_authoritative_model` diagnostic listing the source inputs still required, and `next_required_for_goal`/`next_required_action_ids` entries that keep the operator sequence explicit.
 The review packet mirrors that operator sequence with `review_packet_status`,
 `review_packet_model_authority: "review_packet_not_authority"`,
 `review_packet_item_count`, `review_packet_action_ids`, and false
@@ -231,6 +231,14 @@ Key fields:
 - `source_authority_blockers: ["scan_or_supply_so101_model_source_root", "review_and_declare_authoritative_so101_model_source"]`
 - `source_authority_review_scope_ready: false`
 - `source_authority_missing_review_scope_ids: ["model_identity", "provenance", "license"]`
+- `model_authority: "model_source_inventory_not_authority"`
+- `observed_evidence_is_physical_so101_authority: false`
+- `observed_evidence_is_policy_training_authority: false`
+- `development_fixture_evidence_not_physical_so101_truth: true`
+- `development_fixture_evidence_not_policy_training_truth: true`
+- `physical_so101_model_authority_ready: false`
+- `ready_for_model_backed_ik: false`
+- `ready_for_policy_training: false`
 - `artifacts.summary_json: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_inventory_summary.json`
 - `artifacts.candidates_csv: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_candidates.csv`
 - `artifacts.review_packet_json: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_inventory_review_packet.json`

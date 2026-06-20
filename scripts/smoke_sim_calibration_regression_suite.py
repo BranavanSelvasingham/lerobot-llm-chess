@@ -3700,6 +3700,24 @@ def so101_model_source_inventory_section(
         "output_dir": str(summary_path.parent),
         "ok": bool(inventory.get("ok", False)),
         "status": inventory.get("status"),
+        "model_authority": inventory.get("model_authority"),
+        "observed_evidence_is_physical_so101_authority": inventory.get(
+            "observed_evidence_is_physical_so101_authority"
+        ),
+        "observed_evidence_is_policy_training_authority": inventory.get(
+            "observed_evidence_is_policy_training_authority"
+        ),
+        "development_fixture_evidence_not_physical_so101_truth": inventory.get(
+            "development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "development_fixture_evidence_not_policy_training_truth": inventory.get(
+            "development_fixture_evidence_not_policy_training_truth"
+        ),
+        "physical_so101_model_authority_ready": inventory.get(
+            "physical_so101_model_authority_ready"
+        ),
+        "ready_for_model_backed_ik": inventory.get("ready_for_model_backed_ik"),
+        "ready_for_policy_training": inventory.get("ready_for_policy_training"),
         "candidate_count": inventory.get("candidate_count"),
         "likely_candidate_count": inventory.get("likely_candidate_count"),
         "direct_contract_candidate_count": inventory.get("direct_contract_candidate_count"),
@@ -3838,6 +3856,22 @@ def so101_model_bundle_probe_section(
         "ok": bool(probe.get("ok", False)),
         "status": probe.get("status"),
         "model_authority": probe.get("model_authority"),
+        "observed_evidence_is_physical_so101_authority": probe.get(
+            "observed_evidence_is_physical_so101_authority"
+        ),
+        "observed_evidence_is_policy_training_authority": probe.get(
+            "observed_evidence_is_policy_training_authority"
+        ),
+        "development_fixture_evidence_not_physical_so101_truth": probe.get(
+            "development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "development_fixture_evidence_not_policy_training_truth": probe.get(
+            "development_fixture_evidence_not_policy_training_truth"
+        ),
+        "physical_so101_model_authority_ready": probe.get(
+            "physical_so101_model_authority_ready"
+        ),
+        "ready_for_policy_training": probe.get("ready_for_policy_training"),
         "selected_model_path": str(selected_model_path.expanduser()) if selected_model_path is not None else None,
         "configured_asset_roots": [str(path.expanduser()) for path in asset_roots],
         "model_request_status": probe.get("model_request_status"),
@@ -3962,6 +3996,19 @@ def so101_model_bundle_manifest_section(
         "forwarding": forwarding,
         "ready_for_model_backed_ik": bundle.get("ready_for_model_backed_ik"),
         "model_authority": bundle.get("model_authority"),
+        "observed_evidence_is_physical_so101_authority": bundle.get(
+            "observed_evidence_is_physical_so101_authority"
+        ),
+        "observed_evidence_is_policy_training_authority": bundle.get(
+            "observed_evidence_is_policy_training_authority"
+        ),
+        "development_fixture_evidence_not_physical_so101_truth": bundle.get(
+            "development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "development_fixture_evidence_not_policy_training_truth": bundle.get(
+            "development_fixture_evidence_not_policy_training_truth"
+        ),
+        "ready_for_policy_training": bundle.get("ready_for_policy_training"),
         "physical_authority_gate_status": bundle.get("physical_authority_gate_status"),
         "physical_so101_model_authority_ready": bundle.get("physical_so101_model_authority_ready"),
         "physical_authority_blockers": bundle.get("physical_authority_blockers"),

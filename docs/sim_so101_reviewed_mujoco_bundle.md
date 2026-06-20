@@ -40,6 +40,12 @@ also carries `motion_authority_status`,
 `hardware_free_fixture_motion_checked`, and
 `motion_evidence_not_physical_so101_authority` so fixture-only motion cannot be
 mistaken for reviewed physical SO-101 authority.
+The top-level summary reports
+`observed_evidence_is_physical_so101_authority` only when
+`physical_reviewed_model_motion_checked` is true, keeps
+`observed_evidence_is_policy_training_authority: false`, keeps
+`development_fixture_evidence_not_policy_training_truth: true`, and always keeps
+`ready_for_policy_training: false`.
 
 With no manifest, or with a manifest whose bundle checker does not report
 `ready_for_model_backed_ik: true` after checking reviewed joint limits, mesh
@@ -163,8 +169,10 @@ integrated suite forwards it, and requires this gate to report
 `hardware_free_fixture_motion_checked` must be `true`, and
 `physical_reviewed_model_motion_checked` must remain `false`. The fixture is
 automation coverage and must also report
-`physical_so101_model_authority_ready: false`; it is not physical SO-101 model
-authority.
+`physical_so101_model_authority_ready: false`,
+`observed_evidence_is_physical_so101_authority: false`, and
+`development_fixture_evidence_not_physical_so101_truth: true`; it is not
+physical SO-101 model authority.
 Ready-shaped manifests whose authority sections still carry pending review
 actions or missing review inputs are negative forwarding cases in the same
 smoke: they must remain diagnostic-only and must not feed downstream contract,

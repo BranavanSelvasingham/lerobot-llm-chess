@@ -195,6 +195,12 @@ authority is not ready, `physical_authority_blockers` contains the current
 reviewed-authority action IDs plus any
 `synthetic_fixture_authority_not_physical_so101:<field>` blockers that keep
 fixture-ready manifests from being treated as reviewed physical SO-101 truth.
+The top-level summary mirrors this boundary with
+`observed_evidence_is_physical_so101_authority` equal to
+`physical_so101_model_authority_ready`, false
+`observed_evidence_is_policy_training_authority`, true
+`development_fixture_evidence_not_policy_training_truth`, and
+`ready_for_policy_training: false`.
 
 The manifest checker also writes
 `so101_model_bundle_manifest_review_packet.json` and `.csv`. This packet is
@@ -300,6 +306,9 @@ If no explicit `--ik-model-asset-root` values were supplied, the suite also
 forwards manifest `asset_roots` to the contract checker's nested asset
 preflight. Explicit suite CLI values take precedence and the forwarding reason
 is recorded in `so101_model_bundle_manifest.forwarding`.
+The suite also asserts these top-level physical-authority and policy-authority
+boundary fields so a fixture-ready manifest cannot silently become
+serious-training evidence.
 
 ## Manifest Shape
 

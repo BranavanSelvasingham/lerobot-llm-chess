@@ -3091,6 +3091,15 @@ jobs:
               "reviewed_so101_model_bundle_manifest",
           }, bundle_manifest
           assert bundle_manifest["physical_so101_model_authority_ready"] in {True, False}, bundle_manifest
+          assert bundle_manifest["observed_evidence_is_physical_so101_authority"] == (
+              bundle_manifest["physical_so101_model_authority_ready"] is True
+          ), bundle_manifest
+          assert bundle_manifest["observed_evidence_is_policy_training_authority"] is False, bundle_manifest
+          assert bundle_manifest["development_fixture_evidence_not_physical_so101_truth"] == (
+              bundle_manifest["physical_so101_model_authority_ready"] is False
+          ), bundle_manifest
+          assert bundle_manifest["development_fixture_evidence_not_policy_training_truth"] is True, bundle_manifest
+          assert bundle_manifest["ready_for_policy_training"] is False, bundle_manifest
           assert bundle_manifest["hardware_free_regression_fixture_ready"] in {True, False}, bundle_manifest
           assert bundle_manifest["physical_authority_gate_status"] in {
               "physical_reviewed_authority_ready",
@@ -3266,6 +3275,14 @@ jobs:
           assert isinstance(reviewed_mujoco_bundle["physical_reviewed_model_motion_checked"], bool), reviewed_mujoco_bundle
           assert isinstance(reviewed_mujoco_bundle["hardware_free_fixture_motion_checked"], bool), reviewed_mujoco_bundle
           assert isinstance(reviewed_mujoco_bundle["motion_evidence_not_physical_so101_authority"], bool), reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["observed_evidence_is_physical_so101_authority"] == (
+              reviewed_mujoco_bundle["physical_reviewed_model_motion_checked"] is True
+          ), reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["observed_evidence_is_policy_training_authority"] is False, reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["development_fixture_evidence_not_physical_so101_truth"] == (
+              reviewed_mujoco_bundle["physical_reviewed_model_motion_checked"] is False
+          ), reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["development_fixture_evidence_not_policy_training_truth"] is True, reviewed_mujoco_bundle
           assert isinstance(reviewed_mujoco_bundle["motion_authority"], dict), reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["downstream_handoff_status"] in {
               "waiting_for_reviewed_bundle_authority",
@@ -3385,6 +3402,14 @@ jobs:
               "ambiguous_authoritative_model",
               "authoritative_model_found",
           }, source_inventory
+          assert source_inventory["model_authority"] == "model_source_inventory_not_authority", source_inventory
+          assert source_inventory["observed_evidence_is_physical_so101_authority"] is False, source_inventory
+          assert source_inventory["observed_evidence_is_policy_training_authority"] is False, source_inventory
+          assert source_inventory["development_fixture_evidence_not_physical_so101_truth"] is True, source_inventory
+          assert source_inventory["development_fixture_evidence_not_policy_training_truth"] is True, source_inventory
+          assert source_inventory["physical_so101_model_authority_ready"] is False, source_inventory
+          assert source_inventory["ready_for_model_backed_ik"] is False, source_inventory
+          assert source_inventory["ready_for_policy_training"] is False, source_inventory
           assert isinstance(source_inventory["candidate_count"], int), source_inventory
           assert isinstance(source_inventory["likely_candidate_count"], int), source_inventory
           assert isinstance(source_inventory["direct_contract_candidate_count"], int), source_inventory
@@ -3581,7 +3606,13 @@ jobs:
               "candidate_manifest_ready_for_model_backed_ik",
           }, bundle_probe
           assert bundle_probe["model_authority"] == "draft_candidate_not_reviewed", bundle_probe
+          assert bundle_probe["observed_evidence_is_physical_so101_authority"] is False, bundle_probe
+          assert bundle_probe["observed_evidence_is_policy_training_authority"] is False, bundle_probe
+          assert bundle_probe["development_fixture_evidence_not_physical_so101_truth"] is True, bundle_probe
+          assert bundle_probe["development_fixture_evidence_not_policy_training_truth"] is True, bundle_probe
+          assert bundle_probe["physical_so101_model_authority_ready"] is False, bundle_probe
           assert bundle_probe["ready_for_model_backed_ik"] is False, bundle_probe
+          assert bundle_probe["ready_for_policy_training"] is False, bundle_probe
           assert bundle_probe["manifest_status"] in {
               "model_bundle_manifest_needs_follow_up",
               "model_bundle_manifest_unavailable",
