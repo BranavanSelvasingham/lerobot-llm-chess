@@ -408,6 +408,10 @@ jobs:
           assert incomplete["candidate_source_lock_selected_model_observation_observed"] is True, incomplete
           assert incomplete["candidate_source_lock_selected_model_observation_parse_ok"] is True, incomplete
           assert incomplete["candidate_source_lock_selected_model_observation_root_tag"] == "robot", incomplete
+          assert incomplete["candidate_source_lock_selected_model_expected_joint_coverage_status"] == "partial_expected_so101_joints_observed", incomplete
+          assert incomplete["candidate_source_lock_selected_model_expected_joint_observed_count"] == 1, incomplete
+          assert incomplete["candidate_source_lock_selected_model_expected_joint_missing_count"] == 5, incomplete
+          assert incomplete["candidate_source_lock_selected_model_unexpected_joint_count"] == 0, incomplete
           assert incomplete["candidate_operator_intake_plan_model_authority"] == "candidate_operator_intake_plan_not_authority", incomplete
           assert incomplete["candidate_operator_intake_plan_status"] == "candidate_operator_intake_inputs_incomplete", incomplete
           assert incomplete["candidate_operator_intake_decision_status"] == "vendor_or_external_intake_not_declared", incomplete
@@ -440,6 +444,10 @@ jobs:
           assert invalid_model["candidate_source_lock_selected_model_digest_row_count"] == 0, invalid_model
           assert invalid_model["candidate_source_lock_selected_model_observation_observed"] is False, invalid_model
           assert invalid_model["candidate_source_lock_selected_model_observation_parse_ok"] is False, invalid_model
+          assert invalid_model["candidate_source_lock_selected_model_expected_joint_coverage_status"] == "selected_model_not_observed", invalid_model
+          assert invalid_model["candidate_source_lock_selected_model_expected_joint_observed_count"] == 0, invalid_model
+          assert invalid_model["candidate_source_lock_selected_model_expected_joint_missing_count"] == 6, invalid_model
+          assert invalid_model["candidate_source_lock_selected_model_unexpected_joint_count"] == 0, invalid_model
           assert invalid_model["candidate_operator_intake_plan_status"] == "candidate_operator_intake_inputs_incomplete", invalid_model
           assert invalid_model["candidate_operator_intake_decision_status"] == "vendor_or_external_intake_not_declared", invalid_model
           assert invalid_model["candidate_operator_command_plan_status"] == "candidate_operator_commands_ready_for_pinned_source_review", invalid_model
@@ -489,6 +497,10 @@ jobs:
           assert complete["candidate_source_lock_selected_model_observation_observed"] is True, complete
           assert complete["candidate_source_lock_selected_model_observation_parse_ok"] is True, complete
           assert complete["candidate_source_lock_selected_model_observation_root_tag"] == "robot", complete
+          assert complete["candidate_source_lock_selected_model_expected_joint_coverage_status"] == "partial_expected_so101_joints_observed", complete
+          assert complete["candidate_source_lock_selected_model_expected_joint_observed_count"] == 1, complete
+          assert complete["candidate_source_lock_selected_model_expected_joint_missing_count"] == 5, complete
+          assert complete["candidate_source_lock_selected_model_unexpected_joint_count"] == 0, complete
           assert complete["candidate_source_lock_selected_model_mesh_reference_digest_coverage_status"] == "no_mesh_references_observed", complete
           assert complete["candidate_source_lock_selected_model_mesh_reference_digest_match_count"] == 0, complete
           assert complete["candidate_source_lock_selected_model_mesh_reference_digest_missing_count"] == 0, complete
@@ -512,6 +524,10 @@ jobs:
           assert mjcf_model["status"] == "candidate_intake_checked", mjcf_model
           assert mjcf_model["selected_model_status"] == "selectable_so101_model_selected", mjcf_model
           assert mjcf_model["candidate_source_lock_selected_model_observation_root_tag"] == "mujoco", mjcf_model
+          assert mjcf_model["candidate_source_lock_selected_model_expected_joint_coverage_status"] == "no_expected_so101_joints_observed", mjcf_model
+          assert mjcf_model["candidate_source_lock_selected_model_expected_joint_observed_count"] == 0, mjcf_model
+          assert mjcf_model["candidate_source_lock_selected_model_expected_joint_missing_count"] == 6, mjcf_model
+          assert mjcf_model["candidate_source_lock_selected_model_unexpected_joint_count"] == 1, mjcf_model
           assert mjcf_model["candidate_source_lock_selected_model_observation_mesh_reference_count"] == 1, mjcf_model
           assert mjcf_model["candidate_source_lock_selected_model_mesh_reference_digest_coverage_status"] == "all_observed_mesh_references_locked", mjcf_model
           assert mjcf_model["candidate_source_lock_selected_model_mesh_reference_digest_match_count"] == 1, mjcf_model
@@ -5042,12 +5058,20 @@ jobs:
               assert metrics.get("candidate_intake_checked_source_lock_selected_model_observation_observed") is True, metrics
               assert metrics.get("candidate_intake_checked_source_lock_selected_model_observation_parse_ok") is True, metrics
               assert metrics.get("candidate_intake_checked_source_lock_selected_model_observation_root_tag") == "robot", metrics
+              assert metrics.get("candidate_intake_checked_source_lock_selected_model_expected_joint_coverage_status") == "partial_expected_so101_joints_observed", metrics
+              assert metrics.get("candidate_intake_checked_source_lock_selected_model_expected_joint_observed_count") == 1, metrics
+              assert metrics.get("candidate_intake_checked_source_lock_selected_model_expected_joint_missing_count") == 5, metrics
+              assert metrics.get("candidate_intake_checked_source_lock_selected_model_unexpected_joint_count") == 0, metrics
               assert metrics.get("candidate_intake_checked_source_lock_selected_model_mesh_reference_digest_coverage_status") == "no_mesh_references_observed", metrics
               assert metrics.get("candidate_intake_checked_source_lock_selected_model_mesh_reference_digest_match_count") == 0, metrics
               assert metrics.get("candidate_intake_checked_source_lock_selected_model_mesh_reference_digest_missing_count") == 0, metrics
               assert metrics.get("candidate_intake_mjcf_model_selection_status") == "candidate_intake_checked", metrics
               assert metrics.get("candidate_intake_mjcf_model_selection_selected_model_status") == "selectable_so101_model_selected", metrics
               assert metrics.get("candidate_intake_mjcf_model_selection_source_lock_selected_model_observation_root_tag") == "mujoco", metrics
+              assert metrics.get("candidate_intake_mjcf_model_selection_source_lock_selected_model_expected_joint_coverage_status") == "no_expected_so101_joints_observed", metrics
+              assert metrics.get("candidate_intake_mjcf_model_selection_source_lock_selected_model_expected_joint_observed_count") == 0, metrics
+              assert metrics.get("candidate_intake_mjcf_model_selection_source_lock_selected_model_expected_joint_missing_count") == 6, metrics
+              assert metrics.get("candidate_intake_mjcf_model_selection_source_lock_selected_model_unexpected_joint_count") == 1, metrics
               assert metrics.get("candidate_intake_mjcf_model_selection_source_lock_selected_model_observation_mesh_reference_count") == 1, metrics
               assert metrics.get("candidate_intake_mjcf_model_selection_source_lock_selected_model_mesh_reference_digest_coverage_status") == "all_observed_mesh_references_locked", metrics
               assert metrics.get("candidate_intake_mjcf_model_selection_source_lock_selected_model_mesh_reference_digest_match_count") == 1, metrics
@@ -5058,6 +5082,10 @@ jobs:
               assert metrics.get("candidate_intake_invalid_model_selection_status") == "candidate_intake_model_selection_invalid", metrics
               assert metrics.get("candidate_intake_invalid_model_selection_model_present") is True, metrics
               assert metrics.get("candidate_intake_invalid_model_selection_selected_model_supported") is False, metrics
+              assert metrics.get("candidate_intake_invalid_model_selection_source_lock_selected_model_expected_joint_coverage_status") == "selected_model_not_observed", metrics
+              assert metrics.get("candidate_intake_invalid_model_selection_source_lock_selected_model_expected_joint_observed_count") == 0, metrics
+              assert metrics.get("candidate_intake_invalid_model_selection_source_lock_selected_model_expected_joint_missing_count") == 6, metrics
+              assert metrics.get("candidate_intake_invalid_model_selection_source_lock_selected_model_unexpected_joint_count") == 0, metrics
               assert metrics.get("candidate_intake_invalid_model_selection_selected_model_status") == "selected_model_not_supported", metrics
               assert metrics.get("candidate_intake_invalid_model_selection_model_observation_parsed_selectable_model_row_count") == 4, metrics
               assert metrics.get("candidate_intake_invalid_model_selection_model_observation_selected_model_row_count") == 0, metrics

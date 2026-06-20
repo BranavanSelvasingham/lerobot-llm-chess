@@ -4077,6 +4077,18 @@ def so101_public_candidate_intake_matrix_section(
             "candidate_source_lock_selected_model_observation_root_tag": case.get(
                 "candidate_source_lock_selected_model_observation_root_tag"
             ),
+            "candidate_source_lock_selected_model_expected_joint_coverage_status": case.get(
+                "candidate_source_lock_selected_model_expected_joint_coverage_status"
+            ),
+            "candidate_source_lock_selected_model_expected_joint_observed_count": case.get(
+                "candidate_source_lock_selected_model_expected_joint_observed_count"
+            ),
+            "candidate_source_lock_selected_model_expected_joint_missing_count": case.get(
+                "candidate_source_lock_selected_model_expected_joint_missing_count"
+            ),
+            "candidate_source_lock_selected_model_unexpected_joint_count": case.get(
+                "candidate_source_lock_selected_model_unexpected_joint_count"
+            ),
             "candidate_source_lock_selected_model_observation_mesh_reference_count": case.get(
                 "candidate_source_lock_selected_model_observation_mesh_reference_count"
             ),
@@ -4167,6 +4179,26 @@ def so101_public_candidate_intake_matrix_section(
             else None,
             "candidate_source_lock_selected_model_observation_root_tag": case.get(
                 "candidate_source_lock_selected_model_observation_root_tag"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_coverage_status": case.get(
+                "candidate_source_lock_selected_model_expected_joint_coverage_status"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_observed_count": case.get(
+                "candidate_source_lock_selected_model_expected_joint_observed_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_missing_count": case.get(
+                "candidate_source_lock_selected_model_expected_joint_missing_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_unexpected_joint_count": case.get(
+                "candidate_source_lock_selected_model_unexpected_joint_count"
             )
             if isinstance(case, dict)
             else None,
@@ -4408,6 +4440,26 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(checked_case, dict)
             else None,
+            "candidate_source_lock_selected_model_expected_joint_coverage_status": checked_case.get(
+                "candidate_source_lock_selected_model_expected_joint_coverage_status"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_observed_count": checked_case.get(
+                "candidate_source_lock_selected_model_expected_joint_observed_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_missing_count": checked_case.get(
+                "candidate_source_lock_selected_model_expected_joint_missing_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_unexpected_joint_count": checked_case.get(
+                "candidate_source_lock_selected_model_unexpected_joint_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
             "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status": checked_case.get(
                 "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status"
             )
@@ -4628,6 +4680,26 @@ def so101_public_candidate_intake_matrix_section(
             else None,
             "candidate_source_lock_selected_model_observation_parse_ok": invalid_model_selection_case.get(
                 "candidate_source_lock_selected_model_observation_parse_ok"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_coverage_status": invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_expected_joint_coverage_status"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_observed_count": invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_expected_joint_observed_count"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_missing_count": invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_expected_joint_missing_count"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_unexpected_joint_count": invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_unexpected_joint_count"
             )
             if isinstance(invalid_model_selection_case, dict)
             else None,
@@ -5546,6 +5618,18 @@ def so101_reviewed_model_authority_gate_section(
         ),
         "operator_intake_option_count": public_candidate_checked.get(
             "candidate_operator_intake_option_count"
+        ),
+        "selected_model_expected_joint_coverage_status": public_candidate_checked.get(
+            "candidate_source_lock_selected_model_expected_joint_coverage_status"
+        ),
+        "selected_model_expected_joint_observed_count": public_candidate_checked.get(
+            "candidate_source_lock_selected_model_expected_joint_observed_count"
+        ),
+        "selected_model_expected_joint_missing_count": public_candidate_checked.get(
+            "candidate_source_lock_selected_model_expected_joint_missing_count"
+        ),
+        "selected_model_unexpected_joint_count": public_candidate_checked.get(
+            "candidate_source_lock_selected_model_unexpected_joint_count"
         ),
         "recorded_operator_intake_decision_options": (
             recorded_operator_intake_decision_options

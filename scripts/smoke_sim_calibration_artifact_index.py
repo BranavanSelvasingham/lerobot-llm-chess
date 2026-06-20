@@ -3341,6 +3341,26 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
                 "candidate_source_lock_selected_model_observation_root_tag"
             )
         ),
+        "candidate_intake_checked_source_lock_selected_model_expected_joint_coverage_status": (
+            checked_case.get(
+                "candidate_source_lock_selected_model_expected_joint_coverage_status"
+            )
+        ),
+        "candidate_intake_checked_source_lock_selected_model_expected_joint_observed_count": (
+            checked_case.get(
+                "candidate_source_lock_selected_model_expected_joint_observed_count"
+            )
+        ),
+        "candidate_intake_checked_source_lock_selected_model_expected_joint_missing_count": (
+            checked_case.get(
+                "candidate_source_lock_selected_model_expected_joint_missing_count"
+            )
+        ),
+        "candidate_intake_checked_source_lock_selected_model_unexpected_joint_count": (
+            checked_case.get(
+                "candidate_source_lock_selected_model_unexpected_joint_count"
+            )
+        ),
         "candidate_intake_checked_source_lock_selected_model_mesh_reference_digest_coverage_status": (
             checked_case.get(
                 "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status"
@@ -3370,6 +3390,26 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "candidate_intake_mjcf_model_selection_source_lock_selected_model_observation_mesh_reference_count": (
             mjcf_model_selection_case.get(
                 "candidate_source_lock_selected_model_observation_mesh_reference_count"
+            )
+        ),
+        "candidate_intake_mjcf_model_selection_source_lock_selected_model_expected_joint_coverage_status": (
+            mjcf_model_selection_case.get(
+                "candidate_source_lock_selected_model_expected_joint_coverage_status"
+            )
+        ),
+        "candidate_intake_mjcf_model_selection_source_lock_selected_model_expected_joint_observed_count": (
+            mjcf_model_selection_case.get(
+                "candidate_source_lock_selected_model_expected_joint_observed_count"
+            )
+        ),
+        "candidate_intake_mjcf_model_selection_source_lock_selected_model_expected_joint_missing_count": (
+            mjcf_model_selection_case.get(
+                "candidate_source_lock_selected_model_expected_joint_missing_count"
+            )
+        ),
+        "candidate_intake_mjcf_model_selection_source_lock_selected_model_unexpected_joint_count": (
+            mjcf_model_selection_case.get(
+                "candidate_source_lock_selected_model_unexpected_joint_count"
             )
         ),
         "candidate_intake_mjcf_model_selection_source_lock_selected_model_mesh_reference_digest_coverage_status": (
@@ -3462,6 +3502,26 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "candidate_intake_invalid_model_selection_source_lock_selected_model_observation_parse_ok": (
             invalid_model_selection_case.get(
                 "candidate_source_lock_selected_model_observation_parse_ok"
+            )
+        ),
+        "candidate_intake_invalid_model_selection_source_lock_selected_model_expected_joint_coverage_status": (
+            invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_expected_joint_coverage_status"
+            )
+        ),
+        "candidate_intake_invalid_model_selection_source_lock_selected_model_expected_joint_observed_count": (
+            invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_expected_joint_observed_count"
+            )
+        ),
+        "candidate_intake_invalid_model_selection_source_lock_selected_model_expected_joint_missing_count": (
+            invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_expected_joint_missing_count"
+            )
+        ),
+        "candidate_intake_invalid_model_selection_source_lock_selected_model_unexpected_joint_count": (
+            invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_unexpected_joint_count"
             )
         ),
         "candidate_intake_invalid_model_selection_source_lock_selected_model_digest_row_count": (

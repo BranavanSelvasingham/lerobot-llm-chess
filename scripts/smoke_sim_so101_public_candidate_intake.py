@@ -709,6 +709,33 @@ def selected_model_observation(summary: dict[str, Any]) -> dict[str, Any]:
     }
     mesh_references = selected.get("mesh_references")
     mesh_references = mesh_references if isinstance(mesh_references, list) else []
+    joint_names = selected.get("joint_names")
+    joint_names = [
+        str(joint_name)
+        for joint_name in joint_names
+        if isinstance(joint_name, str) and joint_name
+    ] if isinstance(joint_names, list) else []
+    observed_expected_joint_names = [
+        joint_name for joint_name in EXPECTED_SO101_JOINTS if joint_name in joint_names
+    ]
+    missing_expected_joint_names = [
+        joint_name
+        for joint_name in EXPECTED_SO101_JOINTS
+        if joint_name not in observed_expected_joint_names
+    ]
+    unexpected_joint_names = [
+        joint_name for joint_name in joint_names if joint_name not in EXPECTED_SO101_JOINTS
+    ]
+    if not selected:
+        expected_joint_coverage_status = "selected_model_not_observed"
+    elif selected.get("parse_ok") is not True:
+        expected_joint_coverage_status = "selected_model_not_parseable"
+    elif not observed_expected_joint_names:
+        expected_joint_coverage_status = "no_expected_so101_joints_observed"
+    elif missing_expected_joint_names:
+        expected_joint_coverage_status = "partial_expected_so101_joints_observed"
+    else:
+        expected_joint_coverage_status = "all_expected_so101_joints_observed"
     normalized_mesh_references = [
         normalized
         for normalized in (
@@ -744,6 +771,14 @@ def selected_model_observation(summary: dict[str, Any]) -> dict[str, Any]:
         "joint_limit_or_range_count": int(
             selected.get("joint_limit_or_range_count") or 0
         ),
+        "expected_joint_names": list(EXPECTED_SO101_JOINTS),
+        "observed_expected_joint_names": observed_expected_joint_names,
+        "missing_expected_joint_names": missing_expected_joint_names,
+        "unexpected_joint_names": unexpected_joint_names[:200],
+        "expected_joint_coverage_status": expected_joint_coverage_status,
+        "expected_joint_observed_count": len(observed_expected_joint_names),
+        "expected_joint_missing_count": len(missing_expected_joint_names),
+        "unexpected_joint_count": len(unexpected_joint_names),
         "mesh_reference_count": int(selected.get("mesh_reference_count") or 0),
         "mesh_reference_digest_coverage_status": (
             mesh_reference_digest_coverage_status

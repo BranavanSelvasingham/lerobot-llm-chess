@@ -120,6 +120,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_source_lock_selected_model_observation_parse_ok",
         "candidate_source_lock_selected_model_observation_root_tag",
         "candidate_source_lock_selected_model_observation_joint_count",
+        "candidate_source_lock_selected_model_expected_joint_coverage_status",
+        "candidate_source_lock_selected_model_expected_joint_observed_count",
+        "candidate_source_lock_selected_model_expected_joint_missing_count",
+        "candidate_source_lock_selected_model_unexpected_joint_count",
         "candidate_source_lock_selected_model_observation_mesh_reference_count",
         "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status",
         "candidate_source_lock_selected_model_mesh_reference_digest_match_count",
@@ -394,6 +398,12 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "selected_model_status": "selectable_so101_model_selected",
                 "parsed_model_file_count": 5,
                 "selected_model_root_tag": "mujoco",
+                "selected_model_expected_joint_coverage_status": (
+                    "no_expected_so101_joints_observed"
+                ),
+                "selected_model_expected_joint_observed_count": 0,
+                "selected_model_expected_joint_missing_count": 6,
+                "selected_model_unexpected_joint_count": 1,
                 "selected_model_mesh_reference_count": 1,
                 "selected_model_mesh_digest_coverage_status": (
                     "all_observed_mesh_references_locked"
@@ -864,6 +874,55 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
                 f"expected {expected_selected_root_tag!r}, got "
                 f"{selected_model_observation.get('root_tag')!r}"
             )
+        expected_joint_coverage_status = expect.get(
+            "selected_model_expected_joint_coverage_status",
+            "partial_expected_so101_joints_observed",
+        )
+        if (
+            selected_model_observation.get("expected_joint_coverage_status")
+            != expected_joint_coverage_status
+        ):
+            errors.append(
+                f"{case_id}.candidate_source_lock selected model expected joint coverage "
+                f"expected {expected_joint_coverage_status!r}, got "
+                f"{selected_model_observation.get('expected_joint_coverage_status')!r}"
+            )
+        expected_joint_observed_count = int(
+            expect.get("selected_model_expected_joint_observed_count", 1)
+        )
+        if (
+            selected_model_observation.get("expected_joint_observed_count")
+            != expected_joint_observed_count
+        ):
+            errors.append(
+                f"{case_id}.candidate_source_lock selected model expected joint observed count "
+                f"expected {expected_joint_observed_count!r}, got "
+                f"{selected_model_observation.get('expected_joint_observed_count')!r}"
+            )
+        expected_joint_missing_count = int(
+            expect.get("selected_model_expected_joint_missing_count", 5)
+        )
+        if (
+            selected_model_observation.get("expected_joint_missing_count")
+            != expected_joint_missing_count
+        ):
+            errors.append(
+                f"{case_id}.candidate_source_lock selected model expected joint missing count "
+                f"expected {expected_joint_missing_count!r}, got "
+                f"{selected_model_observation.get('expected_joint_missing_count')!r}"
+            )
+        expected_unexpected_joint_count = int(
+            expect.get("selected_model_unexpected_joint_count", 0)
+        )
+        if (
+            selected_model_observation.get("unexpected_joint_count")
+            != expected_unexpected_joint_count
+        ):
+            errors.append(
+                f"{case_id}.candidate_source_lock selected model unexpected joint count "
+                f"expected {expected_unexpected_joint_count!r}, got "
+                f"{selected_model_observation.get('unexpected_joint_count')!r}"
+            )
         expected_mesh_reference_count = int(
             expect.get("selected_model_mesh_reference_count", 0)
         )
@@ -923,6 +982,25 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         ):
             errors.append(
                 f"{case_id}.candidate_source_lock unsupported selected model mesh digest status invalid"
+            )
+        if (
+            selected_model_observation.get("expected_joint_coverage_status")
+            != "selected_model_not_observed"
+        ):
+            errors.append(
+                f"{case_id}.candidate_source_lock unsupported selected model joint coverage status invalid"
+            )
+        if selected_model_observation.get("expected_joint_observed_count") != 0:
+            errors.append(
+                f"{case_id}.candidate_source_lock unsupported selected model observed joint count invalid"
+            )
+        if selected_model_observation.get("expected_joint_missing_count") != 6:
+            errors.append(
+                f"{case_id}.candidate_source_lock unsupported selected model missing joint count invalid"
+            )
+        if selected_model_observation.get("unexpected_joint_count") != 0:
+            errors.append(
+                f"{case_id}.candidate_source_lock unsupported selected model unexpected joint count invalid"
             )
     expected_digest_row_count = int(summary.get("present_expected_file_count") or 0)
     expected_selected_digest_row_count = (
@@ -1366,6 +1444,18 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         ),
         "candidate_source_lock_selected_model_observation_joint_count": (
             selected_model_observation.get("joint_count")
+        ),
+        "candidate_source_lock_selected_model_expected_joint_coverage_status": (
+            selected_model_observation.get("expected_joint_coverage_status")
+        ),
+        "candidate_source_lock_selected_model_expected_joint_observed_count": (
+            selected_model_observation.get("expected_joint_observed_count")
+        ),
+        "candidate_source_lock_selected_model_expected_joint_missing_count": (
+            selected_model_observation.get("expected_joint_missing_count")
+        ),
+        "candidate_source_lock_selected_model_unexpected_joint_count": (
+            selected_model_observation.get("unexpected_joint_count")
         ),
         "candidate_source_lock_selected_model_observation_mesh_reference_count": (
             selected_model_observation.get("mesh_reference_count")

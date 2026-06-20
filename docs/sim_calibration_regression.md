@@ -482,16 +482,21 @@ selectable variant, and selected model row counts for reviewer inspection, and
 copy the selected model parse observation into the source-lock handoff without
 granting model authority. The matrix includes a MJCF model-selection case so
 the handoff can distinguish `no_mesh_references_observed` from observed mesh
-references covered by the locked candidate digest set. The artifacts also list
-the command templates, explicit clone/fetch/checkout/intake/checker command
-steps, plus flat external/vendor review requirements for either a local external
+references covered by the locked candidate digest set, and it records selected
+model coverage against the expected SO-101 control joint names. Those joint
+coverage fields are intake diagnostics only; they are not reviewed joint-limit
+truth and must still be reconciled against the reviewed bundle manifest before
+model-backed IK or policy training can rely on them. The artifacts also list the
+command templates, explicit clone/fetch/checkout/intake/checker command steps,
+plus flat external/vendor review requirements for either a local external
 checkout or a vendored locked bundle. The intake summary and artifact index
 expose model-observation row counts, selected model observation row count, digest
-row counts, selected model digest row count, requirement row count, selected row
-count, unselected row count, selected row IDs, command-plan status, and selected
-option command count for undecided, external-source, and vendor-lock decisions
-so the observation CSV, digest CSV, requirement CSV, and command plan cannot
-silently drift from the recorded operator decision.
+row counts, selected model digest row count, selected model expected-joint
+coverage status and counts, requirement row count, selected row count,
+unselected row count, selected row IDs, command-plan status, and selected option
+command count for undecided, external-source, and vendor-lock decisions so the
+observation CSV, digest CSV, requirement CSV, and command plan cannot silently
+drift from the recorded operator decision.
 The matrix includes an unpinned-ref case (`--upstream-commit main`) and requires
 `candidate_source_lock_ready_for_review: false` until the upstream commit is a
 full immutable SHA.
