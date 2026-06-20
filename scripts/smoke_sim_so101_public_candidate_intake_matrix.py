@@ -105,6 +105,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_review_observations_model_authority",
         "candidate_model_observation_model_authority",
         "candidate_model_observation_row_count",
+        "candidate_model_observation_scene_row_count",
+        "candidate_model_observation_selectable_model_row_count",
+        "candidate_model_observation_parsed_selectable_model_row_count",
         "candidate_model_observation_selected_model_row_count",
         "candidate_source_lock_model_authority",
         "candidate_source_lock_status",
@@ -608,6 +611,12 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "candidate_review_observations_not_authority",
     )
     expected_model_observation_row_count = 5 if expect["parsed_model_file_count"] else 0
+    expected_model_observation_scene_row_count = (
+        1 if expect["parsed_model_file_count"] else 0
+    )
+    expected_model_observation_selectable_model_row_count = (
+        4 if expect["parsed_model_file_count"] else 0
+    )
     expected_selected_model_observation_row_count = (
         1 if expect["model_present"] and expected_selected_model_supported else 0
     )
@@ -620,6 +629,21 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "candidate_model_observation_row_count",
         summary.get("candidate_model_observation_row_count"),
         expected_model_observation_row_count,
+    )
+    check(
+        "candidate_model_observation_scene_row_count",
+        summary.get("candidate_model_observation_scene_row_count"),
+        expected_model_observation_scene_row_count,
+    )
+    check(
+        "candidate_model_observation_selectable_model_row_count",
+        summary.get("candidate_model_observation_selectable_model_row_count"),
+        expected_model_observation_selectable_model_row_count,
+    )
+    check(
+        "candidate_model_observation_parsed_selectable_model_row_count",
+        summary.get("candidate_model_observation_parsed_selectable_model_row_count"),
+        expected_model_observation_selectable_model_row_count,
     )
     check(
         "candidate_model_observation_selected_model_row_count",
@@ -1156,6 +1180,15 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         ),
         "candidate_model_observation_row_count": summary.get(
             "candidate_model_observation_row_count"
+        ),
+        "candidate_model_observation_scene_row_count": summary.get(
+            "candidate_model_observation_scene_row_count"
+        ),
+        "candidate_model_observation_selectable_model_row_count": summary.get(
+            "candidate_model_observation_selectable_model_row_count"
+        ),
+        "candidate_model_observation_parsed_selectable_model_row_count": summary.get(
+            "candidate_model_observation_parsed_selectable_model_row_count"
         ),
         "candidate_model_observation_selected_model_row_count": summary.get(
             "candidate_model_observation_selected_model_row_count"

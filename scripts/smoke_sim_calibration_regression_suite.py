@@ -4082,6 +4082,21 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(case, dict)
             else None,
+            "candidate_model_observation_scene_row_count": case.get(
+                "candidate_model_observation_scene_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_model_observation_selectable_model_row_count": case.get(
+                "candidate_model_observation_selectable_model_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_model_observation_parsed_selectable_model_row_count": case.get(
+                "candidate_model_observation_parsed_selectable_model_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
             "candidate_model_observation_selected_model_row_count": case.get(
                 "candidate_model_observation_selected_model_row_count"
             )
@@ -4254,6 +4269,21 @@ def so101_public_candidate_intake_matrix_section(
             else None,
             "candidate_model_observation_row_count": checked_case.get(
                 "candidate_model_observation_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_model_observation_scene_row_count": checked_case.get(
+                "candidate_model_observation_scene_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_model_observation_selectable_model_row_count": checked_case.get(
+                "candidate_model_observation_selectable_model_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_model_observation_parsed_selectable_model_row_count": checked_case.get(
+                "candidate_model_observation_parsed_selectable_model_row_count"
             )
             if isinstance(checked_case, dict)
             else None,
@@ -4477,6 +4507,11 @@ def so101_public_candidate_intake_matrix_section(
             else None,
             "candidate_model_observation_selected_model_row_count": invalid_model_selection_case.get(
                 "candidate_model_observation_selected_model_row_count"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_model_observation_parsed_selectable_model_row_count": invalid_model_selection_case.get(
+                "candidate_model_observation_parsed_selectable_model_row_count"
             )
             if isinstance(invalid_model_selection_case, dict)
             else None,

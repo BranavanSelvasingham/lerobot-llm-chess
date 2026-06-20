@@ -394,6 +394,9 @@ jobs:
           assert incomplete["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", incomplete
           assert incomplete["candidate_model_observation_model_authority"] == "candidate_model_observation_not_authority", incomplete
           assert incomplete["candidate_model_observation_row_count"] == 5, incomplete
+          assert incomplete["candidate_model_observation_scene_row_count"] == 1, incomplete
+          assert incomplete["candidate_model_observation_selectable_model_row_count"] == 4, incomplete
+          assert incomplete["candidate_model_observation_parsed_selectable_model_row_count"] == 4, incomplete
           assert incomplete["candidate_model_observation_selected_model_row_count"] == 1, incomplete
           assert incomplete["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", incomplete
           assert incomplete["candidate_review_checklist_row_count"] == 8, incomplete
@@ -422,6 +425,9 @@ jobs:
           assert invalid_model["selected_model_supported"] is False, invalid_model
           assert invalid_model["selected_model_status"] == "selected_model_not_supported", invalid_model
           assert invalid_model["candidate_model_observation_row_count"] == 5, invalid_model
+          assert invalid_model["candidate_model_observation_scene_row_count"] == 1, invalid_model
+          assert invalid_model["candidate_model_observation_selectable_model_row_count"] == 4, invalid_model
+          assert invalid_model["candidate_model_observation_parsed_selectable_model_row_count"] == 4, invalid_model
           assert invalid_model["candidate_model_observation_selected_model_row_count"] == 0, invalid_model
           assert invalid_model["candidate_source_lock_status"] == "candidate_source_lock_incomplete", invalid_model
           assert invalid_model["candidate_source_lock_ready_for_review"] is False, invalid_model
@@ -463,6 +469,9 @@ jobs:
           assert complete["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", complete
           assert complete["candidate_model_observation_model_authority"] == "candidate_model_observation_not_authority", complete
           assert complete["candidate_model_observation_row_count"] == 5, complete
+          assert complete["candidate_model_observation_scene_row_count"] == 1, complete
+          assert complete["candidate_model_observation_selectable_model_row_count"] == 4, complete
+          assert complete["candidate_model_observation_parsed_selectable_model_row_count"] == 4, complete
           assert complete["candidate_model_observation_selected_model_row_count"] == 1, complete
           assert complete["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", complete
           assert complete["candidate_review_checklist_row_count"] == 8, complete
@@ -5002,6 +5011,10 @@ jobs:
               assert metrics.get("candidate_intake_checked_operator_intake_plan_model_authority") == "candidate_operator_intake_plan_not_authority", metrics
               assert metrics.get("candidate_intake_checked_selected_model_supported") is True, metrics
               assert metrics.get("candidate_intake_checked_selected_model_status") == "selectable_so101_model_selected", metrics
+              assert metrics.get("candidate_intake_checked_model_observation_scene_row_count") == 1, metrics
+              assert metrics.get("candidate_intake_checked_model_observation_selectable_model_row_count") == 4, metrics
+              assert metrics.get("candidate_intake_checked_model_observation_parsed_selectable_model_row_count") == 4, metrics
+              assert metrics.get("candidate_intake_checked_model_observation_selected_model_row_count") == 1, metrics
               assert metrics.get("candidate_intake_checked_upstream_commit_sha_valid") is True, metrics
               assert metrics.get("candidate_intake_checked_upstream_commit_status") == "upstream_commit_sha_pinned", metrics
               assert metrics.get("candidate_intake_checked_operator_intake_decision_status") == "vendor_or_external_intake_not_declared", metrics
@@ -5009,6 +5022,8 @@ jobs:
               assert metrics.get("candidate_intake_invalid_model_selection_model_present") is True, metrics
               assert metrics.get("candidate_intake_invalid_model_selection_selected_model_supported") is False, metrics
               assert metrics.get("candidate_intake_invalid_model_selection_selected_model_status") == "selected_model_not_supported", metrics
+              assert metrics.get("candidate_intake_invalid_model_selection_model_observation_parsed_selectable_model_row_count") == 4, metrics
+              assert metrics.get("candidate_intake_invalid_model_selection_model_observation_selected_model_row_count") == 0, metrics
               assert metrics.get("candidate_intake_invalid_model_selection_source_lock_status") == "candidate_source_lock_incomplete", metrics
               assert metrics.get("candidate_intake_invalid_model_selection_source_lock_ready_for_review") is False, metrics
               assert metrics.get("candidate_intake_invalid_model_selection_operator_intake_plan_status") == "candidate_operator_intake_inputs_incomplete", metrics

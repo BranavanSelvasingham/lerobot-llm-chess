@@ -1551,6 +1551,9 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `candidate_review_observations_ready_for_model_backed_ik`: `{str(summary['candidate_review_observations']['ready_for_model_backed_ik']).lower()}`",
         f"- `candidate_model_observation_model_authority`: `{summary['candidate_model_observation_model_authority']}`",
         f"- `candidate_model_observation_row_count`: `{summary['candidate_model_observation_row_count']}`",
+        f"- `candidate_model_observation_scene_row_count`: `{summary['candidate_model_observation_scene_row_count']}`",
+        f"- `candidate_model_observation_selectable_model_row_count`: `{summary['candidate_model_observation_selectable_model_row_count']}`",
+        f"- `candidate_model_observation_parsed_selectable_model_row_count`: `{summary['candidate_model_observation_parsed_selectable_model_row_count']}`",
         f"- `candidate_model_observation_selected_model_row_count`: `{summary['candidate_model_observation_selected_model_row_count']}`",
         f"- `candidate_source_lock_model_authority`: `{summary['candidate_source_lock_model_authority']}`",
         f"- `candidate_source_lock_status`: `{summary['candidate_source_lock']['status']}`",
@@ -1688,6 +1691,17 @@ def main() -> int:
         "candidate_model_observation_not_authority"
     )
     summary["candidate_model_observation_row_count"] = len(model_observation_rows)
+    summary["candidate_model_observation_scene_row_count"] = sum(
+        1 for row in model_observation_rows if row.get("relative_path") == "scene.xml"
+    )
+    summary["candidate_model_observation_selectable_model_row_count"] = sum(
+        1 for row in model_observation_rows if row.get("selectable_model") is True
+    )
+    summary["candidate_model_observation_parsed_selectable_model_row_count"] = sum(
+        1
+        for row in model_observation_rows
+        if row.get("selectable_model") is True and row.get("parse_ok") is True
+    )
     summary["candidate_model_observation_selected_model_row_count"] = len(
         selected_model_observation_rows
     )
@@ -1816,6 +1830,15 @@ def main() -> int:
                 ],
                 "candidate_model_observation_row_count": summary[
                     "candidate_model_observation_row_count"
+                ],
+                "candidate_model_observation_scene_row_count": summary[
+                    "candidate_model_observation_scene_row_count"
+                ],
+                "candidate_model_observation_selectable_model_row_count": summary[
+                    "candidate_model_observation_selectable_model_row_count"
+                ],
+                "candidate_model_observation_parsed_selectable_model_row_count": summary[
+                    "candidate_model_observation_parsed_selectable_model_row_count"
                 ],
                 "candidate_model_observation_selected_model_row_count": summary[
                     "candidate_model_observation_selected_model_row_count"

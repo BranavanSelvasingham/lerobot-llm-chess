@@ -3292,6 +3292,17 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "candidate_intake_checked_model_observation_row_count": checked_case.get(
             "candidate_model_observation_row_count"
         ),
+        "candidate_intake_checked_model_observation_scene_row_count": (
+            checked_case.get("candidate_model_observation_scene_row_count")
+        ),
+        "candidate_intake_checked_model_observation_selectable_model_row_count": (
+            checked_case.get("candidate_model_observation_selectable_model_row_count")
+        ),
+        "candidate_intake_checked_model_observation_parsed_selectable_model_row_count": (
+            checked_case.get(
+                "candidate_model_observation_parsed_selectable_model_row_count"
+            )
+        ),
         "candidate_intake_checked_model_observation_selected_model_row_count": (
             checked_case.get("candidate_model_observation_selected_model_row_count")
         ),
@@ -3358,6 +3369,11 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "candidate_intake_invalid_model_selection_model_observation_selected_model_row_count": (
             invalid_model_selection_case.get(
                 "candidate_model_observation_selected_model_row_count"
+            )
+        ),
+        "candidate_intake_invalid_model_selection_model_observation_parsed_selectable_model_row_count": (
+            invalid_model_selection_case.get(
+                "candidate_model_observation_parsed_selectable_model_row_count"
             )
         ),
         "candidate_intake_invalid_model_selection_source_lock_status": (
