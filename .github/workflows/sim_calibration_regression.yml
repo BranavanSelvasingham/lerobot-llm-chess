@@ -4836,6 +4836,7 @@ jobs:
               "ranked_candidate",
               "perception_fixture",
               "sim_camera_pose_fixture",
+              "so101_public_candidate_intake_matrix",
               "so101_model_source_inventory",
               "so101_reviewed_model_authority_gate",
               "so101_model_bundle_probe",
@@ -4882,6 +4883,27 @@ jobs:
               ]
               for category in required_artifact_categories
           }
+          assert any(
+              row.get("label") == "so101_public_candidate_intake_matrix:summary"
+              and row.get("kind") == "json"
+              and row.get("exists") is True
+              and row.get("metrics", {}).get("case_count") == 5
+              and "candidate_intake_checked_external_decision" in row.get("metrics", {}).get("case_ids", [])
+              for row in artifacts_by_category["so101_public_candidate_intake_matrix"]
+          ), artifacts_by_category["so101_public_candidate_intake_matrix"]
+          for row in artifacts_by_category["so101_public_candidate_intake_matrix"]:
+              metrics = row.get("metrics", {})
+              assert metrics.get("model_authority") == "public_candidate_intake_matrix_not_authority", metrics
+              assert metrics.get("observed_evidence_is_physical_so101_authority") is False, metrics
+              assert metrics.get("ready_for_model_backed_ik") is False, metrics
+              assert metrics.get("ready_for_policy_training") is False, metrics
+              assert metrics.get("candidate_intake_checked_operator_intake_plan_model_authority") == "candidate_operator_intake_plan_not_authority", metrics
+              assert metrics.get("candidate_intake_checked_operator_intake_decision_status") == "vendor_or_external_intake_not_declared", metrics
+              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_plan_model_authority") == "candidate_operator_intake_plan_not_authority", metrics
+              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_decision_status") == "candidate_intake_decision_recorded_not_authority", metrics
+              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_option") == "external_pinned_source_root", metrics
+              assert metrics.get("candidate_intake_checked_external_decision_ready_for_model_backed_ik") is False, metrics
+              assert metrics.get("candidate_intake_checked_external_decision_physical_authority") is False, metrics
           assert any(
               row.get("kind") == "json"
               and row.get("exists") is True

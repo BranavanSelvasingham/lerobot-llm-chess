@@ -3231,6 +3231,10 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
     artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
     checked_case = matrix.get("candidate_intake_checked")
     checked_case = checked_case if isinstance(checked_case, dict) else {}
+    external_decision_case = matrix.get("candidate_intake_checked_external_decision")
+    external_decision_case = (
+        external_decision_case if isinstance(external_decision_case, dict) else {}
+    )
     child_records = matrix.get("child_records")
     child_records = child_records if isinstance(child_records, list) else []
     metrics = {
@@ -3271,8 +3275,32 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "candidate_intake_checked_operator_intake_decision_status": checked_case.get(
             "candidate_operator_intake_decision_status"
         ),
+        "candidate_intake_checked_operator_intake_selected_option": checked_case.get(
+            "candidate_operator_intake_selected_option"
+        ),
         "candidate_intake_checked_operator_intake_option_count": checked_case.get(
             "candidate_operator_intake_option_count"
+        ),
+        "candidate_intake_checked_external_decision_status": external_decision_case.get(
+            "status"
+        ),
+        "candidate_intake_checked_external_decision_operator_intake_plan_model_authority": (
+            external_decision_case.get("candidate_operator_intake_plan_model_authority")
+        ),
+        "candidate_intake_checked_external_decision_operator_intake_plan_status": (
+            external_decision_case.get("candidate_operator_intake_plan_status")
+        ),
+        "candidate_intake_checked_external_decision_operator_intake_decision_status": (
+            external_decision_case.get("candidate_operator_intake_decision_status")
+        ),
+        "candidate_intake_checked_external_decision_operator_intake_selected_option": (
+            external_decision_case.get("candidate_operator_intake_selected_option")
+        ),
+        "candidate_intake_checked_external_decision_ready_for_model_backed_ik": (
+            external_decision_case.get("ready_for_model_backed_ik")
+        ),
+        "candidate_intake_checked_external_decision_physical_authority": (
+            external_decision_case.get("observed_evidence_is_physical_so101_authority")
         ),
         "seeded_template_manifest_checker_status": checked_case.get(
             "seeded_template_manifest_checker_status"
