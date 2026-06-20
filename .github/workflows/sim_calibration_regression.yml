@@ -821,6 +821,26 @@ jobs:
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
           by_case = {case["case_id"]: case for case in summary["cases"]}
+          for case in summary["cases"]:
+              packet = case["blocker_packet"]
+              gate = case["gate"]
+              assert packet["training_priority_gate_id"] == "reviewed_model_authority", case
+              assert packet["training_priority_gate_order"] == [
+                  "reviewed_model_authority",
+                  "mujoco_scene_validity",
+                  "gymnasium_task_wiring",
+                  "scripted_contact_grasp_pick_place",
+                  "focused_training_rollouts",
+              ], case
+              assert packet["next_training_gate_after_ready"] == "mujoco_scene_validity", case
+              assert packet["blocks_serious_policy_training_until_ready"] == (gate["ready"] is False), case
+              assert packet["ready_does_not_imply_policy_training_ready"] is True, case
+              boundary = packet["policy_training_authority_boundary"]
+              assert boundary["training_priority_gate_id"] == "reviewed_model_authority", case
+              assert boundary["next_training_gate_after_ready"] == "mujoco_scene_validity", case
+              assert boundary["blocks_serious_policy_training_until_ready"] == packet["blocks_serious_policy_training_until_ready"], case
+              assert boundary["ready_does_not_imply_policy_training_ready"] is True, case
+              assert case["checklist_status_by_requirement_id"]["serious_policy_training_boundary"] == "ok", case
           stale_source_case = by_case["source_ready_with_stale_blocker_physical_bundle_ready"]
           stale_source = stale_source_case["gate"]
           assert stale_source["ready"] is False, stale_source
@@ -3351,6 +3371,28 @@ jobs:
           }, reviewed_model_authority_gate
           assert isinstance(reviewed_model_authority_gate["ready"], bool), reviewed_model_authority_gate
           assert reviewed_model_authority_gate["reviewed_model_authority_ready"] == reviewed_model_authority_gate["ready"], reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["training_priority_gate_id"] == "reviewed_model_authority", reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["training_priority_gate_order"] == [
+              "reviewed_model_authority",
+              "mujoco_scene_validity",
+              "gymnasium_task_wiring",
+              "scripted_contact_grasp_pick_place",
+              "focused_training_rollouts",
+          ], reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["next_training_gate_after_ready"] == "mujoco_scene_validity", reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["blocks_serious_policy_training_until_ready"] == (
+              reviewed_model_authority_gate["ready"] is False
+          ), reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["serious_policy_training_dependency_status"] in {
+              "blocked_by_reviewed_model_authority",
+              "advance_to_mujoco_scene_validity",
+          }, reviewed_model_authority_gate
+          assert reviewed_model_authority_gate["ready_does_not_imply_policy_training_ready"] is True, reviewed_model_authority_gate
+          policy_training_boundary = reviewed_model_authority_gate["policy_training_authority_boundary"]
+          assert policy_training_boundary["training_priority_gate_id"] == "reviewed_model_authority", policy_training_boundary
+          assert policy_training_boundary["next_training_gate_after_ready"] == "mujoco_scene_validity", policy_training_boundary
+          assert policy_training_boundary["blocks_serious_policy_training_until_ready"] == reviewed_model_authority_gate["blocks_serious_policy_training_until_ready"], policy_training_boundary
+          assert policy_training_boundary["ready_does_not_imply_policy_training_ready"] is True, policy_training_boundary
           assert reviewed_model_authority_gate["source_authority_ready"] == (
               source_inventory["source_authority_gate_status"] == "source_authority_ready"
           ), reviewed_model_authority_gate
@@ -4497,6 +4539,30 @@ jobs:
                   & set(metrics.get("blocker_packet_blocked_by_prior_requirements_item_ids") or [])
               ), metrics
               assert isinstance(metrics.get("blocker_packet_next_action_ids"), list), metrics
+              assert metrics.get("training_priority_gate_id") == "reviewed_model_authority", metrics
+              assert metrics.get("training_priority_gate_order") == [
+                  "reviewed_model_authority",
+                  "mujoco_scene_validity",
+                  "gymnasium_task_wiring",
+                  "scripted_contact_grasp_pick_place",
+                  "focused_training_rollouts",
+              ], metrics
+              assert metrics.get("next_training_gate_after_ready") == "mujoco_scene_validity", metrics
+              assert metrics.get("blocks_serious_policy_training_until_ready") == (
+                  metrics.get("ready") is False
+              ), metrics
+              assert metrics.get("serious_policy_training_dependency_status") in {
+                  "blocked_by_reviewed_model_authority",
+                  "advance_to_mujoco_scene_validity",
+              }, metrics
+              assert metrics.get("ready_does_not_imply_policy_training_ready") is True, metrics
+              policy_training_boundary = metrics.get("policy_training_authority_boundary")
+              assert isinstance(policy_training_boundary, dict), metrics
+              assert policy_training_boundary.get("training_priority_gate_id") == "reviewed_model_authority", metrics
+              assert policy_training_boundary.get("training_priority_gate_order") == metrics.get("training_priority_gate_order"), metrics
+              assert policy_training_boundary.get("next_training_gate_after_ready") == "mujoco_scene_validity", metrics
+              assert policy_training_boundary.get("blocks_serious_policy_training_until_ready") == metrics.get("blocks_serious_policy_training_until_ready"), metrics
+              assert policy_training_boundary.get("ready_does_not_imply_policy_training_ready") is True, metrics
               assert isinstance(metrics.get("checklist_status_by_requirement_id"), dict), metrics
               assert metrics.get("checklist_status_by_requirement_id") == reviewed_model_authority_gate.get("checklist_status_by_requirement_id"), metrics
               assert isinstance(metrics.get("checklist_next_action_ids_by_requirement_id"), dict), metrics
@@ -4510,6 +4576,7 @@ jobs:
               checklist_prior_statuses = metrics.get("checklist_blocked_by_prior_requirement_statuses_by_requirement_id")
               assert checklist_statuses.get("source_authority_ready") in {"ready", "action_required"}, metrics
               assert checklist_statuses.get("physical_bundle_authority_ready") in {"ready", "action_required"}, metrics
+              assert checklist_statuses.get("serious_policy_training_boundary") == "ok", metrics
               for requirement_id in ("source_authority_ready", "physical_bundle_authority_ready"):
                   if checklist_statuses.get(requirement_id) == "action_required":
                       assert checklist_next_actions.get(requirement_id) in metrics.get("blocker_packet_next_action_ids"), metrics

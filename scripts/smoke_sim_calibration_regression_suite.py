@@ -5439,16 +5439,53 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
         for item in items
         if item.get("status") == "blocked_by_prior_requirements"
     ]
+    ready = gate.get("ready") is True
+    training_priority_gate_order = list(SO101_TRAINING_PRIORITY_STAGE_IDS)
+    next_training_gate_after_ready = (
+        training_priority_gate_order[1] if len(training_priority_gate_order) > 1 else None
+    )
+    blocks_serious_policy_training_until_ready = not ready
+    policy_training_authority_boundary = {
+        "training_priority_gate_id": training_priority_gate_order[0],
+        "training_priority_gate_order": training_priority_gate_order,
+        "next_training_gate_after_ready": next_training_gate_after_ready,
+        "blocks_serious_policy_training_until_ready": (
+            blocks_serious_policy_training_until_ready
+        ),
+        "ready_does_not_imply_policy_training_ready": True,
+        "development_fixture_evidence_not_policy_training_truth": True,
+        "status": (
+            "blocked_by_reviewed_model_authority"
+            if blocks_serious_policy_training_until_ready
+            else "advance_to_mujoco_scene_validity"
+        ),
+        "notes": [
+            "Reviewed model authority is the first serious-training gate.",
+            "Clearing this gate only allows MuJoCo scene validity work to become the next priority; it does not authorize policy training.",
+            "Development fixture evidence remains automation coverage, not policy-training authority.",
+        ],
+    }
     return {
         "schema": "lerobot.sim.so101_reviewed_model_authority_blocker_packet.v1",
         "ok": True,
         "status": (
             "reviewed_model_authority_ready"
-            if gate.get("ready") is True
+            if ready
             else "reviewed_model_authority_blocked"
         ),
         "model_authority": "blocker_packet_not_authority",
-        "ready": gate.get("ready") is True,
+        "ready": ready,
+        "training_priority_gate_id": training_priority_gate_order[0],
+        "training_priority_gate_order": training_priority_gate_order,
+        "next_training_gate_after_ready": next_training_gate_after_ready,
+        "blocks_serious_policy_training_until_ready": (
+            blocks_serious_policy_training_until_ready
+        ),
+        "serious_policy_training_dependency_status": (
+            policy_training_authority_boundary["status"]
+        ),
+        "ready_does_not_imply_policy_training_ready": True,
+        "policy_training_authority_boundary": policy_training_authority_boundary,
         "action_required_item_ids": action_required_item_ids,
         "action_required_count": len(action_required_item_ids),
         "blocked_by_prior_requirements_item_ids": blocked_by_prior_item_ids,
@@ -5553,6 +5590,23 @@ def write_so101_reviewed_model_authority_gate_artifacts(
             "blocked_by_prior_requirements_item_ids"
         ],
         "blocker_packet_next_action_ids": blocker_packet["next_action_ids"],
+        "training_priority_gate_id": blocker_packet["training_priority_gate_id"],
+        "training_priority_gate_order": blocker_packet["training_priority_gate_order"],
+        "next_training_gate_after_ready": blocker_packet[
+            "next_training_gate_after_ready"
+        ],
+        "blocks_serious_policy_training_until_ready": blocker_packet[
+            "blocks_serious_policy_training_until_ready"
+        ],
+        "serious_policy_training_dependency_status": blocker_packet[
+            "serious_policy_training_dependency_status"
+        ],
+        "ready_does_not_imply_policy_training_ready": blocker_packet[
+            "ready_does_not_imply_policy_training_ready"
+        ],
+        "policy_training_authority_boundary": blocker_packet[
+            "policy_training_authority_boundary"
+        ],
         "blocker_packet_next_actions_in_gate_queue": (
             not blocker_packet_actions_missing_from_gate_queue
         ),
@@ -5745,6 +5799,29 @@ def write_so101_reviewed_model_authority_gate_artifacts(
             "blockers": "; ".join(gate.get("blockers", [])),
             "notes": "Development fixture evidence remains automation coverage only.",
         },
+        {
+            "requirement_id": "serious_policy_training_boundary",
+            "category": "authority_boundary",
+            "priority": None,
+            "status": "ok"
+            if payload["ready_does_not_imply_policy_training_ready"] is True
+            and payload["training_priority_gate_id"] == SO101_TRAINING_PRIORITY_STAGE_IDS[0]
+            and payload["next_training_gate_after_ready"]
+            == SO101_TRAINING_PRIORITY_STAGE_IDS[1]
+            else "action_required",
+            "observed_value": json.dumps(
+                payload["policy_training_authority_boundary"], sort_keys=True
+            ),
+            "expected_value": (
+                "reviewed model authority is the first gate; clearing it advances "
+                "only to MuJoCo scene validity, not policy training"
+            ),
+            "blocked_by_prior_requirement_ids": [],
+            "blocked_by_prior_requirement_statuses": {},
+            "next_action_id": payload["next_training_gate_after_ready"],
+            "blockers": "; ".join(gate.get("blockers", [])),
+            "notes": "The reviewed-authority gate explicitly blocks serious training until ready and still does not authorize policy rollouts by itself.",
+        },
     ]
     payload["checklist_status_by_requirement_id"] = {
         row["requirement_id"]: row["status"] for row in checklist_rows
@@ -5842,6 +5919,12 @@ def write_so101_reviewed_model_authority_gate_artifacts(
                 f"`{markdown_list_value(payload.get('blocker_packet_action_required_item_ids'))}`",
                 "- Prioritized next required actions: "
                 f"`{markdown_list_value(gate.get('next_required_action_ids'))}`",
+                "- Blocks serious policy training until ready: "
+                f"`{markdown_bool(payload.get('blocks_serious_policy_training_until_ready'))}`",
+                "- Next training gate after authority: "
+                f"`{payload.get('next_training_gate_after_ready')}`",
+                "- Ready does not imply policy training ready: "
+                f"`{markdown_bool(payload.get('ready_does_not_imply_policy_training_ready'))}`",
                 "- Blocker packet next actions are in gate queue: "
                 f"`{markdown_bool(payload.get('blocker_packet_next_actions_in_gate_queue'))}`",
                 "- Blocker packet next actions missing from gate queue: "

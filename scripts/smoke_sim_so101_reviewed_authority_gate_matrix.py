@@ -16,6 +16,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from smoke_sim_calibration_regression_suite import (  # noqa: E402
+    SO101_TRAINING_PRIORITY_STAGE_IDS,
     markdown_mapping_value,
     so101_reviewed_model_authority_blocker_packet,
     so101_reviewed_model_authority_gate_section,
@@ -108,6 +109,13 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "development_fixture_evidence_present",
         "blockers",
         "next_required_action_ids",
+        "training_priority_gate_id",
+        "training_priority_gate_order",
+        "next_training_gate_after_ready",
+        "blocks_serious_policy_training_until_ready",
+        "serious_policy_training_dependency_status",
+        "ready_does_not_imply_policy_training_ready",
+        "policy_training_authority_boundary",
         "blocker_packet_action_required_item_ids",
         "blocker_packet_blocked_by_prior_requirements_item_ids",
         "blocker_packet_next_action_ids",
@@ -1686,6 +1694,77 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         "blocker_packet_not_authority",
     )
     add_error(errors, "blocker_packet_ready", blocker_packet.get("ready"), expect["ready"])
+    training_priority_gate_order = list(SO101_TRAINING_PRIORITY_STAGE_IDS)
+    next_training_gate_after_ready = training_priority_gate_order[1]
+    expected_training_dependency_status = (
+        "advance_to_mujoco_scene_validity"
+        if expect["ready"]
+        else "blocked_by_reviewed_model_authority"
+    )
+    add_error(
+        errors,
+        "blocker_packet_training_priority_gate_id",
+        blocker_packet.get("training_priority_gate_id"),
+        training_priority_gate_order[0],
+    )
+    add_error(
+        errors,
+        "blocker_packet_training_priority_gate_order",
+        blocker_packet.get("training_priority_gate_order"),
+        training_priority_gate_order,
+    )
+    add_error(
+        errors,
+        "blocker_packet_next_training_gate_after_ready",
+        blocker_packet.get("next_training_gate_after_ready"),
+        next_training_gate_after_ready,
+    )
+    add_error(
+        errors,
+        "blocker_packet_blocks_serious_policy_training_until_ready",
+        blocker_packet.get("blocks_serious_policy_training_until_ready"),
+        not expect["ready"],
+    )
+    add_error(
+        errors,
+        "blocker_packet_serious_policy_training_dependency_status",
+        blocker_packet.get("serious_policy_training_dependency_status"),
+        expected_training_dependency_status,
+    )
+    add_error(
+        errors,
+        "blocker_packet_ready_does_not_imply_policy_training_ready",
+        blocker_packet.get("ready_does_not_imply_policy_training_ready"),
+        True,
+    )
+    policy_training_boundary = blocker_packet.get("policy_training_authority_boundary")
+    if not isinstance(policy_training_boundary, dict):
+        errors.append("blocker_packet_policy_training_authority_boundary: expected dict")
+    else:
+        add_error(
+            errors,
+            "blocker_packet_policy_training_boundary.training_priority_gate_id",
+            policy_training_boundary.get("training_priority_gate_id"),
+            training_priority_gate_order[0],
+        )
+        add_error(
+            errors,
+            "blocker_packet_policy_training_boundary.next_training_gate_after_ready",
+            policy_training_boundary.get("next_training_gate_after_ready"),
+            next_training_gate_after_ready,
+        )
+        add_error(
+            errors,
+            "blocker_packet_policy_training_boundary.blocks_serious_policy_training_until_ready",
+            policy_training_boundary.get("blocks_serious_policy_training_until_ready"),
+            not expect["ready"],
+        )
+        add_error(
+            errors,
+            "blocker_packet_policy_training_boundary.ready_does_not_imply_policy_training_ready",
+            policy_training_boundary.get("ready_does_not_imply_policy_training_ready"),
+            True,
+        )
 
     if "source_status_ready" in expect:
         add_error(
@@ -2122,6 +2201,48 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         gate_artifacts.get("blocker_packet_next_actions_missing_from_gate_queue"),
         [],
     )
+    add_error(
+        errors,
+        "artifact_training_priority_gate_id",
+        gate_artifacts.get("training_priority_gate_id"),
+        training_priority_gate_order[0],
+    )
+    add_error(
+        errors,
+        "artifact_training_priority_gate_order",
+        gate_artifacts.get("training_priority_gate_order"),
+        training_priority_gate_order,
+    )
+    add_error(
+        errors,
+        "artifact_next_training_gate_after_ready",
+        gate_artifacts.get("next_training_gate_after_ready"),
+        next_training_gate_after_ready,
+    )
+    add_error(
+        errors,
+        "artifact_blocks_serious_policy_training_until_ready",
+        gate_artifacts.get("blocks_serious_policy_training_until_ready"),
+        not expect["ready"],
+    )
+    add_error(
+        errors,
+        "artifact_serious_policy_training_dependency_status",
+        gate_artifacts.get("serious_policy_training_dependency_status"),
+        expected_training_dependency_status,
+    )
+    add_error(
+        errors,
+        "artifact_ready_does_not_imply_policy_training_ready",
+        gate_artifacts.get("ready_does_not_imply_policy_training_ready"),
+        True,
+    )
+    add_error(
+        errors,
+        "artifact_policy_training_authority_boundary",
+        gate_artifacts.get("policy_training_authority_boundary"),
+        blocker_packet.get("policy_training_authority_boundary"),
+    )
     expected_queue_contract_line = (
         "- Blocker packet next actions are in gate queue: `true`"
     )
@@ -2204,6 +2325,14 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             csv_json_dict(checklist_row.get("blocked_by_prior_requirement_statuses")),
             blocked_statuses if isinstance(blocked_statuses, dict) else {},
         )
+    add_error(
+        errors,
+        "checklist_status:serious_policy_training_boundary",
+        checklist_by_requirement.get("serious_policy_training_boundary", {}).get(
+            "status"
+        ),
+        "ok",
+    )
 
     write_json(gate_summary_path, gate)
     blocker_path = case_dir / "so101_reviewed_model_authority_blocker_packet.json"
@@ -2368,6 +2497,25 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "blockers": gate.get("blockers"),
         "next_required_action_ids": gate.get("next_required_action_ids"),
+        "training_priority_gate_id": gate_artifacts.get("training_priority_gate_id"),
+        "training_priority_gate_order": gate_artifacts.get(
+            "training_priority_gate_order"
+        ),
+        "next_training_gate_after_ready": gate_artifacts.get(
+            "next_training_gate_after_ready"
+        ),
+        "blocks_serious_policy_training_until_ready": gate_artifacts.get(
+            "blocks_serious_policy_training_until_ready"
+        ),
+        "serious_policy_training_dependency_status": gate_artifacts.get(
+            "serious_policy_training_dependency_status"
+        ),
+        "ready_does_not_imply_policy_training_ready": gate_artifacts.get(
+            "ready_does_not_imply_policy_training_ready"
+        ),
+        "policy_training_authority_boundary": gate_artifacts.get(
+            "policy_training_authority_boundary"
+        ),
         "blocker_packet_action_required_item_ids": blocker_packet.get(
             "action_required_item_ids"
         ),

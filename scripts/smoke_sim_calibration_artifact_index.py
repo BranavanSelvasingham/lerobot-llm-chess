@@ -3070,6 +3070,22 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
         or [],
         "blocker_packet_next_action_ids": gate.get("blocker_packet_next_action_ids")
         or [],
+        "training_priority_gate_id": gate.get("training_priority_gate_id"),
+        "training_priority_gate_order": gate.get("training_priority_gate_order") or [],
+        "next_training_gate_after_ready": gate.get("next_training_gate_after_ready"),
+        "blocks_serious_policy_training_until_ready": gate.get(
+            "blocks_serious_policy_training_until_ready"
+        ),
+        "serious_policy_training_dependency_status": gate.get(
+            "serious_policy_training_dependency_status"
+        ),
+        "ready_does_not_imply_policy_training_ready": gate.get(
+            "ready_does_not_imply_policy_training_ready"
+        ),
+        "policy_training_authority_boundary": gate.get(
+            "policy_training_authority_boundary"
+        )
+        or {},
         "checklist_status_by_requirement_id": gate.get(
             "checklist_status_by_requirement_id"
         )
