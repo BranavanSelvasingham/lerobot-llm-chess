@@ -2078,6 +2078,7 @@ jobs:
               "missing_board_pick_prerequisite_fails_closed",
               "failed_board_pick_prerequisite_fails_closed",
               "incomplete_final_board_pick_prerequisite_fails_closed",
+              "place_z_gap_board_pick_prerequisite_fails_closed",
               "forged_authority_board_pick_prerequisite_fails_closed",
               "missing_stage_sequence_board_pick_prerequisite_fails_closed",
               "short_budget_records_incomplete_rollout",
@@ -2095,6 +2096,7 @@ jobs:
               "missing_board_pick_prerequisite_fails_closed",
               "failed_board_pick_prerequisite_fails_closed",
               "incomplete_final_board_pick_prerequisite_fails_closed",
+              "place_z_gap_board_pick_prerequisite_fails_closed",
               "forged_authority_board_pick_prerequisite_fails_closed",
               "missing_stage_sequence_board_pick_prerequisite_fails_closed",
               "short_budget_records_incomplete_rollout",
@@ -2136,6 +2138,12 @@ jobs:
           assert "final_board_contact_observed" in incomplete_final["observations"]["board_pick_failed_checks"], incomplete_final
           assert "final_target_xy_within_tolerance" in incomplete_final["observations"]["board_pick_failed_checks"], incomplete_final
           assert incomplete_final["observations"]["development_prerequisites_satisfied"] is False, incomplete_final
+          place_z_gap = by_case["place_z_gap_board_pick_prerequisite_fails_closed"]
+          assert place_z_gap["record"]["return_code"] == 1, place_z_gap
+          assert place_z_gap["observations"]["ok"] is False, place_z_gap
+          assert place_z_gap["observations"]["board_pick_prerequisite_status"] == "development_board_pick_prerequisite_failed", place_z_gap
+          assert "final_place_z_within_tolerance" in place_z_gap["observations"]["board_pick_failed_checks"], place_z_gap
+          assert place_z_gap["observations"]["development_prerequisites_satisfied"] is False, place_z_gap
           forged = by_case["forged_authority_board_pick_prerequisite_fails_closed"]
           assert forged["record"]["return_code"] == 1, forged
           assert forged["observations"]["ok"] is False, forged
@@ -2204,6 +2212,7 @@ jobs:
               "missing_board_pick_prerequisite_fails_closed",
               "failed_board_pick_prerequisite_fails_closed",
               "incomplete_final_board_pick_prerequisite_fails_closed",
+              "place_z_gap_board_pick_prerequisite_fails_closed",
               "forged_authority_board_pick_prerequisite_fails_closed",
               "missing_stage_sequence_board_pick_prerequisite_fails_closed",
               "short_budget_records_incomplete_rollout",

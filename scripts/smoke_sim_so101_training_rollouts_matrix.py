@@ -230,6 +230,45 @@ def write_incomplete_final_board_pick_prerequisite(path: Path) -> None:
     write_json(path, payload)
 
 
+def write_place_z_gap_board_pick_prerequisite(path: Path) -> None:
+    payload = {
+        "schema": "lerobot.sim.so101_training_rollouts_matrix.place_z_gap_board_pick_prerequisite.v1",
+        "ok": True,
+        "status": "development_board_source_pick_place_verified",
+        "model_authority": "development_scaffold_not_reviewed",
+        "observed_evidence_is_physical_so101_authority": False,
+        "observed_evidence_is_policy_training_authority": False,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "board_source_pick_place_verified": True,
+        "source_pick_started_at_source": True,
+        "close_two_finger_contact_observed": True,
+        "lift_verified": True,
+        "board_contact_cleared_during_lift": True,
+        "transfer_verified": True,
+        "place_without_manual_piece_pose_verified": True,
+        "release_contact_cleared_after_retreat": True,
+        "final_board_contact_observed": True,
+        "final_target_xy_error_m": 0.002,
+        "target_xy_tolerance_m": 0.01,
+        "final_place_z_error_m": 0.02,
+        "place_z_tolerance_m": 0.005,
+        "manual_piece_pose_used_after_reset": False,
+        "robot_pose_seeded_for_source_fixture": True,
+        "required_stage_sequence": list(BOARD_PICK_REQUIRED_STAGE_SEQUENCE),
+        "observed_stage_sequence": list(BOARD_PICK_REQUIRED_STAGE_SEQUENCE),
+        "missing_stage_ids": [],
+        "unexpected_stage_ids": [],
+        "stage_sequence_order_ok": True,
+        "stage_sequence_contract_ok": True,
+        "stage_sequence_contract_errors": [],
+        "manual_piece_pose_after_reset_stage_ids": [],
+        "source_square": "e4",
+        "target_square": "e5",
+    }
+    write_json(path, payload)
+
+
 def write_forged_authority_board_pick_prerequisite(path: Path) -> None:
     payload = {
         "schema": "lerobot.sim.so101_training_rollouts_matrix.forged_authority_board_pick_prerequisite.v1",
@@ -301,6 +340,7 @@ def case_specs(
     valid_prerequisite: Path,
     failed_prerequisite: Path,
     incomplete_final_prerequisite: Path,
+    place_z_gap_prerequisite: Path,
     forged_authority_prerequisite: Path,
     missing_stage_sequence_prerequisite: Path,
 ) -> list[dict[str, Any]]:
@@ -375,6 +415,28 @@ def case_specs(
             "expected_board_pick_failed_checks_contain": [
                 "final_board_contact_observed",
                 "final_target_xy_within_tolerance",
+            ],
+            "expected_all_complete": True,
+            "expected_release_synced": True,
+            "expected_episode_count": 1,
+            "expect_transition_count_positive": True,
+            "expected_model_authority": "development_scaffold_not_reviewed",
+            "expected_rollout_use": "debug_imitation_curriculum_only",
+            "expected_all_fallback_free": True,
+            "expected_model_artifacts": True,
+        },
+        {
+            "case_id": "place_z_gap_board_pick_prerequisite_fails_closed",
+            "prerequisite_path": place_z_gap_prerequisite,
+            "tasks": ["e4:e5"],
+            "max_steps": 96,
+            "expected_return_code": 1,
+            "expected_status": "failed_prerequisite_or_rollout_check",
+            "expected_rollout_ok": False,
+            "expected_development_prerequisites_satisfied": False,
+            "expected_board_pick_prerequisite_status": "development_board_pick_prerequisite_failed",
+            "expected_board_pick_failed_checks_contain": [
+                "final_place_z_within_tolerance",
             ],
             "expected_all_complete": True,
             "expected_release_synced": True,
@@ -593,6 +655,10 @@ def summarize_case(
         "board_pick_prerequisite_status": board_pick.get("status"),
         "board_pick_prerequisite_ok": board_pick.get("ok"),
         "board_pick_failed_checks": board_pick.get("failed_checks"),
+        "board_pick_final_target_xy_error_m": board_pick.get("final_target_xy_error_m"),
+        "board_pick_target_xy_tolerance_m": board_pick.get("target_xy_tolerance_m"),
+        "board_pick_final_place_z_error_m": board_pick.get("final_place_z_error_m"),
+        "board_pick_place_z_tolerance_m": board_pick.get("place_z_tolerance_m"),
         "serious_policy_training_blockers": blockers,
         "configuration_error": summary.get("configuration_error"),
         "artifacts": artifacts,
@@ -770,6 +836,10 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "development_prerequisites_satisfied": observations.get("development_prerequisites_satisfied"),
         "board_pick_prerequisite_status": observations.get("board_pick_prerequisite_status"),
         "board_pick_failed_checks": observations.get("board_pick_failed_checks"),
+        "board_pick_final_target_xy_error_m": observations.get("board_pick_final_target_xy_error_m"),
+        "board_pick_target_xy_tolerance_m": observations.get("board_pick_target_xy_tolerance_m"),
+        "board_pick_final_place_z_error_m": observations.get("board_pick_final_place_z_error_m"),
+        "board_pick_place_z_tolerance_m": observations.get("board_pick_place_z_tolerance_m"),
         "ready_for_policy_training": observations.get("ready_for_policy_training"),
         "policy_authority": observations.get("observed_evidence_is_policy_training_authority"),
         "rollout_use": observations.get("rollout_use"),
@@ -821,7 +891,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "## Caveats",
             "",
             "- Passing rollout cases use generated `development_scaffold_not_reviewed` MJCF.",
-            "- Missing, failed, or incomplete-final board-pick prerequisites must keep rollout status non-OK.",
+            "- Missing, failed, incomplete-final, or out-of-Z-tolerance board-pick prerequisites must keep rollout status non-OK.",
             "- Invalid rollout task configurations must write summary/CSV/README artifacts without generating model XML or manifests.",
             "- Short-budget rollouts must record incomplete episodes instead of becoming policy-ready.",
             "- `ready_for_policy_training` and policy authority flags must remain false.",
@@ -845,6 +915,10 @@ def main() -> int:
         output_dir / "prerequisites" / "incomplete_final_board_pick_summary.json"
     )
     write_incomplete_final_board_pick_prerequisite(incomplete_final_prerequisite)
+    place_z_gap_prerequisite = (
+        output_dir / "prerequisites" / "place_z_gap_board_pick_summary.json"
+    )
+    write_place_z_gap_board_pick_prerequisite(place_z_gap_prerequisite)
     forged_authority_prerequisite = (
         output_dir / "prerequisites" / "forged_authority_board_pick_summary.json"
     )
@@ -864,6 +938,7 @@ def main() -> int:
             valid_prerequisite,
             failed_prerequisite,
             incomplete_final_prerequisite,
+            place_z_gap_prerequisite,
             forged_authority_prerequisite,
             missing_stage_sequence_prerequisite,
         )
