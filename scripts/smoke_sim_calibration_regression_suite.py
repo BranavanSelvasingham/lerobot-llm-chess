@@ -6431,6 +6431,9 @@ def so101_training_priority_gate_queue(
         else:
             status = "action_required"
         next_action_ids = unique_string_values(spec.get("next_action_ids") or [])
+        development_evidence_only_not_training_truth = (
+            automation_ready and not training_ready
+        )
         stages.append(
             {
                 "priority": priority,
@@ -6440,6 +6443,13 @@ def so101_training_priority_gate_queue(
                 "status": status,
                 "training_ready": training_ready,
                 "automation_evidence_ready": automation_ready,
+                "automation_evidence_is_training_authority": training_ready,
+                "development_evidence_only_not_training_truth": (
+                    development_evidence_only_not_training_truth
+                ),
+                "training_blocker_action_ids": (
+                    [] if training_ready else next_action_ids
+                ),
                 "blocked_by_prior_gate_ids": [
                     stage["gate_id"] for stage in stages if stage["training_ready"] is False
                 ]
@@ -6482,6 +6492,14 @@ def so101_training_priority_gate_queue(
         ),
         "blocked_by_prior_gate_ids": blocked_stage_ids,
         "development_evidence_only_gate_ids": development_only_stage_ids,
+        "priority_gate_training_blocker_action_ids_by_gate_id": {
+            stage["gate_id"]: stage["training_blocker_action_ids"]
+            for stage in stages
+        },
+        "priority_gate_development_evidence_only_not_training_truth_by_gate_id": {
+            stage["gate_id"]: stage["development_evidence_only_not_training_truth"]
+            for stage in stages
+        },
     }
 
 
@@ -7013,6 +7031,9 @@ def write_so101_training_readiness_gate_artifacts(
         "status",
         "training_ready",
         "automation_evidence_ready",
+        "automation_evidence_is_training_authority",
+        "development_evidence_only_not_training_truth",
+        "training_blocker_action_ids",
         "blocked_by_prior_gate_ids",
         "next_action_ids",
         "evidence_artifact_paths",

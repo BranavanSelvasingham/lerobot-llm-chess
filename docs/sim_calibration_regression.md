@@ -396,16 +396,21 @@ Its board-pick `detailed_evidence` predicate requires the ordered
 phase IDs, all-required-phases true, and final z placement within
 `place_z_tolerance_m`; legacy booleans alone cannot unblock serious training.
 It also emits `priority_gate_queue`, `priority_gate_order`,
-`next_priority_gate_id`, `next_priority_action_ids`, and
+`next_priority_gate_id`, `next_priority_action_ids`,
+`priority_gate_training_blocker_action_ids_by_gate_id`,
+`priority_gate_development_evidence_only_not_training_truth_by_gate_id`, and
 `so101_training_readiness_gate_priority_queue.csv` so the missing work stays
 ordered as reviewed model authority, MuJoCo scene validity, Gymnasium task
 wiring, scripted contact/grasp/pick/place evidence, and only then focused
-training rollouts. A later gate can carry hardware-free automation evidence
-while remaining `blocked_by_prior_requirements` or `development_evidence_only`
-until the earlier reviewed SO-101 gate is physically authoritative. They are
-priority automation gates for the 3D training path, but serious training
-remains blocked until the reviewed MuJoCo bundle gate reports motion checked and
-board-source pickup works with reviewed model-backed IK. See
+training rollouts. Each queue row records its `training_blocker_action_ids`,
+`automation_evidence_is_training_authority`, and
+`development_evidence_only_not_training_truth` values, so a later gate can carry
+hardware-free automation evidence while remaining `blocked_by_prior_requirements`
+or `development_evidence_only` until the earlier reviewed SO-101 gate is
+physically authoritative. They are priority automation gates for the 3D training
+path, but serious training remains blocked until the reviewed MuJoCo bundle gate
+reports motion checked and board-source pickup works with reviewed
+model-backed IK. See
 [SO-101 reviewed MuJoCo bundle](sim_so101_reviewed_mujoco_bundle.md),
 [SO-101 MuJoCo scene](sim_so101_mujoco_scene.md),
 [SO-101 chess env](sim_so101_chess_env.md),

@@ -130,6 +130,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "next_priority_gate_id",
         "next_priority_action_ids",
         "priority_gate_order",
+        "priority_gate_training_blocker_action_ids_by_gate_id",
+        "priority_gate_development_evidence_only_not_training_truth_by_gate_id",
         "priority_gate_queue_csv",
         "blockers",
         "expected_gate_ready",
@@ -2090,6 +2092,60 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             [stage.get("gate_id") for stage in queue],
             list(SO101_TRAINING_PRIORITY_STAGE_IDS),
         )
+        for stage in queue:
+            if not isinstance(stage, dict):
+                errors.append("priority_gate_queue.stage: expected dict")
+                continue
+            gate_id = stage.get("gate_id")
+            training_ready = stage.get("training_ready") is True
+            automation_ready = stage.get("automation_evidence_ready") is True
+            blocker_action_ids = stage.get("training_blocker_action_ids")
+            if not isinstance(blocker_action_ids, list):
+                errors.append(
+                    f"priority_gate_queue.{gate_id}.training_blocker_action_ids: expected list"
+                )
+            elif training_ready and blocker_action_ids:
+                errors.append(
+                    f"priority_gate_queue.{gate_id}.training_blocker_action_ids: expected empty list when training ready"
+                )
+            elif not training_ready and not blocker_action_ids:
+                errors.append(
+                    f"priority_gate_queue.{gate_id}.training_blocker_action_ids: expected non-empty list while not training ready"
+                )
+            add_error(
+                errors,
+                f"priority_gate_queue.{gate_id}.automation_evidence_is_training_authority",
+                stage.get("automation_evidence_is_training_authority"),
+                training_ready,
+            )
+            add_error(
+                errors,
+                f"priority_gate_queue.{gate_id}.development_evidence_only_not_training_truth",
+                stage.get("development_evidence_only_not_training_truth"),
+                automation_ready and not training_ready,
+            )
+        add_error(
+            errors,
+            "priority_gate_training_blocker_action_ids_by_gate_id",
+            gate.get("priority_gate_training_blocker_action_ids_by_gate_id"),
+            {
+                str(stage.get("gate_id")): stage.get("training_blocker_action_ids")
+                for stage in queue
+                if isinstance(stage, dict)
+            },
+        )
+        add_error(
+            errors,
+            "priority_gate_development_evidence_only_not_training_truth_by_gate_id",
+            gate.get("priority_gate_development_evidence_only_not_training_truth_by_gate_id"),
+            {
+                str(stage.get("gate_id")): stage.get(
+                    "development_evidence_only_not_training_truth"
+                )
+                for stage in queue
+                if isinstance(stage, dict)
+            },
+        )
     add_error(
         errors,
         "next_priority_gate_id",
@@ -2140,6 +2196,20 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             [row.get("gate_id") for row in priority_queue_csv_rows],
             list(SO101_TRAINING_PRIORITY_STAGE_IDS),
         )
+        for row in priority_queue_csv_rows:
+            gate_id = row.get("gate_id")
+            if "training_blocker_action_ids" not in row:
+                errors.append(
+                    f"priority_gate_queue_csv.{gate_id}.training_blocker_action_ids: missing column"
+                )
+            if "automation_evidence_is_training_authority" not in row:
+                errors.append(
+                    f"priority_gate_queue_csv.{gate_id}.automation_evidence_is_training_authority: missing column"
+                )
+            if "development_evidence_only_not_training_truth" not in row:
+                errors.append(
+                    f"priority_gate_queue_csv.{gate_id}.development_evidence_only_not_training_truth: missing column"
+                )
     return {
         "case_id": spec["case_id"],
         "ok": not errors,
@@ -2299,6 +2369,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "next_priority_gate_id": gate.get("next_priority_gate_id"),
         "next_priority_action_ids": gate.get("next_priority_action_ids"),
         "priority_gate_order": gate.get("priority_gate_order"),
+        "priority_gate_training_blocker_action_ids_by_gate_id": gate.get(
+            "priority_gate_training_blocker_action_ids_by_gate_id"
+        ),
+        "priority_gate_development_evidence_only_not_training_truth_by_gate_id": gate.get(
+            "priority_gate_development_evidence_only_not_training_truth_by_gate_id"
+        ),
         "priority_gate_queue_csv": case.get("artifacts", {}).get("priority_gate_queue_csv"),
         "blockers": gate.get("blockers"),
         "expected_gate_ready": case["expected"].get("ready"),
