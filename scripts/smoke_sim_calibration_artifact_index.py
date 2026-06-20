@@ -3231,6 +3231,10 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
     artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
     checked_case = matrix.get("candidate_intake_checked")
     checked_case = checked_case if isinstance(checked_case, dict) else {}
+    unpinned_commit_case = matrix.get("candidate_intake_unpinned_commit_ref")
+    unpinned_commit_case = (
+        unpinned_commit_case if isinstance(unpinned_commit_case, dict) else {}
+    )
     external_decision_case = matrix.get("candidate_intake_checked_external_decision")
     external_decision_case = (
         external_decision_case if isinstance(external_decision_case, dict) else {}
@@ -3279,6 +3283,39 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         ),
         "candidate_intake_checked_source_lock_ready_for_review": checked_case.get(
             "candidate_source_lock_ready_for_review"
+        ),
+        "candidate_intake_checked_upstream_commit_sha_valid": checked_case.get(
+            "upstream_commit_sha_valid"
+        ),
+        "candidate_intake_checked_upstream_commit_status": checked_case.get(
+            "upstream_commit_status"
+        ),
+        "candidate_intake_unpinned_commit_ref_status": unpinned_commit_case.get(
+            "status"
+        ),
+        "candidate_intake_unpinned_commit_ref_model_present": (
+            unpinned_commit_case.get("model_present")
+        ),
+        "candidate_intake_unpinned_commit_ref_upstream_commit": (
+            unpinned_commit_case.get("upstream_commit")
+        ),
+        "candidate_intake_unpinned_commit_ref_upstream_commit_sha_valid": (
+            unpinned_commit_case.get("upstream_commit_sha_valid")
+        ),
+        "candidate_intake_unpinned_commit_ref_upstream_commit_status": (
+            unpinned_commit_case.get("upstream_commit_status")
+        ),
+        "candidate_intake_unpinned_commit_ref_source_lock_status": (
+            unpinned_commit_case.get("candidate_source_lock_status")
+        ),
+        "candidate_intake_unpinned_commit_ref_source_lock_ready_for_review": (
+            unpinned_commit_case.get("candidate_source_lock_ready_for_review")
+        ),
+        "candidate_intake_unpinned_commit_ref_operator_intake_plan_status": (
+            unpinned_commit_case.get("candidate_operator_intake_plan_status")
+        ),
+        "candidate_intake_unpinned_commit_ref_operator_intake_decision_status": (
+            unpinned_commit_case.get("candidate_operator_intake_decision_status")
         ),
         "candidate_intake_checked_operator_intake_plan_model_authority": checked_case.get(
             "candidate_operator_intake_plan_model_authority"
@@ -3554,6 +3591,7 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "case_ids": metrics["case_ids"],
         "failed_case_ids": metrics["failed_case_ids"],
         "candidate_intake_checked": checked_case,
+        "candidate_intake_unpinned_commit_ref": unpinned_commit_case,
     }
 
 

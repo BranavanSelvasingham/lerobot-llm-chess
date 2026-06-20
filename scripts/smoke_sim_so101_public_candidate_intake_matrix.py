@@ -92,6 +92,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "status",
         "source_root",
         "upstream_commit",
+        "upstream_commit_sha_valid",
+        "upstream_commit_status",
         "expected_file_count",
         "present_expected_file_count",
         "missing_expected_relative_paths",
@@ -244,6 +246,36 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "candidate_intake_unpinned_commit_ref",
+            "args": [
+                "--source-root",
+                str(complete_root),
+                "--upstream-commit",
+                "main",
+            ],
+            "expect": {
+                "status": "candidate_intake_checked",
+                "expected_file_count": len(EXPECTED_RELATIVE_PATHS),
+                "present_expected_file_count": len(EXPECTED_RELATIVE_PATHS),
+                "model_present": True,
+                "parsed_model_file_count": 5,
+                "readme_caveats": {
+                    "base_collision_meshes_removed": True,
+                    "gripper_linear_joint_mapping_not_reflected": True,
+                    "onshape_to_robot_generated": True,
+                    "relative_mesh_paths_declared": True,
+                },
+                "missing_exact": [],
+                "commit_action_present": True,
+                "upstream_commit_sha_valid": False,
+                "upstream_commit_status": "upstream_commit_not_immutable_sha",
+                "operator_decision_status": "vendor_or_external_intake_not_declared",
+                "selected_intake_option_id": None,
+                "selected_requirement_count": 0,
+                "selected_requirement_ids": [],
+            },
+        },
+        {
             "case_id": "candidate_intake_checked",
             "args": [
                 "--source-root",
@@ -265,6 +297,8 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 },
                 "missing_exact": [],
                 "commit_action_present": False,
+                "upstream_commit_sha_valid": True,
+                "upstream_commit_status": "upstream_commit_sha_pinned",
                 "operator_decision_status": "vendor_or_external_intake_not_declared",
                 "selected_intake_option_id": None,
                 "selected_requirement_count": 0,
@@ -295,6 +329,8 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 },
                 "missing_exact": [],
                 "commit_action_present": False,
+                "upstream_commit_sha_valid": True,
+                "upstream_commit_status": "upstream_commit_sha_pinned",
                 "operator_decision_status": "candidate_intake_decision_recorded_not_authority",
                 "selected_intake_option_id": "external_pinned_source_root",
                 "selected_requirement_count": 4,
@@ -330,6 +366,8 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 },
                 "missing_exact": [],
                 "commit_action_present": False,
+                "upstream_commit_sha_valid": True,
+                "upstream_commit_status": "upstream_commit_sha_pinned",
                 "operator_decision_status": "candidate_intake_decision_recorded_not_authority",
                 "selected_intake_option_id": "vendor_locked_bundle",
                 "selected_requirement_count": 5,
@@ -498,6 +536,24 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
     next_actions = next_actions if isinstance(next_actions, list) else []
     commit_action_present = "pin_upstream_soarm100_commit" in next_actions
     check("commit_action_present", commit_action_present, expect["commit_action_present"])
+    upstream = summary.get("upstream")
+    upstream = upstream if isinstance(upstream, dict) else {}
+    expected_commit_sha_valid = expect.get("upstream_commit_sha_valid")
+    if expected_commit_sha_valid is None:
+        expected_commit_sha_valid = expect["commit_action_present"] is False
+    check(
+        "upstream.commit_sha_valid",
+        upstream.get("commit_sha_valid"),
+        expected_commit_sha_valid,
+    )
+    expected_commit_status = expect.get("upstream_commit_status")
+    if expected_commit_status is None:
+        expected_commit_status = (
+            "upstream_commit_sha_pinned"
+            if expected_commit_sha_valid
+            else "upstream_commit_not_supplied"
+        )
+    check("upstream.commit_status", upstream.get("commit_status"), expected_commit_status)
 
     missing_paths = summary.get("missing_expected_relative_paths")
     missing_paths = missing_paths if isinstance(missing_paths, list) else []
@@ -822,6 +878,8 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "upstream_commit": (summary.get("upstream") or {}).get("commit")
         if isinstance(summary.get("upstream"), dict)
         else None,
+        "upstream_commit_sha_valid": upstream.get("commit_sha_valid"),
+        "upstream_commit_status": upstream.get("commit_status"),
         "expected_file_count": summary.get("expected_file_count"),
         "present_expected_file_count": summary.get("present_expected_file_count"),
         "missing_expected_relative_paths": missing_paths,

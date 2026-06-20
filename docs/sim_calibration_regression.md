@@ -464,7 +464,7 @@ A public upstream candidate source now exists at
 Default CI still leaves the repo-local model-source scan empty unless a caller
 sets `SO101_MODEL_SOURCE_ROOTS` or vendors the assets, but the source-inventory
 artifacts list this upstream as a known candidate intake pointer. Pin an
-immutable upstream commit, scan the local checkout with
+immutable upstream commit as a 40-character SHA, scan the local checkout with
 `SO101_MODEL_SOURCE_ROOTS`, and then record source authority, file digests,
 mesh authority, joint-limit/TCP/base-board review, and bundle-manifest
 validation before treating it as reviewed physical SO-101 truth. The public
@@ -477,6 +477,9 @@ local external checkout or a vendored locked bundle. The intake summary and
 artifact index expose the requirement row count, selected row count, unselected
 row count, and selected row IDs for undecided, external-source, and vendor-lock
 decisions so the CSV cannot silently drift from the recorded operator decision.
+The matrix includes an unpinned-ref case (`--upstream-commit main`) and requires
+`candidate_source_lock_ready_for_review: false` until the upstream commit is a
+full immutable SHA.
 Operators can record the chosen path without promoting the candidate to
 authority by rerunning the intake with
 `--operator-intake-decision external_pinned_source_root` or

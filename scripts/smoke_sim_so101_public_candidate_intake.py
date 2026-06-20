@@ -6,6 +6,7 @@ import argparse
 import csv
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 import xml.etree.ElementTree as ET
@@ -93,6 +94,10 @@ OPERATOR_REQUIREMENT_FIELDNAMES = (
     "manifest_or_review_field",
     "authority_boundary",
 )
+
+
+def is_full_git_commit_sha(value: str | None) -> bool:
+    return bool(value and re.fullmatch(r"[0-9a-fA-F]{40}", value.strip()))
 
 
 def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
@@ -363,13 +368,14 @@ def candidate_source_lock(summary: dict[str, Any]) -> dict[str, Any]:
         if row.get("exists") is True
     ]
     upstream_commit_supplied = bool(upstream.get("commit_supplied"))
+    upstream_commit_sha_valid = upstream.get("commit_sha_valid") is True
     model_present = summary.get("model_present") is True
     model_sha_supplied = bool(summary.get("model_sha256_observed"))
     expected_count = int(summary.get("expected_file_count") or 0)
     present_expected = int(summary.get("present_expected_file_count") or 0)
     complete_expected = expected_count > 0 and present_expected == expected_count
     source_lock_ready_for_review = (
-        upstream_commit_supplied
+        upstream_commit_sha_valid
         and model_present
         and model_sha_supplied
         and complete_expected
@@ -377,6 +383,8 @@ def candidate_source_lock(summary: dict[str, Any]) -> dict[str, Any]:
     missing_inputs: list[str] = []
     if not upstream_commit_supplied:
         missing_inputs.append("upstream_commit")
+    elif not upstream_commit_sha_valid:
+        missing_inputs.append("immutable_upstream_commit_sha")
     if not complete_expected:
         missing_inputs.append("expected_file_digest_lock")
     if not model_present:
@@ -869,7 +877,10 @@ def build_candidate_review_checklist(summary: dict[str, Any]) -> dict[str, Any]:
     caveats = caveats if isinstance(caveats, dict) else {}
     parsed_model_file_count = int(observations.get("parsed_model_file_count") or 0)
     model_present = summary.get("model_present") is True
-    commit_supplied = bool((summary.get("upstream") or {}).get("commit_supplied"))
+    upstream = summary.get("upstream")
+    upstream = upstream if isinstance(upstream, dict) else {}
+    commit_supplied = bool(upstream.get("commit_supplied"))
+    commit_sha_valid = upstream.get("commit_sha_valid") is True
     model_sha = summary.get("model_sha256_observed")
     missing_expected = summary.get("missing_expected_relative_paths")
     missing_expected = missing_expected if isinstance(missing_expected, list) else []
@@ -882,10 +893,15 @@ def build_candidate_review_checklist(summary: dict[str, Any]) -> dict[str, Any]:
             "priority": 1,
             "action_id": "pin_upstream_soarm100_commit",
             "gate": "reviewed_model_authority",
-            "status": checklist_status(commit_supplied),
-            "title": "Pin the SO-ARM100 upstream commit",
-            "detail": "Record the immutable upstream commit used for candidate review.",
-            "candidate_observation": (summary.get("upstream") or {}).get("commit"),
+            "status": checklist_status(commit_sha_valid),
+            "title": "Pin the SO-ARM100 upstream commit SHA",
+            "detail": "Record the immutable 40-character upstream commit SHA used for candidate review.",
+            "candidate_observation": {
+                "commit": upstream.get("commit"),
+                "commit_supplied": commit_supplied,
+                "commit_sha_valid": commit_sha_valid,
+                "commit_status": upstream.get("commit_status"),
+            },
             "required_review_scope": "provenance",
             "manifest_fields": ["provenance.source_reference"],
             "authority_boundary": "candidate_review_checklist_not_authority",
@@ -930,8 +946,8 @@ def build_candidate_review_checklist(summary: dict[str, Any]) -> dict[str, Any]:
             "title": "Review source, license, and export provenance",
             "detail": "Review upstream source, license basis, onshape-to-robot generation, and any manual edits.",
             "candidate_observation": {
-                "repository_url": (summary.get("upstream") or {}).get("repository_url"),
-                "source_tree_url": (summary.get("upstream") or {}).get("source_tree_url"),
+                "repository_url": upstream.get("repository_url"),
+                "source_tree_url": upstream.get("source_tree_url"),
                 "onshape_to_robot_generated": caveats.get("onshape_to_robot_generated"),
             },
             "required_review_scope": "provenance,license",
@@ -1053,7 +1069,15 @@ def build_summary(args: argparse.Namespace, artifacts: dict[str, str]) -> dict[s
     )
     model_present = bool(model_row and model_row.get("exists") is True)
     model_sha256 = str(model_row.get("sha256")) if model_present and model_row else None
-    upstream_commit_supplied = bool(str(args.upstream_commit or "").strip())
+    upstream_commit_value = str(args.upstream_commit or "").strip()
+    upstream_commit_supplied = bool(upstream_commit_value)
+    upstream_commit_sha_valid = is_full_git_commit_sha(upstream_commit_value)
+    if not upstream_commit_supplied:
+        upstream_commit_status = "upstream_commit_not_supplied"
+    elif upstream_commit_sha_valid:
+        upstream_commit_status = "upstream_commit_sha_pinned"
+    else:
+        upstream_commit_status = "upstream_commit_not_immutable_sha"
     candidate_review_observations = build_candidate_review_observations(
         source_root if source_root_is_dir else None
     )
@@ -1088,7 +1112,7 @@ def build_summary(args: argparse.Namespace, artifacts: dict[str, str]) -> dict[s
         "record_reviewed_tcp_and_base_to_board_alignment",
         "supply_reviewed_so101_model_bundle_manifest",
     ]
-    if upstream_commit_supplied:
+    if upstream_commit_sha_valid:
         next_required_action_ids = [
             action_id
             for action_id in next_required_action_ids
@@ -1115,6 +1139,8 @@ def build_summary(args: argparse.Namespace, artifacts: dict[str, str]) -> dict[s
             "source_tree_url": args.upstream_source_tree_url,
             "commit": args.upstream_commit,
             "commit_supplied": upstream_commit_supplied,
+            "commit_sha_valid": upstream_commit_sha_valid,
+            "commit_status": upstream_commit_status,
         },
         "operator_intake_decision": args.operator_intake_decision,
         "source_root": str(source_root) if source_root else None,
@@ -1170,6 +1196,8 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `ready_for_model_backed_ik`: `{str(summary['ready_for_model_backed_ik']).lower()}`",
         f"- `source_root`: `{summary.get('source_root') or 'none'}`",
         f"- `upstream_commit`: `{summary['upstream'].get('commit') or 'not supplied'}`",
+        f"- `upstream_commit_status`: `{summary['upstream'].get('commit_status')}`",
+        f"- `upstream_commit_sha_valid`: `{str(summary['upstream'].get('commit_sha_valid')).lower()}`",
         f"- `model_relative_path`: `{summary['model_relative_path']}`",
         f"- `model_sha256_observed`: `{summary.get('model_sha256_observed') or 'none'}`",
         f"- `candidate_review_observations_model_authority`: `{summary['candidate_review_observations_model_authority']}`",

@@ -3985,6 +3985,15 @@ def so101_public_candidate_intake_matrix_section(
         ),
         {},
     )
+    unpinned_commit_case = next(
+        (
+            case
+            for case in cases
+            if isinstance(case, dict)
+            and case.get("case_id") == "candidate_intake_unpinned_commit_ref"
+        ),
+        {},
+    )
     external_decision_case = next(
         (
             case
@@ -4051,6 +4060,15 @@ def so101_public_candidate_intake_matrix_section(
             "candidate_source_lock_ready_for_review": case.get(
                 "candidate_source_lock_ready_for_review"
             )
+            if isinstance(case, dict)
+            else None,
+            "upstream_commit": case.get("upstream_commit")
+            if isinstance(case, dict)
+            else None,
+            "upstream_commit_sha_valid": case.get("upstream_commit_sha_valid")
+            if isinstance(case, dict)
+            else None,
+            "upstream_commit_status": case.get("upstream_commit_status")
             if isinstance(case, dict)
             else None,
             "candidate_operator_intake_plan_model_authority": case.get(
@@ -4188,6 +4206,15 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(checked_case, dict)
             else None,
+            "upstream_commit": checked_case.get("upstream_commit")
+            if isinstance(checked_case, dict)
+            else None,
+            "upstream_commit_sha_valid": checked_case.get("upstream_commit_sha_valid")
+            if isinstance(checked_case, dict)
+            else None,
+            "upstream_commit_status": checked_case.get("upstream_commit_status")
+            if isinstance(checked_case, dict)
+            else None,
             "candidate_operator_intake_plan_model_authority": checked_case.get(
                 "candidate_operator_intake_plan_model_authority"
             )
@@ -4255,6 +4282,57 @@ def so101_public_candidate_intake_matrix_section(
             else None,
             "direct_manifest_path": preview.get("direct_manifest_path"),
             "preview_summary_path": preview.get("summary_path"),
+        },
+        "candidate_intake_unpinned_commit_ref": {
+            "status": unpinned_commit_case.get("status")
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "model_present": unpinned_commit_case.get("model_present")
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "upstream_commit": unpinned_commit_case.get("upstream_commit")
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "upstream_commit_sha_valid": unpinned_commit_case.get(
+                "upstream_commit_sha_valid"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "upstream_commit_status": unpinned_commit_case.get(
+                "upstream_commit_status"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "candidate_source_lock_status": unpinned_commit_case.get(
+                "candidate_source_lock_status"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "candidate_source_lock_ready_for_review": unpinned_commit_case.get(
+                "candidate_source_lock_ready_for_review"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "candidate_operator_intake_plan_status": unpinned_commit_case.get(
+                "candidate_operator_intake_plan_status"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "candidate_operator_intake_decision_status": unpinned_commit_case.get(
+                "candidate_operator_intake_decision_status"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "ready_for_model_backed_ik": unpinned_commit_case.get(
+                "ready_for_model_backed_ik"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "observed_evidence_is_physical_so101_authority": unpinned_commit_case.get(
+                "observed_evidence_is_physical_so101_authority"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
         },
         "candidate_intake_checked_external_decision": {
             **recorded_decision_cases["external_pinned_source_root"],
