@@ -198,8 +198,16 @@ The public-candidate intake smoke writes
 `so101_public_candidate_intake_files.csv`,
 `so101_public_candidate_manifest_draft.json`, and `README.md`. It hashes the
 local candidate files and records the pinned upstream commit as intake evidence
-only. Its manifest draft uses `model_sha256_observed` rather than a reviewed
-`model_sha256`, keeps `authority` and `provenance` empty, and always reports
+only. The summary also includes `candidate_review_observations`: README caveat
+detection for `onshape-to-robot`, relative mesh paths, removed base collision
+meshes, and the missing LeRobot gripper linear-joint mapping, plus parsed
+URDF/MJCF metadata such as root tags, model names, joint counts, joint
+limit/range counts, and mesh references. Those observations use
+`candidate_review_observations_not_authority`, false physical SO-101 authority,
+and `ready_for_model_backed_ik: false`; they organize review work but do not
+promote the public candidate to reviewed model truth. Its manifest draft uses
+`model_sha256_observed` rather than a reviewed `model_sha256`, keeps
+`authority` and `provenance` empty, and always reports
 `ready_for_model_backed_ik: false`; copy those observed values into the real
 bundle manifest only after review.
 
@@ -215,7 +223,7 @@ The matrix creates synthetic SO-ARM100-shaped folders and verifies no-root,
 missing-root, incomplete-candidate, and complete-candidate cases. All cases must
 keep `public_candidate_intake_not_authority`, false physical SO-101 authority,
 and `ready_for_model_backed_ik: false`; the complete fixture only proves digest
-locking and artifact generation for review.
+locking, review-observation extraction, and artifact generation for review.
 
 If the source is later declared authoritative, rerun the inventory with
 `--authoritative-path` for exactly one reviewed URDF/MJCF file plus

@@ -97,6 +97,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "model_present",
         "model_sha256_observed",
         "model_authority",
+        "candidate_review_observations_model_authority",
+        "candidate_review_observations_parsed_model_file_count",
+        "candidate_readme_gripper_mapping_caveat",
+        "candidate_readme_base_collision_caveat",
         "ready_for_model_backed_ik",
         "observed_evidence_is_physical_so101_authority",
         "next_required_action_ids",
@@ -123,18 +127,33 @@ def create_complete_fixture(root: Path) -> Path:
                 "<robot name=\"so101_new_calib\">\n"
                 "  <link name=\"base_link\"/>\n"
                 "  <link name=\"gripper_frame_link\"/>\n"
+                "  <joint name=\"shoulder_pan\" type=\"revolute\">\n"
+                "    <parent link=\"base_link\"/>\n"
+                "    <child link=\"gripper_frame_link\"/>\n"
+                "    <limit lower=\"-1.0\" upper=\"1.0\" effort=\"1.0\" velocity=\"1.0\"/>\n"
+                "  </joint>\n"
                 "</robot>\n"
             )
         elif path.suffix == ".xml":
             path.write_text(
                 "<?xml version=\"1.0\"?>\n"
                 "<!-- synthetic public candidate intake fixture only -->\n"
-                "<mujoco model=\"so101_fixture\"/>\n"
+                "<mujoco model=\"so101_fixture\">\n"
+                "  <worldbody>\n"
+                "    <body name=\"base\">\n"
+                "      <joint name=\"fixture_joint\" type=\"hinge\" range=\"-1 1\"/>\n"
+                "      <geom type=\"mesh\" mesh=\"assets/base_so101_v2.stl\"/>\n"
+                "    </body>\n"
+                "  </worldbody>\n"
+                "</mujoco>\n"
             )
         elif path.suffix == ".md":
             path.write_text(
                 "# Synthetic SO101 fixture\n\n"
                 "This fixture is for hardware-free public candidate intake matrix testing only.\n"
+                "Files are generated with onshape-to-robot and modified to use relative mesh paths.\n"
+                "Base collision meshes were removed due to collision issues.\n"
+                "The LeRobot linear joint mapping is not reflected in these URDF/MuJoCo files.\n"
             )
         else:
             path.write_bytes(f"synthetic fixture bytes for {relative_path}\n".encode())
@@ -156,6 +175,7 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "expected_file_count": len(EXPECTED_RELATIVE_PATHS),
                 "present_expected_file_count": 0,
                 "model_present": False,
+                "parsed_model_file_count": 0,
                 "commit_action_present": True,
             },
         },
@@ -172,6 +192,7 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "expected_file_count": len(EXPECTED_RELATIVE_PATHS),
                 "present_expected_file_count": 0,
                 "model_present": False,
+                "parsed_model_file_count": 0,
                 "commit_action_present": False,
             },
         },
@@ -188,6 +209,13 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "expected_file_count": len(EXPECTED_RELATIVE_PATHS),
                 "present_expected_file_count": len(EXPECTED_RELATIVE_PATHS) - 1,
                 "model_present": True,
+                "parsed_model_file_count": 5,
+                "readme_caveats": {
+                    "base_collision_meshes_removed": True,
+                    "gripper_linear_joint_mapping_not_reflected": True,
+                    "onshape_to_robot_generated": True,
+                    "relative_mesh_paths_declared": True,
+                },
                 "missing_contains": ["assets/wrist_roll_pitch_so101_v2.stl"],
                 "commit_action_present": False,
             },
@@ -205,6 +233,13 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "expected_file_count": len(EXPECTED_RELATIVE_PATHS),
                 "present_expected_file_count": len(EXPECTED_RELATIVE_PATHS),
                 "model_present": True,
+                "parsed_model_file_count": 5,
+                "readme_caveats": {
+                    "base_collision_meshes_removed": True,
+                    "gripper_linear_joint_mapping_not_reflected": True,
+                    "onshape_to_robot_generated": True,
+                    "relative_mesh_paths_declared": True,
+                },
                 "missing_exact": [],
                 "commit_action_present": False,
             },
@@ -274,6 +309,11 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         check(key, summary.get(key), expect[key])
 
     check("model_authority", summary.get("model_authority"), "public_candidate_intake_not_authority")
+    check(
+        "candidate_review_observations_model_authority",
+        summary.get("candidate_review_observations_model_authority"),
+        "candidate_review_observations_not_authority",
+    )
     check("ready_for_model_backed_ik", summary.get("ready_for_model_backed_ik"), False)
     check(
         "observed_evidence_is_physical_so101_authority",
@@ -322,6 +362,38 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
     if expect["model_present"] and not summary.get("model_sha256_observed"):
         errors.append(f"{case_id}.model_sha256_observed missing")
 
+    observations = summary.get("candidate_review_observations")
+    observations = observations if isinstance(observations, dict) else {}
+    if observations.get("model_authority") != "candidate_review_observations_not_authority":
+        errors.append(f"{case_id}.candidate_review_observations.model_authority invalid")
+    if observations.get("ready_for_model_backed_ik") is not False:
+        errors.append(f"{case_id}.candidate_review_observations.ready_for_model_backed_ik not false")
+    if observations.get("observed_evidence_is_physical_so101_authority") is not False:
+        errors.append(
+            f"{case_id}.candidate_review_observations observed physical authority not false"
+        )
+    check(
+        "candidate_review_observations.parsed_model_file_count",
+        observations.get("parsed_model_file_count"),
+        expect["parsed_model_file_count"],
+    )
+    readme_caveats = observations.get("readme_caveats")
+    readme_caveats = readme_caveats if isinstance(readme_caveats, dict) else {}
+    for caveat_key, expected_value in expect.get("readme_caveats", {}).items():
+        if readme_caveats.get(caveat_key) is not expected_value:
+            errors.append(
+                f"{case_id}.candidate_review_observations.readme_caveats."
+                f"{caveat_key}: expected {expected_value!r}, got {readme_caveats.get(caveat_key)!r}"
+            )
+    if expect["model_present"]:
+        model_file_observations = observations.get("model_file_observations")
+        model_file_observations = (
+            model_file_observations if isinstance(model_file_observations, list) else []
+        )
+        parsed_files = [item for item in model_file_observations if item.get("parse_ok") is True]
+        if not parsed_files:
+            errors.append(f"{case_id}.candidate_review_observations parsed files missing")
+
     return {
         "case_id": case_id,
         "ok": not errors,
@@ -336,6 +408,18 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "model_present": summary.get("model_present"),
         "model_sha256_observed": summary.get("model_sha256_observed"),
         "model_authority": summary.get("model_authority"),
+        "candidate_review_observations_model_authority": summary.get(
+            "candidate_review_observations_model_authority"
+        ),
+        "candidate_review_observations_parsed_model_file_count": observations.get(
+            "parsed_model_file_count"
+        ),
+        "candidate_readme_gripper_mapping_caveat": readme_caveats.get(
+            "gripper_linear_joint_mapping_not_reflected"
+        ),
+        "candidate_readme_base_collision_caveat": readme_caveats.get(
+            "base_collision_meshes_removed"
+        ),
         "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
         "observed_evidence_is_physical_so101_authority": summary.get(
             "observed_evidence_is_physical_so101_authority"
@@ -358,16 +442,19 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         "",
         "## Cases",
         "",
-        "| Case | Status | OK | Model Present | Ready For Model-Backed IK |",
-        "| --- | --- | --- | --- | --- |",
+        "| Case | Status | OK | Model Present | Parsed Model Files | Gripper Caveat | Base Collision Caveat | Ready For Model-Backed IK |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for case in summary["cases"]:
         lines.append(
-            "| `{case_id}` | `{status}` | `{ok}` | `{model_present}` | `{ready}` |".format(
+            "| `{case_id}` | `{status}` | `{ok}` | `{model_present}` | `{parsed}` | `{gripper}` | `{base_collision}` | `{ready}` |".format(
                 case_id=case["case_id"],
                 status=case["status"],
                 ok=str(case["ok"]).lower(),
                 model_present=str(case["model_present"]).lower(),
+                parsed=case["candidate_review_observations_parsed_model_file_count"],
+                gripper=str(case["candidate_readme_gripper_mapping_caveat"]).lower(),
+                base_collision=str(case["candidate_readme_base_collision_caveat"]).lower(),
                 ready=str(case["ready_for_model_backed_ik"]).lower(),
             )
         )
