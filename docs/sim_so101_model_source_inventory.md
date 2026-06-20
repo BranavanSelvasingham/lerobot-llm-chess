@@ -196,9 +196,10 @@ python scripts/smoke_sim_so101_model_bundle_probe.py \
 The public-candidate intake smoke writes
 `so101_public_candidate_intake_summary.json`,
 `so101_public_candidate_intake_files.csv`,
-`so101_public_candidate_manifest_draft.json`, and `README.md`. It hashes the
-local candidate files and records the pinned upstream commit as intake evidence
-only. The summary also includes `candidate_review_observations`: README caveat
+`so101_public_candidate_manifest_draft.json`,
+`so101_public_candidate_seeded_review_manifest_template.json`, and `README.md`.
+It hashes the local candidate files and records the pinned upstream commit as
+intake evidence only. The summary also includes `candidate_review_observations`: README caveat
 detection for `onshape-to-robot`, relative mesh paths, removed base collision
 meshes, and the missing LeRobot gripper linear-joint mapping, plus parsed
 URDF/MJCF metadata such as root tags, model names, joint counts, joint
@@ -210,6 +211,17 @@ promote the public candidate to reviewed model truth. Its manifest draft uses
 `authority` and `provenance` empty, and always reports
 `ready_for_model_backed_ik: false`; copy those observed values into the real
 bundle manifest only after review.
+
+The seeded review-manifest template follows the reviewed bundle manifest field
+shape and pre-fills observable candidate path, asset-root, upstream, and source
+reference values for operator convenience. It intentionally keeps
+`model_sha256` and every authority/calibration field as placeholders, reports
+`candidate_seeded_review_manifest_template_not_authority`, and stays
+`ready_for_model_backed_ik: false`. Use it as a starting document only: replace
+all placeholders with reviewed values, then run
+`scripts/smoke_sim_so101_model_bundle_manifest.py --manifest-path <reviewed-manifest>`
+and require `physical_so101_model_authority_ready: true` before using it for
+model-backed IK or downstream simulation claims.
 
 Use the focused matrix when changing the public-candidate intake smoke:
 
@@ -223,7 +235,8 @@ The matrix creates synthetic SO-ARM100-shaped folders and verifies no-root,
 missing-root, incomplete-candidate, and complete-candidate cases. All cases must
 keep `public_candidate_intake_not_authority`, false physical SO-101 authority,
 and `ready_for_model_backed_ik: false`; the complete fixture only proves digest
-locking, review-observation extraction, and artifact generation for review.
+locking, review-observation extraction, candidate-seeded template generation,
+and artifact generation for review.
 
 If the source is later declared authoritative, rerun the inventory with
 `--authoritative-path` for exactly one reviewed URDF/MJCF file plus

@@ -17,6 +17,15 @@ DEFAULT_SOURCE_TREE_URL = (
     "https://github.com/TheRobotStudio/SO-ARM100/tree/main/Simulation/SO101"
 )
 DEFAULT_MODEL_RELATIVE_PATH = "so101_new_calib.urdf"
+EXPECTED_TARGET_FRAME = "gripper_frame_link"
+EXPECTED_SO101_JOINTS = (
+    "shoulder_pan",
+    "shoulder_lift",
+    "elbow_flex",
+    "wrist_flex",
+    "wrist_roll",
+    "gripper",
+)
 REQUIRED_REVIEW_SCOPES = (
     "model_identity",
     "provenance",
@@ -338,6 +347,128 @@ def candidate_manifest_draft(
     }
 
 
+def candidate_seeded_review_manifest_template(
+    *,
+    source_root: Path | None,
+    model_path: Path | None,
+    model_sha256: str | None,
+    upstream_repository_url: str,
+    upstream_source_tree_url: str,
+    upstream_commit: str | None,
+    candidate_review_observations: dict[str, Any],
+) -> dict[str, Any]:
+    source_reference_parts = [
+        upstream_source_tree_url,
+        f"commit:{upstream_commit}" if upstream_commit else "commit:<pin-required>",
+    ]
+    return {
+        "schema": "lerobot.sim.so101_public_candidate_seeded_review_manifest_template.v1",
+        "ok": True,
+        "status": "candidate_seeded_template_waiting_for_review",
+        "model_authority": "candidate_seeded_review_manifest_template_not_authority",
+        "ready_for_model_backed_ik": False,
+        "physical_so101_model_authority_ready": False,
+        "observed_evidence_is_physical_so101_authority": False,
+        "physical_so101_truth_claimed": False,
+        "development_fixture_evidence_not_physical_so101_truth": True,
+        "source_root": str(source_root) if source_root is not None else None,
+        "observed_inputs": {
+            "model_path": str(model_path) if model_path is not None else None,
+            "model_sha256_observed": model_sha256,
+            "asset_roots": [str(source_root)] if source_root is not None else [],
+            "upstream": {
+                "repository_url": upstream_repository_url,
+                "source_tree_url": upstream_source_tree_url,
+                "commit": upstream_commit,
+            },
+            "candidate_review_observations": candidate_review_observations,
+        },
+        "manifest_template": {
+            "model_path": str(model_path) if model_path is not None else "<reviewed-so101-model.urdf-or-mjcf>",
+            "model_sha256": "<copy-reviewed-sha256-after-review>",
+            "asset_roots": [str(source_root)] if source_root is not None else ["<reviewed-mesh-or-asset-root>"],
+            "authority": {
+                "source_authority_status": "reviewed",
+                "reviewed_by": "<reviewer-or-team>",
+                "reviewed_at": "<review-date-YYYY-MM-DD>",
+                "review_id": "<stable-review-ticket-commit-or-artifact-id>",
+                "review_scopes": ["model_identity", "provenance", "license"],
+            },
+            "provenance": {
+                "source_reference": " ".join(source_reference_parts),
+                "export_tool": "<review-onshape-to-robot-version-and-any-manual-edits>",
+                "license_basis": "<reviewed-license-file-url-or-record>",
+            },
+            "target_frame": EXPECTED_TARGET_FRAME,
+            "target_frame_authority": {
+                "target_frame_authority_status": "reviewed",
+                "reviewed_by": "<reviewer-or-team>",
+                "reviewed_at": "<review-date-YYYY-MM-DD>",
+                "review_id": "<stable-target-frame-review-artifact-id>",
+                "review_scope": "target_frame",
+                "source": "<reviewed-target-frame-or-tcp-reference-record>",
+            },
+            "joint_limits_deg": {
+                joint: ["<lower-deg-or-mm>", "<upper-deg-or-mm>"]
+                for joint in EXPECTED_SO101_JOINTS
+            },
+            "joint_limit_authority": {
+                "joint_limit_authority_status": "reviewed",
+                "reviewed_by": "<reviewer-or-team>",
+                "reviewed_at": "<review-date-YYYY-MM-DD>",
+                "review_id": "<stable-joint-limit-review-artifact-id>",
+                "review_scope": "joint_limits",
+                "source": "<reviewed-joint-limit-record>",
+            },
+            "mesh_asset_authority": {
+                "mesh_asset_authority_status": "reviewed",
+                "reviewed_by": "<reviewer-or-team>",
+                "reviewed_at": "<review-date-YYYY-MM-DD>",
+                "review_id": "<stable-mesh-asset-review-artifact-id>",
+                "review_scope": "mesh_assets",
+                "source": "<reviewed-model-export-or-mesh-root-record>",
+            },
+            "tcp_offset_m": {"x": "<meters>", "y": "<meters>", "z": "<meters>"},
+            "tcp_offset_authority": {
+                "tcp_offset_authority_status": "reviewed",
+                "reviewed_by": "<reviewer-or-team>",
+                "reviewed_at": "<review-date-YYYY-MM-DD>",
+                "review_id": "<stable-tcp-offset-review-artifact-id>",
+                "review_scope": "tcp_offset",
+                "source": "<reviewed-tcp-or-gripper-tip-calibration-record>",
+            },
+            "base_to_board_transform": {
+                "translation_m": {"x": "<meters>", "y": "<meters>", "z": "<meters>"},
+                "rotation_rpy_rad": {
+                    "roll": "<radians>",
+                    "pitch": "<radians>",
+                    "yaw": "<radians>",
+                },
+            },
+            "base_to_board_alignment_authority": {
+                "base_to_board_alignment_authority_status": "reviewed",
+                "reviewed_by": "<reviewer-or-team>",
+                "reviewed_at": "<review-date-YYYY-MM-DD>",
+                "review_id": "<stable-base-board-review-artifact-id>",
+                "review_scope": "base_to_board_alignment",
+                "source": "<reviewed-board-registration-or-calibration-record>",
+            },
+        },
+        "copy_rules": [
+            "Do not copy model_sha256_observed into model_sha256 until the model identity and source authority review accepts that exact file.",
+            "Do not treat candidate README caveats or parsed XML/URDF metadata as physical SO-101 truth.",
+            "Replace every placeholder authority/provenance/TCP/base-board value before running the manifest checker as a reviewed bundle.",
+        ],
+        "review_required_scopes": list(REQUIRED_REVIEW_SCOPES),
+        "next_required_action_ids": [
+            "review_candidate_seeded_manifest_template",
+            "replace_candidate_observations_with_reviewed_manifest_fields",
+            "run_so101_model_bundle_manifest_checker",
+            "require_physical_so101_model_authority_ready",
+        ],
+    }
+
+
 def build_summary(args: argparse.Namespace, artifacts: dict[str, str]) -> dict[str, Any]:
     source_root = normalize_path(args.source_root) if args.source_root else None
     source_root_supplied = source_root is not None
@@ -367,6 +498,15 @@ def build_summary(args: argparse.Namespace, artifacts: dict[str, str]) -> dict[s
     upstream_commit_supplied = bool(str(args.upstream_commit or "").strip())
     candidate_review_observations = build_candidate_review_observations(
         source_root if source_root_is_dir else None
+    )
+    seeded_review_manifest_template = candidate_seeded_review_manifest_template(
+        source_root=source_root if source_root_is_dir else None,
+        model_path=model_path if model_present else None,
+        model_sha256=model_sha256,
+        upstream_repository_url=args.upstream_repository_url,
+        upstream_source_tree_url=args.upstream_source_tree_url,
+        upstream_commit=args.upstream_commit,
+        candidate_review_observations=candidate_review_observations,
     )
 
     if not source_root_supplied:
@@ -444,6 +584,10 @@ def build_summary(args: argparse.Namespace, artifacts: dict[str, str]) -> dict[s
             "model_authority"
         ],
         "candidate_review_observations": candidate_review_observations,
+        "candidate_seeded_review_manifest_template_model_authority": (
+            seeded_review_manifest_template["model_authority"]
+        ),
+        "candidate_seeded_review_manifest_template": seeded_review_manifest_template,
         "file_rows": file_rows,
         "review_required_scopes": list(REQUIRED_REVIEW_SCOPES),
         "next_required_action_ids": next_required_action_ids,
@@ -470,6 +614,7 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `model_sha256_observed`: `{summary.get('model_sha256_observed') or 'none'}`",
         f"- `candidate_review_observations_model_authority`: `{summary['candidate_review_observations_model_authority']}`",
         f"- `candidate_review_observations_ready_for_model_backed_ik`: `{str(summary['candidate_review_observations']['ready_for_model_backed_ik']).lower()}`",
+        f"- `candidate_seeded_review_manifest_template_model_authority`: `{summary['candidate_seeded_review_manifest_template_model_authority']}`",
         f"- `parsed_model_file_count`: `{summary['candidate_review_observations']['parsed_model_file_count']}`",
         f"- `expected_file_count`: `{summary['expected_file_count']}`",
         f"- `present_expected_file_count`: `{summary['present_expected_file_count']}`",
@@ -477,6 +622,7 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `files_csv`: `{summary['artifacts']['files_csv']}`",
         f"- `candidate_manifest_draft_json`: `{summary['artifacts']['candidate_manifest_draft_json']}`",
+        f"- `candidate_seeded_review_manifest_template_json`: `{summary['artifacts']['candidate_seeded_review_manifest_template_json']}`",
         "",
         "## Next Required Actions",
         "",
@@ -493,6 +639,10 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "## Candidate Review Observations",
             "",
             "The `candidate_review_observations` section records README caveats and XML/URDF metadata for reviewer intake only. It is not reviewed physical SO-101 model authority.",
+            "",
+            "## Candidate-Seeded Reviewed Manifest Template",
+            "",
+            "The `candidate_seeded_review_manifest_template` artifact follows the reviewed bundle manifest shape but keeps placeholder authority fields and remains non-authoritative until a reviewer replaces observations with reviewed values and the manifest checker reports physical authority ready.",
         ]
     )
     path.write_text("\n".join(lines) + "\n")
@@ -505,16 +655,24 @@ def main() -> int:
     summary_path = output_dir / "so101_public_candidate_intake_summary.json"
     files_csv_path = output_dir / "so101_public_candidate_intake_files.csv"
     draft_path = output_dir / "so101_public_candidate_manifest_draft.json"
+    seeded_template_path = (
+        output_dir / "so101_public_candidate_seeded_review_manifest_template.json"
+    )
     readme_path = output_dir / "README.md"
     artifacts = {
         "summary_json": str(summary_path),
         "files_csv": str(files_csv_path),
         "candidate_manifest_draft_json": str(draft_path),
+        "candidate_seeded_review_manifest_template_json": str(seeded_template_path),
         "readme_md": str(readme_path),
     }
     summary = build_summary(args, artifacts)
     write_json(summary_path, summary)
     write_json(draft_path, summary["candidate_manifest_draft"])
+    write_json(
+        seeded_template_path,
+        summary["candidate_seeded_review_manifest_template"],
+    )
     write_csv(
         files_csv_path,
         summary["file_rows"],
@@ -544,8 +702,14 @@ def main() -> int:
                 "candidate_review_observations_model_authority": summary[
                     "candidate_review_observations_model_authority"
                 ],
+                "candidate_seeded_review_manifest_template_model_authority": summary[
+                    "candidate_seeded_review_manifest_template_model_authority"
+                ],
                 "candidate_review_observations_ready_for_model_backed_ik": summary[
                     "candidate_review_observations"
+                ]["ready_for_model_backed_ik"],
+                "candidate_seeded_review_manifest_template_ready_for_model_backed_ik": summary[
+                    "candidate_seeded_review_manifest_template"
                 ]["ready_for_model_backed_ik"],
                 "candidate_review_observations_parsed_model_file_count": summary[
                     "candidate_review_observations"

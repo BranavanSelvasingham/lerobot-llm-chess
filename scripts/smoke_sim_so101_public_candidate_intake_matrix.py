@@ -98,6 +98,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "model_sha256_observed",
         "model_authority",
         "candidate_review_observations_model_authority",
+        "candidate_seeded_review_manifest_template_model_authority",
         "candidate_review_observations_parsed_model_file_count",
         "candidate_readme_gripper_mapping_caveat",
         "candidate_readme_base_collision_caveat",
@@ -347,6 +348,7 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "summary_json",
         "files_csv",
         "candidate_manifest_draft_json",
+        "candidate_seeded_review_manifest_template_json",
         "readme_md",
     ):
         artifact_path = artifacts.get(artifact_key)
@@ -361,6 +363,34 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         errors.append(f"{case_id}.candidate_manifest_draft authority/provenance not empty")
     if expect["model_present"] and not summary.get("model_sha256_observed"):
         errors.append(f"{case_id}.model_sha256_observed missing")
+
+    seeded_template = summary.get("candidate_seeded_review_manifest_template")
+    seeded_template = seeded_template if isinstance(seeded_template, dict) else {}
+    if (
+        summary.get("candidate_seeded_review_manifest_template_model_authority")
+        != "candidate_seeded_review_manifest_template_not_authority"
+    ):
+        errors.append(
+            f"{case_id}.candidate_seeded_review_manifest_template_model_authority invalid"
+        )
+    if seeded_template.get("model_authority") != "candidate_seeded_review_manifest_template_not_authority":
+        errors.append(f"{case_id}.candidate_seeded_review_manifest_template.model_authority invalid")
+    if seeded_template.get("ready_for_model_backed_ik") is not False:
+        errors.append(f"{case_id}.candidate_seeded_review_manifest_template.ready_for_model_backed_ik not false")
+    if seeded_template.get("physical_so101_model_authority_ready") is not False:
+        errors.append(
+            f"{case_id}.candidate_seeded_review_manifest_template.physical authority not false"
+        )
+    manifest_template = seeded_template.get("manifest_template")
+    manifest_template = manifest_template if isinstance(manifest_template, dict) else {}
+    if expect["model_present"] and manifest_template.get("model_path") != summary.get("model_path"):
+        errors.append(f"{case_id}.candidate_seeded_review_manifest_template.model_path not seeded")
+    if manifest_template.get("model_sha256") != "<copy-reviewed-sha256-after-review>":
+        errors.append(f"{case_id}.candidate_seeded_review_manifest_template.model_sha256 not placeholder")
+    authority = manifest_template.get("authority")
+    authority = authority if isinstance(authority, dict) else {}
+    if authority.get("reviewed_by") != "<reviewer-or-team>":
+        errors.append(f"{case_id}.candidate_seeded_review_manifest_template authority placeholder missing")
 
     observations = summary.get("candidate_review_observations")
     observations = observations if isinstance(observations, dict) else {}
@@ -410,6 +440,9 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "model_authority": summary.get("model_authority"),
         "candidate_review_observations_model_authority": summary.get(
             "candidate_review_observations_model_authority"
+        ),
+        "candidate_seeded_review_manifest_template_model_authority": summary.get(
+            "candidate_seeded_review_manifest_template_model_authority"
         ),
         "candidate_review_observations_parsed_model_file_count": observations.get(
             "parsed_model_file_count"
