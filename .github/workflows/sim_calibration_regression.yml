@@ -2454,6 +2454,7 @@ jobs:
               "reviewed_authority_handoff_ready_with_missing_input_rejected",
               "reviewed_authority_handoff_ready_with_pending_action_rejected",
               "reviewed_authority_handoff_physical_truth_claim_rejected",
+              "reviewed_authority_handoff_policy_training_authority_claim_rejected",
               "reviewed_authority_but_board_still_development",
               "reviewed_authority_but_scene_still_development",
               "reviewed_scene_but_gym_still_development",
@@ -2566,6 +2567,12 @@ jobs:
           assert physical_truth_claim["reviewed_mujoco_downstream_handoff_ready"] is False, physical_truth_claim
           assert physical_truth_claim["reviewed_mujoco_downstream_handoff_physical_truth_claimed"] is True, physical_truth_claim
           assert "remove_physical_so101_truth_claim_from_downstream_handoff" in physical_truth_claim["reviewed_mujoco_downstream_handoff_contract_blockers"], physical_truth_claim
+          handoff_policy_claim = by_case["reviewed_authority_handoff_policy_training_authority_claim_rejected"]["gate"]
+          assert handoff_policy_claim["reviewed_mujoco_downstream_handoff_contract_ok"] is False, handoff_policy_claim
+          assert handoff_policy_claim["reviewed_mujoco_downstream_handoff_ready"] is False, handoff_policy_claim
+          assert handoff_policy_claim["reviewed_mujoco_downstream_handoff_policy_training_authority_claimed"] is True, handoff_policy_claim
+          assert handoff_policy_claim["reviewed_mujoco_downstream_handoff_development_fixture_evidence_not_policy_training_truth"] is True, handoff_policy_claim
+          assert "remove_policy_training_authority_claim_from_downstream_handoff" in handoff_policy_claim["reviewed_mujoco_downstream_handoff_contract_blockers"], handoff_policy_claim
           draft = by_case["board_draft_authority_rejected"]["gate"]
           assert draft["ready"] is False, draft
           assert draft["board_pick_reviewed_model_authority_ready"] is False, draft
@@ -2708,6 +2715,8 @@ jobs:
           assert ready["reviewed_mujoco_downstream_handoff_joint_limit_enablement_status"] == "so101_mujoco_joints_limited", ready
           assert ready["reviewed_mujoco_downstream_handoff_missing_limited_joints"] == [], ready
           assert ready["reviewed_mujoco_downstream_handoff_physical_truth_claimed"] is False, ready
+          assert ready["reviewed_mujoco_downstream_handoff_policy_training_authority_claimed"] is False, ready
+          assert ready["reviewed_mujoco_downstream_handoff_development_fixture_evidence_not_policy_training_truth"] is True, ready
           assert ready["board_pick_physical_truth_claimed"] is False, ready
           assert ready["board_pick_policy_training_claimed"] is False, ready
           assert ready["board_pick_policy_authority_claimed"] is False, ready
