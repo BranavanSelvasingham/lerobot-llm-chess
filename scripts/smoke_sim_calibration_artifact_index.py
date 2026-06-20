@@ -2958,6 +2958,26 @@ def collect_so101_model_source_inventory_artifacts(
     )
     source_configuration = inventory.get("source_configuration")
     source_configuration = source_configuration if isinstance(source_configuration, dict) else {}
+    known_public_sources = inventory.get("known_public_candidate_sources")
+    known_public_sources = (
+        known_public_sources if isinstance(known_public_sources, list) else []
+    )
+    known_public_source_ids = [
+        source.get("source_id")
+        for source in known_public_sources
+        if isinstance(source, dict) and source.get("source_id")
+    ]
+    known_source_command_template_keys: dict[str, list[str]] = {}
+    for source in known_public_sources:
+        if not isinstance(source, dict) or not source.get("source_id"):
+            continue
+        operator_intake = source.get("operator_intake")
+        operator_intake = operator_intake if isinstance(operator_intake, dict) else {}
+        known_source_command_template_keys[str(source["source_id"])] = sorted(
+            str(key)
+            for key, value in operator_intake.items()
+            if str(key).endswith("_command_template") and isinstance(value, list) and value
+        )
     metrics = {
         "status": inventory.get("status"),
         "ok": inventory.get("ok"),
@@ -2999,6 +3019,19 @@ def collect_so101_model_source_inventory_artifacts(
         or [],
         "source_authority_gate_status": inventory.get("source_authority_gate_status"),
         "source_authority_blockers": inventory.get("source_authority_blockers") or [],
+        "known_public_candidate_source_count": inventory.get(
+            "known_public_candidate_source_count"
+        ),
+        "known_public_candidate_source_ids": known_public_source_ids,
+        "known_public_candidate_source_command_template_keys": (
+            known_source_command_template_keys
+        ),
+        "therobotstudio_soarm100_simulation_so101_command_template_count": len(
+            known_source_command_template_keys.get(
+                "therobotstudio_soarm100_simulation_so101",
+                [],
+            )
+        ),
         "root_count": inventory.get("root_count"),
         "source_scan_mode": source_configuration.get("scan_mode"),
         "configured_model_source_roots": source_configuration.get("model_source_roots"),

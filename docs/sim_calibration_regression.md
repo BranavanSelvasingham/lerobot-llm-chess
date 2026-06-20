@@ -511,7 +511,9 @@ observation CSV, digest CSV, requirement CSV, and command plan cannot silently
 drift from the recorded operator decision.
 The matrix includes an unpinned-ref case (`--upstream-commit main`) and requires
 `candidate_source_lock_ready_for_review: false` until the upstream commit is a
-full immutable SHA.
+full immutable SHA. The source-inventory artifact-index metrics also mirror the
+known public SO101 candidate source IDs and command-template keys so archived
+evidence proves the pin/fetch/vendor/review handoff stayed present.
 It also includes an invalid model-selection case (`--model-relative-path
 README.md`) and requires `candidate_source_lock_ready_for_review: false` unless
 the selected model path is one of the SO101 new/old calibration URDF/MJCF files.

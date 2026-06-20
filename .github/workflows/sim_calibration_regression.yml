@@ -5452,6 +5452,21 @@ jobs:
               assert metrics.get("source_authority_supplied_review_scope_ids") == source_authority_review["supplied_review_scope_ids"], metrics
               assert metrics.get("source_authority_missing_review_scope_ids") == source_authority_review["missing_review_scope_ids"], metrics
               assert metrics.get("source_authority_review_scope_ready") == source_authority_review["review_scope_ready"], metrics
+              assert metrics.get("known_public_candidate_source_count") >= 1, metrics
+              assert "therobotstudio_soarm100_simulation_so101" in metrics.get("known_public_candidate_source_ids"), metrics
+              known_command_keys = metrics.get("known_public_candidate_source_command_template_keys")
+              assert isinstance(known_command_keys, dict), metrics
+              assert set(known_command_keys.get("therobotstudio_soarm100_simulation_so101", [])) >= {
+                  "resolve_pin_command_template",
+                  "fetch_command_template",
+                  "checkout_command_template",
+                  "candidate_intake_command_template",
+                  "scan_command_template",
+                  "vendor_lock_command_template",
+                  "probe_command_template",
+                  "reviewed_source_inventory_command_template",
+              }, metrics
+              assert metrics.get("therobotstudio_soarm100_simulation_so101_command_template_count") >= 8, metrics
               assert isinstance(metrics.get("next_required_for_goal"), list), metrics
               assert isinstance(metrics.get("next_required_action_ids"), list), metrics
               assert metrics.get("next_required_action_count") == len(metrics.get("next_required_for_goal")), metrics
