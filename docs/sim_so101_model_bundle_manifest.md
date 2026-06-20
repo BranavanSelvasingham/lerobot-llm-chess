@@ -92,9 +92,10 @@ source-authority metadata and does not make observed model hints, joint limits,
 mesh references, TCP offset, or board alignment reviewed truth. `authority`
 must include an accepted reviewed status plus reviewer identity and a stable
 review artifact handle, and `provenance` must include a source reference,
-export tool, and license basis. The manifest must also declare `model_sha256` (or an accepted
-alias such as `model_file_sha256`) matching the resolved `model_path` file. A
-missing, malformed, mismatched, or contradictory digest aliases record
+export tool, and license basis. The manifest must also declare `model_sha256`
+(or an accepted alias such as `model_file_sha256`) as a lowercase
+64-character hex digest matching the resolved `model_path` file. Missing,
+malformed, mismatched, or contradictory digest aliases record
 `model_identity` as not ready and list `model_sha256` in `missing_inputs`; this
 prevents an already-reviewed path from silently changing contents. If multiple
 digest aliases such as `model_sha256`, `model_file_sha256`, `model_digest`, or

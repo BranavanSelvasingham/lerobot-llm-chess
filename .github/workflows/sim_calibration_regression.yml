@@ -517,6 +517,7 @@ jobs:
               "conflicting_alignment_alias_not_ready",
               "conflicting_alignment_nested_alias_not_ready",
               "mismatched_model_sha_not_ready",
+              "invalid_model_sha_not_ready",
               "conflicting_model_sha_alias_not_ready",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -791,6 +792,10 @@ jobs:
           mismatch_sha = by_case["mismatched_model_sha_not_ready"]["observations"]
           assert mismatch_sha["model_identity_status"] == "invalid", mismatch_sha
           assert "model_sha256" in mismatch_sha["missing_inputs"], mismatch_sha
+          invalid_sha = by_case["invalid_model_sha_not_ready"]["observations"]
+          assert invalid_sha["model_identity_status"] == "invalid", invalid_sha
+          assert "model_sha256_invalid" in invalid_sha["model_identity_diagnostics"], invalid_sha
+          assert "model_sha256" in invalid_sha["missing_inputs"], invalid_sha
           conflicting_sha_alias = by_case["conflicting_model_sha_alias_not_ready"]["observations"]
           assert conflicting_sha_alias["model_identity_status"] == "invalid", conflicting_sha_alias
           assert "model_sha256" in conflicting_sha_alias["missing_inputs"], conflicting_sha_alias
@@ -5647,6 +5652,10 @@ jobs:
           ), model_bundle_manifest_matrix
           assert (
               "conflicting_model_sha_alias_not_ready"
+              in model_bundle_manifest_matrix["case_ids"]
+          ), model_bundle_manifest_matrix
+          assert (
+              "invalid_model_sha_not_ready"
               in model_bundle_manifest_matrix["case_ids"]
           ), model_bundle_manifest_matrix
           assert model_bundle_manifest_matrix["failed_case_ids"] == [], model_bundle_manifest_matrix

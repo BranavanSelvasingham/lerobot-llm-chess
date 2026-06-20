@@ -99,6 +99,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "model_path_supported_suffix",
         "model_path_diagnostics",
         "model_identity_status",
+        "model_identity_diagnostics",
         "authority_status",
         "provenance_status",
         "asset_roots_status",
@@ -1091,6 +1092,17 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "invalid_model_sha_not_ready",
+            "manifest_path": fixtures["invalid_model_sha_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_identity_status": "invalid",
+                "model_identity_diagnostics_contains": ["model_sha256_invalid"],
+                "missing_inputs": ["model_sha256"],
+            },
+        },
+        {
             "case_id": "conflicting_model_sha_alias_not_ready",
             "manifest_path": fixtures["conflicting_model_sha_alias_manifest_path"],
             "expect": {
@@ -1388,6 +1400,19 @@ def summarize_case(
             diagnostics,
             expect["asset_roots_diagnostics_contains"],
         )
+    if "model_identity_diagnostics_contains" in expect:
+        model_identity = summary.get("model_identity")
+        diagnostics = (
+            model_identity.get("diagnostics")
+            if isinstance(model_identity, dict)
+            else []
+        )
+        expect_contains(
+            errors,
+            f"{case_id}.model_identity.diagnostics",
+            diagnostics,
+            expect["model_identity_diagnostics_contains"],
+        )
     if "asset_roots_diagnostics_prefixes" in expect:
         asset_roots = summary.get("asset_roots")
         diagnostics = (
@@ -1608,6 +1633,9 @@ def summarize_case(
                 "diagnostics"
             ),
             "model_identity_status": nested_status(summary, "model_identity"),
+            "model_identity_diagnostics": (summary.get("model_identity") or {}).get(
+                "diagnostics"
+            ),
             "authority_status": nested_status(summary, "authority"),
             "provenance_status": nested_status(summary, "provenance"),
             "asset_roots_status": nested_status(summary, "asset_roots"),
