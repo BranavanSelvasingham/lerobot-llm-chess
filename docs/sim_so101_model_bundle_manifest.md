@@ -94,11 +94,14 @@ must include an accepted reviewed status plus reviewer identity and a stable
 review artifact handle, and `provenance` must include a source reference,
 export tool, and license basis. The manifest must also declare `model_sha256` (or an accepted
 alias such as `model_file_sha256`) matching the resolved `model_path` file. A
-missing, malformed, or mismatched digest records `model_identity` as not ready
-and lists `model_sha256` in `missing_inputs`; this prevents an already-reviewed
-path from silently changing contents. The reviewed-authority source/bundle
-consistency gate uses this declared digest for authority matching; the observed
-file digest is diagnostic evidence only. Provenance values that explicitly name
+missing, malformed, mismatched, or contradictory digest aliases record
+`model_identity` as not ready and list `model_sha256` in `missing_inputs`; this
+prevents an already-reviewed path from silently changing contents. If multiple
+digest aliases such as `model_sha256`, `model_file_sha256`, `model_digest`, or
+`model_file_digest` are present, they must normalize to the same SHA-256 value.
+The reviewed-authority source/bundle consistency gate uses this declared digest
+for authority matching; the observed file digest is diagnostic evidence only.
+Provenance values that explicitly name
 synthetic, test-only, smoke, hardware-free, or regression-fixture origins are
 classified as fixture-only automation evidence; they can keep hardware-free
 regression fixtures runnable, but they add `provenance` to

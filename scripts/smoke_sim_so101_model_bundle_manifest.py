@@ -1110,30 +1110,68 @@ def inspect_model_identity(
             "diagnostics": ["model_sha256_missing"],
         }
 
-    field, raw_value = find_first_field(manifest, MODEL_SHA256_FIELDS)
-    if field is None:
+    digest_aliases = [
+        (field_name, manifest.get(field_name))
+        for field_name in MODEL_SHA256_FIELDS
+        if non_empty(manifest.get(field_name))
+    ]
+    if not digest_aliases:
         return {
             "status": "missing",
             "field": None,
+            "digest_aliases": [],
             "declared_sha256": None,
             "observed_sha256": observed_sha256,
             "matches": False,
             "diagnostics": ["model_sha256_missing"],
         }
 
-    declared_sha256 = normalize_sha256(raw_value)
+    field, raw_value = digest_aliases[0]
+    normalized_aliases = [
+        {
+            "field": alias_field,
+            "raw_value": alias_raw_value,
+            "normalized_sha256": normalize_sha256(alias_raw_value),
+        }
+        for alias_field, alias_raw_value in digest_aliases
+    ]
+    declared_sha256 = normalized_aliases[0]["normalized_sha256"]
+    invalid_alias_fields = [
+        alias["field"] for alias in normalized_aliases if alias["normalized_sha256"] is None
+    ]
+    normalized_values = sorted(
+        {
+            alias["normalized_sha256"]
+            for alias in normalized_aliases
+            if isinstance(alias["normalized_sha256"], str)
+        }
+    )
     diagnostics: list[str] = []
-    if declared_sha256 is None:
+    if invalid_alias_fields:
         diagnostics.append("model_sha256_invalid")
+        diagnostics.extend(
+            f"model_sha256_alias_invalid:{alias_field}"
+            for alias_field in invalid_alias_fields
+        )
+    if len(normalized_values) > 1:
+        diagnostics.append("model_sha256_alias_conflict")
     if not observed_sha256:
         diagnostics.append("model_sha256_observed_unavailable")
     if declared_sha256 is not None and observed_sha256 and declared_sha256 != observed_sha256:
         diagnostics.append("model_sha256_mismatch")
 
-    matches = declared_sha256 is not None and bool(observed_sha256) and declared_sha256 == observed_sha256
+    matches = (
+        declared_sha256 is not None
+        and bool(observed_sha256)
+        and declared_sha256 == observed_sha256
+        and not invalid_alias_fields
+        and len(normalized_values) <= 1
+    )
     return {
         "status": "present" if matches else "invalid",
         "field": field,
+        "digest_aliases": normalized_aliases,
+        "digest_alias_conflict": len(normalized_values) > 1,
         "declared_sha256": declared_sha256,
         "observed_sha256": observed_sha256,
         "matches": matches,

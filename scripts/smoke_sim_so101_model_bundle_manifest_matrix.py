@@ -809,6 +809,16 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "missing_inputs": ["model_sha256"],
             },
         },
+        {
+            "case_id": "conflicting_model_sha_alias_not_ready",
+            "manifest_path": fixtures["conflicting_model_sha_alias_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_identity_status": "invalid",
+                "missing_inputs": ["model_sha256"],
+            },
+        },
     ]
 
 

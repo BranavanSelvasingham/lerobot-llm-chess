@@ -484,6 +484,7 @@ jobs:
               "invalid_alignment_transform_not_ready",
               "nonfinite_alignment_transform_not_ready",
               "mismatched_model_sha_not_ready",
+              "conflicting_model_sha_alias_not_ready",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
           by_case = {case["case_id"]: case for case in summary["cases"]}
@@ -655,6 +656,9 @@ jobs:
           mismatch_sha = by_case["mismatched_model_sha_not_ready"]["observations"]
           assert mismatch_sha["model_identity_status"] == "invalid", mismatch_sha
           assert "model_sha256" in mismatch_sha["missing_inputs"], mismatch_sha
+          conflicting_sha_alias = by_case["conflicting_model_sha_alias_not_ready"]["observations"]
+          assert conflicting_sha_alias["model_identity_status"] == "invalid", conflicting_sha_alias
+          assert "model_sha256" in conflicting_sha_alias["missing_inputs"], conflicting_sha_alias
           for case in summary["cases"]:
               artifacts = json.loads(Path(case["summary_path"]).read_text())["artifacts"]
               for key in (
@@ -5144,6 +5148,10 @@ jobs:
           ), model_bundle_manifest_matrix
           assert (
               "nonfinite_alignment_transform_not_ready"
+              in model_bundle_manifest_matrix["case_ids"]
+          ), model_bundle_manifest_matrix
+          assert (
+              "conflicting_model_sha_alias_not_ready"
               in model_bundle_manifest_matrix["case_ids"]
           ), model_bundle_manifest_matrix
           assert model_bundle_manifest_matrix["failed_case_ids"] == [], model_bundle_manifest_matrix

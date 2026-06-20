@@ -434,6 +434,12 @@ def mismatched_model_sha_manifest_payload(model_filename: str) -> dict[str, Any]
     return payload
 
 
+def conflicting_model_sha_alias_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["model_digest"] = "0" * 64
+    return payload
+
+
 def placeholder_review_metadata_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     for review_field in (
@@ -613,6 +619,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     bundle_dir = fixture_dir / "ready_bundle"
     missing_model_file_dir = fixture_dir / "missing_model_file_bundle"
     mismatched_model_sha_dir = fixture_dir / "mismatched_model_sha_bundle"
+    conflicting_model_sha_alias_dir = fixture_dir / "conflicting_model_sha_alias_bundle"
     placeholder_dir = fixture_dir / "placeholder_bundle"
     placeholder_review_dir = fixture_dir / "placeholder_review_bundle"
     thin_review_dir = fixture_dir / "thin_review_bundle"
@@ -645,6 +652,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         bundle_dir,
         missing_model_file_dir,
         mismatched_model_sha_dir,
+        conflicting_model_sha_alias_dir,
         placeholder_dir,
         placeholder_review_dir,
         thin_review_dir,
@@ -682,6 +690,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         mismatched_model_sha_dir / "model" / "synthetic_so101_mujoco.xml"
     )
     mismatched_model_sha_model_path.write_text(mjcf_with_mesh_reference())
+    conflicting_model_sha_alias_model_path = (
+        conflicting_model_sha_alias_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    conflicting_model_sha_alias_model_path.write_text(mjcf_with_mesh_reference())
     placeholder_review_model_path = placeholder_review_dir / "model" / "synthetic_so101_mujoco.xml"
     placeholder_review_model_path.write_text(mjcf_with_mesh_reference())
     thin_review_model_path = thin_review_dir / "model" / "synthetic_so101_mujoco.xml"
@@ -760,6 +772,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     mismatched_model_sha_manifest_path = (
         mismatched_model_sha_dir / "so101_model_bundle.mismatched_model_sha.json"
     )
+    conflicting_model_sha_alias_manifest_path = (
+        conflicting_model_sha_alias_dir
+        / "so101_model_bundle.conflicting_model_sha_alias.json"
+    )
     placeholder_manifest_path = placeholder_dir / "so101_model_bundle.placeholder.json"
     placeholder_review_manifest_path = placeholder_review_dir / "so101_model_bundle.placeholder_review.json"
     thin_review_manifest_path = thin_review_dir / "so101_model_bundle.thin_review.json"
@@ -821,6 +837,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         mismatched_model_sha_manifest_payload(
             model_filename=mismatched_model_sha_model_path.name
         ),
+    )
+    write_manifest_json(
+        conflicting_model_sha_alias_manifest_path,
+        conflicting_model_sha_alias_manifest_payload(
+            model_filename=conflicting_model_sha_alias_model_path.name
+        ),
+        conflicting_model_sha_alias_model_path,
     )
     write_manifest_json(placeholder_manifest_path, manifest_payload(ready=False), placeholder_model_path)
     write_manifest_json(
@@ -953,6 +976,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "ready_manifest_path": ready_manifest_path,
         "missing_model_file_manifest_path": missing_model_file_manifest_path,
         "mismatched_model_sha_manifest_path": mismatched_model_sha_manifest_path,
+        "conflicting_model_sha_alias_manifest_path": (
+            conflicting_model_sha_alias_manifest_path
+        ),
         "placeholder_manifest_path": placeholder_manifest_path,
         "placeholder_review_manifest_path": placeholder_review_manifest_path,
         "thin_review_manifest_path": thin_review_manifest_path,
@@ -980,6 +1006,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "nonfinite_alignment_manifest_path": nonfinite_alignment_manifest_path,
         "ready_model_path": ready_model_path,
         "mismatched_model_sha_model_path": mismatched_model_sha_model_path,
+        "conflicting_model_sha_alias_model_path": (
+            conflicting_model_sha_alias_model_path
+        ),
         "ready_asset_root": bundle_dir / "assets",
         "placeholder_review_model_path": placeholder_review_model_path,
         "thin_review_model_path": thin_review_model_path,
