@@ -290,6 +290,34 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "selected_intake_option_id": "external_pinned_source_root",
             },
         },
+        {
+            "case_id": "candidate_intake_checked_vendor_decision",
+            "args": [
+                "--source-root",
+                str(complete_root),
+                "--upstream-commit",
+                PINNED_FIXTURE_COMMIT,
+                "--operator-intake-decision",
+                "vendor_locked_bundle",
+            ],
+            "expect": {
+                "status": "candidate_intake_checked",
+                "expected_file_count": len(EXPECTED_RELATIVE_PATHS),
+                "present_expected_file_count": len(EXPECTED_RELATIVE_PATHS),
+                "model_present": True,
+                "parsed_model_file_count": 5,
+                "readme_caveats": {
+                    "base_collision_meshes_removed": True,
+                    "gripper_linear_joint_mapping_not_reflected": True,
+                    "onshape_to_robot_generated": True,
+                    "relative_mesh_paths_declared": True,
+                },
+                "missing_exact": [],
+                "commit_action_present": False,
+                "operator_decision_status": "candidate_intake_decision_recorded_not_authority",
+                "selected_intake_option_id": "vendor_locked_bundle",
+            },
+        },
     ]
 
 

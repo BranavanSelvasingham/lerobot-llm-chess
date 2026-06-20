@@ -376,6 +376,7 @@ jobs:
               "candidate_intake_incomplete",
               "candidate_intake_checked",
               "candidate_intake_checked_external_decision",
+              "candidate_intake_checked_vendor_decision",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
           by_case = {case["case_id"]: case for case in summary["cases"]}
@@ -434,6 +435,16 @@ jobs:
           assert external_decision["candidate_operator_intake_option_count"] == 2, external_decision
           assert external_decision["ready_for_model_backed_ik"] is False, external_decision
           assert external_decision["observed_evidence_is_physical_so101_authority"] is False, external_decision
+          vendor_decision = by_case["candidate_intake_checked_vendor_decision"]
+          assert vendor_decision["status"] == "candidate_intake_checked", vendor_decision
+          assert vendor_decision["missing_expected_relative_paths"] == [], vendor_decision
+          assert vendor_decision["candidate_operator_intake_plan_model_authority"] == "candidate_operator_intake_plan_not_authority", vendor_decision
+          assert vendor_decision["candidate_operator_intake_plan_status"] == "candidate_locked_operator_decision_required", vendor_decision
+          assert vendor_decision["candidate_operator_intake_decision_status"] == "candidate_intake_decision_recorded_not_authority", vendor_decision
+          assert vendor_decision["candidate_operator_intake_selected_option"] == "vendor_locked_bundle", vendor_decision
+          assert vendor_decision["candidate_operator_intake_option_count"] == 2, vendor_decision
+          assert vendor_decision["ready_for_model_backed_ik"] is False, vendor_decision
+          assert vendor_decision["observed_evidence_is_physical_so101_authority"] is False, vendor_decision
           for case in summary["cases"]:
               assert case["model_authority"] == "public_candidate_intake_not_authority", case
               assert case["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", case
@@ -4887,8 +4898,9 @@ jobs:
               row.get("label") == "so101_public_candidate_intake_matrix:summary"
               and row.get("kind") == "json"
               and row.get("exists") is True
-              and row.get("metrics", {}).get("case_count") == 5
+              and row.get("metrics", {}).get("case_count") == 6
               and "candidate_intake_checked_external_decision" in row.get("metrics", {}).get("case_ids", [])
+              and "candidate_intake_checked_vendor_decision" in row.get("metrics", {}).get("case_ids", [])
               for row in artifacts_by_category["so101_public_candidate_intake_matrix"]
           ), artifacts_by_category["so101_public_candidate_intake_matrix"]
           for row in artifacts_by_category["so101_public_candidate_intake_matrix"]:
@@ -4904,6 +4916,15 @@ jobs:
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_option") == "external_pinned_source_root", metrics
               assert metrics.get("candidate_intake_checked_external_decision_ready_for_model_backed_ik") is False, metrics
               assert metrics.get("candidate_intake_checked_external_decision_physical_authority") is False, metrics
+              assert metrics.get("recorded_operator_intake_decision_options") == [
+                  "external_pinned_source_root",
+                  "vendor_locked_bundle",
+              ], metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_plan_model_authority") == "candidate_operator_intake_plan_not_authority", metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_decision_status") == "candidate_intake_decision_recorded_not_authority", metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_option") == "vendor_locked_bundle", metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_ready_for_model_backed_ik") is False, metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_physical_authority") is False, metrics
           assert any(
               row.get("kind") == "json"
               and row.get("exists") is True

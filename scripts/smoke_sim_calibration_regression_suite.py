@@ -3994,6 +3994,15 @@ def so101_public_candidate_intake_matrix_section(
         ),
         {},
     )
+    vendor_decision_case = next(
+        (
+            case
+            for case in cases
+            if isinstance(case, dict)
+            and case.get("case_id") == "candidate_intake_checked_vendor_decision"
+        ),
+        {},
+    )
     checked_record = next(
         (
             record
@@ -4017,6 +4026,86 @@ def so101_public_candidate_intake_matrix_section(
     external_decision_artifacts = (
         external_decision_artifacts if isinstance(external_decision_artifacts, dict) else {}
     )
+    vendor_decision_record = next(
+        (
+            record
+            for record in child_records
+            if isinstance(record, dict)
+            and record.get("case_id") == "candidate_intake_checked_vendor_decision"
+        ),
+        {},
+    )
+    vendor_decision_artifacts = vendor_decision_record.get("artifacts")
+    vendor_decision_artifacts = (
+        vendor_decision_artifacts if isinstance(vendor_decision_artifacts, dict) else {}
+    )
+
+    def compact_decision_case(
+        case: dict[str, Any],
+        record: dict[str, Any],
+        artifacts: dict[str, Any],
+    ) -> dict[str, Any]:
+        return {
+            "status": case.get("status") if isinstance(case, dict) else None,
+            "model_present": case.get("model_present") if isinstance(case, dict) else None,
+            "candidate_source_lock_ready_for_review": case.get(
+                "candidate_source_lock_ready_for_review"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_plan_model_authority": case.get(
+                "candidate_operator_intake_plan_model_authority"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_plan_status": case.get(
+                "candidate_operator_intake_plan_status"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_decision_status": case.get(
+                "candidate_operator_intake_decision_status"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_selected_option": case.get(
+                "candidate_operator_intake_selected_option"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_option_count": case.get(
+                "candidate_operator_intake_option_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "ready_for_model_backed_ik": case.get("ready_for_model_backed_ik")
+            if isinstance(case, dict)
+            else None,
+            "observed_evidence_is_physical_so101_authority": case.get(
+                "observed_evidence_is_physical_so101_authority"
+            )
+            if isinstance(case, dict)
+            else None,
+            "summary_path": record.get("summary_path")
+            if isinstance(record, dict)
+            else None,
+            "operator_intake_plan_json_path": artifacts.get(
+                "candidate_operator_intake_plan_json"
+            ),
+        }
+
+    recorded_decision_cases = {
+        "external_pinned_source_root": compact_decision_case(
+            external_decision_case,
+            external_decision_record,
+            external_decision_artifacts,
+        ),
+        "vendor_locked_bundle": compact_decision_case(
+            vendor_decision_case,
+            vendor_decision_record,
+            vendor_decision_artifacts,
+        ),
+    }
     return {
         "summary_path": str(summary_path),
         "output_dir": str(summary_path.parent),
@@ -4108,59 +4197,12 @@ def so101_public_candidate_intake_matrix_section(
             "preview_summary_path": preview.get("summary_path"),
         },
         "candidate_intake_checked_external_decision": {
-            "status": external_decision_case.get("status")
-            if isinstance(external_decision_case, dict)
-            else None,
-            "model_present": external_decision_case.get("model_present")
-            if isinstance(external_decision_case, dict)
-            else None,
-            "candidate_source_lock_ready_for_review": external_decision_case.get(
-                "candidate_source_lock_ready_for_review"
-            )
-            if isinstance(external_decision_case, dict)
-            else None,
-            "candidate_operator_intake_plan_model_authority": external_decision_case.get(
-                "candidate_operator_intake_plan_model_authority"
-            )
-            if isinstance(external_decision_case, dict)
-            else None,
-            "candidate_operator_intake_plan_status": external_decision_case.get(
-                "candidate_operator_intake_plan_status"
-            )
-            if isinstance(external_decision_case, dict)
-            else None,
-            "candidate_operator_intake_decision_status": external_decision_case.get(
-                "candidate_operator_intake_decision_status"
-            )
-            if isinstance(external_decision_case, dict)
-            else None,
-            "candidate_operator_intake_selected_option": external_decision_case.get(
-                "candidate_operator_intake_selected_option"
-            )
-            if isinstance(external_decision_case, dict)
-            else None,
-            "candidate_operator_intake_option_count": external_decision_case.get(
-                "candidate_operator_intake_option_count"
-            )
-            if isinstance(external_decision_case, dict)
-            else None,
-            "ready_for_model_backed_ik": external_decision_case.get(
-                "ready_for_model_backed_ik"
-            )
-            if isinstance(external_decision_case, dict)
-            else None,
-            "observed_evidence_is_physical_so101_authority": external_decision_case.get(
-                "observed_evidence_is_physical_so101_authority"
-            )
-            if isinstance(external_decision_case, dict)
-            else None,
-            "summary_path": external_decision_record.get("summary_path")
-            if isinstance(external_decision_record, dict)
-            else None,
-            "operator_intake_plan_json_path": external_decision_artifacts.get(
-                "candidate_operator_intake_plan_json"
-            ),
+            **recorded_decision_cases["external_pinned_source_root"],
         },
+        "candidate_intake_checked_vendor_decision": {
+            **recorded_decision_cases["vendor_locked_bundle"],
+        },
+        "recorded_operator_intake_decision_cases": recorded_decision_cases,
         "artifacts": {
             "summary_json": matrix.get("summary_json") or str(summary_path),
             "cases_csv": matrix.get("cases_csv"),

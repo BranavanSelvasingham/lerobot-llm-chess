@@ -3235,6 +3235,19 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
     external_decision_case = (
         external_decision_case if isinstance(external_decision_case, dict) else {}
     )
+    vendor_decision_case = matrix.get("candidate_intake_checked_vendor_decision")
+    vendor_decision_case = (
+        vendor_decision_case if isinstance(vendor_decision_case, dict) else {}
+    )
+    recorded_decision_cases = matrix.get("recorded_operator_intake_decision_cases")
+    recorded_decision_cases = (
+        recorded_decision_cases if isinstance(recorded_decision_cases, dict) else {}
+    )
+    recorded_decision_options = sorted(
+        key
+        for key, value in recorded_decision_cases.items()
+        if isinstance(key, str) and isinstance(value, dict)
+    )
     child_records = matrix.get("child_records")
     child_records = child_records if isinstance(child_records, list) else []
     metrics = {
@@ -3249,6 +3262,7 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "case_count": matrix.get("case_count"),
         "case_ids": matrix.get("case_ids") or [],
         "failed_case_ids": matrix.get("failed_case_ids") or [],
+        "recorded_operator_intake_decision_options": recorded_decision_options,
         "candidate_intake_checked_status": checked_case.get("status"),
         "candidate_intake_checked_model_present": checked_case.get("model_present"),
         "candidate_intake_checked_review_checklist_row_count": checked_case.get(
@@ -3301,6 +3315,27 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         ),
         "candidate_intake_checked_external_decision_physical_authority": (
             external_decision_case.get("observed_evidence_is_physical_so101_authority")
+        ),
+        "candidate_intake_checked_vendor_decision_status": vendor_decision_case.get(
+            "status"
+        ),
+        "candidate_intake_checked_vendor_decision_operator_intake_plan_model_authority": (
+            vendor_decision_case.get("candidate_operator_intake_plan_model_authority")
+        ),
+        "candidate_intake_checked_vendor_decision_operator_intake_plan_status": (
+            vendor_decision_case.get("candidate_operator_intake_plan_status")
+        ),
+        "candidate_intake_checked_vendor_decision_operator_intake_decision_status": (
+            vendor_decision_case.get("candidate_operator_intake_decision_status")
+        ),
+        "candidate_intake_checked_vendor_decision_operator_intake_selected_option": (
+            vendor_decision_case.get("candidate_operator_intake_selected_option")
+        ),
+        "candidate_intake_checked_vendor_decision_ready_for_model_backed_ik": (
+            vendor_decision_case.get("ready_for_model_backed_ik")
+        ),
+        "candidate_intake_checked_vendor_decision_physical_authority": (
+            vendor_decision_case.get("observed_evidence_is_physical_so101_authority")
         ),
         "seeded_template_manifest_checker_status": checked_case.get(
             "seeded_template_manifest_checker_status"
