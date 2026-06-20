@@ -3464,6 +3464,18 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
         "public_candidate_source_lock_json_path": gate.get(
             "public_candidate_source_lock_json_path"
         ),
+        "public_candidate_operator_intake_plan_json_path": gate.get(
+            "public_candidate_operator_intake_plan_json_path"
+        ),
+        "public_candidate_operator_intake_plan_status": gate.get(
+            "public_candidate_operator_intake_plan_status"
+        ),
+        "public_candidate_operator_intake_decision_status": gate.get(
+            "public_candidate_operator_intake_decision_status"
+        ),
+        "public_candidate_operator_intake_plan_model_authority": gate.get(
+            "public_candidate_operator_intake_plan_model_authority"
+        ),
         "public_candidate_review_manifest_template_path": gate.get(
             "public_candidate_review_manifest_template_path"
         ),

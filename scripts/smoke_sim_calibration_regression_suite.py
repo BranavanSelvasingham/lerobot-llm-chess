@@ -4899,6 +4899,22 @@ def so101_reviewed_model_authority_gate_section(
         "source_lock_json_path": public_candidate_checked_artifacts.get(
             "candidate_source_lock_json"
         ),
+        "operator_intake_plan_json_path": public_candidate_checked_artifacts.get(
+            "candidate_operator_intake_plan_json"
+        ),
+        "operator_intake_plan_status": public_candidate_checked.get(
+            "candidate_operator_intake_plan_status"
+        ),
+        "operator_intake_plan_model_authority": public_candidate_checked.get(
+            "candidate_operator_intake_plan_model_authority"
+        )
+        or "candidate_operator_intake_plan_not_authority",
+        "operator_intake_decision_status": public_candidate_checked.get(
+            "candidate_operator_intake_decision_status"
+        ),
+        "operator_intake_option_count": public_candidate_checked.get(
+            "candidate_operator_intake_option_count"
+        ),
         "review_manifest_template_path": public_candidate_checked.get(
             "direct_manifest_path"
         ),
@@ -5454,6 +5470,20 @@ def so101_reviewed_model_authority_gate_section(
         "public_candidate_source_lock_json_path": (
             public_candidate_source_lock_handoff["source_lock_json_path"]
         ),
+        "public_candidate_operator_intake_plan_json_path": (
+            public_candidate_source_lock_handoff["operator_intake_plan_json_path"]
+        ),
+        "public_candidate_operator_intake_plan_status": (
+            public_candidate_source_lock_handoff["operator_intake_plan_status"]
+        ),
+        "public_candidate_operator_intake_decision_status": (
+            public_candidate_source_lock_handoff["operator_intake_decision_status"]
+        ),
+        "public_candidate_operator_intake_plan_model_authority": (
+            public_candidate_source_lock_handoff[
+                "operator_intake_plan_model_authority"
+            ]
+        ),
         "public_candidate_review_manifest_template_path": (
             public_candidate_source_lock_handoff["review_manifest_template_path"]
         ),
@@ -5647,6 +5677,26 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
             ),
             "public_candidate_source_lock_json_path": (
                 public_candidate_source_lock_handoff.get("source_lock_json_path")
+            ),
+            "public_candidate_operator_intake_plan_json_path": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_intake_plan_json_path"
+                )
+            ),
+            "public_candidate_operator_intake_plan_status": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_intake_plan_status"
+                )
+            ),
+            "public_candidate_operator_intake_decision_status": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_intake_decision_status"
+                )
+            ),
+            "public_candidate_operator_intake_plan_model_authority": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_intake_plan_model_authority"
+                )
             ),
             "public_candidate_review_manifest_template_path": (
                 public_candidate_source_lock_handoff.get(
@@ -6186,6 +6236,18 @@ def so101_reviewed_model_authority_operator_actions(
                 "public_candidate_source_lock_json_path": item.get(
                     "public_candidate_source_lock_json_path"
                 ),
+                "public_candidate_operator_intake_plan_json_path": item.get(
+                    "public_candidate_operator_intake_plan_json_path"
+                ),
+                "public_candidate_operator_intake_plan_status": item.get(
+                    "public_candidate_operator_intake_plan_status"
+                ),
+                "public_candidate_operator_intake_decision_status": item.get(
+                    "public_candidate_operator_intake_decision_status"
+                ),
+                "public_candidate_operator_intake_plan_model_authority": item.get(
+                    "public_candidate_operator_intake_plan_model_authority"
+                ),
                 "public_candidate_review_manifest_template_path": item.get(
                     "public_candidate_review_manifest_template_path"
                 ),
@@ -6693,6 +6755,10 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "public_candidate_source_lock_status",
         "public_candidate_source_lock_ready_for_review",
         "public_candidate_source_lock_json_path",
+        "public_candidate_operator_intake_plan_json_path",
+        "public_candidate_operator_intake_plan_status",
+        "public_candidate_operator_intake_decision_status",
+        "public_candidate_operator_intake_plan_model_authority",
         "public_candidate_review_manifest_template_path",
         "public_candidate_source_lock_model_authority",
         "evidence_artifact_path",
@@ -6721,6 +6787,10 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "public_candidate_source_lock_status",
         "public_candidate_source_lock_ready_for_review",
         "public_candidate_source_lock_json_path",
+        "public_candidate_operator_intake_plan_json_path",
+        "public_candidate_operator_intake_plan_status",
+        "public_candidate_operator_intake_decision_status",
+        "public_candidate_operator_intake_plan_model_authority",
         "public_candidate_review_manifest_template_path",
         "public_candidate_source_lock_model_authority",
         "development_fixture_evidence_not_physical_so101_truth",

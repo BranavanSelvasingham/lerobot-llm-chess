@@ -345,9 +345,10 @@ identify the same reviewed model path and SHA-256 digest as the bundle
 manifest. When the public SO-ARM100/SO101 intake matrix has a ready source-lock
 handoff, the gate carries it as `public_candidate_source_lock_handoff` and adds
 that context to the source-authority blocker/operator-action rows; this points
-reviewers to the candidate source-lock JSON and direct manifest template, but it
-does not satisfy source authority, bundle authority, or model-backed IK
-readiness by itself. The gate summary reports
+reviewers to the candidate source-lock JSON, the unresolved operator intake
+plan, and the direct manifest template, but it does not satisfy source
+authority, bundle authority, or model-backed IK readiness by itself. The gate
+summary reports
 `model_authority: "reviewed_so101_model_authority_gate"` only when ready;
 otherwise it reports `reviewed_model_authority_gate_not_authority`. Its
 `observed_evidence_is_physical_so101_authority` and

@@ -1091,10 +1091,18 @@ jobs:
           assert source_lock_handoff["ready_for_model_backed_ik"] is False, source_lock_handoff
           assert source_lock_handoff["ready_for_policy_training"] is False, source_lock_handoff
           assert Path(source_lock_handoff["source_lock_json_path"]).is_file(), source_lock_handoff
+          assert Path(source_lock_handoff["operator_intake_plan_json_path"]).is_file(), source_lock_handoff
+          assert source_lock_handoff["operator_intake_plan_status"] == "candidate_locked_operator_decision_required", source_lock_handoff
+          assert source_lock_handoff["operator_intake_decision_status"] == "vendor_or_external_intake_not_declared", source_lock_handoff
+          assert source_lock_handoff["operator_intake_plan_model_authority"] == "candidate_operator_intake_plan_not_authority", source_lock_handoff
           assert Path(source_lock_handoff["review_manifest_template_path"]).is_file(), source_lock_handoff
           assert Path(source_lock_handoff["candidate_intake_matrix_summary_path"]).is_file(), source_lock_handoff
           assert source_lock_case["gate_artifacts"]["public_candidate_source_lock_ready_for_review"] is True, source_lock_case
           assert source_lock_case["gate_artifacts"]["public_candidate_source_lock_json_path"] == source_lock_handoff["source_lock_json_path"], source_lock_case
+          assert source_lock_case["gate_artifacts"]["public_candidate_operator_intake_plan_json_path"] == source_lock_handoff["operator_intake_plan_json_path"], source_lock_case
+          assert source_lock_case["gate_artifacts"]["public_candidate_operator_intake_plan_status"] == "candidate_locked_operator_decision_required", source_lock_case
+          assert source_lock_case["gate_artifacts"]["public_candidate_operator_intake_decision_status"] == "vendor_or_external_intake_not_declared", source_lock_case
+          assert source_lock_case["gate_artifacts"]["public_candidate_operator_intake_plan_model_authority"] == "candidate_operator_intake_plan_not_authority", source_lock_case
           assert source_lock_case["gate_artifacts"]["public_candidate_review_manifest_template_path"] == source_lock_handoff["review_manifest_template_path"], source_lock_case
           stale_source_case = by_case["source_ready_with_stale_blocker_physical_bundle_ready"]
           stale_source = stale_source_case["gate"]
@@ -5250,6 +5258,12 @@ jobs:
                   metrics.get("ready") is True
               ), metrics
               assert metrics.get("ready_for_policy_training") is False, metrics
+              assert metrics.get("public_candidate_source_lock_ready_for_review") is True, metrics
+              assert isinstance(metrics.get("public_candidate_source_lock_json_path"), str), metrics
+              assert isinstance(metrics.get("public_candidate_operator_intake_plan_json_path"), str), metrics
+              assert metrics.get("public_candidate_operator_intake_plan_status") == "candidate_locked_operator_decision_required", metrics
+              assert metrics.get("public_candidate_operator_intake_decision_status") == "vendor_or_external_intake_not_declared", metrics
+              assert metrics.get("public_candidate_operator_intake_plan_model_authority") == "candidate_operator_intake_plan_not_authority", metrics
               assert metrics.get("operator_action_status") in {
                   "operator_actions_ready_for_reviewed_model_authority_follow_up",
                   "reviewed_model_authority_ready_no_operator_actions_required",
