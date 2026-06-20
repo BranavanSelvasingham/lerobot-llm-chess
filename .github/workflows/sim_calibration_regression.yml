@@ -433,6 +433,13 @@ jobs:
           assert external_decision["candidate_operator_intake_decision_status"] == "candidate_intake_decision_recorded_not_authority", external_decision
           assert external_decision["candidate_operator_intake_selected_option"] == "external_pinned_source_root", external_decision
           assert external_decision["candidate_operator_intake_option_count"] == 2, external_decision
+          assert external_decision["candidate_operator_intake_selected_requirement_count"] == 4, external_decision
+          assert external_decision["candidate_operator_intake_selected_requirement_ids"] == [
+              "external_checkout_path_declared",
+              "external_upstream_commit_pinned",
+              "external_file_digest_lock_reviewed",
+              "external_reviewed_bundle_manifest_supplied",
+          ], external_decision
           assert external_decision["ready_for_model_backed_ik"] is False, external_decision
           assert external_decision["observed_evidence_is_physical_so101_authority"] is False, external_decision
           vendor_decision = by_case["candidate_intake_checked_vendor_decision"]
@@ -443,6 +450,14 @@ jobs:
           assert vendor_decision["candidate_operator_intake_decision_status"] == "candidate_intake_decision_recorded_not_authority", vendor_decision
           assert vendor_decision["candidate_operator_intake_selected_option"] == "vendor_locked_bundle", vendor_decision
           assert vendor_decision["candidate_operator_intake_option_count"] == 2, vendor_decision
+          assert vendor_decision["candidate_operator_intake_selected_requirement_count"] == 5, vendor_decision
+          assert vendor_decision["candidate_operator_intake_selected_requirement_ids"] == [
+              "vendor_import_path_declared",
+              "vendor_upstream_commit_pinned",
+              "vendor_license_provenance_reviewed",
+              "vendor_file_digest_manifest_reviewed",
+              "vendor_reviewed_bundle_manifest_supplied",
+          ], vendor_decision
           assert vendor_decision["ready_for_model_backed_ik"] is False, vendor_decision
           assert vendor_decision["observed_evidence_is_physical_so101_authority"] is False, vendor_decision
           for case in summary["cases"]:
@@ -4914,6 +4929,13 @@ jobs:
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_plan_model_authority") == "candidate_operator_intake_plan_not_authority", metrics
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_decision_status") == "candidate_intake_decision_recorded_not_authority", metrics
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_option") == "external_pinned_source_root", metrics
+              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_requirement_count") == 4, metrics
+              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_requirement_ids") == [
+                  "external_checkout_path_declared",
+                  "external_upstream_commit_pinned",
+                  "external_file_digest_lock_reviewed",
+                  "external_reviewed_bundle_manifest_supplied",
+              ], metrics
               assert metrics.get("candidate_intake_checked_external_decision_ready_for_model_backed_ik") is False, metrics
               assert metrics.get("candidate_intake_checked_external_decision_physical_authority") is False, metrics
               assert metrics.get("recorded_operator_intake_decision_options") == [
@@ -4923,6 +4945,14 @@ jobs:
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_plan_model_authority") == "candidate_operator_intake_plan_not_authority", metrics
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_decision_status") == "candidate_intake_decision_recorded_not_authority", metrics
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_option") == "vendor_locked_bundle", metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_count") == 5, metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_ids") == [
+                  "vendor_import_path_declared",
+                  "vendor_upstream_commit_pinned",
+                  "vendor_license_provenance_reviewed",
+                  "vendor_file_digest_manifest_reviewed",
+                  "vendor_reviewed_bundle_manifest_supplied",
+              ], metrics
               assert metrics.get("candidate_intake_checked_vendor_decision_ready_for_model_backed_ik") is False, metrics
               assert metrics.get("candidate_intake_checked_vendor_decision_physical_authority") is False, metrics
           assert any(

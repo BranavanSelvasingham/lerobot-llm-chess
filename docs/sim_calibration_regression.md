@@ -480,7 +480,10 @@ reviewed manifest, digest/provenance/license review, joint/TCP/base-board
 review, and downstream reviewed MuJoCo checks pass. The integrated suite also
 copies the recorded external-checkout and vendored-bundle decision cases into
 `calibration_regression_summary.json` and `artifact_index.json` so reviewers can
-audit either selected intake path without treating it as model authority.
+audit either selected intake path without treating it as model authority. Each
+recorded decision also carries explicit selected review requirement IDs so the
+external-checkout path and vendored-bundle path cannot silently lose the source,
+digest, license/provenance, import, or reviewed-manifest evidence requirements.
 
 To guard the source-authority state machine without hardware or repo-local
 SO-101 assets, run the focused source-authority matrix smoke:

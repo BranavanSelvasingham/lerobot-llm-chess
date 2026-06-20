@@ -107,6 +107,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_operator_intake_decision_status",
         "candidate_operator_intake_selected_option",
         "candidate_operator_intake_option_count",
+        "candidate_operator_intake_selected_requirement_count",
+        "candidate_operator_intake_selected_requirement_ids",
         "candidate_review_checklist_model_authority",
         "candidate_review_checklist_row_count",
         "candidate_seeded_review_manifest_template_model_authority",
@@ -260,6 +262,8 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "commit_action_present": False,
                 "operator_decision_status": "vendor_or_external_intake_not_declared",
                 "selected_intake_option_id": None,
+                "selected_requirement_count": 0,
+                "selected_requirement_ids": [],
             },
         },
         {
@@ -288,6 +292,13 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "commit_action_present": False,
                 "operator_decision_status": "candidate_intake_decision_recorded_not_authority",
                 "selected_intake_option_id": "external_pinned_source_root",
+                "selected_requirement_count": 4,
+                "selected_requirement_ids": [
+                    "external_checkout_path_declared",
+                    "external_upstream_commit_pinned",
+                    "external_file_digest_lock_reviewed",
+                    "external_reviewed_bundle_manifest_supplied",
+                ],
             },
         },
         {
@@ -316,6 +327,14 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "commit_action_present": False,
                 "operator_decision_status": "candidate_intake_decision_recorded_not_authority",
                 "selected_intake_option_id": "vendor_locked_bundle",
+                "selected_requirement_count": 5,
+                "selected_requirement_ids": [
+                    "vendor_import_path_declared",
+                    "vendor_upstream_commit_pinned",
+                    "vendor_license_provenance_reviewed",
+                    "vendor_file_digest_manifest_reviewed",
+                    "vendor_reviewed_bundle_manifest_supplied",
+                ],
             },
         },
     ]
@@ -580,6 +599,21 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
             f"expected {expected_selected_option!r}, got "
             f"{operator_plan.get('selected_intake_option_id')!r}"
         )
+    expected_requirement_count = int(expect.get("selected_requirement_count", 0))
+    expected_requirement_ids = expect.get("selected_requirement_ids", [])
+    selected_requirement_ids = operator_plan.get("selected_option_review_requirement_ids")
+    selected_requirement_ids = (
+        selected_requirement_ids if isinstance(selected_requirement_ids, list) else []
+    )
+    if operator_plan.get("selected_option_review_requirement_count") != expected_requirement_count:
+        errors.append(
+            f"{case_id}.candidate_operator_intake_plan.selected_option_review_requirement_count invalid"
+        )
+    if selected_requirement_ids != expected_requirement_ids:
+        errors.append(
+            f"{case_id}.candidate_operator_intake_plan.selected_option_review_requirement_ids "
+            f"expected {expected_requirement_ids!r}, got {selected_requirement_ids!r}"
+        )
     if operator_plan.get("ready_for_model_backed_ik") is not False:
         errors.append(f"{case_id}.candidate_operator_intake_plan.ready_for_model_backed_ik not false")
     if operator_plan.get("ready_for_policy_training") is not False:
@@ -770,6 +804,10 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
             "selected_intake_option_id"
         ),
         "candidate_operator_intake_option_count": len(intake_options),
+        "candidate_operator_intake_selected_requirement_count": operator_plan.get(
+            "selected_option_review_requirement_count"
+        ),
+        "candidate_operator_intake_selected_requirement_ids": selected_requirement_ids,
         "candidate_review_checklist_model_authority": summary.get(
             "candidate_review_checklist_model_authority"
         ),

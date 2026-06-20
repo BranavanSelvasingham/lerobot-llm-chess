@@ -3310,6 +3310,16 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "candidate_intake_checked_external_decision_operator_intake_selected_option": (
             external_decision_case.get("candidate_operator_intake_selected_option")
         ),
+        "candidate_intake_checked_external_decision_operator_intake_selected_requirement_count": (
+            external_decision_case.get(
+                "candidate_operator_intake_selected_requirement_count"
+            )
+        ),
+        "candidate_intake_checked_external_decision_operator_intake_selected_requirement_ids": (
+            external_decision_case.get(
+                "candidate_operator_intake_selected_requirement_ids"
+            )
+        ),
         "candidate_intake_checked_external_decision_ready_for_model_backed_ik": (
             external_decision_case.get("ready_for_model_backed_ik")
         ),
@@ -3330,6 +3340,16 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         ),
         "candidate_intake_checked_vendor_decision_operator_intake_selected_option": (
             vendor_decision_case.get("candidate_operator_intake_selected_option")
+        ),
+        "candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_count": (
+            vendor_decision_case.get(
+                "candidate_operator_intake_selected_requirement_count"
+            )
+        ),
+        "candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_ids": (
+            vendor_decision_case.get(
+                "candidate_operator_intake_selected_requirement_ids"
+            )
         ),
         "candidate_intake_checked_vendor_decision_ready_for_model_backed_ik": (
             vendor_decision_case.get("ready_for_model_backed_ik")

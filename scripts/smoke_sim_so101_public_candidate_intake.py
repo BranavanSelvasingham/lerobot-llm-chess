@@ -125,6 +125,71 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
             for action_id in next_required_action_ids
             if action_id != "declare_vendor_or_external_intake_decision"
         ]
+    option_review_requirements = {
+        "external_pinned_source_root": [
+            {
+                "requirement_id": "external_checkout_path_declared",
+                "title": "Declare the local SO-ARM100/SO101 checkout path",
+                "required_evidence": "absolute local source root for the pinned upstream checkout",
+                "manifest_or_review_field": "asset_roots",
+            },
+            {
+                "requirement_id": "external_upstream_commit_pinned",
+                "title": "Pin the immutable upstream commit",
+                "required_evidence": "reviewed SO-ARM100 commit SHA for Simulation/SO101",
+                "manifest_or_review_field": "provenance.source_reference",
+            },
+            {
+                "requirement_id": "external_file_digest_lock_reviewed",
+                "title": "Review expected file digest lock",
+                "required_evidence": "complete expected SO101 file digest set from candidate_source_lock",
+                "manifest_or_review_field": "mesh_asset_authority",
+            },
+            {
+                "requirement_id": "external_reviewed_bundle_manifest_supplied",
+                "title": "Supply reviewed bundle manifest for external source",
+                "required_evidence": "reviewed model bundle manifest with authority fields replaced",
+                "manifest_or_review_field": "<reviewed-manifest>",
+            },
+        ],
+        "vendor_locked_bundle": [
+            {
+                "requirement_id": "vendor_import_path_declared",
+                "title": "Declare the vendored SO101 asset root",
+                "required_evidence": "repo-local vendored asset path and import commit or review record",
+                "manifest_or_review_field": "asset_roots",
+            },
+            {
+                "requirement_id": "vendor_upstream_commit_pinned",
+                "title": "Pin the vendored upstream source commit",
+                "required_evidence": "reviewed SO-ARM100 commit SHA used for the vendored subset",
+                "manifest_or_review_field": "provenance.source_reference",
+            },
+            {
+                "requirement_id": "vendor_license_provenance_reviewed",
+                "title": "Review license and provenance for vendored files",
+                "required_evidence": "license/provenance review record for copied asset subset",
+                "manifest_or_review_field": "provenance.license_basis",
+            },
+            {
+                "requirement_id": "vendor_file_digest_manifest_reviewed",
+                "title": "Review vendored file digest manifest",
+                "required_evidence": "digest manifest for every vendored SO101 file used by the bundle",
+                "manifest_or_review_field": "mesh_asset_authority",
+            },
+            {
+                "requirement_id": "vendor_reviewed_bundle_manifest_supplied",
+                "title": "Supply reviewed bundle manifest for vendored source",
+                "required_evidence": "reviewed model bundle manifest with authority fields replaced",
+                "manifest_or_review_field": "<reviewed-manifest>",
+            },
+        ],
+    }
+    selected_option_review_requirements = (
+        option_review_requirements.get(selected_intake_option_id, [])
+        if selected_intake_option_id is not None
+        else []
+    )
     return {
         "schema": "lerobot.sim.so101_public_candidate_operator_intake_plan.v1",
         "ok": True,
@@ -136,6 +201,15 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
         "model_authority": "candidate_operator_intake_plan_not_authority",
         "decision_status": decision_status,
         "selected_intake_option_id": selected_intake_option_id,
+        "option_review_requirements": option_review_requirements,
+        "selected_option_review_requirements": selected_option_review_requirements,
+        "selected_option_review_requirement_count": len(
+            selected_option_review_requirements
+        ),
+        "selected_option_review_requirement_ids": [
+            requirement["requirement_id"]
+            for requirement in selected_option_review_requirements
+        ],
         "observed_evidence_is_physical_so101_authority": False,
         "ready_for_model_backed_ik": False,
         "ready_for_policy_training": False,
