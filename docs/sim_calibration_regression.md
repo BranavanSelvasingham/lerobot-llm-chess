@@ -818,6 +818,12 @@ ready manifest whose declared body-joint bounds intentionally mismatch the
 loaded MuJoCo `jnt_range`, and a ready synthetic fixture manifest whose MuJoCo/SimRobot motion
 check must remain
 `hardware_free_fixture_motion_checked_not_physical_so101_authority`. It also
+includes `generated_reviewed_contract_motion_checked`, which uses generated
+matrix data to exercise the positive
+`physical_reviewed_model_motion_checked` branch while the matrix summary still
+reports `model_authority: "reviewed_mujoco_bundle_matrix_not_authority"` and
+`observed_evidence_is_physical_so101_authority: false`. That generated contract
+case is not a reviewed physical SO-101 asset. It also
 asserts the reviewed-MuJoCo downstream handoff producer emits the current
 `lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1` schema in both
 the flattened summary and the handoff JSON before downstream scene/training

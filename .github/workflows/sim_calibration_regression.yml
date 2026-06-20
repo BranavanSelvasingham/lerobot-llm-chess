@@ -1315,6 +1315,7 @@ jobs:
               "ready_manifest_unlimited_mujoco_joint_not_ready",
               "ready_manifest_gripper_range_not_moving",
               "ready_summary_open_handoff_work_blocked",
+              "generated_reviewed_contract_motion_checked",
               "ready_synthetic_fixture_motion_not_physical",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -1657,6 +1658,26 @@ jobs:
           assert sorted(set(open_handoff_work["observations"]["motion_checks_csv_statuses"])) == [
               "motion_checked"
           ], open_handoff_work
+          generated_contract = by_case["generated_reviewed_contract_motion_checked"]
+          assert generated_contract["observations"]["status"] == "reviewed_mujoco_bundle_motion_checked", generated_contract
+          assert generated_contract["observations"]["model_authority"] == "reviewed_so101_model_bundle_manifest", generated_contract
+          assert generated_contract["observations"]["physical_so101_model_authority_ready"] is True, generated_contract
+          assert generated_contract["observations"]["hardware_free_regression_fixture_ready"] is False, generated_contract
+          assert generated_contract["observations"]["reviewed_model_motion_checked"] is True, generated_contract
+          assert generated_contract["observations"]["simrobot_sync_ok"] is True, generated_contract
+          assert generated_contract["observations"]["motion_authority_status"] == "physical_reviewed_model_motion_checked", generated_contract
+          assert generated_contract["observations"]["physical_reviewed_model_motion_checked"] is True, generated_contract
+          assert generated_contract["observations"]["hardware_free_fixture_motion_checked"] is False, generated_contract
+          assert generated_contract["observations"]["motion_evidence_not_physical_so101_authority"] is False, generated_contract
+          assert generated_contract["observations"]["downstream_handoff_status"] == "physical_reviewed_mujoco_handoff_ready", generated_contract
+          assert generated_contract["observations"]["downstream_handoff_ready"] is True, generated_contract
+          assert generated_contract["observations"]["fixture_handoff_ready_not_physical_so101_authority"] is False, generated_contract
+          assert generated_contract["observations"]["ready_handoff_has_open_work"] is False, generated_contract
+          assert generated_contract["observations"]["ready_handoff_open_work_missing_inputs"] == [], generated_contract
+          assert generated_contract["observations"]["ready_handoff_open_work_pending_action_ids"] == [], generated_contract
+          assert sorted(set(generated_contract["observations"]["motion_checks_csv_statuses"])) == [
+              "motion_checked"
+          ], generated_contract
           ready_fixture = by_case["ready_synthetic_fixture_motion_not_physical"]
           assert ready_fixture["observations"]["status"] == "reviewed_mujoco_bundle_motion_checked", ready_fixture
           assert ready_fixture["observations"]["reviewed_model_motion_checked"] is True, ready_fixture

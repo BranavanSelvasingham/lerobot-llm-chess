@@ -170,6 +170,15 @@ actions or missing review inputs are negative forwarding cases in the same
 smoke: they must remain diagnostic-only and must not feed downstream contract,
 IK, or reviewed-MuJoCo motion checks.
 
+The focused reviewed-MuJoCo bundle matrix also carries
+`generated_reviewed_contract_motion_checked`, a generated contract fixture that
+removes synthetic authority flags and exercises the positive
+`physical_reviewed_model_motion_checked` branch. That case is branch and schema
+coverage only. The matrix summary remains
+`model_authority: "reviewed_mujoco_bundle_matrix_not_authority"` and
+`observed_evidence_is_physical_so101_authority: false`; the generated fixture is
+not a reviewed physical SO-101 asset.
+
 The reviewed MuJoCo bundle matrix also includes generic-review-scope and
 per-field weak-authority fixtures. It also includes a ready-shaped manifest
 whose authority sections still carry pending review actions or missing review
