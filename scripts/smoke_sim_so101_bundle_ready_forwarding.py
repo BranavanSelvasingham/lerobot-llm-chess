@@ -590,6 +590,12 @@ def nonfinite_tcp_offset_manifest_payload(model_filename: str) -> dict[str, Any]
     return payload
 
 
+def conflicting_tcp_offset_alias_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["gripper_tip_offset_m"] = {"x": 0.125, "y": 0.0, "z": 0.075}
+    return payload
+
+
 def weak_alignment_authority_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload.pop("base_to_board_alignment_authority", None)
@@ -642,6 +648,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_tcp_dir = fixture_dir / "weak_tcp_bundle"
     invalid_tcp_dir = fixture_dir / "invalid_tcp_bundle"
     nonfinite_tcp_dir = fixture_dir / "nonfinite_tcp_bundle"
+    conflicting_tcp_alias_dir = fixture_dir / "conflicting_tcp_alias_bundle"
     weak_alignment_dir = fixture_dir / "weak_alignment_bundle"
     invalid_alignment_dir = fixture_dir / "invalid_alignment_bundle"
     nonfinite_alignment_dir = fixture_dir / "nonfinite_alignment_bundle"
@@ -673,6 +680,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_tcp_dir,
         invalid_tcp_dir,
         nonfinite_tcp_dir,
+        conflicting_tcp_alias_dir,
         weak_alignment_dir,
         invalid_alignment_dir,
         nonfinite_alignment_dir,
@@ -748,6 +756,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     invalid_tcp_model_path.write_text(mjcf_with_mesh_reference())
     nonfinite_tcp_model_path = nonfinite_tcp_dir / "model" / "synthetic_so101_mujoco.xml"
     nonfinite_tcp_model_path.write_text(mjcf_with_mesh_reference())
+    conflicting_tcp_alias_model_path = (
+        conflicting_tcp_alias_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    conflicting_tcp_alias_model_path.write_text(mjcf_with_mesh_reference())
     weak_alignment_model_path = weak_alignment_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_alignment_model_path.write_text(mjcf_with_mesh_reference())
     invalid_alignment_model_path = invalid_alignment_dir / "model" / "synthetic_so101_mujoco.xml"
@@ -812,6 +824,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     invalid_tcp_manifest_path = invalid_tcp_dir / "so101_model_bundle.invalid_tcp_offset.json"
     nonfinite_tcp_manifest_path = (
         nonfinite_tcp_dir / "so101_model_bundle.nonfinite_tcp_offset.json"
+    )
+    conflicting_tcp_alias_manifest_path = (
+        conflicting_tcp_alias_dir
+        / "so101_model_bundle.conflicting_tcp_offset_alias.json"
     )
     weak_alignment_manifest_path = weak_alignment_dir / "so101_model_bundle.weak_alignment.json"
     invalid_alignment_manifest_path = invalid_alignment_dir / "so101_model_bundle.invalid_alignment.json"
@@ -954,6 +970,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         nonfinite_tcp_model_path,
     )
     write_manifest_json(
+        conflicting_tcp_alias_manifest_path,
+        conflicting_tcp_offset_alias_manifest_payload(
+            model_filename=conflicting_tcp_alias_model_path.name
+        ),
+        conflicting_tcp_alias_model_path,
+    )
+    write_manifest_json(
         weak_alignment_manifest_path,
         weak_alignment_authority_manifest_payload(model_filename=weak_alignment_model_path.name),
         weak_alignment_model_path,
@@ -1001,6 +1024,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "weak_tcp_manifest_path": weak_tcp_manifest_path,
         "invalid_tcp_manifest_path": invalid_tcp_manifest_path,
         "nonfinite_tcp_manifest_path": nonfinite_tcp_manifest_path,
+        "conflicting_tcp_alias_manifest_path": conflicting_tcp_alias_manifest_path,
         "weak_alignment_manifest_path": weak_alignment_manifest_path,
         "invalid_alignment_manifest_path": invalid_alignment_manifest_path,
         "nonfinite_alignment_manifest_path": nonfinite_alignment_manifest_path,
@@ -1031,6 +1055,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "weak_tcp_model_path": weak_tcp_model_path,
         "invalid_tcp_model_path": invalid_tcp_model_path,
         "nonfinite_tcp_model_path": nonfinite_tcp_model_path,
+        "conflicting_tcp_alias_model_path": conflicting_tcp_alias_model_path,
         "weak_alignment_model_path": weak_alignment_model_path,
         "invalid_alignment_model_path": invalid_alignment_model_path,
         "nonfinite_alignment_model_path": nonfinite_alignment_model_path,

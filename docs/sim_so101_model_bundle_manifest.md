@@ -377,10 +377,11 @@ resolved from the manifest directory.
 ```
 
 Accepted TCP aliases are `tcp_offset_m`, `gripper_tip_offset_m`,
-`target_frame_to_tcp_m`, and `tool_center_point_offset_m`. Diagnostic output
-may use `gripper_frame_link` when `target_frame` is omitted, but readiness
-requires an explicit `target_frame` plus accepted reviewed target-frame
-authority.
+`target_frame_to_tcp_m`, and `tool_center_point_offset_m`. If more than one
+alias is present, every non-empty alias must resolve to the same finite vector
+in meters; conflicting aliases are not readiness evidence. Diagnostic output may
+use `gripper_frame_link` when `target_frame` is omitted, but readiness requires
+an explicit `target_frame` plus accepted reviewed target-frame authority.
 
 `asset_roots` must be present. An explicit empty list is valid when the model
 directory alone resolves mesh paths, but readiness still requires at least one

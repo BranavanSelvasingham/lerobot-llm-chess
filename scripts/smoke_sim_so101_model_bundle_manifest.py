@@ -1016,6 +1016,34 @@ def vector3_status(value: Any) -> dict[str, Any]:
     return vector_status(value, ("x", "y", "z"))
 
 
+def vector3_components(value: Any) -> list[float] | None:
+    if isinstance(value, dict):
+        try:
+            return [float(value[axis]) for axis in ("x", "y", "z")]
+        except (KeyError, TypeError, ValueError):
+            return None
+    if isinstance(value, list) and len(value) == 3:
+        try:
+            return [float(item) for item in value]
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def vectors_equivalent(
+    left: list[float],
+    right: list[float],
+    *,
+    abs_tol: float = 1e-9,
+) -> bool:
+    if len(left) != len(right):
+        return False
+    return all(
+        math.isclose(left_item, right_item, rel_tol=0.0, abs_tol=abs_tol)
+        for left_item, right_item in zip(left, right)
+    )
+
+
 def vector_norm(value: Any) -> float | None:
     if isinstance(value, dict):
         items = list(value.values())
@@ -1820,6 +1848,8 @@ def inspect_tcp_offset(manifest: dict[str, Any] | None) -> dict[str, Any]:
             "status": "missing",
             "field": None,
             "value": None,
+            "tcp_offset_aliases": [],
+            "tcp_offset_alias_conflict": False,
             "diagnostics": ["tcp_offset_missing"],
         }
     field_name, value = find_first_field(manifest, TCP_OFFSET_FIELDS)
@@ -1828,11 +1858,52 @@ def inspect_tcp_offset(manifest: dict[str, Any] | None) -> dict[str, Any]:
             "status": "missing",
             "field": None,
             "value": None,
+            "tcp_offset_aliases": [],
+            "tcp_offset_alias_conflict": False,
             "diagnostics": ["tcp_offset_missing"],
         }
+    alias_checks = []
+    for alias_field in TCP_OFFSET_FIELDS:
+        alias_value = manifest.get(alias_field)
+        if not non_empty(alias_value):
+            continue
+        alias_vector = vector3_status(alias_value)
+        alias_checks.append(
+            {
+                "field": alias_field,
+                "value": alias_vector["value"],
+                "valid": alias_vector["valid"],
+                "diagnostics": alias_vector["diagnostics"],
+            }
+        )
     vector = vector3_status(value)
     review = inspect_tcp_offset_review(manifest, field_name, value)
     diagnostics = list(vector["diagnostics"])
+    invalid_alias_fields = [
+        alias["field"] for alias in alias_checks if not alias["valid"]
+    ]
+    if invalid_alias_fields:
+        diagnostics.extend(
+            f"tcp_offset_alias_invalid:{alias_field}"
+            for alias_field in invalid_alias_fields
+        )
+    normalized_alias_vectors = []
+    for alias in alias_checks:
+        if not alias["valid"]:
+            continue
+        components = vector3_components(alias["value"])
+        if components is not None:
+            normalized_alias_vectors.append(components)
+    unique_alias_vectors: list[list[float]] = []
+    for components in normalized_alias_vectors:
+        if not any(
+            vectors_equivalent(components, existing)
+            for existing in unique_alias_vectors
+        ):
+            unique_alias_vectors.append(components)
+    alias_conflict = len(unique_alias_vectors) > 1
+    if alias_conflict:
+        diagnostics.append("tcp_offset_alias_conflict")
     norm_m = vector_norm(vector["value"]) if vector["valid"] else None
     if norm_m is not None and norm_m > MAX_TCP_OFFSET_NORM_M:
         diagnostics.append(
@@ -1841,13 +1912,15 @@ def inspect_tcp_offset(manifest: dict[str, Any] | None) -> dict[str, Any]:
     value_valid = bool(vector["valid"] and not any(
         diagnostic.startswith("tcp_offset_norm_exceeds_limit")
         for diagnostic in diagnostics
-    ))
+    ) and not invalid_alias_fields and not alias_conflict)
     if value_valid and review["status"] != "present":
         diagnostics.extend(review.get("diagnostics", []))
     return {
         "status": "present" if not diagnostics else "needs_review" if value_valid else "invalid",
         "field": field_name,
         "value": vector["value"],
+        "tcp_offset_aliases": alias_checks,
+        "tcp_offset_alias_conflict": alias_conflict,
         "norm_m": norm_m,
         "max_norm_m": MAX_TCP_OFFSET_NORM_M,
         "review": review,

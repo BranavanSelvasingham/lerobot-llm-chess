@@ -770,6 +770,16 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "conflicting_tcp_offset_alias_not_ready",
+            "manifest_path": fixtures["conflicting_tcp_alias_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "tcp_offset_status": "invalid",
+                "missing_inputs": ["tcp_offset_m"],
+            },
+        },
+        {
             "case_id": "weak_alignment_authority_not_ready",
             "manifest_path": fixtures["weak_alignment_manifest_path"],
             "expect": {
@@ -1128,6 +1138,9 @@ def summarize_case(
             "mesh_assets_status": nested_status(summary, "mesh_assets"),
             "target_frame_status": nested_status(summary, "target_frame"),
             "tcp_offset_status": nested_status(summary, "tcp_offset"),
+            "tcp_offset_alias_conflict": (
+                summary.get("tcp_offset") or {}
+            ).get("tcp_offset_alias_conflict"),
             "alignment_status": nested_status(summary, "base_to_board_alignment"),
             "contract_checker_status": (summary.get("contract_checker") or {}).get(
                 "status"
@@ -1240,6 +1253,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "mesh_assets_status": obs.get("mesh_assets_status"),
         "target_frame_status": obs.get("target_frame_status"),
         "tcp_offset_status": obs.get("tcp_offset_status"),
+        "tcp_offset_alias_conflict": obs.get("tcp_offset_alias_conflict"),
         "alignment_status": obs.get("alignment_status"),
         "contract_checker_status": obs.get("contract_checker_status"),
         "authority_review_open_work_fields": obs.get(
