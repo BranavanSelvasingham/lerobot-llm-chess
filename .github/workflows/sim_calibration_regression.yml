@@ -1803,6 +1803,9 @@ jobs:
           assert summary["development_scene"]["reviewed_mujoco_handoff_required"] is False, summary["development_scene"]
           assert summary["development_scene"]["reviewed_mujoco_handoff_ready"] is False, summary["development_scene"]
           assert summary["development_scene"]["reviewed_mujoco_handoff_contract_ok"] is False, summary["development_scene"]
+          assert summary["development_scene"]["reviewed_mujoco_handoff_joint_limit_enablement_ok"] is False, summary["development_scene"]
+          assert summary["development_scene"]["reviewed_mujoco_handoff_joint_limit_enablement_status"] is None, summary["development_scene"]
+          assert summary["development_scene"]["reviewed_mujoco_handoff_missing_limited_joints"] == [], summary["development_scene"]
           assert summary["development_scene"]["scene_uses_reviewed_mujoco_handoff"] is False, summary["development_scene"]
           assert summary["development_scene"]["contract_errors"] == [], summary["development_scene"]
           by_case = {case["case_id"]: case for case in summary["cases"]}
@@ -3560,6 +3563,9 @@ jobs:
           assert so101_mujoco_scene["reviewed_mujoco_handoff_hardware_free_fixture_motion_checked"] is False, so101_mujoco_scene
           assert so101_mujoco_scene["reviewed_mujoco_handoff_model_authority"] == "downstream_handoff_not_authority", so101_mujoco_scene
           assert so101_mujoco_scene["reviewed_mujoco_handoff_physical_truth_claimed"] is False, so101_mujoco_scene
+          assert so101_mujoco_scene["reviewed_mujoco_handoff_joint_limit_enablement_ok"] is False, so101_mujoco_scene
+          assert so101_mujoco_scene["reviewed_mujoco_handoff_joint_limit_enablement_status"] is None, so101_mujoco_scene
+          assert so101_mujoco_scene["reviewed_mujoco_handoff_missing_limited_joints"] == [], so101_mujoco_scene
           assert so101_mujoco_scene["scene_uses_reviewed_mujoco_handoff"] is False, so101_mujoco_scene
           assert so101_mujoco_scene["source_square"] == "e4", so101_mujoco_scene
           assert so101_mujoco_scene["target_square"] == "e5", so101_mujoco_scene
@@ -4789,10 +4795,16 @@ jobs:
               assert metrics.get("reviewed_mujoco_downstream_handoff_raw_ready") in {True, False, None}, metrics
               assert metrics.get("reviewed_mujoco_downstream_handoff_ready") in {True, False, None}, metrics
               assert metrics.get("reviewed_mujoco_downstream_handoff_physical_truth_claimed") in {False, None}, metrics
+              assert metrics.get("reviewed_mujoco_downstream_handoff_joint_limit_enablement_ok") in {True, False, None}, metrics
+              assert metrics.get("reviewed_mujoco_downstream_handoff_joint_limit_enablement_status") in {None, "so101_mujoco_joints_limited", "so101_mujoco_joints_unlimited"}, metrics
+              assert isinstance(metrics.get("reviewed_mujoco_downstream_handoff_missing_limited_joints"), list), metrics
               if metrics.get("reviewed_mujoco_downstream_handoff_ready") is True:
                   assert metrics.get("reviewed_mujoco_downstream_handoff_contract_ok") is True, metrics
                   assert metrics.get("reviewed_mujoco_downstream_handoff_raw_ready") is True, metrics
                   assert metrics.get("reviewed_mujoco_downstream_handoff_model_authority") == "downstream_handoff_not_authority", metrics
+                  assert metrics.get("reviewed_mujoco_downstream_handoff_joint_limit_enablement_ok") is True, metrics
+                  assert metrics.get("reviewed_mujoco_downstream_handoff_joint_limit_enablement_status") == "so101_mujoco_joints_limited", metrics
+                  assert metrics.get("reviewed_mujoco_downstream_handoff_missing_limited_joints") == [], metrics
               assert isinstance(metrics.get("reviewed_mujoco_downstream_handoff_contract_blockers"), list), metrics
               assert isinstance(metrics.get("reviewed_mujoco_downstream_handoff_missing_item_ids"), list), metrics
               assert metrics.get("reviewed_model_backed_board_source_pick_place") in {True, False, None}, metrics
@@ -4841,6 +4853,9 @@ jobs:
               and row.get("metrics", {}).get("reviewed_mujoco_handoff_contract_ok") is True
               and row.get("metrics", {}).get("reviewed_mujoco_handoff_ready") is False
               and row.get("metrics", {}).get("reviewed_mujoco_handoff_physical_truth_claimed") is False
+              and row.get("metrics", {}).get("reviewed_mujoco_handoff_joint_limit_enablement_ok") is False
+              and row.get("metrics", {}).get("reviewed_mujoco_handoff_joint_limit_enablement_status") is None
+              and row.get("metrics", {}).get("reviewed_mujoco_handoff_missing_limited_joints") == []
               for row in artifacts_by_category["so101_mujoco_scene"]
           ), artifacts_by_category["so101_mujoco_scene"]
           for category in ("so101_mujoco_scene", "so101_chess_env", "so101_env_resets", "so101_mujoco_contact_probe", "so101_mujoco_grasp_probe", "so101_mujoco_board_pick_probe"):

@@ -448,6 +448,24 @@ def development_scene_contract_errors(scene_summary: dict[str, Any]) -> list[str
     )
     add_error(
         errors,
+        "development_scene.reviewed_mujoco_handoff_joint_limit_enablement_ok",
+        scene_summary.get("reviewed_mujoco_handoff_joint_limit_enablement_ok"),
+        False,
+    )
+    add_error(
+        errors,
+        "development_scene.reviewed_mujoco_handoff_joint_limit_enablement_status",
+        scene_summary.get("reviewed_mujoco_handoff_joint_limit_enablement_status"),
+        None,
+    )
+    add_error(
+        errors,
+        "development_scene.reviewed_mujoco_handoff_missing_limited_joints",
+        scene_summary.get("reviewed_mujoco_handoff_missing_limited_joints"),
+        [],
+    )
+    add_error(
+        errors,
         "development_scene.scene_uses_reviewed_mujoco_handoff",
         scene_summary.get("scene_uses_reviewed_mujoco_handoff"),
         False,
@@ -769,6 +787,15 @@ def main() -> int:
             ),
             "reviewed_mujoco_handoff_contract_ok": scene_summary.get(
                 "reviewed_mujoco_handoff_contract_ok"
+            ),
+            "reviewed_mujoco_handoff_joint_limit_enablement_ok": scene_summary.get(
+                "reviewed_mujoco_handoff_joint_limit_enablement_ok"
+            ),
+            "reviewed_mujoco_handoff_joint_limit_enablement_status": scene_summary.get(
+                "reviewed_mujoco_handoff_joint_limit_enablement_status"
+            ),
+            "reviewed_mujoco_handoff_missing_limited_joints": scene_summary.get(
+                "reviewed_mujoco_handoff_missing_limited_joints"
             ),
             "scene_uses_reviewed_mujoco_handoff": scene_summary.get(
                 "scene_uses_reviewed_mujoco_handoff"

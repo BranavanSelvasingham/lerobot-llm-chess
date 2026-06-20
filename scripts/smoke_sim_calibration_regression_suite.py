@@ -3411,6 +3411,8 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
     }
     for key in (
         "mujoco_model_load",
+        "mujoco_joint_limit_enablement",
+        "joint_limit_model_consistency",
         "sim_robot_mujoco_sync",
         "env_scripted_pick_place",
         "sim_status",
@@ -3505,6 +3507,9 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked",
         "reviewed_mujoco_handoff_motion_evidence_not_physical_so101_authority",
         "reviewed_mujoco_handoff_physical_so101_model_authority_ready",
+        "reviewed_mujoco_handoff_joint_limit_enablement_ok",
+        "reviewed_mujoco_handoff_joint_limit_enablement_status",
+        "reviewed_mujoco_handoff_missing_limited_joints",
         "reviewed_mujoco_handoff_item_ids",
         "reviewed_mujoco_handoff_blockers",
         "scene_uses_reviewed_mujoco_handoff",

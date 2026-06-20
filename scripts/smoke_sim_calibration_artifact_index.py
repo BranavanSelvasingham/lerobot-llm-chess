@@ -2202,6 +2202,12 @@ def collect_so101_mujoco_smoke_artifacts(
     next_required = smoke.get("next_required_for_goal")
     next_required = next_required if isinstance(next_required, list) else []
     next_required_action_ids = next_required_action_labels(next_required)
+    mujoco_joint_limit_enablement = smoke.get("mujoco_joint_limit_enablement")
+    mujoco_joint_limit_enablement = (
+        mujoco_joint_limit_enablement
+        if isinstance(mujoco_joint_limit_enablement, dict)
+        else {}
+    )
     metrics = {
         "status": smoke.get("status"),
         "ok": smoke.get("ok"),
@@ -2223,6 +2229,14 @@ def collect_so101_mujoco_smoke_artifacts(
         "hardware_free_fixture_motion_checked": smoke.get("hardware_free_fixture_motion_checked"),
         "motion_evidence_not_physical_so101_authority": smoke.get("motion_evidence_not_physical_so101_authority"),
         "motion_authority": smoke.get("motion_authority"),
+        "mujoco_joint_limit_enablement_status": mujoco_joint_limit_enablement.get(
+            "status"
+        ),
+        "mujoco_joint_limit_enablement_ok": mujoco_joint_limit_enablement.get("ok"),
+        "mujoco_joint_limit_missing_limited_joints": mujoco_joint_limit_enablement.get(
+            "missing_limited_joints"
+        )
+        or [],
         "downstream_handoff_status": smoke.get("downstream_handoff_status"),
         "downstream_handoff_model_authority": smoke.get("downstream_handoff_model_authority"),
         "downstream_handoff_ready": smoke.get("downstream_handoff_ready"),
@@ -2269,6 +2283,16 @@ def collect_so101_mujoco_smoke_artifacts(
         "reviewed_mujoco_handoff_physical_truth_claimed": smoke.get(
             "reviewed_mujoco_handoff_physical_truth_claimed"
         ),
+        "reviewed_mujoco_handoff_joint_limit_enablement_ok": smoke.get(
+            "reviewed_mujoco_handoff_joint_limit_enablement_ok"
+        ),
+        "reviewed_mujoco_handoff_joint_limit_enablement_status": smoke.get(
+            "reviewed_mujoco_handoff_joint_limit_enablement_status"
+        ),
+        "reviewed_mujoco_handoff_missing_limited_joints": smoke.get(
+            "reviewed_mujoco_handoff_missing_limited_joints"
+        )
+        or [],
         "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": smoke.get(
             "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority"
         ),
@@ -3160,6 +3184,16 @@ def collect_so101_training_readiness_gate_artifacts(
         "reviewed_mujoco_downstream_handoff_motion_authority_status": gate.get(
             "reviewed_mujoco_downstream_handoff_motion_authority_status"
         ),
+        "reviewed_mujoco_downstream_handoff_joint_limit_enablement_ok": gate.get(
+            "reviewed_mujoco_downstream_handoff_joint_limit_enablement_ok"
+        ),
+        "reviewed_mujoco_downstream_handoff_joint_limit_enablement_status": gate.get(
+            "reviewed_mujoco_downstream_handoff_joint_limit_enablement_status"
+        ),
+        "reviewed_mujoco_downstream_handoff_missing_limited_joints": gate.get(
+            "reviewed_mujoco_downstream_handoff_missing_limited_joints"
+        )
+        or [],
         "reviewed_mujoco_downstream_handoff_missing_item_ids": gate.get(
             "reviewed_mujoco_downstream_handoff_missing_item_ids"
         ),
