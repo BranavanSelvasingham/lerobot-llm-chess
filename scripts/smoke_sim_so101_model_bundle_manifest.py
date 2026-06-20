@@ -1098,7 +1098,22 @@ def inspect_model_path(manifest: dict[str, Any] | None, manifest_dir: Path | Non
             "diagnostics": ["model_path_missing"],
         }
 
-    raw = str(manifest["model_path"])
+    raw_value = manifest["model_path"]
+    if not isinstance(raw_value, str):
+        return {
+            "status": "invalid",
+            "raw": raw_value,
+            "path": None,
+            "exists": False,
+            "is_file": False,
+            "suffix": None,
+            "supported_suffix": False,
+            "supported_suffixes": list(SUPPORTED_MODEL_SUFFIXES),
+            "sha256": None,
+            "diagnostics": ["model_path_not_string"],
+        }
+
+    raw = raw_value
     resolved = resolve_manifest_relative(raw, manifest_dir)
     suffix = resolved.suffix.lower()
     exists = resolved.exists()

@@ -151,6 +151,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `status`: `{summary['status']}`",
         f"- `ready_manifest`: `{summary['fixtures']['ready_manifest_path']}`",
         f"- `missing_model_file_manifest`: `{summary['fixtures']['missing_model_file_manifest_path']}`",
+        f"- `invalid_model_path_type_manifest`: `{summary['fixtures']['invalid_model_path_type_manifest_path']}`",
         f"- `model_path_directory_manifest`: `{summary['fixtures']['model_path_directory_manifest_path']}`",
         f"- `invalid_asset_roots_manifest`: `{summary['fixtures']['invalid_asset_roots_manifest_path']}`",
         f"- `unavailable_asset_root_manifest`: `{summary['fixtures']['unavailable_asset_root_manifest_path']}`",
@@ -470,6 +471,13 @@ def invalid_model_sha_manifest_payload(model_filename: str) -> dict[str, Any]:
     return payload
 
 
+def invalid_model_path_type_manifest_payload() -> dict[str, Any]:
+    payload = manifest_payload(ready=True)
+    payload["model_path"] = {"path": "model/synthetic_so101.urdf"}
+    payload["model_sha256"] = "1" * 64
+    return payload
+
+
 def conflicting_model_sha_alias_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload["model_digest"] = "0" * 64
@@ -749,6 +757,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     raw_nonstandard_json_dir = fixture_dir / "raw_nonstandard_json_bundle"
     bundle_dir = fixture_dir / "ready_bundle"
     missing_model_file_dir = fixture_dir / "missing_model_file_bundle"
+    invalid_model_path_type_dir = fixture_dir / "invalid_model_path_type_bundle"
     unsupported_suffix_dir = fixture_dir / "unsupported_suffix_bundle"
     model_path_directory_dir = fixture_dir / "model_path_directory_bundle"
     invalid_asset_roots_dir = fixture_dir / "invalid_asset_roots_bundle"
@@ -810,6 +819,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     for root in (
         bundle_dir,
         missing_model_file_dir,
+        invalid_model_path_type_dir,
         unsupported_suffix_dir,
         model_path_directory_dir,
         invalid_asset_roots_dir,
@@ -1012,6 +1022,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     missing_model_file_manifest_path = (
         missing_model_file_dir / "so101_model_bundle.missing_model_file.json"
     )
+    invalid_model_path_type_manifest_path = (
+        invalid_model_path_type_dir
+        / "so101_model_bundle.invalid_model_path_type.json"
+    )
     unsupported_suffix_manifest_path = (
         unsupported_suffix_dir / "so101_model_bundle.unsupported_suffix.json"
     )
@@ -1137,6 +1151,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     )
     missing_model_file_payload["model_sha256"] = "1" * 64
     write_json(missing_model_file_manifest_path, missing_model_file_payload)
+    write_json(
+        invalid_model_path_type_manifest_path,
+        invalid_model_path_type_manifest_payload(),
+    )
     write_manifest_json(
         unsupported_suffix_manifest_path,
         manifest_payload(ready=True, model_filename=unsupported_suffix_model_path.name),
@@ -1403,6 +1421,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "raw_nonstandard_json_manifest_path": raw_nonstandard_json_manifest_path,
         "ready_manifest_path": ready_manifest_path,
         "missing_model_file_manifest_path": missing_model_file_manifest_path,
+        "invalid_model_path_type_manifest_path": invalid_model_path_type_manifest_path,
         "unsupported_suffix_manifest_path": unsupported_suffix_manifest_path,
         "model_path_directory_manifest_path": model_path_directory_manifest_path,
         "invalid_asset_roots_manifest_path": invalid_asset_roots_manifest_path,

@@ -561,6 +561,40 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "invalid_model_path_type_not_ready",
+            "manifest_path": fixtures["invalid_model_path_type_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_authority": (
+                    "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": False,
+                "model_path_status": "invalid",
+                "model_path_supported_suffix": False,
+                "model_path_diagnostics_contains": [
+                    "model_path_not_string",
+                ],
+                "model_identity_status": "invalid",
+                "model_identity_diagnostics_contains": [
+                    "model_sha256_observed_unavailable",
+                ],
+                "missing_inputs": [
+                    "mesh_assets",
+                    "model_path",
+                    "model_sha256",
+                    "non_blocking_contract_checker_result",
+                ],
+                "next_actions": [
+                    "select_reviewed_so101_model_path",
+                    "record_reviewed_so101_model_file_sha256",
+                    "resolve_so101_mesh_assets",
+                    "clear_model_contract_and_asset_preflight",
+                ],
+            },
+        },
+        {
             "case_id": "model_path_directory_not_ready",
             "manifest_path": fixtures["model_path_directory_manifest_path"],
             "expect": {
