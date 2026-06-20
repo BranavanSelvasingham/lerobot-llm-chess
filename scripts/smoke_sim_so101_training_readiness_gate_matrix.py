@@ -22,6 +22,9 @@ from smoke_sim_calibration_regression_suite import (  # noqa: E402
     REVIEWED_SO101_MODEL_AUTHORITY,
     SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_SCHEMA,
     SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_ITEM_IDS,
+    SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_GATE_ID,
+    SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_ORDER,
+    SO101_REVIEWED_MUJOCO_NEXT_DOWNSTREAM_GATE_AFTER_READY,
     SO101_TRAINING_PRIORITY_STAGE_IDS,
     so101_training_readiness_gate_section,
     write_so101_training_readiness_gate_artifacts,
@@ -93,6 +96,12 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_downstream_handoff_pending_action_ids",
         "reviewed_mujoco_downstream_handoff_ready_has_open_work",
         "reviewed_mujoco_downstream_handoff_contract_blockers",
+        "reviewed_mujoco_downstream_handoff_priority_gate_id",
+        "reviewed_mujoco_downstream_handoff_priority_gate_order",
+        "reviewed_mujoco_downstream_handoff_next_downstream_gate_after_ready",
+        "reviewed_mujoco_downstream_handoff_blocks_downstream_gates_until_ready",
+        "reviewed_mujoco_downstream_handoff_ready_does_not_imply_policy_training_ready",
+        "reviewed_mujoco_downstream_handoff_priority_contract_ok",
         "reviewed_model_backed_board_source_pick_place",
         "board_pick_reviewed_model_authority_ready",
         "board_pick_authority_status",
@@ -500,6 +509,17 @@ def reviewed_mujoco_bundle_state(
         ),
         "downstream_handoff_item_count": item_count,
         "downstream_handoff_item_ids": item_ids,
+        "downstream_priority_gate_id": (
+            SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_GATE_ID
+        ),
+        "downstream_priority_gate_order": list(
+            SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_ORDER
+        ),
+        "next_downstream_gate_after_ready": (
+            SO101_REVIEWED_MUJOCO_NEXT_DOWNSTREAM_GATE_AFTER_READY
+        ),
+        "blocks_downstream_gates_until_ready": True,
+        "ready_does_not_imply_policy_training_ready": True,
         "missing_inputs": missing_inputs,
         "next_required_for_goal": next_required_for_goal,
         "next_required_action_ids": next_required_action_ids,
@@ -2295,6 +2315,24 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "reviewed_mujoco_downstream_handoff_contract_blockers": gate.get(
             "reviewed_mujoco_downstream_handoff_contract_blockers"
+        ),
+        "reviewed_mujoco_downstream_handoff_priority_gate_id": gate.get(
+            "reviewed_mujoco_downstream_handoff_priority_gate_id"
+        ),
+        "reviewed_mujoco_downstream_handoff_priority_gate_order": gate.get(
+            "reviewed_mujoco_downstream_handoff_priority_gate_order"
+        ),
+        "reviewed_mujoco_downstream_handoff_next_downstream_gate_after_ready": gate.get(
+            "reviewed_mujoco_downstream_handoff_next_downstream_gate_after_ready"
+        ),
+        "reviewed_mujoco_downstream_handoff_blocks_downstream_gates_until_ready": gate.get(
+            "reviewed_mujoco_downstream_handoff_blocks_downstream_gates_until_ready"
+        ),
+        "reviewed_mujoco_downstream_handoff_ready_does_not_imply_policy_training_ready": gate.get(
+            "reviewed_mujoco_downstream_handoff_ready_does_not_imply_policy_training_ready"
+        ),
+        "reviewed_mujoco_downstream_handoff_priority_contract_ok": gate.get(
+            "reviewed_mujoco_downstream_handoff_priority_contract_ok"
         ),
         "reviewed_model_backed_board_source_pick_place": gate.get(
             "reviewed_model_backed_board_source_pick_place"
