@@ -506,6 +506,12 @@ def mismatched_model_sha_manifest_payload(model_filename: str) -> dict[str, Any]
     return payload
 
 
+def missing_model_sha_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload.pop("model_sha256", None)
+    return payload
+
+
 def invalid_model_sha_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload["model_sha256"] = "not-a-sha256"
@@ -875,6 +881,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     invalid_asset_root_entries_dir = fixture_dir / "invalid_asset_root_entries_bundle"
     unavailable_asset_root_dir = fixture_dir / "unavailable_asset_root_bundle"
     file_asset_root_dir = fixture_dir / "file_asset_root_bundle"
+    missing_model_sha_dir = fixture_dir / "missing_model_sha_bundle"
     invalid_model_sha_dir = fixture_dir / "invalid_model_sha_bundle"
     mismatched_model_sha_dir = fixture_dir / "mismatched_model_sha_bundle"
     conflicting_model_sha_alias_dir = fixture_dir / "conflicting_model_sha_alias_bundle"
@@ -953,6 +960,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         invalid_asset_root_entries_dir,
         unavailable_asset_root_dir,
         file_asset_root_dir,
+        missing_model_sha_dir,
         invalid_model_sha_dir,
         mismatched_model_sha_dir,
         conflicting_model_sha_alias_dir,
@@ -1017,6 +1025,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     unsupported_suffix_model_path.write_text(
         "This fixture intentionally is not a URDF, MJCF, XML, or Xacro model.\n"
     )
+    missing_model_sha_model_path = (
+        missing_model_sha_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    missing_model_sha_model_path.write_text(mjcf_with_mesh_reference())
     mismatched_model_sha_model_path = (
         mismatched_model_sha_dir / "model" / "synthetic_so101_mujoco.xml"
     )
@@ -1212,6 +1224,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     file_asset_root_manifest_path = (
         file_asset_root_dir / "so101_model_bundle.file_asset_root.json"
     )
+    missing_model_sha_manifest_path = (
+        missing_model_sha_dir / "so101_model_bundle.missing_model_sha.json"
+    )
     invalid_model_sha_manifest_path = (
         invalid_model_sha_dir / "so101_model_bundle.invalid_model_sha.json"
     )
@@ -1390,6 +1405,12 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         file_asset_root_manifest_path,
         file_asset_root_payload,
         file_asset_root_dir / "model" / "synthetic_so101.urdf",
+    )
+    write_json(
+        missing_model_sha_manifest_path,
+        missing_model_sha_manifest_payload(
+            model_filename=missing_model_sha_model_path.name
+        ),
     )
     write_json(
         invalid_model_sha_manifest_path,
@@ -1674,6 +1695,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         ),
         "unavailable_asset_root_manifest_path": unavailable_asset_root_manifest_path,
         "file_asset_root_manifest_path": file_asset_root_manifest_path,
+        "missing_model_sha_manifest_path": missing_model_sha_manifest_path,
         "invalid_model_sha_manifest_path": invalid_model_sha_manifest_path,
         "mismatched_model_sha_manifest_path": mismatched_model_sha_manifest_path,
         "conflicting_model_sha_alias_manifest_path": (
@@ -1745,6 +1767,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "ready_model_path": ready_model_path,
         "reviewed_contract_model_path": reviewed_contract_model_path,
         "unsupported_suffix_model_path": unsupported_suffix_model_path,
+        "missing_model_sha_model_path": missing_model_sha_model_path,
         "mismatched_model_sha_model_path": mismatched_model_sha_model_path,
         "conflicting_model_sha_alias_model_path": (
             conflicting_model_sha_alias_model_path

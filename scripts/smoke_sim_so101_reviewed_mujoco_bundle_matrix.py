@@ -259,6 +259,11 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
     mismatched_model_sha_path = fixture_dir / "so101_model_bundle.mismatched_model_sha.json"
     write_json(mismatched_model_sha_path, mismatched_model_sha)
 
+    missing_model_sha = json_clone(ready_payload)
+    missing_model_sha.pop("model_sha256", None)
+    missing_model_sha_path = fixture_dir / "so101_model_bundle.missing_model_sha.json"
+    write_json(missing_model_sha_path, missing_model_sha)
+
     return {
         "tiny_gripper_range_manifest_path": tiny_gripper_manifest_path,
         "tiny_gripper_range_model_path": tiny_gripper_model_path,
@@ -277,6 +282,7 @@ def create_invalid_numeric_fixtures(output_dir: Path, fixtures: dict[str, Path])
         "out_of_range_alignment_manifest_path": out_of_range_alignment_path,
         "nonstandard_json_constant_manifest_path": nonstandard_json_constant_path,
         "mismatched_joint_limits_manifest_path": mismatched_joint_limits_path,
+        "missing_model_sha_manifest_path": missing_model_sha_path,
         "mismatched_model_sha_manifest_path": mismatched_model_sha_path,
     }
 
@@ -1104,6 +1110,25 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "alignment_diagnostics_contains": [
                     "translation:base_to_board_translation_norm_exceeds_limit"
                 ],
+            },
+        },
+        {
+            "case_id": "missing_model_sha_not_ready",
+            "manifest_path": fixtures["missing_model_sha_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "model_identity_status": "missing",
+                "missing_inputs_contains": ["model_sha256"],
+                "model_identity_diagnostics_contains": ["model_sha256_missing"],
             },
         },
         {

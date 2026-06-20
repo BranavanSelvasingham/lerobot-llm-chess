@@ -1267,6 +1267,17 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "missing_model_sha_not_ready",
+            "manifest_path": fixtures["missing_model_sha_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_identity_status": "missing",
+                "model_identity_diagnostics_contains": ["model_sha256_missing"],
+                "missing_inputs": ["model_sha256"],
+            },
+        },
+        {
             "case_id": "mismatched_model_sha_not_ready",
             "manifest_path": fixtures["mismatched_model_sha_manifest_path"],
             "expect": {

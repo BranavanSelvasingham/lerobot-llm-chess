@@ -525,6 +525,7 @@ jobs:
               "oversized_alignment_translation_not_ready",
               "conflicting_alignment_alias_not_ready",
               "conflicting_alignment_nested_alias_not_ready",
+              "missing_model_sha_not_ready",
               "mismatched_model_sha_not_ready",
               "invalid_model_sha_not_ready",
               "conflicting_model_sha_alias_not_ready",
@@ -865,6 +866,10 @@ jobs:
           assert conflicting_alignment_nested_alias["alignment_alias_conflict"] is True, conflicting_alignment_nested_alias
           assert conflicting_alignment_nested_alias["nested_alignment_alias_conflict"] is True, conflicting_alignment_nested_alias
           assert "base_to_board_transform" in conflicting_alignment_nested_alias["missing_inputs"], conflicting_alignment_nested_alias
+          missing_sha = by_case["missing_model_sha_not_ready"]["observations"]
+          assert missing_sha["model_identity_status"] == "missing", missing_sha
+          assert "model_sha256_missing" in missing_sha["model_identity_diagnostics"], missing_sha
+          assert "model_sha256" in missing_sha["missing_inputs"], missing_sha
           mismatch_sha = by_case["mismatched_model_sha_not_ready"]["observations"]
           assert mismatch_sha["model_identity_status"] == "invalid", mismatch_sha
           assert "model_sha256" in mismatch_sha["missing_inputs"], mismatch_sha
@@ -1340,6 +1345,7 @@ jobs:
               "invalid_base_to_board_transform_not_ready",
               "invalid_nonfinite_base_to_board_transform_not_ready",
               "invalid_out_of_range_base_to_board_transform_not_ready",
+              "missing_model_sha_not_ready",
               "mismatched_model_sha_not_ready",
               "ready_manifest_mismatched_mujoco_joint_limits",
               "ready_manifest_unlimited_mujoco_joint_not_ready",
@@ -1610,6 +1616,14 @@ jobs:
           assert "base_to_board_transform" in out_of_range_alignment["observations"]["missing_inputs"], out_of_range_alignment
           assert "translation:base_to_board_translation_norm_exceeds_limit" in "\n".join(out_of_range_alignment["observations"]["alignment_diagnostics"]), out_of_range_alignment
           assert out_of_range_alignment["observations"]["reviewed_model_motion_checked"] is False, out_of_range_alignment
+          missing_sha = by_case["missing_model_sha_not_ready"]
+          assert missing_sha["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", missing_sha
+          assert missing_sha["observations"]["ready_for_model_backed_ik"] is False, missing_sha
+          assert missing_sha["observations"]["model_identity_status"] == "missing", missing_sha
+          assert "model_sha256_missing" in missing_sha["observations"]["model_identity_diagnostics"], missing_sha
+          assert "model_sha256" in missing_sha["observations"]["missing_inputs"], missing_sha
+          assert missing_sha["observations"]["reviewed_model_motion_checked"] is False, missing_sha
+          assert missing_sha["observations"]["motion_authority_status"] == "not_checked_manifest_not_ready", missing_sha
           mismatched_sha = by_case["mismatched_model_sha_not_ready"]
           assert mismatched_sha["observations"]["status"] == "reviewed_mujoco_bundle_not_ready", mismatched_sha
           assert mismatched_sha["observations"]["ready_for_model_backed_ik"] is False, mismatched_sha

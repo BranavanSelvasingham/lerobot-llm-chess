@@ -499,8 +499,8 @@ gate to report `reviewed_mujoco_bundle_motion_checked` for the ready MJCF
 fixture while preserving `hardware_free_fixture_motion_checked` as non-physical
 SO-101 authority, requires explicit `--ik-model-path` to take precedence and
 leave the ready manifest diagnostic-only for downstream IK/contract forwarding,
-requires a ready-shaped manifest with mismatched `model_sha256` to remain not
-ready and not forward, requires incomplete placeholder-alignment,
+requires ready-shaped manifests with missing or mismatched `model_sha256` to
+remain not ready and not forward, requires incomplete placeholder-alignment,
 placeholder-review, thin-review, invalid-review-URL, generic-review-scope,
 pending-review-metadata, and placeholder-provenance manifests to remain not
 ready and not forward, requires accepted review metadata to include reviewer
@@ -786,7 +786,7 @@ malformed or future-dated review timestamps, generic review scopes,
 ready-shaped review metadata with pending follow-up, weak field-specific
 authority, placeholder or malformed provenance, reviewed-status fixture
 provenance, unexpected/non-finite/reversed joint-limit entries, wrong target
-frame, invalid TCP/alignment payloads, and mismatched model SHA. Ready fixture
+frame, invalid TCP/alignment payloads, and missing or mismatched model SHA. Ready fixture
 cases exercise the manifest state machine only; synthetic fixtures must keep
 `physical_so101_model_authority_ready: false`, and the generated reviewed
 contract fixture is not a reviewed physical SO-101 asset. The focused matrix
