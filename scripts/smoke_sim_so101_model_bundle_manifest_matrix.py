@@ -102,6 +102,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "authority_status",
         "provenance_status",
         "asset_roots_status",
+        "asset_roots_diagnostics",
         "joint_limits_status",
         "joint_limit_unexpected_joints",
         "joint_limits_diagnostics",
@@ -154,6 +155,18 @@ def expect_contains(errors: list[str], label: str, values: Any, expected: list[s
     for item in expected:
         if item not in values:
             errors.append(f"{label}: expected {item!r} in {values!r}")
+
+
+def expect_contains_prefix(
+    errors: list[str],
+    label: str,
+    values: Any,
+    expected_prefixes: list[str],
+) -> None:
+    values = [str(value) for value in values] if isinstance(values, list) else []
+    for prefix in expected_prefixes:
+        if not any(value.startswith(prefix) for value in values):
+            errors.append(f"{label}: expected prefix {prefix!r} in {values!r}")
 
 
 def nested_status(summary: dict[str, Any], key: str) -> Any:
@@ -575,6 +588,57 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                     "resolve_so101_mesh_assets",
                     "clear_model_contract_and_asset_preflight",
                 ],
+            },
+        },
+        {
+            "case_id": "invalid_asset_roots_not_ready",
+            "manifest_path": fixtures["invalid_asset_roots_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_authority": (
+                    "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": False,
+                "asset_roots_status": "invalid",
+                "asset_roots_diagnostics_contains": ["asset_roots_not_list"],
+                "missing_inputs": ["asset_roots"],
+                "next_actions": ["declare_model_asset_roots"],
+            },
+        },
+        {
+            "case_id": "unavailable_asset_root_not_ready",
+            "manifest_path": fixtures["unavailable_asset_root_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_authority": (
+                    "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": False,
+                "asset_roots_status": "needs_follow_up",
+                "asset_roots_diagnostics_prefixes": ["asset_root_unavailable:"],
+                "missing_inputs": ["asset_roots"],
+                "next_actions": ["declare_model_asset_roots"],
+            },
+        },
+        {
+            "case_id": "file_asset_root_not_ready",
+            "manifest_path": fixtures["file_asset_root_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_authority": (
+                    "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": False,
+                "asset_roots_status": "needs_follow_up",
+                "asset_roots_diagnostics_prefixes": ["asset_root_not_directory:"],
+                "missing_inputs": ["asset_roots"],
+                "next_actions": ["declare_model_asset_roots"],
             },
         },
         {
@@ -1313,6 +1377,28 @@ def summarize_case(
             diagnostics,
             expect["model_path_diagnostics_contains"],
         )
+    if "asset_roots_diagnostics_contains" in expect:
+        asset_roots = summary.get("asset_roots")
+        diagnostics = (
+            asset_roots.get("diagnostics") if isinstance(asset_roots, dict) else []
+        )
+        expect_contains(
+            errors,
+            f"{case_id}.asset_roots.diagnostics",
+            diagnostics,
+            expect["asset_roots_diagnostics_contains"],
+        )
+    if "asset_roots_diagnostics_prefixes" in expect:
+        asset_roots = summary.get("asset_roots")
+        diagnostics = (
+            asset_roots.get("diagnostics") if isinstance(asset_roots, dict) else []
+        )
+        expect_contains_prefix(
+            errors,
+            f"{case_id}.asset_roots.diagnostics",
+            diagnostics,
+            expect["asset_roots_diagnostics_prefixes"],
+        )
     if "joint_limits_diagnostics_contains" in expect:
         joint_limits = summary.get("joint_limits")
         diagnostics = (
@@ -1525,6 +1611,9 @@ def summarize_case(
             "authority_status": nested_status(summary, "authority"),
             "provenance_status": nested_status(summary, "provenance"),
             "asset_roots_status": nested_status(summary, "asset_roots"),
+            "asset_roots_diagnostics": (summary.get("asset_roots") or {}).get(
+                "diagnostics"
+            ),
             "joint_limits_status": nested_status(summary, "joint_limits"),
             "joint_limit_unexpected_joints": (
                 summary.get("joint_limits") or {}

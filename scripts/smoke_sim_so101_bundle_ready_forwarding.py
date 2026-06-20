@@ -152,6 +152,9 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `ready_manifest`: `{summary['fixtures']['ready_manifest_path']}`",
         f"- `missing_model_file_manifest`: `{summary['fixtures']['missing_model_file_manifest_path']}`",
         f"- `model_path_directory_manifest`: `{summary['fixtures']['model_path_directory_manifest_path']}`",
+        f"- `invalid_asset_roots_manifest`: `{summary['fixtures']['invalid_asset_roots_manifest_path']}`",
+        f"- `unavailable_asset_root_manifest`: `{summary['fixtures']['unavailable_asset_root_manifest_path']}`",
+        f"- `file_asset_root_manifest`: `{summary['fixtures']['file_asset_root_manifest_path']}`",
         f"- `mismatched_model_sha_manifest`: `{summary['fixtures']['mismatched_model_sha_manifest_path']}`",
         f"- `placeholder_manifest`: `{summary['fixtures']['placeholder_manifest_path']}`",
         f"- `placeholder_review_manifest`: `{summary['fixtures']['placeholder_review_manifest_path']}`",
@@ -741,6 +744,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     missing_model_file_dir = fixture_dir / "missing_model_file_bundle"
     unsupported_suffix_dir = fixture_dir / "unsupported_suffix_bundle"
     model_path_directory_dir = fixture_dir / "model_path_directory_bundle"
+    invalid_asset_roots_dir = fixture_dir / "invalid_asset_roots_bundle"
+    unavailable_asset_root_dir = fixture_dir / "unavailable_asset_root_bundle"
+    file_asset_root_dir = fixture_dir / "file_asset_root_bundle"
     mismatched_model_sha_dir = fixture_dir / "mismatched_model_sha_bundle"
     conflicting_model_sha_alias_dir = fixture_dir / "conflicting_model_sha_alias_bundle"
     placeholder_dir = fixture_dir / "placeholder_bundle"
@@ -798,6 +804,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         missing_model_file_dir,
         unsupported_suffix_dir,
         model_path_directory_dir,
+        invalid_asset_roots_dir,
+        unavailable_asset_root_dir,
+        file_asset_root_dir,
         mismatched_model_sha_dir,
         conflicting_model_sha_alias_dir,
         placeholder_dir,
@@ -1000,6 +1009,15 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     model_path_directory_manifest_path = (
         model_path_directory_dir / "so101_model_bundle.model_path_directory.json"
     )
+    invalid_asset_roots_manifest_path = (
+        invalid_asset_roots_dir / "so101_model_bundle.invalid_asset_roots.json"
+    )
+    unavailable_asset_root_manifest_path = (
+        unavailable_asset_root_dir / "so101_model_bundle.unavailable_asset_root.json"
+    )
+    file_asset_root_manifest_path = (
+        file_asset_root_dir / "so101_model_bundle.file_asset_root.json"
+    )
     mismatched_model_sha_manifest_path = (
         mismatched_model_sha_dir / "so101_model_bundle.mismatched_model_sha.json"
     )
@@ -1115,6 +1133,29 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     model_path_directory_payload = manifest_payload(ready=True, model_filename=".")
     model_path_directory_payload["model_sha256"] = "1" * 64
     write_json(model_path_directory_manifest_path, model_path_directory_payload)
+    invalid_asset_roots_payload = manifest_payload(ready=True)
+    invalid_asset_roots_payload["asset_roots"] = "assets"
+    write_manifest_json(
+        invalid_asset_roots_manifest_path,
+        invalid_asset_roots_payload,
+        invalid_asset_roots_dir / "model" / "synthetic_so101.urdf",
+    )
+    unavailable_asset_root_payload = manifest_payload(ready=True)
+    unavailable_asset_root_payload["asset_roots"] = ["missing_assets"]
+    write_manifest_json(
+        unavailable_asset_root_manifest_path,
+        unavailable_asset_root_payload,
+        unavailable_asset_root_dir / "model" / "synthetic_so101.urdf",
+    )
+    file_asset_root_path = file_asset_root_dir / "assets" / "not_a_directory.txt"
+    file_asset_root_path.write_text("asset-root negative fixture file\n")
+    file_asset_root_payload = manifest_payload(ready=True)
+    file_asset_root_payload["asset_roots"] = ["assets/not_a_directory.txt"]
+    write_manifest_json(
+        file_asset_root_manifest_path,
+        file_asset_root_payload,
+        file_asset_root_dir / "model" / "synthetic_so101.urdf",
+    )
     write_json(
         mismatched_model_sha_manifest_path,
         mismatched_model_sha_manifest_payload(
@@ -1348,6 +1389,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "missing_model_file_manifest_path": missing_model_file_manifest_path,
         "unsupported_suffix_manifest_path": unsupported_suffix_manifest_path,
         "model_path_directory_manifest_path": model_path_directory_manifest_path,
+        "invalid_asset_roots_manifest_path": invalid_asset_roots_manifest_path,
+        "unavailable_asset_root_manifest_path": unavailable_asset_root_manifest_path,
+        "file_asset_root_manifest_path": file_asset_root_manifest_path,
         "mismatched_model_sha_manifest_path": mismatched_model_sha_manifest_path,
         "conflicting_model_sha_alias_manifest_path": (
             conflicting_model_sha_alias_manifest_path

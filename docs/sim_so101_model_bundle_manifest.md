@@ -409,11 +409,12 @@ in meters; conflicting aliases are not readiness evidence. Diagnostic output may
 use `gripper_frame_link` when `target_frame` is omitted, but readiness requires
 an explicit `target_frame` plus accepted reviewed target-frame authority.
 
-`asset_roots` must be present. An explicit empty list is valid when the model
-directory alone resolves mesh paths, but readiness still requires at least one
-literal mesh reference visible to asset preflight and resolved with no missing
-or unresolved assets, plus reviewed mesh/asset-root authority. Nonexistent roots
-are reported as follow-up diagnostics.
+`asset_roots` must be present as a JSON list. An explicit empty list is valid
+when the model directory alone resolves mesh paths, but every supplied root must
+resolve to an existing directory. Non-list values, nonexistent roots, and file
+paths are reported as follow-up diagnostics. Readiness still requires at least
+one literal mesh reference visible to asset preflight and resolved with no
+missing or unresolved assets, plus reviewed mesh/asset-root authority.
 Explicit placeholders such as
 `base_to_board_alignment_placeholder` or `alignment_placeholders` are recorded,
 but they do not make the bundle ready for model-backed IK.
@@ -552,7 +553,7 @@ true:
 
 - the manifest is loaded as a JSON object
 - `model_path` exists
-- `asset_roots` is present and all supplied roots are directories
+- `asset_roots` is present as a list and all supplied roots are existing directories
 - `authority` declares an accepted reviewed status plus traceable review
   evidence (`reviewed_by` plus `review_id` or HTTP(S) `review_url`) and no
   open review-work fields

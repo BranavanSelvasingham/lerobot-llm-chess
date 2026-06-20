@@ -296,6 +296,9 @@ that are directories or have unsupported suffixes. The selected path must be an
 existing supported URDF/XML/MJCF or Xacro robot model file; a matching SHA-256
 digest on a `.txt`, another non-model file, or a directory still leaves
 `ready_for_model_backed_ik: false`.
+The checker also rejects malformed `asset_roots`: the field must be a list, and
+each non-empty entry must resolve to an existing directory rather than a missing
+path or file.
 
 To supply a reviewed bundle to the suite:
 
