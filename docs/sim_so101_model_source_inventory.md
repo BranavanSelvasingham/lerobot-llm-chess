@@ -196,13 +196,19 @@ python scripts/smoke_sim_so101_model_bundle_probe.py \
 The public-candidate intake smoke writes
 `so101_public_candidate_intake_summary.json`,
 `so101_public_candidate_intake_files.csv`,
+`so101_public_candidate_source_lock.json`,
 `so101_public_candidate_manifest_draft.json`,
 `so101_public_candidate_seeded_review_manifest_template.json`,
 `so101_public_candidate_review_manifest_template.direct.json`,
 `so101_public_candidate_review_checklist.json`,
 `so101_public_candidate_review_checklist.csv`, and `README.md`.
 It hashes the local candidate files and records the pinned upstream commit as
-intake evidence only. The summary also includes `candidate_review_observations`: README caveat
+intake evidence only. The source-lock JSON is the compact review handoff for
+that candidate: upstream commit, selected model path/digest, expected file
+digests, and the reviewed-manifest rerun command template. It uses
+`candidate_source_lock_not_authority`, keeps model-backed IK readiness false,
+and does not claim physical SO-101 truth. The summary also includes
+`candidate_review_observations`: README caveat
 detection for `onshape-to-robot`, relative mesh paths, removed base collision
 meshes, and the missing LeRobot gripper linear-joint mapping, plus parsed
 URDF/MJCF metadata such as root tags, model names, joint counts, joint

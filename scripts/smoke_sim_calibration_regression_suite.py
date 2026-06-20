@@ -4027,6 +4027,21 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(checked_case, dict)
             else None,
+            "candidate_source_lock_model_authority": checked_case.get(
+                "candidate_source_lock_model_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_status": checked_case.get(
+                "candidate_source_lock_status"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_ready_for_review": checked_case.get(
+                "candidate_source_lock_ready_for_review"
+            )
+            if isinstance(checked_case, dict)
+            else None,
             "seeded_template_manifest_checker_status": checked_case.get(
                 "seeded_template_manifest_checker_status"
             )

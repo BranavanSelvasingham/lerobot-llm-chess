@@ -80,6 +80,110 @@ REVIEW_CHECKLIST_FIELDNAMES = (
 )
 
 
+def candidate_source_lock(summary: dict[str, Any]) -> dict[str, Any]:
+    upstream = summary.get("upstream")
+    upstream = upstream if isinstance(upstream, dict) else {}
+    file_rows = summary.get("file_rows")
+    file_rows = file_rows if isinstance(file_rows, list) else []
+    expected_file_rows = [
+        row
+        for row in file_rows
+        if isinstance(row, dict) and row.get("expected") is True
+    ]
+    expected_digest_rows = [
+        {
+            "relative_path": row.get("relative_path"),
+            "sha256": row.get("sha256"),
+            "size_bytes": row.get("size_bytes"),
+            "suffix": row.get("suffix"),
+        }
+        for row in expected_file_rows
+        if row.get("exists") is True
+    ]
+    upstream_commit_supplied = bool(upstream.get("commit_supplied"))
+    model_present = summary.get("model_present") is True
+    model_sha_supplied = bool(summary.get("model_sha256_observed"))
+    expected_count = int(summary.get("expected_file_count") or 0)
+    present_expected = int(summary.get("present_expected_file_count") or 0)
+    complete_expected = expected_count > 0 and present_expected == expected_count
+    source_lock_ready_for_review = (
+        upstream_commit_supplied
+        and model_present
+        and model_sha_supplied
+        and complete_expected
+    )
+    missing_inputs: list[str] = []
+    if not upstream_commit_supplied:
+        missing_inputs.append("upstream_commit")
+    if not complete_expected:
+        missing_inputs.append("expected_file_digest_lock")
+    if not model_present:
+        missing_inputs.append("selected_model_path")
+    if not model_sha_supplied:
+        missing_inputs.append("selected_model_sha256")
+    return {
+        "schema": "lerobot.sim.so101_public_candidate_source_lock.v1",
+        "ok": True,
+        "status": (
+            "candidate_source_lock_ready_for_review"
+            if source_lock_ready_for_review
+            else "candidate_source_lock_incomplete"
+        ),
+        "model_authority": "candidate_source_lock_not_authority",
+        "observed_evidence_is_physical_so101_authority": False,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "source_lock_ready_for_review": source_lock_ready_for_review,
+        "missing_inputs": missing_inputs,
+        "source_root": summary.get("source_root"),
+        "upstream": upstream,
+        "selected_model": {
+            "relative_path": summary.get("model_relative_path"),
+            "path": summary.get("model_path"),
+            "sha256": summary.get("model_sha256_observed"),
+        },
+        "expected_file_count": expected_count,
+        "present_expected_file_count": present_expected,
+        "missing_expected_relative_paths": summary.get("missing_expected_relative_paths")
+        or [],
+        "file_digest_count": len(expected_digest_rows),
+        "file_digests": expected_digest_rows,
+        "review_required_scopes": list(REQUIRED_REVIEW_SCOPES),
+        "review_handoff": {
+            "candidate_direct_review_manifest_template_json": (
+                summary.get("artifacts") or {}
+            ).get("candidate_direct_review_manifest_template_json"),
+            "candidate_review_checklist_json": (summary.get("artifacts") or {}).get(
+                "candidate_review_checklist_json"
+            ),
+            "candidate_review_checklist_csv": (summary.get("artifacts") or {}).get(
+                "candidate_review_checklist_csv"
+            ),
+            "manifest_checker_command_template": [
+                "python",
+                "scripts/smoke_sim_so101_model_bundle_manifest.py",
+                "--manifest-path",
+                "<reviewed-edited-copy-of-candidate_direct_review_manifest_template_json>",
+                "--output-dir",
+                "/private/tmp/lerobot_sim/so101_model_bundle_manifest_reviewed_candidate",
+                "--python",
+                "<python-executable>",
+            ],
+        },
+        "next_required_action_ids": [
+            "declare_vendor_or_external_intake_decision",
+            "review_candidate_source_lock",
+            "replace_candidate_template_placeholders_with_reviewed_values",
+            "run_reviewed_bundle_manifest_checker",
+        ],
+        "limitations": [
+            "This source lock records candidate file digests and upstream metadata only.",
+            "A ready source lock is review handoff readiness, not physical SO-101 authority.",
+            "Reviewed authority still requires edited manifest fields and a passing reviewed bundle manifest check.",
+        ],
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -797,6 +901,9 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `model_sha256_observed`: `{summary.get('model_sha256_observed') or 'none'}`",
         f"- `candidate_review_observations_model_authority`: `{summary['candidate_review_observations_model_authority']}`",
         f"- `candidate_review_observations_ready_for_model_backed_ik`: `{str(summary['candidate_review_observations']['ready_for_model_backed_ik']).lower()}`",
+        f"- `candidate_source_lock_model_authority`: `{summary['candidate_source_lock_model_authority']}`",
+        f"- `candidate_source_lock_status`: `{summary['candidate_source_lock']['status']}`",
+        f"- `candidate_source_lock_ready_for_review`: `{str(summary['candidate_source_lock']['source_lock_ready_for_review']).lower()}`",
         f"- `candidate_seeded_review_manifest_template_model_authority`: `{summary['candidate_seeded_review_manifest_template_model_authority']}`",
         f"- `parsed_model_file_count`: `{summary['candidate_review_observations']['parsed_model_file_count']}`",
         f"- `expected_file_count`: `{summary['expected_file_count']}`",
@@ -804,6 +911,7 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `missing_expected_relative_paths`: `{', '.join(summary['missing_expected_relative_paths']) if summary['missing_expected_relative_paths'] else 'none'}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `files_csv`: `{summary['artifacts']['files_csv']}`",
+        f"- `candidate_source_lock_json`: `{summary['artifacts']['candidate_source_lock_json']}`",
         f"- `candidate_manifest_draft_json`: `{summary['artifacts']['candidate_manifest_draft_json']}`",
         f"- `candidate_seeded_review_manifest_template_json`: `{summary['artifacts']['candidate_seeded_review_manifest_template_json']}`",
         f"- `candidate_direct_review_manifest_template_json`: `{summary['artifacts']['candidate_direct_review_manifest_template_json']}`",
@@ -826,6 +934,10 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "",
             "The `candidate_review_observations` section records README caveats and XML/URDF metadata for reviewer intake only. It is not reviewed physical SO-101 model authority.",
             "",
+            "## Candidate Source Lock",
+            "",
+            "The `candidate_source_lock` JSON records the pinned upstream, selected model, and expected file digests as review handoff evidence. It is not reviewed physical SO-101 model authority.",
+            "",
             "## Candidate-Seeded Reviewed Manifest Template",
             "",
             "The `candidate_seeded_review_manifest_template` artifact follows the reviewed bundle manifest shape but keeps placeholder authority fields and remains non-authoritative until a reviewer replaces observations with reviewed values and the manifest checker reports physical authority ready.",
@@ -846,6 +958,7 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
     summary_path = output_dir / "so101_public_candidate_intake_summary.json"
     files_csv_path = output_dir / "so101_public_candidate_intake_files.csv"
+    source_lock_path = output_dir / "so101_public_candidate_source_lock.json"
     draft_path = output_dir / "so101_public_candidate_manifest_draft.json"
     seeded_template_path = (
         output_dir / "so101_public_candidate_seeded_review_manifest_template.json"
@@ -859,6 +972,7 @@ def main() -> int:
     artifacts = {
         "summary_json": str(summary_path),
         "files_csv": str(files_csv_path),
+        "candidate_source_lock_json": str(source_lock_path),
         "candidate_manifest_draft_json": str(draft_path),
         "candidate_seeded_review_manifest_template_json": str(seeded_template_path),
         "candidate_direct_review_manifest_template_json": str(direct_template_path),
@@ -867,12 +981,16 @@ def main() -> int:
         "readme_md": str(readme_path),
     }
     summary = build_summary(args, artifacts)
+    source_lock = candidate_source_lock(summary)
+    summary["candidate_source_lock_model_authority"] = source_lock["model_authority"]
+    summary["candidate_source_lock"] = source_lock
     candidate_review_checklist = build_candidate_review_checklist(summary)
     summary["candidate_review_checklist_model_authority"] = candidate_review_checklist[
         "model_authority"
     ]
     summary["candidate_review_checklist"] = candidate_review_checklist
     write_json(summary_path, summary)
+    write_json(source_lock_path, source_lock)
     write_json(draft_path, summary["candidate_manifest_draft"])
     write_json(
         seeded_template_path,
@@ -917,6 +1035,13 @@ def main() -> int:
                 "candidate_review_observations_model_authority": summary[
                     "candidate_review_observations_model_authority"
                 ],
+                "candidate_source_lock_model_authority": summary[
+                    "candidate_source_lock_model_authority"
+                ],
+                "candidate_source_lock_status": summary["candidate_source_lock"]["status"],
+                "candidate_source_lock_ready_for_review": summary[
+                    "candidate_source_lock"
+                ]["source_lock_ready_for_review"],
                 "candidate_seeded_review_manifest_template_model_authority": summary[
                     "candidate_seeded_review_manifest_template_model_authority"
                 ],

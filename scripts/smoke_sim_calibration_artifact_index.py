@@ -3253,6 +3253,15 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "candidate_intake_checked_review_checklist_model_authority": checked_case.get(
             "candidate_review_checklist_model_authority"
         ),
+        "candidate_intake_checked_source_lock_model_authority": checked_case.get(
+            "candidate_source_lock_model_authority"
+        ),
+        "candidate_intake_checked_source_lock_status": checked_case.get(
+            "candidate_source_lock_status"
+        ),
+        "candidate_intake_checked_source_lock_ready_for_review": checked_case.get(
+            "candidate_source_lock_ready_for_review"
+        ),
         "seeded_template_manifest_checker_status": checked_case.get(
             "seeded_template_manifest_checker_status"
         ),
@@ -3293,6 +3302,22 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
             output_dir=output_dir,
             repo_root=repo_root,
             source=f"so101_public_candidate_intake_matrix.child_records.{case_id}.summary_path",
+            metrics=case_metrics,
+        )
+        record_artifacts = record.get("artifacts")
+        record_artifacts = record_artifacts if isinstance(record_artifacts, dict) else {}
+        add_path(
+            artifacts,
+            category="so101_public_candidate_intake_matrix",
+            label=f"so101_public_candidate_intake_matrix:{case_id}:source_lock",
+            value=record_artifacts.get("candidate_source_lock_json"),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=(
+                "so101_public_candidate_intake_matrix.child_records."
+                f"{case_id}.artifacts.candidate_source_lock_json"
+            ),
             metrics=case_metrics,
         )
         preview = record.get("seeded_template_manifest_preview")

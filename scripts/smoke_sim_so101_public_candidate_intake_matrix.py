@@ -99,6 +99,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "model_sha256_observed",
         "model_authority",
         "candidate_review_observations_model_authority",
+        "candidate_source_lock_model_authority",
+        "candidate_source_lock_status",
+        "candidate_source_lock_ready_for_review",
         "candidate_review_checklist_model_authority",
         "candidate_review_checklist_row_count",
         "candidate_seeded_review_manifest_template_model_authority",
@@ -292,6 +295,7 @@ def run_case(
         "stdout_path": str(stdout_path),
         "stderr_path": str(stderr_path),
         "summary_path": str(summary_path),
+        "artifacts": summary.get("artifacts") if isinstance(summary, dict) else {},
     }
     seeded_preview = run_seeded_template_manifest_preview(
         case_dir=case_dir,
@@ -424,6 +428,7 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "summary_json",
         "files_csv",
         "candidate_manifest_draft_json",
+        "candidate_source_lock_json",
         "candidate_seeded_review_manifest_template_json",
         "candidate_direct_review_manifest_template_json",
         "candidate_review_checklist_json",
@@ -460,6 +465,36 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         errors.append(
             f"{case_id}.candidate_seeded_review_manifest_template.physical authority not false"
         )
+    source_lock = summary.get("candidate_source_lock")
+    source_lock = source_lock if isinstance(source_lock, dict) else {}
+    expected_source_lock_status = (
+        "candidate_source_lock_ready_for_review"
+        if expect["model_present"] and not missing_paths and commit_action_present is False
+        else "candidate_source_lock_incomplete"
+    )
+    expected_source_lock_ready = expected_source_lock_status == "candidate_source_lock_ready_for_review"
+    if summary.get("candidate_source_lock_model_authority") != "candidate_source_lock_not_authority":
+        errors.append(f"{case_id}.candidate_source_lock_model_authority invalid")
+    if source_lock.get("model_authority") != "candidate_source_lock_not_authority":
+        errors.append(f"{case_id}.candidate_source_lock.model_authority invalid")
+    if source_lock.get("status") != expected_source_lock_status:
+        errors.append(
+            f"{case_id}.candidate_source_lock.status expected "
+            f"{expected_source_lock_status!r}, got {source_lock.get('status')!r}"
+        )
+    if source_lock.get("source_lock_ready_for_review") is not expected_source_lock_ready:
+        errors.append(f"{case_id}.candidate_source_lock.source_lock_ready_for_review invalid")
+    if source_lock.get("observed_evidence_is_physical_so101_authority") is not False:
+        errors.append(f"{case_id}.candidate_source_lock physical authority not false")
+    if source_lock.get("ready_for_model_backed_ik") is not False:
+        errors.append(f"{case_id}.candidate_source_lock.ready_for_model_backed_ik not false")
+    if expected_source_lock_ready:
+        if source_lock.get("file_digest_count") != summary.get("expected_file_count"):
+            errors.append(f"{case_id}.candidate_source_lock.file_digest_count invalid")
+        selected_model = source_lock.get("selected_model")
+        selected_model = selected_model if isinstance(selected_model, dict) else {}
+        if selected_model.get("sha256") != summary.get("model_sha256_observed"):
+            errors.append(f"{case_id}.candidate_source_lock selected model digest mismatch")
     manifest_template = seeded_template.get("manifest_template")
     manifest_template = manifest_template if isinstance(manifest_template, dict) else {}
     if expect["model_present"] and manifest_template.get("model_path") != summary.get("model_path"):
@@ -583,6 +618,13 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "model_authority": summary.get("model_authority"),
         "candidate_review_observations_model_authority": summary.get(
             "candidate_review_observations_model_authority"
+        ),
+        "candidate_source_lock_model_authority": summary.get(
+            "candidate_source_lock_model_authority"
+        ),
+        "candidate_source_lock_status": source_lock.get("status"),
+        "candidate_source_lock_ready_for_review": source_lock.get(
+            "source_lock_ready_for_review"
         ),
         "candidate_review_checklist_model_authority": summary.get(
             "candidate_review_checklist_model_authority"
