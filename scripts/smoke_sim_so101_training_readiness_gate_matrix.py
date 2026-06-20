@@ -136,6 +136,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_downstream_handoff_model_identity_status",
         "reviewed_mujoco_downstream_handoff_model_identity_matches",
         "reviewed_mujoco_downstream_handoff_model_path",
+        "reviewed_mujoco_downstream_handoff_declared_model_sha256",
+        "reviewed_mujoco_downstream_handoff_observed_model_sha256",
         "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority",
         "reviewed_mujoco_downstream_handoff_physical_motion_checked",
         "reviewed_mujoco_downstream_handoff_hardware_free_fixture_motion_checked",
@@ -581,6 +583,11 @@ def reviewed_mujoco_bundle_state(
     handoff_ready: bool,
     fixture_handoff_ready: bool = False,
     model_identity_contract_ok: bool | None = None,
+    model_identity_matches: bool | None = None,
+    omit_model_path: bool = False,
+    omit_declared_model_sha256: bool = False,
+    omit_observed_model_sha256: bool = False,
+    observed_model_sha256: str | None = None,
     status: str | None = None,
     physical_motion_checked: bool | None = None,
     fixture_motion_checked: bool | None = None,
@@ -616,6 +623,8 @@ def reviewed_mujoco_bundle_state(
         reviewed_motion_checked = physical_motion_checked or fixture_motion_checked
     if model_identity_contract_ok is None:
         model_identity_contract_ok = handoff_ready or fixture_handoff_ready
+    if model_identity_matches is None:
+        model_identity_matches = model_identity_contract_ok
     physical_model_authority_ready = (
         handoff_ready
         if physical_model_authority_ready is None
@@ -677,17 +686,25 @@ def reviewed_mujoco_bundle_state(
         "downstream_handoff_model_identity_status": (
             "present" if model_identity_contract_ok else None
         ),
-        "downstream_handoff_model_identity_matches": model_identity_contract_ok,
+        "downstream_handoff_model_identity_matches": model_identity_matches,
         "downstream_handoff_model_path": (
             "/tmp/synthetic-reviewed-so101.xml"
-            if model_identity_contract_ok
+            if model_identity_contract_ok and not omit_model_path
             else None
         ),
         "downstream_handoff_declared_model_sha256": (
-            "a" * 64 if model_identity_contract_ok else None
+            "a" * 64
+            if model_identity_contract_ok and not omit_declared_model_sha256
+            else None
         ),
         "downstream_handoff_observed_model_sha256": (
-            "a" * 64 if model_identity_contract_ok else None
+            observed_model_sha256
+            if model_identity_contract_ok
+            and not omit_observed_model_sha256
+            and observed_model_sha256 is not None
+            else "a" * 64
+            if model_identity_contract_ok and not omit_observed_model_sha256
+            else None
         ),
         "downstream_handoff_observed_evidence_is_authority": (
             observed_evidence_is_authority
@@ -906,6 +923,27 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         summaries / "reviewed_mujoco_bundle_ready_missing_model_identity.json",
         handoff_ready=True,
         model_identity_contract_ok=False,
+    )
+    handoff_ready_missing_model_path = reviewed_mujoco_bundle_state(
+        summaries / "reviewed_mujoco_bundle_ready_missing_model_path.json",
+        handoff_ready=True,
+        omit_model_path=True,
+    )
+    handoff_ready_missing_declared_model_sha = reviewed_mujoco_bundle_state(
+        summaries / "reviewed_mujoco_bundle_ready_missing_declared_model_sha.json",
+        handoff_ready=True,
+        omit_declared_model_sha256=True,
+    )
+    handoff_ready_missing_observed_model_sha = reviewed_mujoco_bundle_state(
+        summaries / "reviewed_mujoco_bundle_ready_missing_observed_model_sha.json",
+        handoff_ready=True,
+        omit_observed_model_sha256=True,
+    )
+    handoff_ready_mismatched_model_sha = reviewed_mujoco_bundle_state(
+        summaries / "reviewed_mujoco_bundle_ready_mismatched_model_sha.json",
+        handoff_ready=True,
+        model_identity_matches=False,
+        observed_model_sha256="b" * 64,
     )
     handoff_incomplete_items = reviewed_mujoco_bundle_state(
         summaries / "reviewed_mujoco_bundle_incomplete_items.json",
@@ -1181,6 +1219,152 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 ],
                 "blockers_contain": [
                     "provide_reviewed_mujoco_model_identity_evidence"
+                ],
+                "next_priority_gate": "mujoco_scene_validity",
+            },
+        },
+        {
+            "case_id": "reviewed_authority_handoff_missing_model_path_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready_missing_model_path,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "reviewed_motion": True,
+                "reviewed_downstream_handoff": False,
+                "reviewed_downstream_handoff_contract": False,
+                "reviewed_handoff_model_identity_contract_ok": False,
+                "reviewed_handoff_model_path": None,
+                "reviewed_handoff_declared_model_sha256": "a" * 64,
+                "reviewed_handoff_observed_model_sha256": "a" * 64,
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "handoff_contract_blockers_contain": [
+                    "provide_reviewed_mujoco_model_path_evidence",
+                    "provide_reviewed_mujoco_model_identity_evidence",
+                ],
+                "blockers_contain": [
+                    "provide_reviewed_mujoco_model_path_evidence",
+                    "provide_reviewed_mujoco_model_identity_evidence",
+                ],
+                "next_priority_gate": "mujoco_scene_validity",
+            },
+        },
+        {
+            "case_id": "reviewed_authority_handoff_missing_declared_model_sha_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready_missing_declared_model_sha,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "reviewed_motion": True,
+                "reviewed_downstream_handoff": False,
+                "reviewed_downstream_handoff_contract": False,
+                "reviewed_handoff_model_identity_contract_ok": False,
+                "reviewed_handoff_declared_model_sha256": None,
+                "reviewed_handoff_observed_model_sha256": "a" * 64,
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "handoff_contract_blockers_contain": [
+                    "provide_reviewed_mujoco_declared_model_sha256",
+                    "provide_reviewed_mujoco_model_identity_evidence",
+                ],
+                "blockers_contain": [
+                    "provide_reviewed_mujoco_declared_model_sha256",
+                    "provide_reviewed_mujoco_model_identity_evidence",
+                ],
+                "next_priority_gate": "mujoco_scene_validity",
+            },
+        },
+        {
+            "case_id": "reviewed_authority_handoff_missing_observed_model_sha_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready_missing_observed_model_sha,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "reviewed_motion": True,
+                "reviewed_downstream_handoff": False,
+                "reviewed_downstream_handoff_contract": False,
+                "reviewed_handoff_model_identity_contract_ok": False,
+                "reviewed_handoff_declared_model_sha256": "a" * 64,
+                "reviewed_handoff_observed_model_sha256": None,
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "handoff_contract_blockers_contain": [
+                    "provide_reviewed_mujoco_observed_model_sha256",
+                    "provide_reviewed_mujoco_model_identity_evidence",
+                ],
+                "blockers_contain": [
+                    "provide_reviewed_mujoco_observed_model_sha256",
+                    "provide_reviewed_mujoco_model_identity_evidence",
+                ],
+                "next_priority_gate": "mujoco_scene_validity",
+            },
+        },
+        {
+            "case_id": "reviewed_authority_handoff_mismatched_model_sha_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready_mismatched_model_sha,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "reviewed_motion": True,
+                "reviewed_downstream_handoff": False,
+                "reviewed_downstream_handoff_contract": False,
+                "reviewed_handoff_model_identity_contract_ok": False,
+                "reviewed_handoff_model_identity_matches": False,
+                "reviewed_handoff_declared_model_sha256": "a" * 64,
+                "reviewed_handoff_observed_model_sha256": "b" * 64,
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "handoff_contract_blockers_contain": [
+                    "repair_reviewed_mujoco_model_sha256_mismatch",
+                    "provide_reviewed_mujoco_model_identity_evidence",
+                ],
+                "blockers_contain": [
+                    "repair_reviewed_mujoco_model_sha256_mismatch",
+                    "provide_reviewed_mujoco_model_identity_evidence",
                 ],
                 "next_priority_gate": "mujoco_scene_validity",
             },
@@ -2079,6 +2263,34 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             ),
             expect["reviewed_handoff_model_identity_contract_ok"],
         )
+    if "reviewed_handoff_model_identity_matches" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_downstream_handoff_model_identity_matches",
+            gate.get("reviewed_mujoco_downstream_handoff_model_identity_matches"),
+            expect["reviewed_handoff_model_identity_matches"],
+        )
+    if "reviewed_handoff_model_path" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_downstream_handoff_model_path",
+            gate.get("reviewed_mujoco_downstream_handoff_model_path"),
+            expect["reviewed_handoff_model_path"],
+        )
+    if "reviewed_handoff_declared_model_sha256" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_downstream_handoff_declared_model_sha256",
+            gate.get("reviewed_mujoco_downstream_handoff_declared_model_sha256"),
+            expect["reviewed_handoff_declared_model_sha256"],
+        )
+    if "reviewed_handoff_observed_model_sha256" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_downstream_handoff_observed_model_sha256",
+            gate.get("reviewed_mujoco_downstream_handoff_observed_model_sha256"),
+            expect["reviewed_handoff_observed_model_sha256"],
+        )
     if "reviewed_handoff_schema" in expect:
         add_error(
             errors,
@@ -2729,6 +2941,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "reviewed_mujoco_downstream_handoff_model_path": gate.get(
             "reviewed_mujoco_downstream_handoff_model_path"
         ),
+        "reviewed_mujoco_downstream_handoff_declared_model_sha256": gate.get(
+            "reviewed_mujoco_downstream_handoff_declared_model_sha256"
+        ),
+        "reviewed_mujoco_downstream_handoff_observed_model_sha256": gate.get(
+            "reviewed_mujoco_downstream_handoff_observed_model_sha256"
+        ),
         "reviewed_mujoco_downstream_handoff_physical_truth_claimed": gate.get(
             "reviewed_mujoco_downstream_handoff_physical_truth_claimed"
         ),
@@ -2985,6 +3203,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "- Each case writes `so101_training_readiness_gate_priority_queue.csv` so the prioritized missing-gate order is reviewable without parsing nested JSON.",
             "- Draft, development, and fixture-only model-authority labels are rejected even when raw readiness booleans are true.",
             "- Reviewed-MuJoCo downstream handoff readiness requires a complete current-schema summary-level handoff contract; raw-ready, fixture-only, stale-schema, incomplete, or physical-truth-claiming handoffs cannot unblock training.",
+            "- Ready handoffs must carry reviewed model path evidence plus matching declared and observed model SHA-256 values before training readiness can advance.",
             "- Board-pick readiness requires detailed source-start, contact, lift, transfer, place, release, final-board-contact, and target-tolerance evidence without physical SO-101 truth or policy-training authority overclaims.",
             "- Focused rollout blocker action IDs must sync with `next_required_for_goal`; the ready branch requires empty rollout blockers and empty rollout action IDs.",
             "- Reviewed rollout readiness requires status `ok`, reviewed-policy-ready authority status, `policy_training` use, policy-authority evidence, and no serious-policy blockers.",

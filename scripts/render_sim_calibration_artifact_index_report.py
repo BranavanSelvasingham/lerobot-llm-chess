@@ -1563,6 +1563,8 @@ def so101_training_readiness_gate_row(artifact: dict[str, Any]) -> list[Any]:
         ),
         metrics.get("reviewed_mujoco_downstream_handoff_model_identity_status", ""),
         metrics.get("reviewed_mujoco_downstream_handoff_model_path", ""),
+        metrics.get("reviewed_mujoco_downstream_handoff_declared_model_sha256", ""),
+        metrics.get("reviewed_mujoco_downstream_handoff_observed_model_sha256", ""),
         metrics.get("reviewed_mujoco_downstream_handoff_physical_truth_claimed", ""),
         compact_list(
             metrics.get("reviewed_mujoco_downstream_handoff_missing_item_ids")
@@ -3334,6 +3336,8 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Handoff Identity OK",
                 "Handoff Identity",
                 "Handoff Model Path",
+                "Handoff Declared SHA",
+                "Handoff Observed SHA",
                 "Handoff Truth Claimed",
                 "Handoff Missing Items",
                 "Handoff Gate",

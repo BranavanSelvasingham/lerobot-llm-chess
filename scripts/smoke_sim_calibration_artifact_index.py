@@ -3489,6 +3489,12 @@ def collect_so101_training_readiness_gate_artifacts(
         "reviewed_mujoco_downstream_handoff_model_path": gate.get(
             "reviewed_mujoco_downstream_handoff_model_path"
         ),
+        "reviewed_mujoco_downstream_handoff_declared_model_sha256": gate.get(
+            "reviewed_mujoco_downstream_handoff_declared_model_sha256"
+        ),
+        "reviewed_mujoco_downstream_handoff_observed_model_sha256": gate.get(
+            "reviewed_mujoco_downstream_handoff_observed_model_sha256"
+        ),
         "reviewed_mujoco_downstream_handoff_physical_truth_claimed": gate.get(
             "reviewed_mujoco_downstream_handoff_physical_truth_claimed"
         ),

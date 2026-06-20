@@ -7008,6 +7008,25 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
         blockers.append("resolve_ready_reviewed_mujoco_handoff_pending_actions")
     if (raw_ready or fixture_ready) and not ready_joint_limit_enablement_contract_ok:
         blockers.append("provide_reviewed_mujoco_joint_limit_enablement_evidence")
+    if (raw_ready or fixture_ready) and not (
+        isinstance(handoff_model_path, str) and bool(handoff_model_path)
+    ):
+        blockers.append("provide_reviewed_mujoco_model_path_evidence")
+    if (raw_ready or fixture_ready) and not isinstance(
+        handoff_model_declared_sha256, str
+    ):
+        blockers.append("provide_reviewed_mujoco_declared_model_sha256")
+    if (raw_ready or fixture_ready) and not isinstance(
+        handoff_model_observed_sha256, str
+    ):
+        blockers.append("provide_reviewed_mujoco_observed_model_sha256")
+    if (
+        (raw_ready or fixture_ready)
+        and isinstance(handoff_model_declared_sha256, str)
+        and isinstance(handoff_model_observed_sha256, str)
+        and handoff_model_declared_sha256 != handoff_model_observed_sha256
+    ):
+        blockers.append("repair_reviewed_mujoco_model_sha256_mismatch")
     if (raw_ready or fixture_ready) and not handoff_model_identity_contract_ok:
         blockers.append("provide_reviewed_mujoco_model_identity_evidence")
     if raw_ready and not physical_ready_contract_ok:
@@ -7617,6 +7636,12 @@ def so101_training_readiness_gate_section(
         "reviewed_mujoco_downstream_handoff_model_path": (
             downstream_handoff_contract.get("model_path")
         ),
+        "reviewed_mujoco_downstream_handoff_declared_model_sha256": (
+            downstream_handoff_contract.get("model_declared_sha256")
+        ),
+        "reviewed_mujoco_downstream_handoff_observed_model_sha256": (
+            downstream_handoff_contract.get("model_observed_sha256")
+        ),
         "reviewed_mujoco_downstream_handoff_observed_evidence_is_authority": (
             downstream_handoff_contract.get("observed_evidence_is_authority")
         ),
@@ -7990,6 +8015,39 @@ def write_so101_training_readiness_gate_artifacts(
             "notes": "Scene, Gymnasium, pick/place, and rollout gates must consume a contract-valid reviewed MuJoCo handoff, not a fixture or malformed raw-ready handoff.",
         },
         {
+            "requirement_id": "reviewed_mujoco_downstream_handoff_model_identity",
+            "category": "mujoco_scene_validity",
+            "status": "ok"
+            if gate.get("reviewed_mujoco_downstream_handoff_model_identity_contract_ok")
+            is True
+            else "action_required",
+            "observed_value": json.dumps(
+                {
+                    "status": gate.get(
+                        "reviewed_mujoco_downstream_handoff_model_identity_status"
+                    ),
+                    "matches": gate.get(
+                        "reviewed_mujoco_downstream_handoff_model_identity_matches"
+                    ),
+                    "model_path": gate.get(
+                        "reviewed_mujoco_downstream_handoff_model_path"
+                    ),
+                    "declared_sha256": gate.get(
+                        "reviewed_mujoco_downstream_handoff_declared_model_sha256"
+                    ),
+                    "observed_sha256": gate.get(
+                        "reviewed_mujoco_downstream_handoff_observed_model_sha256"
+                    ),
+                },
+                sort_keys=True,
+            ),
+            "expected_value": "present matching reviewed model path and SHA-256",
+            "blockers": "; ".join(
+                gate.get("reviewed_mujoco_downstream_handoff_contract_blockers") or []
+            ),
+            "notes": "Ready MuJoCo handoffs must carry reviewed model path evidence plus matching declared and observed model digests.",
+        },
+        {
             "requirement_id": "reviewed_model_backed_board_pick_place",
             "category": "scripted_pick_place_evidence",
             "status": "ok"
@@ -8154,6 +8212,11 @@ def write_so101_training_readiness_gate_artifacts(
                 f"`{markdown_bool(gate.get('reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority'))}`",
                 "- Reviewed MuJoCo downstream handoff missing items: "
                 f"`{markdown_list_value(gate.get('reviewed_mujoco_downstream_handoff_missing_item_ids'))}`",
+                "- Reviewed MuJoCo downstream handoff model identity: "
+                f"`{markdown_bool(gate.get('reviewed_mujoco_downstream_handoff_model_identity_contract_ok'))}`",
+                "- Reviewed MuJoCo downstream handoff model SHA-256: "
+                f"`{gate.get('reviewed_mujoco_downstream_handoff_declared_model_sha256')}` / "
+                f"`{gate.get('reviewed_mujoco_downstream_handoff_observed_model_sha256')}`",
                 "- Reviewed model-backed board-source pick/place: "
                 f"`{markdown_bool(gate.get('reviewed_model_backed_board_source_pick_place'))}`",
                 "- Board-pick reviewed model authority ready: "

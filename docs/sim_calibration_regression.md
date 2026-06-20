@@ -1173,6 +1173,12 @@ A passing summary should show:
   `reviewed_mujoco_downstream_handoff_raw_ready`, accepted
   `reviewed_mujoco_downstream_handoff_ready`,
   `reviewed_mujoco_downstream_handoff_model_authority`,
+  `reviewed_mujoco_downstream_handoff_model_identity_contract_ok`,
+  `reviewed_mujoco_downstream_handoff_model_identity_status`,
+  `reviewed_mujoco_downstream_handoff_model_identity_matches`,
+  `reviewed_mujoco_downstream_handoff_model_path`,
+  `reviewed_mujoco_downstream_handoff_declared_model_sha256`,
+  `reviewed_mujoco_downstream_handoff_observed_model_sha256`,
   `reviewed_mujoco_downstream_handoff_observed_evidence_is_authority`,
   `reviewed_mujoco_downstream_handoff_physical_truth_claimed`,
   `reviewed_mujoco_downstream_handoff_missing_item_ids`,
