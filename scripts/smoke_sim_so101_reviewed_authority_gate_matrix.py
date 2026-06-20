@@ -128,6 +128,13 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "blocker_packet_next_actions_in_gate_queue",
         "blocker_packet_next_actions_missing_from_gate_queue",
         "gate_next_actions_checked_against_blocker_packet",
+        "operator_action_status",
+        "operator_action_model_authority",
+        "operator_action_count",
+        "operator_action_immediate_action_count",
+        "operator_action_immediate_action_ids",
+        "operator_action_command_template_count",
+        "operator_action_command_scopes",
         "blocker_source_bundle_consistency_status",
         "blocker_source_bundle_consistency_blocker",
         "blocker_selected_authoritative_candidate_path",
@@ -2277,7 +2284,10 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
     case_dir.mkdir(parents=True, exist_ok=True)
     gate_artifacts = write_so101_reviewed_model_authority_gate_artifacts(case_dir, gate)
     checklist_path = Path(gate_artifacts["artifacts"]["checklist_csv"])
+    operator_actions_path = Path(gate_artifacts["artifacts"]["operator_actions_json"])
+    operator_actions_csv_path = Path(gate_artifacts["artifacts"]["operator_actions_csv"])
     readme_path = Path(gate_artifacts["artifacts"]["readme_md"])
+    operator_actions = json.loads(operator_actions_path.read_text())
     readme_text = readme_path.read_text()
     add_error(
         errors,
@@ -2333,6 +2343,46 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         gate_artifacts.get("policy_training_authority_boundary"),
         blocker_packet.get("policy_training_authority_boundary"),
     )
+    add_error(
+        errors,
+        "artifact_operator_action_status",
+        gate_artifacts.get("operator_action_status"),
+        "reviewed_model_authority_ready_no_operator_actions_required"
+        if expect["ready"]
+        else "operator_actions_ready_for_reviewed_model_authority_follow_up",
+    )
+    add_error(
+        errors,
+        "artifact_operator_action_model_authority",
+        gate_artifacts.get("operator_action_model_authority"),
+        "operator_actions_not_authority",
+    )
+    add_error(
+        errors,
+        "artifact_operator_action_immediate_action_ids",
+        gate_artifacts.get("operator_action_immediate_action_ids"),
+        blocker_packet.get("next_action_ids"),
+    )
+    add_error(
+        errors,
+        "operator_actions_model_authority",
+        operator_actions.get("model_authority"),
+        "operator_actions_not_authority",
+    )
+    add_error(
+        errors,
+        "operator_actions_policy_training_authority_claimed",
+        operator_actions.get("policy_training_authority_claimed"),
+        False,
+    )
+    if not operator_actions_path.is_file():
+        errors.append("operator_actions_json_missing")
+    if not operator_actions_csv_path.is_file():
+        errors.append("operator_actions_csv_missing")
+    if operator_actions.get("command_template_count") != operator_actions.get("action_count"):
+        errors.append("operator_actions_command_template_count_mismatch")
+    if not operator_actions.get("command_scopes"):
+        errors.append("operator_actions_command_scopes_missing")
     expected_queue_contract_line = (
         "- Blocker packet next actions are in gate queue: `true`"
     )
@@ -2353,6 +2403,10 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             "readme_blocked_prior_statuses: expected "
             f"{expected_readme_prior_status_line!r}"
         )
+    if f"- Operator actions: `{operator_actions_path}`" not in readme_text:
+        errors.append("readme_operator_actions_path_missing")
+    if f"- Operator action rows: `{operator_actions_csv_path}`" not in readme_text:
+        errors.append("readme_operator_action_rows_path_missing")
     checklist_rows = read_csv(checklist_path)
     checklist_by_requirement = {
         row.get("requirement_id"): row
@@ -2633,6 +2687,23 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "gate_next_actions_checked_against_blocker_packet": gate_artifacts.get(
             "gate_next_actions_checked_against_blocker_packet"
+        ),
+        "operator_action_status": gate_artifacts.get("operator_action_status"),
+        "operator_action_model_authority": gate_artifacts.get(
+            "operator_action_model_authority"
+        ),
+        "operator_action_count": gate_artifacts.get("operator_action_count"),
+        "operator_action_immediate_action_count": gate_artifacts.get(
+            "operator_action_immediate_action_count"
+        ),
+        "operator_action_immediate_action_ids": gate_artifacts.get(
+            "operator_action_immediate_action_ids"
+        ),
+        "operator_action_command_template_count": gate_artifacts.get(
+            "operator_action_command_template_count"
+        ),
+        "operator_action_command_scopes": gate_artifacts.get(
+            "operator_action_command_scopes"
         ),
         "blocker_source_bundle_consistency_status": source_bundle_item.get(
             "source_bundle_consistency_status"

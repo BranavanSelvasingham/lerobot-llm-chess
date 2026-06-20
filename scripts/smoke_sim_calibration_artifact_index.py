@@ -3138,6 +3138,25 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
         or [],
         "blocker_packet_next_action_ids": gate.get("blocker_packet_next_action_ids")
         or [],
+        "operator_action_status": gate.get("operator_action_status"),
+        "operator_action_model_authority": gate.get("operator_action_model_authority"),
+        "operator_action_count": gate.get("operator_action_count"),
+        "operator_action_immediate_action_count": gate.get(
+            "operator_action_immediate_action_count"
+        ),
+        "operator_action_immediate_action_ids": gate.get(
+            "operator_action_immediate_action_ids"
+        )
+        or [],
+        "operator_action_command_template_count": gate.get(
+            "operator_action_command_template_count"
+        ),
+        "operator_action_command_scopes": gate.get("operator_action_command_scopes")
+        or [],
+        "operator_actions_json_path": gate.get("operator_actions_json_path")
+        or artifact_paths.get("operator_actions_json"),
+        "operator_actions_csv_path": gate.get("operator_actions_csv_path")
+        or artifact_paths.get("operator_actions_csv"),
         "training_priority_gate_id": gate.get("training_priority_gate_id"),
         "training_priority_gate_order": gate.get("training_priority_gate_order") or [],
         "next_training_gate_after_ready": gate.get("next_training_gate_after_ready"),
@@ -3196,6 +3215,8 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
         ("checklist_csv", "checklist"),
         ("blocker_packet_json", "blocker_packet"),
         ("blocker_packet_csv", "blocker_packet_rows"),
+        ("operator_actions_json", "operator_actions"),
+        ("operator_actions_csv", "operator_action_rows"),
         ("readme_md", "readme"),
     ):
         add_path(
@@ -3215,6 +3236,8 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
         "checklist_csv_path": artifact_paths.get("checklist_csv"),
         "blocker_packet_json_path": artifact_paths.get("blocker_packet_json"),
         "blocker_packet_csv_path": artifact_paths.get("blocker_packet_csv"),
+        "operator_actions_json_path": artifact_paths.get("operator_actions_json"),
+        "operator_actions_csv_path": artifact_paths.get("operator_actions_csv"),
         "readme_md_path": artifact_paths.get("readme_md"),
         "artifact_paths": artifact_paths,
     }

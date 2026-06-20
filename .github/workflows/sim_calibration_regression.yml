@@ -4830,6 +4830,18 @@ jobs:
               and row.get("exists") is True
               for row in artifacts_by_category["so101_reviewed_model_authority_gate"]
           ), artifacts_by_category["so101_reviewed_model_authority_gate"]
+          assert any(
+              row.get("label") == "so101_reviewed_model_authority_gate:operator_actions"
+              and row.get("kind") == "json"
+              and row.get("exists") is True
+              for row in artifacts_by_category["so101_reviewed_model_authority_gate"]
+          ), artifacts_by_category["so101_reviewed_model_authority_gate"]
+          assert any(
+              row.get("label") == "so101_reviewed_model_authority_gate:operator_action_rows"
+              and row.get("kind") == "csv"
+              and row.get("exists") is True
+              for row in artifacts_by_category["so101_reviewed_model_authority_gate"]
+          ), artifacts_by_category["so101_reviewed_model_authority_gate"]
           for row in artifacts_by_category["so101_reviewed_model_authority_gate"]:
               metrics = row.get("metrics", {})
               assert metrics.get("ready") in {True, False}, metrics
@@ -4852,6 +4864,20 @@ jobs:
                   metrics.get("ready") is True
               ), metrics
               assert metrics.get("ready_for_policy_training") is False, metrics
+              assert metrics.get("operator_action_status") in {
+                  "operator_actions_ready_for_reviewed_model_authority_follow_up",
+                  "reviewed_model_authority_ready_no_operator_actions_required",
+              }, metrics
+              assert metrics.get("operator_action_model_authority") == "operator_actions_not_authority", metrics
+              assert isinstance(metrics.get("operator_action_count"), int), metrics
+              assert metrics.get("operator_action_count") >= 4, metrics
+              assert isinstance(metrics.get("operator_action_immediate_action_count"), int), metrics
+              assert isinstance(metrics.get("operator_action_immediate_action_ids"), list), metrics
+              assert metrics.get("operator_action_immediate_action_ids") == metrics.get("blocker_packet_next_action_ids"), metrics
+              assert isinstance(metrics.get("operator_action_command_template_count"), int), metrics
+              assert metrics.get("operator_action_command_template_count") == metrics.get("operator_action_count"), metrics
+              assert isinstance(metrics.get("operator_action_command_scopes"), list), metrics
+              assert metrics.get("operator_action_command_scopes"), metrics
               assert metrics.get("source_authority_ready") in {True, False, None}, metrics
               assert metrics.get("physical_so101_model_authority_ready") in {True, False, None}, metrics
               assert metrics.get("source_bundle_consistency_ready") in {True, False, None}, metrics
@@ -5563,6 +5589,8 @@ jobs:
           assert "`so101_model_bundle_manifest/so101_model_bundle_manifest_checklist.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_reviewed_model_authority_gate/so101_reviewed_model_authority_blocker_packet.json`" in entrypoint_text, entrypoint_text
           assert "`so101_reviewed_model_authority_gate/so101_reviewed_model_authority_blocker_packet.csv`" in entrypoint_text, entrypoint_text
+          assert "`so101_reviewed_model_authority_gate/so101_reviewed_model_authority_operator_actions.json`" in entrypoint_text, entrypoint_text
+          assert "`so101_reviewed_model_authority_gate/so101_reviewed_model_authority_operator_actions.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_summary.json`" in entrypoint_text, entrypoint_text
           assert "`so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_checklist.csv`" in entrypoint_text, entrypoint_text
           assert "`so101_reviewed_mujoco_bundle/so101_reviewed_mujoco_bundle_motion_checks.csv`" in entrypoint_text, entrypoint_text

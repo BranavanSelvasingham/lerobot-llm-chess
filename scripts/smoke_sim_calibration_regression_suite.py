@@ -104,6 +104,12 @@ SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_JSON_NAME = (
 SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_CSV_NAME = (
     "so101_reviewed_model_authority_blocker_packet.csv"
 )
+SO101_REVIEWED_MODEL_AUTHORITY_OPERATOR_ACTIONS_JSON_NAME = (
+    "so101_reviewed_model_authority_operator_actions.json"
+)
+SO101_REVIEWED_MODEL_AUTHORITY_OPERATOR_ACTIONS_CSV_NAME = (
+    "so101_reviewed_model_authority_operator_actions.csv"
+)
 SO101_REVIEWED_MODEL_AUTHORITY_GATE_README_NAME = "README.md"
 SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME = "so101_reviewed_mujoco_bundle"
 SO101_REVIEWED_MUJOCO_BUNDLE_SUMMARY_NAME = "so101_reviewed_mujoco_bundle_summary.json"
@@ -1804,6 +1810,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_CHECKLIST_NAME}`",
         f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_JSON_NAME}`",
         f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_CSV_NAME}`",
+        f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_OPERATOR_ACTIONS_JSON_NAME}`",
+        f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_OPERATOR_ACTIONS_CSV_NAME}`",
         f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_README_NAME}`",
         f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/{SO101_REVIEWED_MUJOCO_BUNDLE_SUMMARY_NAME}`",
         f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/so101_reviewed_mujoco_bundle_checklist.csv`",
@@ -5614,6 +5622,255 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
     }
 
 
+def reviewed_model_authority_command_template(
+    action_id: str | None,
+    item: dict[str, Any],
+) -> tuple[str, list[str]]:
+    output_root = DEFAULT_OUTPUT_DIR.parent
+    python = sys.executable
+    action_id = action_id or ""
+    source_actions = {
+        "scan_or_supply_so101_model_source_root",
+        "review_and_declare_authoritative_so101_model_source",
+        "record_source_authority_review_metadata",
+        "select_single_authoritative_so101_model_source",
+        "select_so101_relevant_authoritative_model_source",
+        "select_reviewed_authoritative_so101_source_model_path",
+        "declare_reviewed_authoritative_so101_source_path_or_root",
+        "align_selected_so101_source_model_with_authoritative_declaration",
+    }
+    manifest_actions = {
+        "supply_reviewed_so101_model_bundle_manifest",
+        "select_reviewed_so101_model_path",
+        "record_reviewed_so101_model_file_sha256",
+        "record_reviewed_model_source_authority",
+        "record_model_provenance",
+        "declare_model_asset_roots",
+        "resolve_so101_mesh_assets",
+        "declare_reviewed_joint_limits",
+        "declare_target_frame",
+        "calibrate_tcp_offset",
+        "calibrate_base_to_board_transform",
+        "clear_model_contract_and_asset_preflight",
+        "align_source_inventory_with_bundle_manifest_model_path",
+        "align_source_inventory_with_bundle_manifest_model_digest",
+        "verify_reviewed_so101_bundle_model_file_sha256",
+        "inspect_reviewed_so101_bundle_model_file_sha256",
+        "resolve_contradictory_physical_bundle_authority_gate_state",
+    }
+    motion_actions = {
+        "load_reviewed_model_in_mujoco",
+        "prove_physical_reviewed_model_motion",
+        "rerun_reviewed_mujoco_motion_with_bundle_model_path",
+        "align_reviewed_mujoco_motion_with_bundle_model_path",
+        "record_reviewed_mujoco_motion_model_sha256",
+        "verify_reviewed_mujoco_motion_model_file_sha256",
+        "inspect_reviewed_mujoco_motion_model_file_sha256",
+        "align_reviewed_mujoco_motion_with_bundle_model_digest",
+        "resolve_contradictory_reviewed_mujoco_motion_gate_state",
+    }
+    if action_id == "scan_or_supply_so101_model_source_root":
+        return (
+            "source_inventory_scan",
+            [
+                python,
+                "scripts/smoke_sim_so101_model_source_inventory.py",
+                "--root",
+                "<reviewed-so101-model-source-root>",
+                "--output-dir",
+                str(output_root / "so101_model_source_inventory_reviewed"),
+            ],
+        )
+    if action_id in source_actions or item.get("item_id") == "source_authority_ready":
+        return (
+            "source_inventory_authority",
+            [
+                python,
+                "scripts/smoke_sim_so101_model_source_inventory.py",
+                "--root",
+                "<reviewed-so101-model-source-root>",
+                "--authoritative-path",
+                "<reviewed-so101-model.urdf-or-mjcf>",
+                "--authority-reviewed-by",
+                "<reviewer-or-team>",
+                "--authority-reviewed-at",
+                "<review-date-YYYY-MM-DD>",
+                "--authority-review-id",
+                "<stable-review-artifact-id>",
+                "--authority-source-reference",
+                "<reviewed-source-reference>",
+                "--authority-license-basis",
+                "<reviewed-license-basis>",
+                "--authority-review-scope",
+                "model_identity",
+                "--authority-review-scope",
+                "provenance",
+                "--authority-review-scope",
+                "license",
+                "--output-dir",
+                str(output_root / "so101_model_source_inventory_reviewed"),
+            ],
+        )
+    if action_id == "run_so101_model_bundle_probe":
+        return (
+            "model_bundle_probe",
+            [
+                python,
+                "scripts/smoke_sim_so101_model_bundle_probe.py",
+                "--model-path",
+                "<reviewed-so101-model.urdf-or-mjcf>",
+                "--asset-root",
+                "<reviewed-mesh-or-asset-root>",
+                "--output-dir",
+                str(output_root / "so101_model_bundle_probe_reviewed"),
+                "--python",
+                python,
+            ],
+        )
+    if action_id in manifest_actions or item.get("item_id") in {
+        "physical_bundle_authority_ready",
+        "source_bundle_consistency",
+    }:
+        return (
+            "model_bundle_manifest",
+            [
+                python,
+                "scripts/smoke_sim_so101_model_bundle_manifest.py",
+                "--manifest-path",
+                "<reviewed-so101-model-bundle.json>",
+                "--output-dir",
+                str(output_root / "so101_model_bundle_manifest_reviewed"),
+                "--python",
+                python,
+            ],
+        )
+    if action_id in motion_actions or item.get("item_id") == "physical_reviewed_mujoco_motion_checked":
+        return (
+            "reviewed_mujoco_bundle",
+            [
+                python,
+                "scripts/smoke_sim_so101_reviewed_mujoco_bundle.py",
+                "--manifest-path",
+                "<reviewed-so101-model-bundle.json>",
+                "--output-dir",
+                str(output_root / "so101_reviewed_mujoco_bundle_reviewed"),
+                "--python",
+                python,
+                "--require-ready-reviewed-model",
+            ],
+        )
+    return (
+        "calibration_regression_suite",
+        [
+            python,
+            "scripts/smoke_sim_calibration_regression_suite.py",
+            "--so101-model-bundle-manifest",
+            "<reviewed-so101-model-bundle.json>",
+            "--output-dir",
+            str(output_root / "calibration_regression_suite_reviewed_so101"),
+            "--python",
+            python,
+            "--include-negative-check",
+        ],
+    )
+
+
+def so101_reviewed_model_authority_operator_actions(
+    gate: dict[str, Any],
+    blocker_packet: dict[str, Any],
+) -> dict[str, Any]:
+    actions: list[dict[str, Any]] = []
+    for item in blocker_packet.get("items") or []:
+        if not isinstance(item, dict):
+            continue
+        next_action_id = item.get("next_action_id")
+        scope, command = reviewed_model_authority_command_template(
+            next_action_id if isinstance(next_action_id, str) else None,
+            item,
+        )
+        actions.append(
+            {
+                "priority": len(actions) + 1,
+                "item_id": item.get("item_id"),
+                "status": item.get("status"),
+                "gate": item.get("gate"),
+                "required_state": item.get("required_state"),
+                "next_action_id": next_action_id,
+                "command_scope": scope,
+                "command": command,
+                "evidence_artifact_path": item.get("evidence_artifact_path"),
+                "blocked_by_prior_requirement_ids": (
+                    item.get("blocked_by_prior_requirement_ids") or []
+                ),
+                "blocked_by_prior_requirement_statuses": (
+                    item.get("blocked_by_prior_requirement_statuses") or {}
+                ),
+                "operator_action": item.get("operator_action"),
+                "development_fixture_evidence_not_physical_so101_truth": item.get(
+                    "development_fixture_evidence_not_physical_so101_truth"
+                )
+                is True,
+            }
+        )
+    immediate_action_ids = [
+        action["next_action_id"]
+        for action in actions
+        if action.get("status") == "action_required" and action.get("next_action_id")
+    ]
+    return {
+        "schema": "lerobot.sim.so101_reviewed_model_authority_operator_actions.v1",
+        "ok": True,
+        "status": (
+            "reviewed_model_authority_ready_no_operator_actions_required"
+            if gate.get("ready") is True
+            else "operator_actions_ready_for_reviewed_model_authority_follow_up"
+        ),
+        "model_authority": "operator_actions_not_authority",
+        "ready": gate.get("ready") is True,
+        "observed_evidence_is_authority": False,
+        "physical_so101_truth_claimed": False,
+        "policy_training_authority_claimed": False,
+        "development_fixture_evidence_not_physical_so101_truth": True,
+        "development_fixture_evidence_not_policy_training_truth": True,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "training_priority_gate_id": blocker_packet.get("training_priority_gate_id"),
+        "next_training_gate_after_ready": blocker_packet.get(
+            "next_training_gate_after_ready"
+        ),
+        "blocker_packet_status": blocker_packet.get("status"),
+        "blocker_packet_model_authority": blocker_packet.get("model_authority"),
+        "blocker_packet_next_action_ids": blocker_packet.get("next_action_ids") or [],
+        "action_count": len(actions),
+        "immediate_action_count": len(immediate_action_ids),
+        "immediate_action_ids": immediate_action_ids,
+        "blocked_by_prior_requirements_count": len(
+            [
+                action
+                for action in actions
+                if action.get("status") == "blocked_by_prior_requirements"
+            ]
+        ),
+        "command_template_count": len(
+            [action for action in actions if action.get("command")]
+        ),
+        "command_scopes": unique_string_values(
+            [
+                action.get("command_scope")
+                for action in actions
+                if isinstance(action.get("command_scope"), str)
+            ]
+        ),
+        "actions": actions,
+        "caveats": [
+            "This operator-action checklist is command guidance only; it is not reviewed physical SO-101 authority.",
+            "Placeholder values must be replaced with reviewed model, source, manifest, calibration, and review evidence before rerunning commands.",
+            "A passing command rerun is still only authority evidence when the reviewed source, bundle, consistency, and reviewed-MuJoCo motion gates all report ready.",
+            "Development fixture evidence remains automation coverage and must not be used as physical calibration truth or policy-training authority.",
+        ],
+    }
+
+
 def write_so101_reviewed_model_authority_gate_artifacts(
     output_dir: Path,
     gate: dict[str, Any],
@@ -5627,12 +5884,20 @@ def write_so101_reviewed_model_authority_gate_artifacts(
     blocker_packet_csv_path = (
         gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_CSV_NAME
     )
+    operator_actions_path = (
+        gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_OPERATOR_ACTIONS_JSON_NAME
+    )
+    operator_actions_csv_path = (
+        gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_OPERATOR_ACTIONS_CSV_NAME
+    )
     readme_path = gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_README_NAME
     artifacts = {
         "summary_json": str(summary_path),
         "checklist_csv": str(checklist_path),
         "blocker_packet_json": str(blocker_packet_path),
         "blocker_packet_csv": str(blocker_packet_csv_path),
+        "operator_actions_json": str(operator_actions_path),
+        "operator_actions_csv": str(operator_actions_csv_path),
         "readme_md": str(readme_path),
     }
     blocker_packet = so101_reviewed_model_authority_blocker_packet(
@@ -5640,6 +5905,10 @@ def write_so101_reviewed_model_authority_gate_artifacts(
             **gate,
             "summary_path": str(summary_path),
         }
+    )
+    operator_actions = so101_reviewed_model_authority_operator_actions(
+        gate,
+        blocker_packet,
     )
     gate_next_action_ids = unique_string_values(
         gate.get("next_required_action_ids")
@@ -5714,6 +5983,22 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         ),
         "gate_next_actions_checked_against_blocker_packet": gate_next_action_ids,
         "blocker_packet": blocker_packet,
+        "operator_action_status": operator_actions["status"],
+        "operator_action_model_authority": operator_actions["model_authority"],
+        "operator_action_count": operator_actions["action_count"],
+        "operator_action_immediate_action_count": operator_actions[
+            "immediate_action_count"
+        ],
+        "operator_action_immediate_action_ids": operator_actions[
+            "immediate_action_ids"
+        ],
+        "operator_action_command_template_count": operator_actions[
+            "command_template_count"
+        ],
+        "operator_action_command_scopes": operator_actions["command_scopes"],
+        "operator_actions_json_path": str(operator_actions_path),
+        "operator_actions_csv_path": str(operator_actions_csv_path),
+        "operator_actions": operator_actions,
     }
     blocker_items_by_id = {
         item.get("item_id"): item
@@ -5961,6 +6246,7 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         for row in checklist_rows:
             writer.writerow({field: csv_cell(row.get(field)) for field in fieldnames})
     write_json(blocker_packet_path, blocker_packet)
+    write_json(operator_actions_path, operator_actions)
     blocker_fieldnames = (
         "priority",
         "item_id",
@@ -5993,6 +6279,31 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         writer.writeheader()
         for item in blocker_packet["items"]:
             writer.writerow({field: csv_cell(item.get(field)) for field in blocker_fieldnames})
+    operator_action_fieldnames = (
+        "priority",
+        "item_id",
+        "status",
+        "gate",
+        "required_state",
+        "next_action_id",
+        "command_scope",
+        "command",
+        "evidence_artifact_path",
+        "blocked_by_prior_requirement_ids",
+        "blocked_by_prior_requirement_statuses",
+        "operator_action",
+        "development_fixture_evidence_not_physical_so101_truth",
+    )
+    with operator_actions_csv_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=operator_action_fieldnames)
+        writer.writeheader()
+        for action in operator_actions["actions"]:
+            writer.writerow(
+                {
+                    field: csv_cell(action.get(field))
+                    for field in operator_action_fieldnames
+                }
+            )
     blocker_lines = (
         [f"- `{blocker}`" for blocker in gate.get("blockers", [])]
         if gate.get("blockers")
@@ -6045,6 +6356,12 @@ def write_so101_reviewed_model_authority_gate_artifacts(
                 f"`{markdown_mapping_value(payload.get('checklist_blocked_by_prior_requirement_statuses_by_requirement_id'))}`",
                 f"- Blocker packet: `{blocker_packet_path}`",
                 f"- Blocker packet rows: `{blocker_packet_csv_path}`",
+                f"- Operator actions: `{operator_actions_path}`",
+                f"- Operator action rows: `{operator_actions_csv_path}`",
+                "- Operator action status: "
+                f"`{payload.get('operator_action_status')}`",
+                "- Operator action command scopes: "
+                f"`{markdown_list_value(payload.get('operator_action_command_scopes'))}`",
                 "",
                 "## Blockers",
                 "",
