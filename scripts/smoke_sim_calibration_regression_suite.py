@@ -75,6 +75,14 @@ SO101_MODEL_SOURCE_REVIEW_REQUIREMENTS_JSON_NAME = (
 SO101_MODEL_SOURCE_REVIEW_REQUIREMENTS_CSV_NAME = (
     "so101_model_source_review_requirements.csv"
 )
+SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_DIR_NAME = "so101_public_candidate_intake_matrix"
+SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_SUMMARY_NAME = (
+    "so101_public_candidate_intake_matrix_summary.json"
+)
+SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_CASES_NAME = (
+    "so101_public_candidate_intake_matrix_cases.csv"
+)
+SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_README_NAME = "README.md"
 SO101_MODEL_BUNDLE_PROBE_DIR_NAME = "so101_model_bundle_probe"
 SO101_MODEL_BUNDLE_PROBE_SUMMARY_NAME = "so101_model_bundle_probe_summary.json"
 SO101_MODEL_BUNDLE_MANIFEST_SUMMARY_NAME = "so101_model_bundle_manifest_summary.json"
@@ -1145,6 +1153,21 @@ def recommended_contract_model_path(inventory: dict[str, Any] | None) -> Path | 
     return path_from_string(candidate_path)
 
 
+def so101_public_candidate_intake_matrix_command(
+    *,
+    python: str,
+    matrix_dir: Path,
+) -> list[str]:
+    return [
+        python,
+        str(REPO_ROOT / "scripts" / "smoke_sim_so101_public_candidate_intake_matrix.py"),
+        "--output-dir",
+        str(matrix_dir),
+        "--python",
+        python,
+    ]
+
+
 def so101_model_bundle_probe_command(
     *,
     python: str,
@@ -1834,6 +1857,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         f"- `so101_model_source_inventory/{SO101_MODEL_SOURCE_REVIEW_REQUIREMENTS_JSON_NAME}`",
         f"- `so101_model_source_inventory/{SO101_MODEL_SOURCE_REVIEW_REQUIREMENTS_CSV_NAME}`",
         "- `so101_model_source_inventory/README.md`",
+        f"- `{SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_DIR_NAME}/{SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_SUMMARY_NAME}`",
+        f"- `{SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_DIR_NAME}/{SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_CASES_NAME}`",
+        f"- `{SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_DIR_NAME}/{SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_README_NAME}`",
         f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/{SO101_MODEL_BUNDLE_PROBE_SUMMARY_NAME}`",
         f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/so101_model_bundle.candidate.json`",
         f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/so101_model_bundle_review_packet.json`",
@@ -3939,6 +3965,92 @@ def so101_model_source_inventory_section(
         "gui_skipped": inventory.get("gui_skipped"),
         "openai_skipped": inventory.get("openai_skipped"),
         "limitations": inventory.get("limitations"),
+    }
+
+
+def so101_public_candidate_intake_matrix_section(
+    matrix: dict[str, Any] | None,
+    summary_path: Path,
+) -> dict[str, Any]:
+    matrix = matrix if isinstance(matrix, dict) else {}
+    cases = matrix.get("cases")
+    cases = cases if isinstance(cases, list) else []
+    child_records = matrix.get("child_records")
+    child_records = child_records if isinstance(child_records, list) else []
+    checked_case = next(
+        (
+            case
+            for case in cases
+            if isinstance(case, dict) and case.get("case_id") == "candidate_intake_checked"
+        ),
+        {},
+    )
+    checked_record = next(
+        (
+            record
+            for record in child_records
+            if isinstance(record, dict) and record.get("case_id") == "candidate_intake_checked"
+        ),
+        {},
+    )
+    preview = checked_record.get("seeded_template_manifest_preview")
+    preview = preview if isinstance(preview, dict) else {}
+    return {
+        "summary_path": str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(matrix.get("ok", False)),
+        "status": matrix.get("status"),
+        "model_authority": matrix.get("model_authority"),
+        "observed_evidence_is_physical_so101_authority": matrix.get(
+            "observed_evidence_is_physical_so101_authority"
+        ),
+        "ready_for_model_backed_ik": matrix.get("ready_for_model_backed_ik"),
+        "ready_for_policy_training": matrix.get("ready_for_policy_training"),
+        "case_count": matrix.get("case_count"),
+        "case_ids": matrix.get("case_ids") or [],
+        "failed_case_ids": matrix.get("failed_case_ids") or [],
+        "candidate_intake_checked": {
+            "status": checked_case.get("status") if isinstance(checked_case, dict) else None,
+            "model_present": checked_case.get("model_present")
+            if isinstance(checked_case, dict)
+            else None,
+            "present_expected_file_count": checked_case.get("present_expected_file_count")
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_review_checklist_row_count": checked_case.get(
+                "candidate_review_checklist_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_review_checklist_model_authority": checked_case.get(
+                "candidate_review_checklist_model_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "seeded_template_manifest_checker_status": checked_case.get(
+                "seeded_template_manifest_checker_status"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "seeded_template_manifest_checker_ready_for_model_backed_ik": checked_case.get(
+                "seeded_template_manifest_checker_ready_for_model_backed_ik"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "seeded_template_manifest_checker_physical_ready": checked_case.get(
+                "seeded_template_manifest_checker_physical_ready"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "direct_manifest_path": preview.get("direct_manifest_path"),
+            "preview_summary_path": preview.get("summary_path"),
+        },
+        "artifacts": {
+            "summary_json": matrix.get("summary_json") or str(summary_path),
+            "cases_csv": matrix.get("cases_csv"),
+            "readme_md": matrix.get("readme_md"),
+        },
+        "child_records": child_records,
     }
 
 
@@ -8857,6 +8969,26 @@ def main() -> int:
         expected_json_path=so101_model_source_inventory_summary_path,
     )
 
+    so101_public_candidate_intake_matrix_dir = (
+        output_dir / SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_DIR_NAME
+    )
+    so101_public_candidate_intake_matrix_summary_path = (
+        so101_public_candidate_intake_matrix_dir
+        / SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_SUMMARY_NAME
+    )
+    (
+        so101_public_candidate_intake_matrix_record,
+        so101_public_candidate_intake_matrix,
+    ) = run_child(
+        name="so101_public_candidate_intake_matrix",
+        command=so101_public_candidate_intake_matrix_command(
+            python=python,
+            matrix_dir=so101_public_candidate_intake_matrix_dir,
+        ),
+        output_dir=so101_public_candidate_intake_matrix_dir,
+        expected_json_path=so101_public_candidate_intake_matrix_summary_path,
+    )
+
     so101_model_bundle_probe_dir = output_dir / SO101_MODEL_BUNDLE_PROBE_DIR_NAME
     so101_model_bundle_probe_summary_path = (
         so101_model_bundle_probe_dir / SO101_MODEL_BUNDLE_PROBE_SUMMARY_NAME
@@ -9137,6 +9269,7 @@ def main() -> int:
         "so101_model_bundle_manifest": so101_model_bundle_manifest_record,
         "so101_reviewed_mujoco_bundle": so101_reviewed_mujoco_bundle_record,
         "so101_model_source_inventory": so101_model_source_inventory_record,
+        "so101_public_candidate_intake_matrix": so101_public_candidate_intake_matrix_record,
         "so101_model_bundle_probe": so101_model_bundle_probe_record,
         "so101_model_contract": so101_model_contract_record,
         "ik_reachability_drill": ik_reachability_record,
@@ -9158,6 +9291,12 @@ def main() -> int:
         so101_model_source_inventory,
         so101_model_source_inventory_summary_path,
         so101_source_config,
+    )
+    so101_public_candidate_intake_matrix_section_row = (
+        so101_public_candidate_intake_matrix_section(
+            so101_public_candidate_intake_matrix,
+            so101_public_candidate_intake_matrix_summary_path,
+        )
     )
     so101_bundle_probe_section = so101_model_bundle_probe_section(
         so101_model_bundle_probe,
@@ -9320,6 +9459,9 @@ def main() -> int:
             pose_fixture_summary_path,
         ),
         "so101_model_source_inventory": so101_source_inventory_section,
+        "so101_public_candidate_intake_matrix": (
+            so101_public_candidate_intake_matrix_section_row
+        ),
         "so101_model_bundle_probe": so101_bundle_probe_section,
         "so101_model_bundle_manifest": so101_bundle_manifest_section,
         "so101_reviewed_mujoco_bundle": so101_reviewed_mujoco_bundle_section,

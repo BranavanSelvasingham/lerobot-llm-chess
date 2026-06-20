@@ -27,26 +27,27 @@ CATEGORY_ORDER = {
     "perception_fixture": 13,
     "sim_camera_pose_fixture": 14,
     "so101_model_source_inventory": 15,
-    "so101_reviewed_model_authority_gate": 16,
-    "so101_model_bundle_probe": 17,
-    "so101_model_bundle_manifest": 18,
-    "so101_reviewed_mujoco_bundle": 19,
-    "so101_model_contract": 20,
-    "so101_model_asset_preflight": 21,
-    "ik_reachability": 22,
-    "so101_mujoco_scene": 23,
-    "so101_chess_env": 24,
-    "so101_env_resets": 25,
-    "so101_mujoco_contact_probe": 26,
-    "so101_mujoco_grasp_probe": 27,
-    "so101_mujoco_board_pick_probe": 28,
-    "so101_training_readiness_gate": 29,
-    "so101_training_rollouts": 30,
-    "gripper_camera_pov": 31,
-    "app_entrypoint": 32,
-    "pick_place_scenario": 33,
-    "negative_check": 34,
-    "logs": 35,
+    "so101_public_candidate_intake_matrix": 16,
+    "so101_reviewed_model_authority_gate": 17,
+    "so101_model_bundle_probe": 18,
+    "so101_model_bundle_manifest": 19,
+    "so101_reviewed_mujoco_bundle": 20,
+    "so101_model_contract": 21,
+    "so101_model_asset_preflight": 22,
+    "ik_reachability": 23,
+    "so101_mujoco_scene": 24,
+    "so101_chess_env": 25,
+    "so101_env_resets": 26,
+    "so101_mujoco_contact_probe": 27,
+    "so101_mujoco_grasp_probe": 28,
+    "so101_mujoco_board_pick_probe": 29,
+    "so101_training_readiness_gate": 30,
+    "so101_training_rollouts": 31,
+    "gripper_camera_pov": 32,
+    "app_entrypoint": 33,
+    "pick_place_scenario": 34,
+    "negative_check": 35,
+    "logs": 36,
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi"}
@@ -3216,6 +3217,133 @@ def collect_so101_model_source_inventory_artifacts(
     }
 
 
+def collect_so101_public_candidate_intake_matrix_artifacts(
+    *,
+    suite: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    suite_summary_path: Path,
+    output_dir: Path,
+    repo_root: Path | None,
+) -> dict[str, Any]:
+    matrix = suite.get("so101_public_candidate_intake_matrix")
+    matrix = matrix if isinstance(matrix, dict) else {}
+    artifact_paths = matrix.get("artifacts")
+    artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
+    checked_case = matrix.get("candidate_intake_checked")
+    checked_case = checked_case if isinstance(checked_case, dict) else {}
+    child_records = matrix.get("child_records")
+    child_records = child_records if isinstance(child_records, list) else []
+    metrics = {
+        "status": matrix.get("status"),
+        "ok": matrix.get("ok"),
+        "model_authority": matrix.get("model_authority"),
+        "observed_evidence_is_physical_so101_authority": matrix.get(
+            "observed_evidence_is_physical_so101_authority"
+        ),
+        "ready_for_model_backed_ik": matrix.get("ready_for_model_backed_ik"),
+        "ready_for_policy_training": matrix.get("ready_for_policy_training"),
+        "case_count": matrix.get("case_count"),
+        "case_ids": matrix.get("case_ids") or [],
+        "failed_case_ids": matrix.get("failed_case_ids") or [],
+        "candidate_intake_checked_status": checked_case.get("status"),
+        "candidate_intake_checked_model_present": checked_case.get("model_present"),
+        "candidate_intake_checked_review_checklist_row_count": checked_case.get(
+            "candidate_review_checklist_row_count"
+        ),
+        "candidate_intake_checked_review_checklist_model_authority": checked_case.get(
+            "candidate_review_checklist_model_authority"
+        ),
+        "seeded_template_manifest_checker_status": checked_case.get(
+            "seeded_template_manifest_checker_status"
+        ),
+        "seeded_template_manifest_checker_ready_for_model_backed_ik": checked_case.get(
+            "seeded_template_manifest_checker_ready_for_model_backed_ik"
+        ),
+        "seeded_template_manifest_checker_physical_ready": checked_case.get(
+            "seeded_template_manifest_checker_physical_ready"
+        ),
+    }
+    for key, label_suffix in (
+        ("summary_json", "summary"),
+        ("cases_csv", "cases"),
+        ("readme_md", "readme"),
+    ):
+        add_path(
+            artifacts,
+            category="so101_public_candidate_intake_matrix",
+            label=f"so101_public_candidate_intake_matrix:{label_suffix}",
+            value=artifact_paths.get(key),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"so101_public_candidate_intake_matrix.artifacts.{key}",
+            metrics=metrics,
+        )
+    for record in child_records:
+        if not isinstance(record, dict):
+            continue
+        case_id = str(record.get("case_id") or "unknown")
+        case_metrics = {**metrics, "case_id": case_id}
+        add_path(
+            artifacts,
+            category="so101_public_candidate_intake_matrix",
+            label=f"so101_public_candidate_intake_matrix:{case_id}:summary",
+            value=record.get("summary_path"),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=f"so101_public_candidate_intake_matrix.child_records.{case_id}.summary_path",
+            metrics=case_metrics,
+        )
+        preview = record.get("seeded_template_manifest_preview")
+        preview = preview if isinstance(preview, dict) else {}
+        add_path(
+            artifacts,
+            category="so101_public_candidate_intake_matrix",
+            label=f"so101_public_candidate_intake_matrix:{case_id}:direct_manifest_template",
+            value=preview.get("direct_manifest_path"),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=(
+                "so101_public_candidate_intake_matrix.child_records."
+                f"{case_id}.seeded_template_manifest_preview.direct_manifest_path"
+            ),
+            metrics=case_metrics,
+        )
+        add_path(
+            artifacts,
+            category="so101_public_candidate_intake_matrix",
+            label=f"so101_public_candidate_intake_matrix:{case_id}:manifest_preview",
+            value=preview.get("summary_path"),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=(
+                "so101_public_candidate_intake_matrix.child_records."
+                f"{case_id}.seeded_template_manifest_preview.summary_path"
+            ),
+            metrics=case_metrics,
+        )
+    return {
+        "status": matrix.get("status"),
+        "ok": matrix.get("ok"),
+        "summary_path": artifact_paths.get("summary_json") or matrix.get("summary_path"),
+        "cases_csv_path": artifact_paths.get("cases_csv"),
+        "readme_md_path": artifact_paths.get("readme_md"),
+        "model_authority": matrix.get("model_authority"),
+        "observed_evidence_is_physical_so101_authority": metrics[
+            "observed_evidence_is_physical_so101_authority"
+        ],
+        "ready_for_model_backed_ik": metrics["ready_for_model_backed_ik"],
+        "ready_for_policy_training": metrics["ready_for_policy_training"],
+        "case_count": metrics["case_count"],
+        "case_ids": metrics["case_ids"],
+        "failed_case_ids": metrics["failed_case_ids"],
+        "candidate_intake_checked": checked_case,
+    }
+
+
 def collect_so101_reviewed_model_authority_gate_artifacts(
     *,
     suite: dict[str, Any],
@@ -4296,6 +4424,15 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         output_dir=output_dir,
         repo_root=repo_root,
     )
+    so101_public_candidate_intake_matrix = (
+        collect_so101_public_candidate_intake_matrix_artifacts(
+            suite=suite,
+            artifacts=artifacts,
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+        )
+    )
     so101_reviewed_model_authority_gate = (
         collect_so101_reviewed_model_authority_gate_artifacts(
             suite=suite,
@@ -4508,6 +4645,7 @@ def build_index(suite_summary_path: Path, output_json: Path) -> dict[str, Any]:
         "visual_review": visual_review,
         "sim_camera_pose_fixture_metadata_contract": sim_camera_pose_metadata_contract,
         "so101_model_source_inventory": so101_model_source_inventory,
+        "so101_public_candidate_intake_matrix": so101_public_candidate_intake_matrix,
         "so101_reviewed_model_authority_gate": so101_reviewed_model_authority_gate,
         "so101_model_bundle_probe": so101_model_bundle_probe,
         "so101_model_bundle_manifest": so101_model_bundle_manifest,
