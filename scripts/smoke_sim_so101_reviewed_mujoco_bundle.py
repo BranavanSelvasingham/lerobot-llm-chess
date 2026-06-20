@@ -1120,6 +1120,8 @@ def build_downstream_handoff(summary: dict[str, Any]) -> tuple[dict[str, Any], l
         "model_authority": "downstream_handoff_not_authority",
         "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
         "reviewed_model_motion_checked": summary.get("reviewed_model_motion_checked"),
+        "ready_for_policy_training": False,
+        "observed_evidence_is_policy_training_authority": False,
         "physical_reviewed_model_motion_checked": summary.get(
             "physical_reviewed_model_motion_checked"
         ),
@@ -1153,7 +1155,9 @@ def build_downstream_handoff(summary: dict[str, Any]) -> tuple[dict[str, Any], l
         "handoff_open_work_contract": open_work_contract,
         "observed_evidence_is_authority": False,
         "physical_so101_truth_claimed": False,
+        "policy_training_authority_claimed": False,
         "development_fixture_evidence_not_physical_so101_truth": True,
+        "development_fixture_evidence_not_policy_training_truth": True,
         "gates_unblocked_when_physical_handoff_ready": [
             *DOWNSTREAM_HANDOFF_PRIORITY_GATE_ORDER,
         ],
@@ -1268,6 +1272,8 @@ def build_not_ready_summary(
         "hardware_free_regression_fixture_ready": fixture_ready,
         "synthetic_fixture_authority_fields": manifest_summary.get("synthetic_fixture_authority_fields") or [],
         "ready_for_model_backed_ik": ready,
+        "ready_for_policy_training": False,
+        "observed_evidence_is_policy_training_authority": False,
         "reviewed_model_motion_checked": False,
         "motion_authority_status": motion_authority_summary["status"],
         "physical_reviewed_model_motion_checked": motion_authority_summary[
@@ -1460,6 +1466,8 @@ def build_ready_summary(
         "hardware_free_regression_fixture_ready": fixture_ready,
         "synthetic_fixture_authority_fields": manifest_summary.get("synthetic_fixture_authority_fields") or [],
         "ready_for_model_backed_ik": True,
+        "ready_for_policy_training": False,
+        "observed_evidence_is_policy_training_authority": False,
         "reviewed_model_motion_checked": motion_ok,
         "motion_authority_status": motion_authority_summary["status"],
         "physical_reviewed_model_motion_checked": motion_authority_summary[
@@ -1591,6 +1599,8 @@ def write_readme(path: Path, summary: dict[str, Any], rows: list[dict[str, Any]]
         f"- `physical_so101_model_authority_ready`: `{str(summary.get('physical_so101_model_authority_ready')).lower()}`",
         f"- `hardware_free_regression_fixture_ready`: `{str(summary.get('hardware_free_regression_fixture_ready')).lower()}`",
         f"- `ready_for_model_backed_ik`: `{str(summary.get('ready_for_model_backed_ik')).lower()}`",
+        f"- `ready_for_policy_training`: `{str(summary.get('ready_for_policy_training')).lower()}`",
+        f"- `observed_evidence_is_policy_training_authority`: `{str(summary.get('observed_evidence_is_policy_training_authority')).lower()}`",
         f"- `reviewed_model_motion_checked`: `{str(summary.get('reviewed_model_motion_checked')).lower()}`",
         f"- `motion_authority_status`: `{summary.get('motion_authority_status')}`",
         f"- `physical_reviewed_model_motion_checked`: `{str(summary.get('physical_reviewed_model_motion_checked')).lower()}`",
@@ -1732,9 +1742,17 @@ def main() -> int:
             "downstream_handoff_physical_so101_truth_claimed": (
                 downstream_handoff["physical_so101_truth_claimed"]
             ),
+            "downstream_handoff_policy_training_authority_claimed": (
+                downstream_handoff["policy_training_authority_claimed"]
+            ),
             "downstream_handoff_development_fixture_evidence_not_physical_so101_truth": (
                 downstream_handoff[
                     "development_fixture_evidence_not_physical_so101_truth"
+                ]
+            ),
+            "downstream_handoff_development_fixture_evidence_not_policy_training_truth": (
+                downstream_handoff[
+                    "development_fixture_evidence_not_policy_training_truth"
                 ]
             ),
             "downstream_handoff_item_count": downstream_handoff[
@@ -1782,6 +1800,10 @@ def main() -> int:
                 "hardware_free_fixture_motion_checked": summary["hardware_free_fixture_motion_checked"],
                 "motion_evidence_not_physical_so101_authority": summary[
                     "motion_evidence_not_physical_so101_authority"
+                ],
+                "ready_for_policy_training": summary["ready_for_policy_training"],
+                "observed_evidence_is_policy_training_authority": summary[
+                    "observed_evidence_is_policy_training_authority"
                 ],
                 "downstream_handoff_status": summary["downstream_handoff_status"],
                 "downstream_handoff_ready": summary["downstream_handoff_ready"],

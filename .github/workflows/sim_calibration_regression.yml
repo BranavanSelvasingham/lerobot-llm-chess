@@ -1244,6 +1244,8 @@ jobs:
           assert summary["status"] == "ok", summary
           assert summary["model_authority"] == "reviewed_mujoco_bundle_matrix_not_authority", summary
           assert summary["observed_evidence_is_physical_so101_authority"] is False, summary
+          assert summary["observed_evidence_is_policy_training_authority"] is False, summary
+          assert summary["ready_for_policy_training"] is False, summary
           assert summary["hardware_skipped"] is True, summary
           assert summary["gui_skipped"] is True, summary
           assert summary["openai_skipped"] is True, summary
@@ -1310,6 +1312,8 @@ jobs:
               assert observations["next_downstream_gate_after_ready"] == "mujoco_scene_validity", case
               assert observations["blocks_downstream_gates_until_ready"] is True, case
               assert observations["ready_does_not_imply_policy_training_ready"] is True, case
+              assert observations["ready_for_policy_training"] is False, case
+              assert observations["observed_evidence_is_policy_training_authority"] is False, case
               assert observations["downstream_handoff_json_priority_gate_id"] == "reviewed_mujoco_handoff", case
               assert observations["downstream_handoff_json_priority_gate_order"] == [
                   "mujoco_scene_validity",
@@ -3179,7 +3183,9 @@ jobs:
           assert reviewed_mujoco_bundle["downstream_handoff_model_authority"] == "downstream_handoff_not_authority", reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["downstream_handoff_observed_evidence_is_authority"] is False, reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["downstream_handoff_physical_so101_truth_claimed"] is False, reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["downstream_handoff_policy_training_authority_claimed"] is False, reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["downstream_handoff_development_fixture_evidence_not_physical_so101_truth"] is True, reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["downstream_handoff_development_fixture_evidence_not_policy_training_truth"] is True, reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["downstream_handoff_schema"] == "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1", reviewed_mujoco_bundle
           assert isinstance(reviewed_mujoco_bundle["downstream_handoff_item_count"], int), reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["downstream_handoff_item_count"] >= 8, reviewed_mujoco_bundle
@@ -3193,6 +3199,8 @@ jobs:
           assert reviewed_mujoco_bundle["next_downstream_gate_after_ready"] == "mujoco_scene_validity", reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["blocks_downstream_gates_until_ready"] is True, reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["ready_does_not_imply_policy_training_ready"] is True, reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["ready_for_policy_training"] is False, reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["observed_evidence_is_policy_training_authority"] is False, reviewed_mujoco_bundle
           if bundle_manifest["ready_for_model_backed_ik"] is True:
               assert reviewed_mujoco_bundle["reviewed_model_motion_checked"] is True, reviewed_mujoco_bundle
               assert reviewed_mujoco_bundle["status"] == "reviewed_mujoco_bundle_motion_checked", reviewed_mujoco_bundle
@@ -3245,7 +3253,9 @@ jobs:
           assert handoff["reviewed_model_path"] == reviewed_mujoco_bundle["downstream_handoff_model_path"], handoff
           assert handoff["observed_evidence_is_authority"] is False, handoff
           assert handoff["physical_so101_truth_claimed"] is False, handoff
+          assert handoff["policy_training_authority_claimed"] is False, handoff
           assert handoff["development_fixture_evidence_not_physical_so101_truth"] is True, handoff
+          assert handoff["development_fixture_evidence_not_policy_training_truth"] is True, handoff
           assert "downstream_gate_handoff" in handoff["handoff_item_ids"], handoff
           assert handoff["downstream_priority_gate_id"] == reviewed_mujoco_bundle["downstream_priority_gate_id"], handoff
           assert handoff["downstream_priority_gate_order"] == reviewed_mujoco_bundle["downstream_priority_gate_order"], handoff
@@ -4092,7 +4102,9 @@ jobs:
           assert training_readiness_gate["reviewed_mujoco_downstream_handoff_model_identity_status"] == reviewed_mujoco_bundle["downstream_handoff_model_identity_status"], training_readiness_gate
           assert training_readiness_gate["reviewed_mujoco_downstream_handoff_model_path"] == reviewed_mujoco_bundle["downstream_handoff_model_path"], training_readiness_gate
           assert training_readiness_gate["reviewed_mujoco_downstream_handoff_physical_truth_claimed"] is False, training_readiness_gate
+          assert training_readiness_gate["reviewed_mujoco_downstream_handoff_policy_training_authority_claimed"] is False, training_readiness_gate
           assert training_readiness_gate["reviewed_mujoco_downstream_handoff_observed_evidence_is_authority"] is False, training_readiness_gate
+          assert training_readiness_gate["reviewed_mujoco_downstream_handoff_development_fixture_evidence_not_policy_training_truth"] is True, training_readiness_gate
           assert "downstream_gate_handoff" in training_readiness_gate["reviewed_mujoco_downstream_handoff_item_ids"], training_readiness_gate
           assert training_readiness_gate["reviewed_mujoco_downstream_handoff_priority_gate_id"] == "reviewed_mujoco_handoff", training_readiness_gate
           assert training_readiness_gate["reviewed_mujoco_downstream_handoff_priority_gate_order"] == [

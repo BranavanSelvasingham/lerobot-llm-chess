@@ -92,7 +92,13 @@ gates must consume. It always reports
 `schema: "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1"`,
 `model_authority: "downstream_handoff_not_authority"`,
 `observed_evidence_is_authority: false`, and
-`physical_so101_truth_claimed: false`. Its `downstream_handoff_ready` flag is
+`physical_so101_truth_claimed: false`. It also keeps
+`ready_for_policy_training: false`,
+`observed_evidence_is_policy_training_authority: false`,
+`policy_training_authority_claimed: false`, and
+`development_fixture_evidence_not_policy_training_truth: true` so a model-motion
+handoff cannot be mistaken for serious-training authority. Its
+`downstream_handoff_ready` flag is
 true only when physical reviewed model authority and MuJoCo/SimRobot motion are
 both true; fixture-positive runs instead report
 `fixture_handoff_ready_not_physical_so101_authority: true`.

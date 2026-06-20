@@ -367,6 +367,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "mesh_assets_status",
         "target_frame_status",
         "ready_for_model_backed_ik",
+        "ready_for_policy_training",
+        "observed_evidence_is_policy_training_authority",
         "model_authority",
         "physical_so101_model_authority_ready",
         "hardware_free_regression_fixture_ready",
@@ -1775,6 +1777,12 @@ def summarize_case(
         )
         add_error(
             errors,
+            f"{case_id}.downstream_handoff_json.policy_training_authority_claimed",
+            downstream_handoff.get("policy_training_authority_claimed"),
+            False,
+        )
+        add_error(
+            errors,
             f"{case_id}.downstream_handoff_json.observed_evidence_is_authority",
             downstream_handoff.get("observed_evidence_is_authority"),
             False,
@@ -1786,6 +1794,26 @@ def summarize_case(
                 "development_fixture_evidence_not_physical_so101_truth"
             ),
             True,
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.development_fixture_policy_caveat",
+            downstream_handoff.get(
+                "development_fixture_evidence_not_policy_training_truth"
+            ),
+            True,
+        )
+        add_error(
+            errors,
+            f"{case_id}.summary.ready_for_policy_training",
+            summary.get("ready_for_policy_training"),
+            False,
+        )
+        add_error(
+            errors,
+            f"{case_id}.summary.observed_evidence_is_policy_training_authority",
+            summary.get("observed_evidence_is_policy_training_authority"),
+            False,
         )
         add_error(
             errors,
@@ -2011,6 +2039,10 @@ def summarize_case(
             "mesh_assets_diagnostics": (summary.get("mesh_assets") or {}).get("diagnostics"),
             "target_frame_status": (summary.get("target_frame") or {}).get("status"),
             "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
+            "ready_for_policy_training": summary.get("ready_for_policy_training"),
+            "observed_evidence_is_policy_training_authority": summary.get(
+                "observed_evidence_is_policy_training_authority"
+            ),
             "model_authority": summary.get("model_authority"),
             "physical_so101_model_authority_ready": summary.get(
                 "physical_so101_model_authority_ready"
@@ -2183,6 +2215,10 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "mesh_assets_status": observations.get("mesh_assets_status"),
         "target_frame_status": observations.get("target_frame_status"),
         "ready_for_model_backed_ik": observations.get("ready_for_model_backed_ik"),
+        "ready_for_policy_training": observations.get("ready_for_policy_training"),
+        "observed_evidence_is_policy_training_authority": observations.get(
+            "observed_evidence_is_policy_training_authority"
+        ),
         "model_authority": observations.get("model_authority"),
         "physical_so101_model_authority_ready": observations.get(
             "physical_so101_model_authority_ready"
@@ -2378,6 +2414,8 @@ def main() -> int:
         "output_dir": str(output_dir),
         "model_authority": "reviewed_mujoco_bundle_matrix_not_authority",
         "observed_evidence_is_physical_so101_authority": False,
+        "observed_evidence_is_policy_training_authority": False,
+        "ready_for_policy_training": False,
         "hardware_skipped": True,
         "gui_skipped": True,
         "openai_skipped": True,

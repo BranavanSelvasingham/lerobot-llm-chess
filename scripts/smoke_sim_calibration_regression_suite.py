@@ -3578,7 +3578,9 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "fixture_handoff_ready_not_physical_so101_authority",
         "downstream_handoff_observed_evidence_is_authority",
         "downstream_handoff_physical_so101_truth_claimed",
+        "downstream_handoff_policy_training_authority_claimed",
         "downstream_handoff_development_fixture_evidence_not_physical_so101_truth",
+        "downstream_handoff_development_fixture_evidence_not_policy_training_truth",
         "downstream_handoff_item_count",
         "downstream_handoff_item_ids",
         "downstream_priority_gate_id",
@@ -6227,9 +6229,19 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
         reviewed_mujoco_bundle.get("downstream_handoff_physical_so101_truth_claimed")
         is True
     )
+    policy_training_authority_claimed = (
+        reviewed_mujoco_bundle.get("downstream_handoff_policy_training_authority_claimed")
+        is True
+    )
     development_fixture_not_truth = (
         reviewed_mujoco_bundle.get(
             "downstream_handoff_development_fixture_evidence_not_physical_so101_truth"
+        )
+        is True
+    )
+    development_fixture_not_policy_training_truth = (
+        reviewed_mujoco_bundle.get(
+            "downstream_handoff_development_fixture_evidence_not_policy_training_truth"
         )
         is True
     )
@@ -6355,8 +6367,12 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
         blockers.append("mark_downstream_handoff_as_non_authority_snapshot")
     if physical_truth_claimed:
         blockers.append("remove_physical_so101_truth_claim_from_downstream_handoff")
+    if policy_training_authority_claimed:
+        blockers.append("remove_policy_training_authority_claim_from_downstream_handoff")
     if not development_fixture_not_truth:
         blockers.append("mark_downstream_handoff_development_fixture_boundary")
+    if not development_fixture_not_policy_training_truth:
+        blockers.append("mark_downstream_handoff_policy_training_boundary")
     if missing_item_ids:
         blockers.append("provide_complete_reviewed_mujoco_downstream_handoff_items")
     if not item_count_ok:
@@ -6429,8 +6445,12 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
             "downstream_handoff_observed_evidence_is_authority"
         ),
         "physical_truth_claimed": physical_truth_claimed,
+        "policy_training_authority_claimed": policy_training_authority_claimed,
         "development_fixture_evidence_not_physical_so101_truth": (
             development_fixture_not_truth
+        ),
+        "development_fixture_evidence_not_policy_training_truth": (
+            development_fixture_not_policy_training_truth
         ),
         "item_count": item_count,
         "item_ids": item_ids,
@@ -6888,9 +6908,17 @@ def so101_training_readiness_gate_section(
         "reviewed_mujoco_downstream_handoff_physical_truth_claimed": (
             reviewed_mujoco_downstream_handoff_physical_truth_claimed
         ),
+        "reviewed_mujoco_downstream_handoff_policy_training_authority_claimed": (
+            downstream_handoff_contract.get("policy_training_authority_claimed")
+        ),
         "reviewed_mujoco_downstream_handoff_development_fixture_evidence_not_physical_so101_truth": (
             downstream_handoff_contract.get(
                 "development_fixture_evidence_not_physical_so101_truth"
+            )
+        ),
+        "reviewed_mujoco_downstream_handoff_development_fixture_evidence_not_policy_training_truth": (
+            downstream_handoff_contract.get(
+                "development_fixture_evidence_not_policy_training_truth"
             )
         ),
         "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority": (
