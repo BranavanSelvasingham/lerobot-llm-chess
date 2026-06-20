@@ -159,6 +159,11 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "public_candidate_operator_intake_plan_status",
         "public_candidate_operator_intake_decision_status",
         "public_candidate_operator_intake_plan_model_authority",
+        "public_candidate_operator_command_plan_json_path",
+        "public_candidate_operator_command_plan_status",
+        "public_candidate_operator_command_plan_model_authority",
+        "public_candidate_operator_command_plan_review_handoff_artifact_ids",
+        "public_candidate_operator_command_plan_authority_blockers_until_reviewed",
         "public_candidate_review_manifest_template_path",
         "public_candidate_source_lock_model_authority",
         "checklist_status_by_requirement_id",
@@ -326,6 +331,9 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
     artifact_dir = output_dir / "public_candidate_intake"
     source_lock_path = artifact_dir / "so101_public_candidate_source_lock.json"
     operator_plan_path = artifact_dir / "so101_public_candidate_operator_intake_plan.json"
+    operator_command_plan_path = (
+        artifact_dir / "so101_public_candidate_operator_command_plan.json"
+    )
     direct_manifest_path = artifact_dir / "so101_public_candidate_review_manifest_template.json"
     matrix_summary_path = artifact_dir / "so101_public_candidate_intake_matrix_summary.json"
     source_lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -364,6 +372,12 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
             "model_authority": "template_not_authority",
         },
     )
+    (artifact_dir / "so101_public_candidate_source_lock_digests.csv").write_text(
+        "relative_path,sha256,model_authority\n"
+    )
+    (artifact_dir / "so101_public_candidate_operator_intake_requirements.csv").write_text(
+        "requirement_id,model_authority\n"
+    )
     write_json(
         matrix_summary_path,
         {
@@ -385,6 +399,67 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
         "vendor_file_digest_manifest_reviewed",
         "vendor_reviewed_bundle_manifest_supplied",
     ]
+    review_handoff_artifacts = [
+        {
+            "artifact_id": "candidate_source_lock_json",
+            "path": str(source_lock_path),
+            "purpose": "pinned source, selected model, digest, and non-authority lock summary",
+            "authority_boundary": "candidate_source_lock_not_authority",
+        },
+        {
+            "artifact_id": "candidate_source_lock_digests_csv",
+            "path": str(artifact_dir / "so101_public_candidate_source_lock_digests.csv"),
+            "purpose": "complete expected and extra lockable file digest review rows",
+            "authority_boundary": "candidate_source_lock_digest_not_authority",
+        },
+        {
+            "artifact_id": "candidate_operator_intake_requirements_csv",
+            "path": str(
+                artifact_dir / "so101_public_candidate_operator_intake_requirements.csv"
+            ),
+            "purpose": "selected external or vendor requirement checklist",
+            "authority_boundary": (
+                "candidate_operator_intake_requirement_not_authority"
+            ),
+        },
+        {
+            "artifact_id": "candidate_direct_review_manifest_template_json",
+            "path": str(direct_manifest_path),
+            "purpose": "reviewer-editable bundle manifest template",
+            "authority_boundary": (
+                "candidate_seeded_review_manifest_template_not_authority"
+            ),
+        },
+    ]
+    write_json(
+        operator_command_plan_path,
+        {
+            "schema": "lerobot.sim.so101_public_candidate_operator_command_plan.v1",
+            "ok": True,
+            "status": "candidate_operator_commands_ready_for_pinned_source_review",
+            "model_authority": "candidate_operator_command_plan_not_authority",
+            "observed_evidence_is_physical_so101_authority": False,
+            "ready_for_model_backed_ik": False,
+            "ready_for_policy_training": False,
+            "source_lock_ready_for_review": True,
+            "upstream_commit_sha_valid": True,
+            "selected_intake_option_id": "external_pinned_source_root",
+            "selected_option_command_count": 7,
+            "selected_option_review_requirement_count": len(external_requirement_ids),
+            "selected_option_review_requirement_ids": external_requirement_ids,
+            "selected_option_review_requirements": [
+                {"requirement_id": requirement_id}
+                for requirement_id in external_requirement_ids
+            ],
+            "review_handoff_artifacts": review_handoff_artifacts,
+            "authority_blockers_until_reviewed": [
+                "selected source-lock digest rows must be reviewed and copied only into reviewed authority fields",
+                "license and provenance review evidence must be recorded for the selected intake option",
+                "reviewed bundle manifest checker must report physical_so101_model_authority_ready",
+                "reviewed MuJoCo bundle gate must prove physical reviewed model motion",
+            ],
+        },
+    )
     recorded_decision_cases = {
         "external_pinned_source_root": {
             "candidate_operator_intake_decision_status": (
@@ -393,6 +468,13 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
             "candidate_operator_intake_selected_option": (
                 "external_pinned_source_root"
             ),
+            "candidate_operator_command_plan_model_authority": (
+                "candidate_operator_command_plan_not_authority"
+            ),
+            "candidate_operator_command_plan_status": (
+                "candidate_operator_commands_ready_for_pinned_source_review"
+            ),
+            "candidate_operator_command_plan_selected_option_command_count": 7,
             "candidate_operator_intake_selected_requirement_count": (
                 len(external_requirement_ids)
             ),
@@ -405,6 +487,13 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
                 "candidate_intake_decision_recorded_not_authority"
             ),
             "candidate_operator_intake_selected_option": "vendor_locked_bundle",
+            "candidate_operator_command_plan_model_authority": (
+                "candidate_operator_command_plan_not_authority"
+            ),
+            "candidate_operator_command_plan_status": (
+                "candidate_operator_commands_ready_for_pinned_source_review"
+            ),
+            "candidate_operator_command_plan_selected_option_command_count": 5,
             "candidate_operator_intake_selected_requirement_count": (
                 len(vendor_requirement_ids)
             ),
@@ -431,6 +520,13 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
             "candidate_operator_intake_decision_status": (
                 "vendor_or_external_intake_not_declared"
             ),
+            "candidate_operator_command_plan_model_authority": (
+                "candidate_operator_command_plan_not_authority"
+            ),
+            "candidate_operator_command_plan_status": (
+                "candidate_operator_commands_ready_for_pinned_source_review"
+            ),
+            "candidate_operator_command_plan_selected_option_command_count": 7,
             "candidate_operator_intake_option_count": 2,
             "direct_manifest_path": str(direct_manifest_path),
         },
@@ -441,6 +537,9 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
                 "artifacts": {
                     "candidate_source_lock_json": str(source_lock_path),
                     "candidate_operator_intake_plan_json": str(operator_plan_path),
+                    "candidate_operator_command_plan_json": str(
+                        operator_command_plan_path
+                    ),
                     "direct_manifest_template_json": str(direct_manifest_path),
                 },
             }
@@ -799,6 +898,23 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "public_candidate_operator_intake_plan_model_authority": (
                     "candidate_operator_intake_plan_not_authority"
                 ),
+                "public_candidate_operator_command_plan_status": (
+                    "candidate_operator_commands_ready_for_pinned_source_review"
+                ),
+                "public_candidate_operator_command_plan_model_authority": (
+                    "candidate_operator_command_plan_not_authority"
+                ),
+                "public_candidate_operator_command_plan_review_handoff_artifact_ids": [
+                    "candidate_source_lock_json",
+                    "candidate_source_lock_digests_csv",
+                    "candidate_operator_intake_requirements_csv",
+                    "candidate_direct_review_manifest_template_json",
+                ],
+                "public_candidate_operator_command_plan_authority_blockers_contains": [
+                    "license and provenance review evidence must be recorded for the selected intake option",
+                    "reviewed bundle manifest checker must report physical_so101_model_authority_ready",
+                    "reviewed MuJoCo bundle gate must prove physical reviewed model motion",
+                ],
                 "public_candidate_recorded_operator_intake_decision_options": [
                     "external_pinned_source_root",
                     "vendor_locked_bundle",
@@ -820,6 +936,10 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 },
                 "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option": {
                     "external_pinned_source_root": 4,
+                    "vendor_locked_bundle": 5,
+                },
+                "public_candidate_recorded_operator_command_selected_command_counts_by_option": {
+                    "external_pinned_source_root": 7,
                     "vendor_locked_bundle": 5,
                 },
                 "public_candidate_source_lock_paths_present": True,
@@ -1961,6 +2081,71 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             source_lock_handoff.get("operator_intake_plan_model_authority"),
             expect["public_candidate_operator_intake_plan_model_authority"],
         )
+    if "public_candidate_operator_command_plan_status" in expect:
+        add_error(
+            errors,
+            "public_candidate_operator_command_plan_status",
+            gate.get("public_candidate_operator_command_plan_status"),
+            expect["public_candidate_operator_command_plan_status"],
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.operator_command_plan_status",
+            source_lock_handoff.get("operator_command_plan_status"),
+            expect["public_candidate_operator_command_plan_status"],
+        )
+    if "public_candidate_operator_command_plan_model_authority" in expect:
+        add_error(
+            errors,
+            "public_candidate_operator_command_plan_model_authority",
+            gate.get("public_candidate_operator_command_plan_model_authority"),
+            expect["public_candidate_operator_command_plan_model_authority"],
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.operator_command_plan_model_authority",
+            source_lock_handoff.get("operator_command_plan_model_authority"),
+            expect["public_candidate_operator_command_plan_model_authority"],
+        )
+    if "public_candidate_operator_command_plan_review_handoff_artifact_ids" in expect:
+        add_error(
+            errors,
+            "public_candidate_operator_command_plan_review_handoff_artifact_ids",
+            gate.get(
+                "public_candidate_operator_command_plan_review_handoff_artifact_ids"
+            ),
+            expect[
+                "public_candidate_operator_command_plan_review_handoff_artifact_ids"
+            ],
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.operator_command_plan_review_handoff_artifact_ids",
+            source_lock_handoff.get(
+                "operator_command_plan_review_handoff_artifact_ids"
+            ),
+            expect[
+                "public_candidate_operator_command_plan_review_handoff_artifact_ids"
+            ],
+        )
+    if "public_candidate_operator_command_plan_authority_blockers_contains" in expect:
+        blockers_until_reviewed = source_lock_handoff.get(
+            "operator_command_plan_authority_blockers_until_reviewed"
+        )
+        blockers_until_reviewed = (
+            blockers_until_reviewed
+            if isinstance(blockers_until_reviewed, list)
+            else []
+        )
+        for expected_blocker in expect[
+            "public_candidate_operator_command_plan_authority_blockers_contains"
+        ]:
+            if expected_blocker not in blockers_until_reviewed:
+                errors.append(
+                    "public_candidate_source_lock_handoff."
+                    "operator_command_plan_authority_blockers_until_reviewed "
+                    f"missing {expected_blocker!r}"
+                )
     if "public_candidate_recorded_operator_intake_decision_options" in expect:
         add_error(
             errors,
@@ -2022,10 +2207,35 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
                 "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option"
             ],
         )
+    if (
+        "public_candidate_recorded_operator_command_selected_command_counts_by_option"
+        in expect
+    ):
+        add_error(
+            errors,
+            "public_candidate_recorded_operator_command_selected_command_counts_by_option",
+            gate.get(
+                "public_candidate_recorded_operator_command_selected_command_counts_by_option"
+            ),
+            expect[
+                "public_candidate_recorded_operator_command_selected_command_counts_by_option"
+            ],
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.recorded_operator_command_selected_command_counts_by_option",
+            source_lock_handoff.get(
+                "recorded_operator_command_selected_command_counts_by_option"
+            ),
+            expect[
+                "public_candidate_recorded_operator_command_selected_command_counts_by_option"
+            ],
+        )
     if expect.get("public_candidate_source_lock_paths_present"):
         for path_field in (
             "source_lock_json_path",
             "operator_intake_plan_json_path",
+            "operator_command_plan_json_path",
             "review_manifest_template_path",
             "candidate_intake_matrix_summary_path",
         ):
@@ -2705,6 +2915,26 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             gate_artifacts.get("public_candidate_review_manifest_template_path"),
             source_lock_handoff.get("review_manifest_template_path"),
         )
+        add_error(
+            errors,
+            "artifact_public_candidate_operator_command_plan_json_path",
+            gate_artifacts.get("public_candidate_operator_command_plan_json_path"),
+            source_lock_handoff.get("operator_command_plan_json_path"),
+        )
+        add_error(
+            errors,
+            "artifact_public_candidate_operator_command_plan_status",
+            gate_artifacts.get("public_candidate_operator_command_plan_status"),
+            source_lock_handoff.get("operator_command_plan_status"),
+        )
+        add_error(
+            errors,
+            "artifact_public_candidate_operator_command_plan_model_authority",
+            gate_artifacts.get(
+                "public_candidate_operator_command_plan_model_authority"
+            ),
+            source_lock_handoff.get("operator_command_plan_model_authority"),
+        )
     add_error(
         errors,
         "artifact_policy_training_authority_boundary",
@@ -3190,6 +3420,23 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "public_candidate_operator_intake_plan_model_authority": (
             source_lock_handoff.get("operator_intake_plan_model_authority")
+        ),
+        "public_candidate_operator_command_plan_json_path": source_lock_handoff.get(
+            "operator_command_plan_json_path"
+        ),
+        "public_candidate_operator_command_plan_status": source_lock_handoff.get(
+            "operator_command_plan_status"
+        ),
+        "public_candidate_operator_command_plan_model_authority": (
+            source_lock_handoff.get("operator_command_plan_model_authority")
+        ),
+        "public_candidate_operator_command_plan_review_handoff_artifact_ids": (
+            source_lock_handoff.get("operator_command_plan_review_handoff_artifact_ids")
+        ),
+        "public_candidate_operator_command_plan_authority_blockers_until_reviewed": (
+            source_lock_handoff.get(
+                "operator_command_plan_authority_blockers_until_reviewed"
+            )
         ),
         "public_candidate_review_manifest_template_path": source_lock_handoff.get(
             "review_manifest_template_path"

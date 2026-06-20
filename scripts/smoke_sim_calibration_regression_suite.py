@@ -5633,6 +5633,21 @@ def so101_reviewed_model_authority_gate_section(
         if isinstance(public_candidate_checked_artifacts, dict)
         else {}
     )
+    public_candidate_operator_command_plan = {}
+    public_candidate_operator_command_plan_error = None
+    operator_command_plan_json_path = public_candidate_checked_artifacts.get(
+        "candidate_operator_command_plan_json"
+    )
+    if isinstance(operator_command_plan_json_path, str):
+        operator_command_plan_payload, operator_command_plan_error = read_json_object(
+            Path(operator_command_plan_json_path)
+        )
+        public_candidate_operator_command_plan = (
+            operator_command_plan_payload
+            if isinstance(operator_command_plan_payload, dict)
+            else {}
+        )
+        public_candidate_operator_command_plan_error = operator_command_plan_error
     recorded_operator_intake_decision_cases = public_candidate_intake_matrix.get(
         "recorded_operator_intake_decision_cases"
     )
@@ -5661,6 +5676,49 @@ def so101_reviewed_model_authority_gate_section(
         )
         for option in recorded_operator_intake_decision_options
     }
+    recorded_operator_command_selected_command_counts_by_option = {
+        option: recorded_operator_intake_decision_cases[option].get(
+            "candidate_operator_command_plan_selected_option_command_count"
+        )
+        for option in recorded_operator_intake_decision_options
+    }
+    recorded_operator_command_selected_requirement_ids_by_option = {
+        option: recorded_operator_intake_decision_cases[option].get(
+            "candidate_operator_intake_selected_requirement_ids"
+        )
+        for option in recorded_operator_intake_decision_options
+    }
+    review_handoff_artifacts = public_candidate_operator_command_plan.get(
+        "review_handoff_artifacts"
+    )
+    review_handoff_artifacts = (
+        review_handoff_artifacts if isinstance(review_handoff_artifacts, list) else []
+    )
+    review_handoff_artifact_ids = unique_string_values(
+        [
+            artifact.get("artifact_id")
+            for artifact in review_handoff_artifacts
+            if isinstance(artifact, dict)
+        ]
+    )
+    review_handoff_artifact_paths = {
+        artifact.get("artifact_id"): artifact.get("path")
+        for artifact in review_handoff_artifacts
+        if isinstance(artifact, dict) and artifact.get("artifact_id")
+    }
+    review_handoff_artifact_authority_boundaries = {
+        artifact.get("artifact_id"): artifact.get("authority_boundary")
+        for artifact in review_handoff_artifacts
+        if isinstance(artifact, dict) and artifact.get("artifact_id")
+    }
+    authority_blockers_until_reviewed = public_candidate_operator_command_plan.get(
+        "authority_blockers_until_reviewed"
+    )
+    authority_blockers_until_reviewed = (
+        authority_blockers_until_reviewed
+        if isinstance(authority_blockers_until_reviewed, list)
+        else []
+    )
     public_candidate_source_lock_handoff = {
         "status": (
             "candidate_source_lock_ready_for_review"
@@ -5695,6 +5753,52 @@ def so101_reviewed_model_authority_gate_section(
         "operator_intake_option_count": public_candidate_checked.get(
             "candidate_operator_intake_option_count"
         ),
+        "operator_command_plan_json_path": operator_command_plan_json_path,
+        "operator_command_plan_parse_error": public_candidate_operator_command_plan_error,
+        "operator_command_plan_status": public_candidate_checked.get(
+            "candidate_operator_command_plan_status"
+        )
+        or public_candidate_operator_command_plan.get("status"),
+        "operator_command_plan_model_authority": public_candidate_checked.get(
+            "candidate_operator_command_plan_model_authority"
+        )
+        or public_candidate_operator_command_plan.get("model_authority")
+        or "candidate_operator_command_plan_not_authority",
+        "operator_command_plan_selected_option_command_count": (
+            public_candidate_checked.get(
+                "candidate_operator_command_plan_selected_option_command_count"
+            )
+            if public_candidate_checked.get(
+                "candidate_operator_command_plan_selected_option_command_count"
+            )
+            is not None
+            else public_candidate_operator_command_plan.get(
+                "selected_option_command_count"
+            )
+        ),
+        "operator_command_plan_selected_option_review_requirement_count": (
+            public_candidate_operator_command_plan.get(
+                "selected_option_review_requirement_count"
+            )
+        ),
+        "operator_command_plan_selected_option_review_requirement_ids": (
+            public_candidate_operator_command_plan.get(
+                "selected_option_review_requirement_ids"
+            )
+            or []
+        ),
+        "operator_command_plan_review_handoff_artifact_ids": (
+            review_handoff_artifact_ids
+        ),
+        "operator_command_plan_review_handoff_artifact_paths": (
+            review_handoff_artifact_paths
+        ),
+        "operator_command_plan_review_handoff_artifact_authority_boundaries": (
+            review_handoff_artifact_authority_boundaries
+        ),
+        "operator_command_plan_authority_blockers_until_reviewed": (
+            authority_blockers_until_reviewed
+        ),
         "selected_model_expected_joint_coverage_status": public_candidate_checked.get(
             "candidate_source_lock_selected_model_expected_joint_coverage_status"
         ),
@@ -5715,6 +5819,12 @@ def so101_reviewed_model_authority_gate_section(
         ),
         "recorded_operator_intake_selected_requirement_counts_by_option": (
             recorded_operator_intake_selected_requirement_counts_by_option
+        ),
+        "recorded_operator_command_selected_command_counts_by_option": (
+            recorded_operator_command_selected_command_counts_by_option
+        ),
+        "recorded_operator_command_selected_requirement_ids_by_option": (
+            recorded_operator_command_selected_requirement_ids_by_option
         ),
         "recorded_operator_intake_decision_cases": (
             recorded_operator_intake_decision_cases
@@ -6288,6 +6398,27 @@ def so101_reviewed_model_authority_gate_section(
                 "operator_intake_plan_model_authority"
             ]
         ),
+        "public_candidate_operator_command_plan_json_path": (
+            public_candidate_source_lock_handoff["operator_command_plan_json_path"]
+        ),
+        "public_candidate_operator_command_plan_status": (
+            public_candidate_source_lock_handoff["operator_command_plan_status"]
+        ),
+        "public_candidate_operator_command_plan_model_authority": (
+            public_candidate_source_lock_handoff[
+                "operator_command_plan_model_authority"
+            ]
+        ),
+        "public_candidate_operator_command_plan_review_handoff_artifact_ids": (
+            public_candidate_source_lock_handoff[
+                "operator_command_plan_review_handoff_artifact_ids"
+            ]
+        ),
+        "public_candidate_operator_command_plan_authority_blockers_until_reviewed": (
+            public_candidate_source_lock_handoff[
+                "operator_command_plan_authority_blockers_until_reviewed"
+            ]
+        ),
         "public_candidate_recorded_operator_intake_decision_options": (
             public_candidate_source_lock_handoff[
                 "recorded_operator_intake_decision_options"
@@ -6301,6 +6432,16 @@ def so101_reviewed_model_authority_gate_section(
         "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option": (
             public_candidate_source_lock_handoff[
                 "recorded_operator_intake_selected_requirement_counts_by_option"
+            ]
+        ),
+        "public_candidate_recorded_operator_command_selected_command_counts_by_option": (
+            public_candidate_source_lock_handoff[
+                "recorded_operator_command_selected_command_counts_by_option"
+            ]
+        ),
+        "public_candidate_recorded_operator_command_selected_requirement_ids_by_option": (
+            public_candidate_source_lock_handoff[
+                "recorded_operator_command_selected_requirement_ids_by_option"
             ]
         ),
         "public_candidate_review_manifest_template_path": (
@@ -6517,6 +6658,31 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
                     "operator_intake_plan_model_authority"
                 )
             ),
+            "public_candidate_operator_command_plan_json_path": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_command_plan_json_path"
+                )
+            ),
+            "public_candidate_operator_command_plan_status": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_command_plan_status"
+                )
+            ),
+            "public_candidate_operator_command_plan_model_authority": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_command_plan_model_authority"
+                )
+            ),
+            "public_candidate_operator_command_plan_review_handoff_artifact_ids": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_command_plan_review_handoff_artifact_ids"
+                )
+            ),
+            "public_candidate_operator_command_plan_authority_blockers_until_reviewed": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_command_plan_authority_blockers_until_reviewed"
+                )
+            ),
             "public_candidate_recorded_operator_intake_decision_options": (
                 public_candidate_source_lock_handoff.get(
                     "recorded_operator_intake_decision_options"
@@ -6530,6 +6696,16 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
             "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option": (
                 public_candidate_source_lock_handoff.get(
                     "recorded_operator_intake_selected_requirement_counts_by_option"
+                )
+            ),
+            "public_candidate_recorded_operator_command_selected_command_counts_by_option": (
+                public_candidate_source_lock_handoff.get(
+                    "recorded_operator_command_selected_command_counts_by_option"
+                )
+            ),
+            "public_candidate_recorded_operator_command_selected_requirement_ids_by_option": (
+                public_candidate_source_lock_handoff.get(
+                    "recorded_operator_command_selected_requirement_ids_by_option"
                 )
             ),
             "public_candidate_review_manifest_template_path": (
@@ -7082,6 +7258,21 @@ def so101_reviewed_model_authority_operator_actions(
                 "public_candidate_operator_intake_plan_model_authority": item.get(
                     "public_candidate_operator_intake_plan_model_authority"
                 ),
+                "public_candidate_operator_command_plan_json_path": item.get(
+                    "public_candidate_operator_command_plan_json_path"
+                ),
+                "public_candidate_operator_command_plan_status": item.get(
+                    "public_candidate_operator_command_plan_status"
+                ),
+                "public_candidate_operator_command_plan_model_authority": item.get(
+                    "public_candidate_operator_command_plan_model_authority"
+                ),
+                "public_candidate_operator_command_plan_review_handoff_artifact_ids": item.get(
+                    "public_candidate_operator_command_plan_review_handoff_artifact_ids"
+                ),
+                "public_candidate_operator_command_plan_authority_blockers_until_reviewed": item.get(
+                    "public_candidate_operator_command_plan_authority_blockers_until_reviewed"
+                ),
                 "public_candidate_review_manifest_template_path": item.get(
                     "public_candidate_review_manifest_template_path"
                 ),
@@ -7593,6 +7784,11 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "public_candidate_operator_intake_plan_status",
         "public_candidate_operator_intake_decision_status",
         "public_candidate_operator_intake_plan_model_authority",
+        "public_candidate_operator_command_plan_json_path",
+        "public_candidate_operator_command_plan_status",
+        "public_candidate_operator_command_plan_model_authority",
+        "public_candidate_operator_command_plan_review_handoff_artifact_ids",
+        "public_candidate_operator_command_plan_authority_blockers_until_reviewed",
         "public_candidate_review_manifest_template_path",
         "public_candidate_source_lock_model_authority",
         "evidence_artifact_path",
@@ -7625,6 +7821,11 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "public_candidate_operator_intake_plan_status",
         "public_candidate_operator_intake_decision_status",
         "public_candidate_operator_intake_plan_model_authority",
+        "public_candidate_operator_command_plan_json_path",
+        "public_candidate_operator_command_plan_status",
+        "public_candidate_operator_command_plan_model_authority",
+        "public_candidate_operator_command_plan_review_handoff_artifact_ids",
+        "public_candidate_operator_command_plan_authority_blockers_until_reviewed",
         "public_candidate_review_manifest_template_path",
         "public_candidate_source_lock_model_authority",
         "development_fixture_evidence_not_physical_so101_truth",
