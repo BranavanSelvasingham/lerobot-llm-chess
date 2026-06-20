@@ -730,9 +730,9 @@ manifest whose referenced model file is missing, placeholder alignment,
 placeholder/thin/invalid review evidence, malformed or future-dated review
 timestamps, generic review scopes, ready-shaped review metadata with pending follow-up, weak
 field-specific authority, placeholder or malformed provenance, reviewed-status
-fixture provenance, wrong target frame, invalid TCP/alignment payloads, and
-mismatched model SHA. Ready fixture cases exercise the manifest state machine
-only; they must keep
+fixture provenance, unexpected/non-finite/reversed joint-limit entries, wrong
+target frame, invalid TCP/alignment payloads, and mismatched model SHA. Ready
+fixture cases exercise the manifest state machine only; they must keep
 `physical_so101_model_authority_ready: false`.
 
 The standalone model-bundle probe matrix writes

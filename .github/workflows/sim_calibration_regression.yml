@@ -475,6 +475,8 @@ jobs:
               "reviewed_status_with_fixture_provenance_not_physical_authority",
               "weak_joint_limit_authority_not_ready",
               "unexpected_joint_limit_name_not_ready",
+              "nonfinite_joint_limit_not_ready",
+              "reversed_joint_limit_not_ready",
               "unexpected_model_joint_not_ready",
               "conflicting_joint_limit_alias_not_ready",
               "conflicting_joint_limit_nested_alias_not_ready",
@@ -544,6 +546,14 @@ jobs:
           assert unexpected_joint["joint_limits_status"] == "invalid", unexpected_joint
           assert unexpected_joint["joint_limit_unexpected_joints"] == ["unknown_aux_joint"], unexpected_joint
           assert "joint_limits_deg" in unexpected_joint["missing_inputs"], unexpected_joint
+          nonfinite_joint_limit = by_case["nonfinite_joint_limit_not_ready"]["observations"]
+          assert nonfinite_joint_limit["joint_limits_status"] == "invalid", nonfinite_joint_limit
+          assert "joint_limit_invalid:shoulder_pan:joint_limit_non_finite" in nonfinite_joint_limit["joint_limits_diagnostics"], nonfinite_joint_limit
+          assert "joint_limits_deg" in nonfinite_joint_limit["missing_inputs"], nonfinite_joint_limit
+          reversed_joint_limit = by_case["reversed_joint_limit_not_ready"]["observations"]
+          assert reversed_joint_limit["joint_limits_status"] == "invalid", reversed_joint_limit
+          assert "joint_limit_invalid:shoulder_pan:joint_limit_lower_not_below_upper" in reversed_joint_limit["joint_limits_diagnostics"], reversed_joint_limit
+          assert "joint_limits_deg" in reversed_joint_limit["missing_inputs"], reversed_joint_limit
           unexpected_model_joint = by_case["unexpected_model_joint_not_ready"]["observations"]
           assert unexpected_model_joint["ready_for_model_backed_ik"] is False, unexpected_model_joint
           assert "non_blocking_contract_checker_result" in unexpected_model_joint["missing_inputs"], unexpected_model_joint

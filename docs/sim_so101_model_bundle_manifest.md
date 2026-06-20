@@ -451,9 +451,10 @@ Unexpected joint-limit entries are rejected; the reviewed limit map must match
 the expected SO-101 joint set instead of carrying extra stale or non-SO-101
 joint names.
 Each entry may be a two-item `[lower, upper]` list or an object with
-`lower`/`upper` or `min`/`max` numeric values. If more than one joint-limit
-alias is present, every non-empty alias must normalize to the same finite
-per-joint bounds. If `joint_limit_authority` embeds nested limit values,
+`lower`/`upper` or `min`/`max` numeric values. Bounds must be finite and the
+lower value must be strictly below the upper value. If more than one joint-limit
+alias is present, every non-empty alias must normalize to the same finite,
+ordered per-joint bounds. If `joint_limit_authority` embeds nested limit values,
 accepted nested aliases are `joint_limits_deg`, `joint_limits`, `limits_deg`,
 and `limits`; those nested aliases must also agree. Conflicting joint-limit
 aliases are not readiness evidence. The checker also requires

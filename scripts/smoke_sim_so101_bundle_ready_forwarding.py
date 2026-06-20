@@ -756,6 +756,8 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     )
     weak_joint_limits_dir = fixture_dir / "weak_joint_limits_bundle"
     unexpected_joint_limit_dir = fixture_dir / "unexpected_joint_limit_bundle"
+    nonfinite_joint_limit_dir = fixture_dir / "nonfinite_joint_limit_bundle"
+    reversed_joint_limit_dir = fixture_dir / "reversed_joint_limit_bundle"
     unexpected_model_joint_dir = fixture_dir / "unexpected_model_joint_bundle"
     conflicting_joint_limit_alias_dir = fixture_dir / "conflicting_joint_limit_alias_bundle"
     conflicting_joint_limit_nested_alias_dir = (
@@ -807,6 +809,8 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         fixture_provenance_reviewed_authority_dir,
         weak_joint_limits_dir,
         unexpected_joint_limit_dir,
+        nonfinite_joint_limit_dir,
+        reversed_joint_limit_dir,
         unexpected_model_joint_dir,
         conflicting_joint_limit_alias_dir,
         conflicting_joint_limit_nested_alias_dir,
@@ -888,6 +892,14 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         unexpected_joint_limit_dir / "model" / "synthetic_so101_mujoco.xml"
     )
     unexpected_joint_limit_model_path.write_text(mjcf_with_mesh_reference())
+    nonfinite_joint_limit_model_path = (
+        nonfinite_joint_limit_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    nonfinite_joint_limit_model_path.write_text(mjcf_with_mesh_reference())
+    reversed_joint_limit_model_path = (
+        reversed_joint_limit_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    reversed_joint_limit_model_path.write_text(mjcf_with_mesh_reference())
     unexpected_model_joint_model_path = (
         unexpected_model_joint_dir / "model" / "synthetic_so101_mujoco.xml"
     )
@@ -1006,6 +1018,12 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_joint_limits_manifest_path = weak_joint_limits_dir / "so101_model_bundle.weak_joint_limits.json"
     unexpected_joint_limit_manifest_path = (
         unexpected_joint_limit_dir / "so101_model_bundle.unexpected_joint_limit.json"
+    )
+    nonfinite_joint_limit_manifest_path = (
+        nonfinite_joint_limit_dir / "so101_model_bundle.nonfinite_joint_limit.json"
+    )
+    reversed_joint_limit_manifest_path = (
+        reversed_joint_limit_dir / "so101_model_bundle.reversed_joint_limit.json"
     )
     unexpected_model_joint_manifest_path = (
         unexpected_model_joint_dir / "so101_model_bundle.unexpected_model_joint.json"
@@ -1165,6 +1183,26 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         ),
         unexpected_joint_limit_model_path,
     )
+    nonfinite_joint_limit_payload = manifest_payload(
+        ready=True,
+        model_filename=nonfinite_joint_limit_model_path.name,
+    )
+    nonfinite_joint_limit_payload["joint_limits_deg"]["shoulder_pan"] = ["NaN", 110.0]
+    write_manifest_json(
+        nonfinite_joint_limit_manifest_path,
+        nonfinite_joint_limit_payload,
+        nonfinite_joint_limit_model_path,
+    )
+    reversed_joint_limit_payload = manifest_payload(
+        ready=True,
+        model_filename=reversed_joint_limit_model_path.name,
+    )
+    reversed_joint_limit_payload["joint_limits_deg"]["shoulder_pan"] = [110.0, -110.0]
+    write_manifest_json(
+        reversed_joint_limit_manifest_path,
+        reversed_joint_limit_payload,
+        reversed_joint_limit_model_path,
+    )
     write_manifest_json(
         unexpected_model_joint_manifest_path,
         manifest_payload(ready=True, model_filename=unexpected_model_joint_model_path.name),
@@ -1303,6 +1341,8 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         ),
         "weak_joint_limits_manifest_path": weak_joint_limits_manifest_path,
         "unexpected_joint_limit_manifest_path": unexpected_joint_limit_manifest_path,
+        "nonfinite_joint_limit_manifest_path": nonfinite_joint_limit_manifest_path,
+        "reversed_joint_limit_manifest_path": reversed_joint_limit_manifest_path,
         "unexpected_model_joint_manifest_path": unexpected_model_joint_manifest_path,
         "conflicting_joint_limit_alias_manifest_path": (
             conflicting_joint_limit_alias_manifest_path
@@ -1355,6 +1395,8 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         ),
         "weak_joint_limits_model_path": weak_joint_limits_model_path,
         "unexpected_joint_limit_model_path": unexpected_joint_limit_model_path,
+        "nonfinite_joint_limit_model_path": nonfinite_joint_limit_model_path,
+        "reversed_joint_limit_model_path": reversed_joint_limit_model_path,
         "unexpected_model_joint_model_path": unexpected_model_joint_model_path,
         "conflicting_joint_limit_alias_model_path": (
             conflicting_joint_limit_alias_model_path

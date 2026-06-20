@@ -97,6 +97,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "asset_roots_status",
         "joint_limits_status",
         "joint_limit_unexpected_joints",
+        "joint_limits_diagnostics",
         "mesh_assets_status",
         "mesh_asset_review_alias_conflict",
         "mesh_asset_review_alias_not_ready_fields",
@@ -735,6 +736,32 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "nonfinite_joint_limit_not_ready",
+            "manifest_path": fixtures["nonfinite_joint_limit_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "joint_limits_status": "invalid",
+                "joint_limits_diagnostics_contains": [
+                    "joint_limit_invalid:shoulder_pan:joint_limit_non_finite",
+                ],
+                "missing_inputs": ["joint_limits_deg"],
+            },
+        },
+        {
+            "case_id": "reversed_joint_limit_not_ready",
+            "manifest_path": fixtures["reversed_joint_limit_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "joint_limits_status": "invalid",
+                "joint_limits_diagnostics_contains": [
+                    "joint_limit_invalid:shoulder_pan:joint_limit_lower_not_below_upper",
+                ],
+                "missing_inputs": ["joint_limits_deg"],
+            },
+        },
+        {
             "case_id": "unexpected_model_joint_not_ready",
             "manifest_path": fixtures["unexpected_model_joint_manifest_path"],
             "expect": {
@@ -1096,6 +1123,19 @@ def summarize_case(
             actual,
             expect["joint_limit_unexpected_joints"],
         )
+    if "joint_limits_diagnostics_contains" in expect:
+        joint_limits = summary.get("joint_limits")
+        diagnostics = (
+            joint_limits.get("diagnostics")
+            if isinstance(joint_limits, dict)
+            else []
+        )
+        expect_contains(
+            errors,
+            f"{case_id}.joint_limits.diagnostics",
+            diagnostics,
+            expect["joint_limits_diagnostics_contains"],
+        )
     if "contract_checker_status" in expect:
         add_error(
             errors,
@@ -1280,6 +1320,9 @@ def summarize_case(
             "joint_limit_unexpected_joints": (
                 summary.get("joint_limits") or {}
             ).get("unexpected_joints"),
+            "joint_limits_diagnostics": (
+                summary.get("joint_limits") or {}
+            ).get("diagnostics"),
             "joint_limit_alias_conflict": (
                 summary.get("joint_limits") or {}
             ).get("joint_limit_alias_conflict"),
@@ -1438,6 +1481,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "asset_roots_status": obs.get("asset_roots_status"),
         "joint_limits_status": obs.get("joint_limits_status"),
         "joint_limit_unexpected_joints": obs.get("joint_limit_unexpected_joints"),
+        "joint_limits_diagnostics": obs.get("joint_limits_diagnostics"),
         "joint_limit_alias_conflict": obs.get("joint_limit_alias_conflict"),
         "top_level_joint_limit_alias_conflict": obs.get(
             "top_level_joint_limit_alias_conflict"
