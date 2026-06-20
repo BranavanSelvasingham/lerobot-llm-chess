@@ -114,6 +114,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_source_lock_ready_for_review",
         "candidate_source_lock_digest_model_authority",
         "candidate_source_lock_digest_row_count",
+        "candidate_source_lock_expected_file_digest_count",
+        "candidate_source_lock_extra_lockable_file_count",
+        "candidate_source_lock_extra_lockable_relative_paths",
         "candidate_source_lock_selected_model_digest_row_count",
         "candidate_source_lock_selected_model_observation_authority",
         "candidate_source_lock_selected_model_observation_observed",
@@ -217,6 +220,10 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
     incomplete_root = fixtures_dir / "incomplete_so101"
     shutil.copytree(complete_root, incomplete_root)
     (incomplete_root / "assets" / "wrist_roll_pitch_so101_v2.stl").unlink()
+    extra_lockable_root = fixtures_dir / "extra_lockable_so101"
+    shutil.copytree(complete_root, extra_lockable_root)
+    extra_lockable_path = extra_lockable_root / "assets" / "base_so101_v2.part"
+    extra_lockable_path.write_bytes(b"synthetic upstream CAD source bytes\n")
     missing_root = fixtures_dir / "missing_so101"
     return [
         {
@@ -377,6 +384,42 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "selected_intake_option_id": None,
                 "selected_requirement_count": 0,
                 "selected_requirement_ids": [],
+            },
+        },
+        {
+            "case_id": "candidate_intake_extra_lockable_source_file",
+            "args": [
+                "--source-root",
+                str(extra_lockable_root),
+                "--upstream-commit",
+                PINNED_FIXTURE_COMMIT,
+            ],
+            "expect": {
+                "status": "candidate_intake_checked",
+                "expected_file_count": len(EXPECTED_RELATIVE_PATHS),
+                "present_expected_file_count": len(EXPECTED_RELATIVE_PATHS),
+                "model_present": True,
+                "selected_model_supported": True,
+                "selected_model_status": "selectable_so101_model_selected",
+                "parsed_model_file_count": 5,
+                "readme_caveats": {
+                    "base_collision_meshes_removed": True,
+                    "gripper_linear_joint_mapping_not_reflected": True,
+                    "onshape_to_robot_generated": True,
+                    "relative_mesh_paths_declared": True,
+                },
+                "missing_exact": [],
+                "commit_action_present": False,
+                "upstream_commit_sha_valid": True,
+                "upstream_commit_status": "upstream_commit_sha_pinned",
+                "source_lock_status": "candidate_source_lock_ready_for_review",
+                "source_lock_ready_for_review": True,
+                "operator_plan_status": "candidate_locked_operator_decision_required",
+                "operator_decision_status": "vendor_or_external_intake_not_declared",
+                "selected_intake_option_id": None,
+                "selected_requirement_count": 0,
+                "selected_requirement_ids": [],
+                "extra_lockable_relative_paths": ["assets/base_so101_v2.part"],
             },
         },
         {
@@ -1002,7 +1045,16 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
             errors.append(
                 f"{case_id}.candidate_source_lock unsupported selected model unexpected joint count invalid"
             )
-    expected_digest_row_count = int(summary.get("present_expected_file_count") or 0)
+    expected_extra_lockable_paths = list(
+        expect.get("extra_lockable_relative_paths", [])
+    )
+    expected_extra_lockable_count = len(expected_extra_lockable_paths)
+    expected_expected_digest_row_count = int(
+        summary.get("present_expected_file_count") or 0
+    )
+    expected_digest_row_count = (
+        expected_expected_digest_row_count + expected_extra_lockable_count
+    )
     expected_selected_digest_row_count = (
         1 if expect["model_present"] and expected_selected_model_supported else 0
     )
@@ -1018,6 +1070,33 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
             f"{summary.get('candidate_source_lock_digest_row_count')!r}"
         )
     if (
+        summary.get("candidate_source_lock_expected_file_digest_count")
+        != expected_expected_digest_row_count
+    ):
+        errors.append(
+            f"{case_id}.candidate_source_lock_expected_file_digest_count expected "
+            f"{expected_expected_digest_row_count!r}, got "
+            f"{summary.get('candidate_source_lock_expected_file_digest_count')!r}"
+        )
+    if (
+        summary.get("candidate_source_lock_extra_lockable_file_count")
+        != expected_extra_lockable_count
+    ):
+        errors.append(
+            f"{case_id}.candidate_source_lock_extra_lockable_file_count expected "
+            f"{expected_extra_lockable_count!r}, got "
+            f"{summary.get('candidate_source_lock_extra_lockable_file_count')!r}"
+        )
+    if (
+        summary.get("candidate_source_lock_extra_lockable_relative_paths")
+        != expected_extra_lockable_paths
+    ):
+        errors.append(
+            f"{case_id}.candidate_source_lock_extra_lockable_relative_paths expected "
+            f"{expected_extra_lockable_paths!r}, got "
+            f"{summary.get('candidate_source_lock_extra_lockable_relative_paths')!r}"
+        )
+    if (
         summary.get("candidate_source_lock_selected_model_digest_row_count")
         != expected_selected_digest_row_count
     ):
@@ -1027,8 +1106,20 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
             f"{summary.get('candidate_source_lock_selected_model_digest_row_count')!r}"
         )
     if expected_source_lock_ready:
-        if source_lock.get("file_digest_count") != summary.get("expected_file_count"):
+        if source_lock.get("file_digest_count") != expected_digest_row_count:
             errors.append(f"{case_id}.candidate_source_lock.file_digest_count invalid")
+        if source_lock.get("expected_file_digest_count") != expected_expected_digest_row_count:
+            errors.append(
+                f"{case_id}.candidate_source_lock.expected_file_digest_count invalid"
+            )
+        if source_lock.get("extra_lockable_file_count") != expected_extra_lockable_count:
+            errors.append(
+                f"{case_id}.candidate_source_lock.extra_lockable_file_count invalid"
+            )
+        if source_lock.get("extra_lockable_relative_paths") != expected_extra_lockable_paths:
+            errors.append(
+                f"{case_id}.candidate_source_lock.extra_lockable_relative_paths invalid"
+            )
         if selected_model.get("sha256") != summary.get("model_sha256_observed"):
             errors.append(f"{case_id}.candidate_source_lock selected model digest mismatch")
     elif expect["model_present"] and not expected_selected_model_supported:
@@ -1467,6 +1558,15 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "candidate_source_lock_digest_row_count": summary.get(
             "candidate_source_lock_digest_row_count"
         ),
+        "candidate_source_lock_expected_file_digest_count": summary.get(
+            "candidate_source_lock_expected_file_digest_count"
+        ),
+        "candidate_source_lock_extra_lockable_file_count": summary.get(
+            "candidate_source_lock_extra_lockable_file_count"
+        ),
+        "candidate_source_lock_extra_lockable_relative_paths": summary.get(
+            "candidate_source_lock_extra_lockable_relative_paths"
+        ),
         "candidate_source_lock_selected_model_digest_row_count": summary.get(
             "candidate_source_lock_selected_model_digest_row_count"
         ),
@@ -1664,6 +1764,11 @@ def main() -> int:
         cases.append(summarize_case(record, child_summary, spec["expect"]))
 
     failed_case_ids = [case["case_id"] for case in cases if not case["ok"]]
+    cases_with_extra_lockable_files = [
+        case["case_id"]
+        for case in cases
+        if int(case.get("candidate_source_lock_extra_lockable_file_count") or 0) > 0
+    ]
     summary_path = output_dir / "so101_public_candidate_intake_matrix_summary.json"
     csv_path = output_dir / "so101_public_candidate_intake_matrix_cases.csv"
     readme_path = output_dir / "README.md"
@@ -1682,6 +1787,8 @@ def main() -> int:
         "case_count": len(cases),
         "case_ids": [case["case_id"] for case in cases],
         "failed_case_ids": failed_case_ids,
+        "cases_with_extra_lockable_files": cases_with_extra_lockable_files,
+        "case_count_with_extra_lockable_files": len(cases_with_extra_lockable_files),
         "cases": cases,
         "child_records": child_records,
         "summary_json": str(summary_path),
@@ -1697,6 +1804,9 @@ def main() -> int:
                 "ok": summary["ok"],
                 "status": summary["status"],
                 "case_count": summary["case_count"],
+                "case_count_with_extra_lockable_files": summary[
+                    "case_count_with_extra_lockable_files"
+                ],
                 "failed_case_ids": summary["failed_case_ids"],
                 "summary_json": str(summary_path),
                 "cases_csv": str(csv_path),

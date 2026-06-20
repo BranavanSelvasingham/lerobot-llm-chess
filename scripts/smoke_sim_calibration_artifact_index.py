@@ -3282,6 +3282,10 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         if isinstance(invalid_model_selection_case, dict)
         else {}
     )
+    extra_lockable_case = matrix.get("candidate_intake_extra_lockable_source_file")
+    extra_lockable_case = (
+        extra_lockable_case if isinstance(extra_lockable_case, dict) else {}
+    )
     external_decision_case = matrix.get("candidate_intake_checked_external_decision")
     external_decision_case = (
         external_decision_case if isinstance(external_decision_case, dict) else {}
@@ -3313,6 +3317,13 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "case_count": matrix.get("case_count"),
         "case_ids": matrix.get("case_ids") or [],
         "failed_case_ids": matrix.get("failed_case_ids") or [],
+        "case_count_with_extra_lockable_files": matrix.get(
+            "case_count_with_extra_lockable_files"
+        ),
+        "cases_with_extra_lockable_files": matrix.get(
+            "cases_with_extra_lockable_files"
+        )
+        or [],
         "recorded_operator_intake_decision_options": recorded_decision_options,
         "candidate_intake_checked_status": checked_case.get("status"),
         "candidate_intake_checked_model_present": checked_case.get("model_present"),
@@ -3463,8 +3474,40 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "candidate_intake_checked_source_lock_digest_row_count": checked_case.get(
             "candidate_source_lock_digest_row_count"
         ),
+        "candidate_intake_checked_source_lock_expected_file_digest_count": (
+            checked_case.get("candidate_source_lock_expected_file_digest_count")
+        ),
+        "candidate_intake_checked_source_lock_extra_lockable_file_count": (
+            checked_case.get("candidate_source_lock_extra_lockable_file_count")
+        ),
+        "candidate_intake_checked_source_lock_extra_lockable_relative_paths": (
+            checked_case.get("candidate_source_lock_extra_lockable_relative_paths")
+        ),
         "candidate_intake_checked_source_lock_selected_model_digest_row_count": (
             checked_case.get("candidate_source_lock_selected_model_digest_row_count")
+        ),
+        "candidate_intake_extra_lockable_source_file_status": (
+            extra_lockable_case.get("status")
+        ),
+        "candidate_intake_extra_lockable_source_file_source_lock_ready_for_review": (
+            extra_lockable_case.get("candidate_source_lock_ready_for_review")
+        ),
+        "candidate_intake_extra_lockable_source_file_source_lock_digest_row_count": (
+            extra_lockable_case.get("candidate_source_lock_digest_row_count")
+        ),
+        "candidate_intake_extra_lockable_source_file_source_lock_expected_file_digest_count": (
+            extra_lockable_case.get("candidate_source_lock_expected_file_digest_count")
+        ),
+        "candidate_intake_extra_lockable_source_file_source_lock_extra_lockable_file_count": (
+            extra_lockable_case.get("candidate_source_lock_extra_lockable_file_count")
+        ),
+        "candidate_intake_extra_lockable_source_file_source_lock_extra_lockable_relative_paths": (
+            extra_lockable_case.get("candidate_source_lock_extra_lockable_relative_paths")
+        ),
+        "candidate_intake_extra_lockable_source_file_source_lock_selected_model_digest_row_count": (
+            extra_lockable_case.get(
+                "candidate_source_lock_selected_model_digest_row_count"
+            )
         ),
         "candidate_intake_checked_upstream_commit_sha_valid": checked_case.get(
             "upstream_commit_sha_valid"

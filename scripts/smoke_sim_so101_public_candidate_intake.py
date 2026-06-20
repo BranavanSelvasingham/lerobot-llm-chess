@@ -702,24 +702,27 @@ def candidate_source_lock_digest_rows(
         if not isinstance(digest, dict):
             continue
         relative_path = digest.get("relative_path")
+        expected = digest.get("expected") is True
         is_selected_model = bool(
             selected_model_supported
             and relative_path
             and relative_path == selected_relative_path
         )
+        if is_selected_model:
+            digest_role = "selected_model_digest"
+        elif expected:
+            digest_role = "expected_candidate_file_digest"
+        else:
+            digest_role = "discovered_lockable_candidate_file_digest"
         rows.append(
             {
                 "relative_path": relative_path,
                 "sha256": digest.get("sha256"),
                 "size_bytes": digest.get("size_bytes"),
                 "suffix": digest.get("suffix"),
-                "expected": True,
+                "expected": expected,
                 "selected_model": is_selected_model,
-                "digest_role": (
-                    "selected_model_digest"
-                    if is_selected_model
-                    else "expected_candidate_file_digest"
-                ),
+                "digest_role": digest_role,
                 "authority_boundary": "candidate_source_lock_digest_not_authority",
             }
         )
@@ -913,16 +916,25 @@ def candidate_source_lock(summary: dict[str, Any]) -> dict[str, Any]:
         for row in file_rows
         if isinstance(row, dict) and row.get("expected") is True
     ]
-    expected_digest_rows = [
+    present_lockable_rows = [
         {
             "relative_path": row.get("relative_path"),
             "sha256": row.get("sha256"),
             "size_bytes": row.get("size_bytes"),
             "suffix": row.get("suffix"),
+            "expected": row.get("expected") is True,
         }
-        for row in expected_file_rows
+        for row in file_rows
         if row.get("exists") is True
     ]
+    extra_lockable_relative_paths = [
+        str(row.get("relative_path"))
+        for row in present_lockable_rows
+        if row.get("expected") is not True and row.get("relative_path")
+    ]
+    expected_digest_count = sum(
+        1 for row in present_lockable_rows if row.get("expected") is True
+    )
     upstream_commit_supplied = bool(upstream.get("commit_supplied"))
     upstream_commit_sha_valid = upstream.get("commit_sha_valid") is True
     model_present = summary.get("model_present") is True
@@ -981,8 +993,11 @@ def candidate_source_lock(summary: dict[str, Any]) -> dict[str, Any]:
         "present_expected_file_count": present_expected,
         "missing_expected_relative_paths": summary.get("missing_expected_relative_paths")
         or [],
-        "file_digest_count": len(expected_digest_rows),
-        "file_digests": expected_digest_rows,
+        "file_digest_count": len(present_lockable_rows),
+        "expected_file_digest_count": expected_digest_count,
+        "extra_lockable_file_count": len(extra_lockable_relative_paths),
+        "extra_lockable_relative_paths": extra_lockable_relative_paths[:200],
+        "file_digests": present_lockable_rows,
         "review_required_scopes": list(REQUIRED_REVIEW_SCOPES),
         "review_handoff": {
             "candidate_direct_review_manifest_template_json": (
@@ -1836,6 +1851,9 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `candidate_source_lock_ready_for_review`: `{str(summary['candidate_source_lock']['source_lock_ready_for_review']).lower()}`",
         f"- `candidate_source_lock_digest_model_authority`: `{summary['candidate_source_lock_digest_model_authority']}`",
         f"- `candidate_source_lock_digest_row_count`: `{summary['candidate_source_lock_digest_row_count']}`",
+        f"- `candidate_source_lock_expected_file_digest_count`: `{summary['candidate_source_lock_expected_file_digest_count']}`",
+        f"- `candidate_source_lock_extra_lockable_file_count`: `{summary['candidate_source_lock_extra_lockable_file_count']}`",
+        f"- `candidate_source_lock_extra_lockable_relative_paths`: `{', '.join(summary['candidate_source_lock_extra_lockable_relative_paths']) if summary['candidate_source_lock_extra_lockable_relative_paths'] else 'none'}`",
         f"- `candidate_operator_intake_plan_model_authority`: `{summary['candidate_operator_intake_plan_model_authority']}`",
         f"- `candidate_operator_intake_plan_status`: `{summary['candidate_operator_intake_plan_status']}`",
         f"- `candidate_operator_intake_decision_status`: `{summary['candidate_operator_intake_decision_status']}`",
@@ -1884,9 +1902,9 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "",
             "## Candidate Source Lock",
             "",
-            "The `candidate_source_lock` JSON records the pinned upstream, selected model, and expected file digests as review handoff evidence. It is not reviewed physical SO-101 model authority.",
+            "The `candidate_source_lock` JSON records the pinned upstream, selected model, expected file digests, and discovered lockable extra file digests as review handoff evidence. It is not reviewed physical SO-101 model authority.",
             "",
-            "The `candidate_source_lock_digests` CSV flattens the expected candidate file digest set and marks the selected model digest row for review. It is not reviewed physical SO-101 model authority.",
+            "The `candidate_source_lock_digests` CSV flattens expected candidate files plus discovered lockable extras, marks the selected model digest row, and labels non-expected rows for review. It is not reviewed physical SO-101 model authority.",
             "",
             "## Candidate Operator Intake Plan",
             "",
@@ -1992,6 +2010,15 @@ def main() -> int:
         "candidate_source_lock_digest_not_authority"
     )
     summary["candidate_source_lock_digest_row_count"] = len(source_lock_digest_rows)
+    summary["candidate_source_lock_expected_file_digest_count"] = source_lock.get(
+        "expected_file_digest_count"
+    )
+    summary["candidate_source_lock_extra_lockable_file_count"] = source_lock.get(
+        "extra_lockable_file_count"
+    )
+    summary["candidate_source_lock_extra_lockable_relative_paths"] = source_lock.get(
+        "extra_lockable_relative_paths"
+    ) or []
     summary["candidate_source_lock_selected_model_digest_row_count"] = len(
         selected_source_lock_digest_rows
     )

@@ -482,11 +482,15 @@ candidate intake smoke now writes
 `so101_public_candidate_operator_intake_requirements.csv` for each case; those
 artifacts keep `candidate_operator_intake_plan_not_authority` or
 `candidate_operator_command_plan_not_authority`, flatten the expected candidate
-file digest set with the selected supported model digest row marked for review,
+file digest set plus discovered lockable extras with the selected supported
+model digest row marked for review,
 flatten parsed URDF/MJCF/scene metadata with scene, selectable variant, parsed
 selectable variant, and selected model row counts for reviewer inspection, and
 copy the selected model parse observation into the source-lock handoff without
-granting model authority. The matrix includes a MJCF model-selection case so
+granting model authority. The matrix includes an extra-lockable-source-file
+case for upstream files such as `.part` CAD/source assets, keeping those digest
+rows visible while preserving expected-file completeness as the source-lock
+readiness check. The matrix also includes a MJCF model-selection case so
 the handoff can distinguish `no_mesh_references_observed` from observed mesh
 references covered by the locked candidate digest set, and it records selected
 model coverage against the expected SO-101 control joint names. Those joint
@@ -503,12 +507,13 @@ checklist keeps target-frame authority, TCP/gripper offset authority, and
 base-to-board alignment authority as separate prioritized rows so those missing
 review items cannot be collapsed into one broad placeholder. The intake summary and artifact index
 expose model-observation row counts, selected model observation row count, digest
-row counts, selected model digest row count, selected model expected-joint
-coverage status and counts, requirement row count, selected row count,
-unselected row count, selected row IDs, command-plan status, and selected option
-command count for undecided, external-source, and vendor-lock decisions so the
-observation CSV, digest CSV, requirement CSV, and command plan cannot silently
-drift from the recorded operator decision.
+row counts, expected-file digest counts, extra lockable file counts and paths,
+selected model digest row count, selected model expected-joint coverage status
+and counts, requirement row count, selected row count, unselected row count,
+selected row IDs, command-plan status, and selected option command count for
+undecided, external-source, and vendor-lock decisions so the observation CSV,
+digest CSV, requirement CSV, and command plan cannot silently drift from the
+recorded operator decision.
 The matrix includes an unpinned-ref case (`--upstream-commit main`) and requires
 `candidate_source_lock_ready_for_review: false` until the upstream commit is a
 full immutable SHA. The source-inventory artifact-index metrics also mirror the

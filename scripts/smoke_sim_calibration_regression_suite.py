@@ -4003,6 +4003,15 @@ def so101_public_candidate_intake_matrix_section(
         ),
         {},
     )
+    extra_lockable_case = next(
+        (
+            case
+            for case in cases
+            if isinstance(case, dict)
+            and case.get("case_id") == "candidate_intake_extra_lockable_source_file"
+        ),
+        {},
+    )
     invalid_model_selection_case = next(
         (
             case
@@ -4351,6 +4360,13 @@ def so101_public_candidate_intake_matrix_section(
         "case_count": matrix.get("case_count"),
         "case_ids": matrix.get("case_ids") or [],
         "failed_case_ids": matrix.get("failed_case_ids") or [],
+        "case_count_with_extra_lockable_files": matrix.get(
+            "case_count_with_extra_lockable_files"
+        ),
+        "cases_with_extra_lockable_files": matrix.get(
+            "cases_with_extra_lockable_files"
+        )
+        or [],
         "candidate_intake_checked": {
             "status": checked_case.get("status") if isinstance(checked_case, dict) else None,
             "model_present": checked_case.get("model_present")
@@ -4485,6 +4501,21 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(checked_case, dict)
             else None,
+            "candidate_source_lock_expected_file_digest_count": checked_case.get(
+                "candidate_source_lock_expected_file_digest_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_extra_lockable_file_count": checked_case.get(
+                "candidate_source_lock_extra_lockable_file_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_extra_lockable_relative_paths": checked_case.get(
+                "candidate_source_lock_extra_lockable_relative_paths"
+            )
+            if isinstance(checked_case, dict)
+            else None,
             "candidate_source_lock_selected_model_digest_row_count": checked_case.get(
                 "candidate_source_lock_selected_model_digest_row_count"
             )
@@ -4581,6 +4612,51 @@ def so101_public_candidate_intake_matrix_section(
             else None,
             "direct_manifest_path": preview.get("direct_manifest_path"),
             "preview_summary_path": preview.get("summary_path"),
+        },
+        "candidate_intake_extra_lockable_source_file": {
+            "status": extra_lockable_case.get("status")
+            if isinstance(extra_lockable_case, dict)
+            else None,
+            "candidate_source_lock_ready_for_review": extra_lockable_case.get(
+                "candidate_source_lock_ready_for_review"
+            )
+            if isinstance(extra_lockable_case, dict)
+            else None,
+            "candidate_source_lock_digest_row_count": extra_lockable_case.get(
+                "candidate_source_lock_digest_row_count"
+            )
+            if isinstance(extra_lockable_case, dict)
+            else None,
+            "candidate_source_lock_expected_file_digest_count": extra_lockable_case.get(
+                "candidate_source_lock_expected_file_digest_count"
+            )
+            if isinstance(extra_lockable_case, dict)
+            else None,
+            "candidate_source_lock_extra_lockable_file_count": extra_lockable_case.get(
+                "candidate_source_lock_extra_lockable_file_count"
+            )
+            if isinstance(extra_lockable_case, dict)
+            else None,
+            "candidate_source_lock_extra_lockable_relative_paths": extra_lockable_case.get(
+                "candidate_source_lock_extra_lockable_relative_paths"
+            )
+            if isinstance(extra_lockable_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_digest_row_count": extra_lockable_case.get(
+                "candidate_source_lock_selected_model_digest_row_count"
+            )
+            if isinstance(extra_lockable_case, dict)
+            else None,
+            "candidate_operator_intake_plan_status": extra_lockable_case.get(
+                "candidate_operator_intake_plan_status"
+            )
+            if isinstance(extra_lockable_case, dict)
+            else None,
+            "observed_evidence_is_physical_so101_authority": extra_lockable_case.get(
+                "observed_evidence_is_physical_so101_authority"
+            )
+            if isinstance(extra_lockable_case, dict)
+            else None,
         },
         "candidate_intake_checked_mjcf_model_selection": (
             compact_model_selection_case(mjcf_model_selection_case)
