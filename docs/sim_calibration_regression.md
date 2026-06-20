@@ -836,7 +836,11 @@ It reports `model_authority: "contract_matrix_not_authority"`,
 `physical_so101_model_authority_ready: false` even though it includes an
 `all_ready_contract_state` case to exercise the ready branch. That case is a
 state-machine guard only; it is not evidence that a reviewed physical SO-101
-bundle exists. It also includes an inconsistent-motion negative case: even when
+bundle exists. It includes a public-candidate source-lock handoff case that
+keeps source, bundle, MuJoCo motion, model-backed IK, and policy-training
+readiness blocked while verifying that the gate points reviewers to the
+candidate source-lock JSON and manifest template. It also includes an
+inconsistent-motion negative case: even when
 the injected physical motion boolean is true, the top-level authority gate stays
 blocked unless the reviewed-MuJoCo child status and motion-authority status also
 match physical reviewed motion. The matrix also includes physical-motion child

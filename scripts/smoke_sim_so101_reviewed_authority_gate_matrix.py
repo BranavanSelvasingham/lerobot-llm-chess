@@ -152,6 +152,11 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "blocker_reviewed_mujoco_motion_model_path",
         "blocker_reviewed_mujoco_motion_model_declared_sha256",
         "blocker_reviewed_mujoco_motion_model_observed_sha256",
+        "public_candidate_source_lock_status",
+        "public_candidate_source_lock_ready_for_review",
+        "public_candidate_source_lock_json_path",
+        "public_candidate_review_manifest_template_path",
+        "public_candidate_source_lock_model_authority",
         "checklist_status_by_requirement_id",
         "checklist_next_action_ids_by_requirement_id",
         "checklist_blocked_by_prior_requirement_ids_by_requirement_id",
@@ -311,6 +316,63 @@ def source_ready_with_pending_action(
     payload["next_required_for_goal"] = [action]
     payload["next_required_action_ids"] = [action["action_id"]]
     return payload
+
+
+def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
+    artifact_dir = output_dir / "public_candidate_intake"
+    source_lock_path = artifact_dir / "so101_public_candidate_source_lock.json"
+    direct_manifest_path = artifact_dir / "so101_public_candidate_review_manifest_template.json"
+    matrix_summary_path = artifact_dir / "so101_public_candidate_intake_matrix_summary.json"
+    source_lock_path.parent.mkdir(parents=True, exist_ok=True)
+    write_json(
+        source_lock_path,
+        {
+            "schema": "lerobot.sim.so101_public_candidate_source_lock.v1",
+            "status": "candidate_source_lock_ready_for_review",
+            "model_authority": "candidate_source_lock_not_authority",
+            "ready_for_review": True,
+            "notes": [
+                "Synthetic matrix handoff only; not reviewed physical SO-101 truth."
+            ],
+        },
+    )
+    write_json(
+        direct_manifest_path,
+        {
+            "schema": "lerobot.sim.so101_public_candidate_review_manifest_template.v1",
+            "status": "template_ready_for_operator_review",
+            "model_authority": "template_not_authority",
+        },
+    )
+    write_json(
+        matrix_summary_path,
+        {
+            "schema": "lerobot.sim.so101_public_candidate_intake_matrix.v1",
+            "status": "ok",
+            "model_authority": "public_candidate_intake_matrix_not_authority",
+        },
+    )
+    return {
+        "summary_path": str(matrix_summary_path),
+        "status": "ok",
+        "candidate_intake_checked": {
+            "candidate_source_lock_status": "candidate_source_lock_ready_for_review",
+            "candidate_source_lock_model_authority": (
+                "candidate_source_lock_not_authority"
+            ),
+            "candidate_source_lock_ready_for_review": True,
+            "direct_manifest_path": str(direct_manifest_path),
+        },
+        "child_records": [
+            {
+                "case_id": "candidate_intake_checked",
+                "artifacts": {
+                    "candidate_source_lock_json": str(source_lock_path),
+                    "direct_manifest_template_json": str(direct_manifest_path),
+                },
+            }
+        ],
+    }
 
 
 def source_ready_missing_selected_path(summary_path: Path, model_path: Path) -> dict[str, Any]:
@@ -621,6 +683,41 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "consistency_status": "not_checked_prerequisites_not_ready",
                 "consistency_ready": False,
                 "development_fixture": True,
+                "blockers_contain": [
+                    "scan_or_supply_so101_model_source_root",
+                    "supply_reviewed_so101_model_bundle_manifest",
+                    "load_reviewed_model_in_mujoco",
+                ],
+                "actions_contain": [
+                    "scan_or_supply_so101_model_source_root",
+                    "supply_reviewed_so101_model_bundle_manifest",
+                    "load_reviewed_model_in_mujoco",
+                ],
+                "blocked_prior_contains": [
+                    "source_bundle_consistency",
+                    "physical_reviewed_mujoco_motion_checked",
+                ],
+            },
+        },
+        {
+            "case_id": "public_candidate_source_lock_handoff_source_missing",
+            "source": source_missing(summary_dir / "source_missing.json"),
+            "bundle": bundle_missing(summary_dir / "bundle_missing.json"),
+            "motion": motion_missing(summary_dir / "motion_missing.json"),
+            "public_candidate": public_candidate_source_lock_ready(output_dir),
+            "expect": {
+                "ready": False,
+                "consistency_status": "not_checked_prerequisites_not_ready",
+                "consistency_ready": False,
+                "development_fixture": True,
+                "public_candidate_source_lock_ready_for_review": True,
+                "public_candidate_source_lock_status": (
+                    "candidate_source_lock_ready_for_review"
+                ),
+                "public_candidate_source_lock_model_authority": (
+                    "candidate_source_lock_not_authority"
+                ),
+                "public_candidate_source_lock_paths_present": True,
                 "blockers_contain": [
                     "scan_or_supply_so101_model_source_root",
                     "supply_reviewed_so101_model_bundle_manifest",
@@ -1637,6 +1734,7 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         spec["source"],
         spec["bundle"],
         spec["motion"],
+        spec.get("public_candidate"),
     )
     gate_summary_path = case_dir / "so101_reviewed_model_authority_gate_summary.json"
     blocker_packet = so101_reviewed_model_authority_blocker_packet(
@@ -1706,6 +1804,66 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         gate.get("ready_for_policy_training"),
         False,
     )
+    source_lock_handoff = gate.get("public_candidate_source_lock_handoff")
+    source_lock_handoff = (
+        source_lock_handoff if isinstance(source_lock_handoff, dict) else {}
+    )
+    if "public_candidate_source_lock_ready_for_review" in expect:
+        add_error(
+            errors,
+            "public_candidate_source_lock_ready_for_review",
+            gate.get("public_candidate_source_lock_ready_for_review"),
+            expect["public_candidate_source_lock_ready_for_review"],
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.ready_for_review",
+            source_lock_handoff.get("ready_for_review"),
+            expect["public_candidate_source_lock_ready_for_review"],
+        )
+    if "public_candidate_source_lock_status" in expect:
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.status",
+            source_lock_handoff.get("status"),
+            expect["public_candidate_source_lock_status"],
+        )
+    if "public_candidate_source_lock_model_authority" in expect:
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.model_authority",
+            source_lock_handoff.get("model_authority"),
+            expect["public_candidate_source_lock_model_authority"],
+        )
+    if expect.get("public_candidate_source_lock_paths_present"):
+        for path_field in (
+            "source_lock_json_path",
+            "review_manifest_template_path",
+            "candidate_intake_matrix_summary_path",
+        ):
+            value = source_lock_handoff.get(path_field)
+            if not isinstance(value, str) or not Path(value).is_file():
+                errors.append(
+                    f"public_candidate_source_lock_handoff.{path_field}: expected file path, got {value!r}"
+                )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.physical_so101_authority_ready",
+            source_lock_handoff.get("physical_so101_authority_ready"),
+            False,
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.ready_for_model_backed_ik",
+            source_lock_handoff.get("ready_for_model_backed_ik"),
+            False,
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.ready_for_policy_training",
+            source_lock_handoff.get("ready_for_policy_training"),
+            False,
+        )
     add_error(
         errors,
         "source_bundle_consistency_status",
@@ -2340,6 +2498,25 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         gate_artifacts.get("ready_does_not_imply_policy_training_ready"),
         True,
     )
+    if "public_candidate_source_lock_ready_for_review" in expect:
+        add_error(
+            errors,
+            "artifact_public_candidate_source_lock_ready_for_review",
+            gate_artifacts.get("public_candidate_source_lock_ready_for_review"),
+            expect["public_candidate_source_lock_ready_for_review"],
+        )
+        add_error(
+            errors,
+            "artifact_public_candidate_source_lock_json_path",
+            gate_artifacts.get("public_candidate_source_lock_json_path"),
+            source_lock_handoff.get("source_lock_json_path"),
+        )
+        add_error(
+            errors,
+            "artifact_public_candidate_review_manifest_template_path",
+            gate_artifacts.get("public_candidate_review_manifest_template_path"),
+            source_lock_handoff.get("review_manifest_template_path"),
+        )
     add_error(
         errors,
         "artifact_policy_training_authority_boundary",
@@ -2584,6 +2761,10 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
     source_bundle_item = (
         source_bundle_item if isinstance(source_bundle_item, dict) else {}
     )
+    source_lock_handoff = gate.get("public_candidate_source_lock_handoff")
+    source_lock_handoff = (
+        source_lock_handoff if isinstance(source_lock_handoff, dict) else {}
+    )
     motion_item = case.get("blocker_motion_item")
     motion_item = motion_item if isinstance(motion_item, dict) else {}
     return {
@@ -2802,6 +2983,19 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "blocker_reviewed_mujoco_motion_model_observed_sha256": motion_item.get(
             "reviewed_mujoco_motion_model_observed_sha256"
+        ),
+        "public_candidate_source_lock_status": source_lock_handoff.get("status"),
+        "public_candidate_source_lock_ready_for_review": source_lock_handoff.get(
+            "ready_for_review"
+        ),
+        "public_candidate_source_lock_json_path": source_lock_handoff.get(
+            "source_lock_json_path"
+        ),
+        "public_candidate_review_manifest_template_path": source_lock_handoff.get(
+            "review_manifest_template_path"
+        ),
+        "public_candidate_source_lock_model_authority": source_lock_handoff.get(
+            "model_authority"
         ),
         "checklist_status_by_requirement_id": case.get(
             "checklist_status_by_requirement_id"

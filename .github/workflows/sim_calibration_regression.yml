@@ -1010,6 +1010,7 @@ jobs:
           assert summary["openai_skipped"] is True, summary
           assert summary["case_ids"] == [
               "source_missing_bundle_missing_motion_missing",
+              "public_candidate_source_lock_handoff_source_missing",
               "source_ready_bundle_missing",
               "source_missing_physical_bundle_ready",
               "source_ready_with_stale_blocker_physical_bundle_ready",
@@ -1067,6 +1068,23 @@ jobs:
               assert boundary["blocks_serious_policy_training_until_ready"] == packet["blocks_serious_policy_training_until_ready"], case
               assert boundary["ready_does_not_imply_policy_training_ready"] is True, case
               assert case["checklist_status_by_requirement_id"]["serious_policy_training_boundary"] == "ok", case
+          source_lock_case = by_case["public_candidate_source_lock_handoff_source_missing"]
+          source_lock_gate = source_lock_case["gate"]
+          source_lock_handoff = source_lock_gate["public_candidate_source_lock_handoff"]
+          assert source_lock_gate["ready"] is False, source_lock_gate
+          assert source_lock_gate["model_authority"] == "reviewed_model_authority_gate_not_authority", source_lock_gate
+          assert source_lock_gate["public_candidate_source_lock_ready_for_review"] is True, source_lock_gate
+          assert source_lock_handoff["status"] == "candidate_source_lock_ready_for_review", source_lock_handoff
+          assert source_lock_handoff["model_authority"] == "candidate_source_lock_not_authority", source_lock_handoff
+          assert source_lock_handoff["physical_so101_authority_ready"] is False, source_lock_handoff
+          assert source_lock_handoff["ready_for_model_backed_ik"] is False, source_lock_handoff
+          assert source_lock_handoff["ready_for_policy_training"] is False, source_lock_handoff
+          assert Path(source_lock_handoff["source_lock_json_path"]).is_file(), source_lock_handoff
+          assert Path(source_lock_handoff["review_manifest_template_path"]).is_file(), source_lock_handoff
+          assert Path(source_lock_handoff["candidate_intake_matrix_summary_path"]).is_file(), source_lock_handoff
+          assert source_lock_case["gate_artifacts"]["public_candidate_source_lock_ready_for_review"] is True, source_lock_case
+          assert source_lock_case["gate_artifacts"]["public_candidate_source_lock_json_path"] == source_lock_handoff["source_lock_json_path"], source_lock_case
+          assert source_lock_case["gate_artifacts"]["public_candidate_review_manifest_template_path"] == source_lock_handoff["review_manifest_template_path"], source_lock_case
           stale_source_case = by_case["source_ready_with_stale_blocker_physical_bundle_ready"]
           stale_source = stale_source_case["gate"]
           assert stale_source["ready"] is False, stale_source
