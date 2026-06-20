@@ -77,7 +77,8 @@ declared/observed SHA-256 evidence, plus
 `mujoco_motion_inputs.mujoco_joint_limit_enablement` with
 `status: "so101_mujoco_joints_limited"` and no missing limited SO-101 joints.
 Fixture motion, incomplete ready payloads, forged ready flags, missing
-downstream gate entries, missing model-identity evidence,
+downstream gate entries, missing model-identity evidence, missing declared or
+observed reviewed model SHA-256 values, mismatched reviewed model hashes,
 missing/enforced joint-limit evidence, mismatched handoff `next_required_action_ids`
 versus action IDs derived from `next_required_for_goal`, or handoffs that
 point the next downstream gate away from `mujoco_scene_validity` or claim
@@ -105,8 +106,8 @@ and non-positive max-step cases, fail-closed required handoff cases for
 not-ready, fixture-only, forged-ready, and incomplete-ready handoffs, ready
 handoffs with open review work, and ready
 handoffs that claim authority/physical SO-101 truth, drift explicit handoff
-action IDs from `next_required_for_goal`, omit enforced SO-101
-truth or policy-training authority, omit enforced SO-101 joint-limit evidence,
+action IDs from `next_required_for_goal`, omit enforced SO-101 model identity
+hash evidence, omit enforced SO-101 joint-limit evidence,
 or drift the next downstream gate away from
 `mujoco_scene_validity`, plus valid optional and required ready-handoff intake
 cases that still keep the generated scene development-only,

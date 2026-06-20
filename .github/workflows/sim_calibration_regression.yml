@@ -1774,6 +1774,9 @@ jobs:
               "ready_handoff_missing_scene_gate_rejected",
               "ready_handoff_wrong_next_downstream_gate_rejected",
               "ready_handoff_missing_model_identity_rejected",
+              "ready_handoff_missing_declared_model_sha_rejected",
+              "ready_handoff_missing_observed_model_sha_rejected",
+              "ready_handoff_mismatched_model_sha_rejected",
               "ready_handoff_unlimited_joint_rejected",
               "required_ready_handoff_intake_still_development_scene",
               "ready_handoff_intake_still_development_scene",
@@ -1820,6 +1823,9 @@ jobs:
               "ready_handoff_missing_scene_gate_rejected",
               "ready_handoff_wrong_next_downstream_gate_rejected",
               "ready_handoff_missing_model_identity_rejected",
+              "ready_handoff_missing_declared_model_sha_rejected",
+              "ready_handoff_missing_observed_model_sha_rejected",
+              "ready_handoff_mismatched_model_sha_rejected",
               "ready_handoff_unlimited_joint_rejected",
           }
           by_case = {case["case_id"]: case for case in summary["cases"]}
@@ -1932,6 +1938,37 @@ jobs:
           assert missing_model_identity_handoff["reviewed_mujoco_handoff_ready"] is False, missing_model_identity_handoff
           assert missing_model_identity_handoff["reviewed_mujoco_handoff_model_identity_contract_ok"] is False, missing_model_identity_handoff
           assert "provide_reviewed_mujoco_model_identity_evidence" in missing_model_identity_handoff["reviewed_mujoco_handoff_blockers"], missing_model_identity_handoff
+          missing_declared_sha_handoff = by_case["ready_handoff_missing_declared_model_sha_rejected"]["observations"]
+          assert missing_declared_sha_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", missing_declared_sha_handoff
+          assert missing_declared_sha_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", missing_declared_sha_handoff
+          assert missing_declared_sha_handoff["reviewed_mujoco_handoff_contract_ok"] is False, missing_declared_sha_handoff
+          assert missing_declared_sha_handoff["reviewed_mujoco_handoff_ready"] is False, missing_declared_sha_handoff
+          assert missing_declared_sha_handoff["reviewed_mujoco_handoff_model_identity_contract_ok"] is False, missing_declared_sha_handoff
+          assert missing_declared_sha_handoff["reviewed_mujoco_handoff_declared_model_sha256"] is None, missing_declared_sha_handoff
+          assert missing_declared_sha_handoff["reviewed_mujoco_handoff_observed_model_sha256"] == "a" * 64, missing_declared_sha_handoff
+          assert "provide_reviewed_mujoco_declared_model_sha256" in missing_declared_sha_handoff["reviewed_mujoco_handoff_blockers"], missing_declared_sha_handoff
+          assert "provide_reviewed_mujoco_model_identity_evidence" in missing_declared_sha_handoff["reviewed_mujoco_handoff_blockers"], missing_declared_sha_handoff
+          missing_observed_sha_handoff = by_case["ready_handoff_missing_observed_model_sha_rejected"]["observations"]
+          assert missing_observed_sha_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", missing_observed_sha_handoff
+          assert missing_observed_sha_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", missing_observed_sha_handoff
+          assert missing_observed_sha_handoff["reviewed_mujoco_handoff_contract_ok"] is False, missing_observed_sha_handoff
+          assert missing_observed_sha_handoff["reviewed_mujoco_handoff_ready"] is False, missing_observed_sha_handoff
+          assert missing_observed_sha_handoff["reviewed_mujoco_handoff_model_identity_contract_ok"] is False, missing_observed_sha_handoff
+          assert missing_observed_sha_handoff["reviewed_mujoco_handoff_declared_model_sha256"] == "a" * 64, missing_observed_sha_handoff
+          assert missing_observed_sha_handoff["reviewed_mujoco_handoff_observed_model_sha256"] is None, missing_observed_sha_handoff
+          assert "provide_reviewed_mujoco_observed_model_sha256" in missing_observed_sha_handoff["reviewed_mujoco_handoff_blockers"], missing_observed_sha_handoff
+          assert "provide_reviewed_mujoco_model_identity_evidence" in missing_observed_sha_handoff["reviewed_mujoco_handoff_blockers"], missing_observed_sha_handoff
+          mismatched_sha_handoff = by_case["ready_handoff_mismatched_model_sha_rejected"]["observations"]
+          assert mismatched_sha_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", mismatched_sha_handoff
+          assert mismatched_sha_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", mismatched_sha_handoff
+          assert mismatched_sha_handoff["reviewed_mujoco_handoff_contract_ok"] is False, mismatched_sha_handoff
+          assert mismatched_sha_handoff["reviewed_mujoco_handoff_ready"] is False, mismatched_sha_handoff
+          assert mismatched_sha_handoff["reviewed_mujoco_handoff_model_identity_contract_ok"] is False, mismatched_sha_handoff
+          assert mismatched_sha_handoff["reviewed_mujoco_handoff_model_identity_matches"] is False, mismatched_sha_handoff
+          assert mismatched_sha_handoff["reviewed_mujoco_handoff_declared_model_sha256"] == "a" * 64, mismatched_sha_handoff
+          assert mismatched_sha_handoff["reviewed_mujoco_handoff_observed_model_sha256"] == "b" * 64, mismatched_sha_handoff
+          assert "repair_reviewed_mujoco_model_sha256_mismatch" in mismatched_sha_handoff["reviewed_mujoco_handoff_blockers"], mismatched_sha_handoff
+          assert "provide_reviewed_mujoco_model_identity_evidence" in mismatched_sha_handoff["reviewed_mujoco_handoff_blockers"], mismatched_sha_handoff
           unlimited_joint_handoff = by_case["ready_handoff_unlimited_joint_rejected"]["observations"]
           assert unlimited_joint_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", unlimited_joint_handoff
           assert unlimited_joint_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", unlimited_joint_handoff

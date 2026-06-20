@@ -158,6 +158,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_handoff_model_identity_status",
         "reviewed_mujoco_handoff_model_identity_matches",
         "reviewed_mujoco_handoff_model_path",
+        "reviewed_mujoco_handoff_declared_model_sha256",
+        "reviewed_mujoco_handoff_observed_model_sha256",
         "reviewed_mujoco_handoff_joint_limit_enablement_ok",
         "reviewed_mujoco_handoff_joint_limit_enablement_status",
         "reviewed_mujoco_handoff_missing_limited_joints",
@@ -224,6 +226,9 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
         "ready_wrong_next_downstream_gate",
         "ready_with_action_id_drift",
         "ready_missing_model_identity",
+        "ready_missing_declared_model_sha",
+        "ready_missing_observed_model_sha",
+        "ready_mismatched_model_sha",
         "ready_with_unlimited_joint",
         "schema_mismatch_ready",
     }
@@ -411,6 +416,17 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
             "observed_sha256": None,
             "matches": False,
         }
+    elif state == "ready_missing_declared_model_sha":
+        payload["reviewed_model_declared_sha256"] = None
+        payload["reviewed_model_identity"]["declared_sha256"] = None
+    elif state == "ready_missing_observed_model_sha":
+        payload["reviewed_model_observed_sha256"] = None
+        payload["reviewed_model_identity"]["observed_sha256"] = None
+    elif state == "ready_mismatched_model_sha":
+        payload["reviewed_model_observed_sha256"] = "b" * 64
+        payload["reviewed_model_identity"]["observed_sha256"] = "b" * 64
+        payload["reviewed_model_identity"]["matches"] = False
+        payload["reviewed_model_identity_matches"] = False
     elif state == "ready_with_unlimited_joint":
         enablement = payload["mujoco_motion_inputs"]["mujoco_joint_limit_enablement"]
         enablement["ok"] = False
@@ -698,6 +714,67 @@ def case_specs() -> list[dict[str, Any]]:
             ],
         },
         {
+            "case_id": "ready_handoff_missing_declared_model_sha_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": False,
+            "handoff_state": "ready_missing_declared_model_sha",
+            "require_handoff": True,
+            "expected_status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "expected_handoff_intake_status": "handoff_contract_invalid",
+            "expected_handoff_ready": False,
+            "expected_handoff_contract_ok": False,
+            "expected_handoff_model_identity_contract_ok": False,
+            "expected_handoff_declared_model_sha256": None,
+            "expected_handoff_observed_model_sha256": SYNTHETIC_REVIEWED_MODEL_SHA256,
+            "expected_handoff_blockers_contain": [
+                "provide_reviewed_mujoco_declared_model_sha256",
+                "provide_reviewed_mujoco_model_identity_evidence",
+            ],
+        },
+        {
+            "case_id": "ready_handoff_missing_observed_model_sha_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": False,
+            "handoff_state": "ready_missing_observed_model_sha",
+            "require_handoff": True,
+            "expected_status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "expected_handoff_intake_status": "handoff_contract_invalid",
+            "expected_handoff_ready": False,
+            "expected_handoff_contract_ok": False,
+            "expected_handoff_model_identity_contract_ok": False,
+            "expected_handoff_declared_model_sha256": SYNTHETIC_REVIEWED_MODEL_SHA256,
+            "expected_handoff_observed_model_sha256": None,
+            "expected_handoff_blockers_contain": [
+                "provide_reviewed_mujoco_observed_model_sha256",
+                "provide_reviewed_mujoco_model_identity_evidence",
+            ],
+        },
+        {
+            "case_id": "ready_handoff_mismatched_model_sha_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": False,
+            "handoff_state": "ready_mismatched_model_sha",
+            "require_handoff": True,
+            "expected_status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "expected_handoff_intake_status": "handoff_contract_invalid",
+            "expected_handoff_ready": False,
+            "expected_handoff_contract_ok": False,
+            "expected_handoff_model_identity_contract_ok": False,
+            "expected_handoff_model_identity_matches": False,
+            "expected_handoff_declared_model_sha256": SYNTHETIC_REVIEWED_MODEL_SHA256,
+            "expected_handoff_observed_model_sha256": "b" * 64,
+            "expected_handoff_blockers_contain": [
+                "repair_reviewed_mujoco_model_sha256_mismatch",
+                "provide_reviewed_mujoco_model_identity_evidence",
+            ],
+        },
+        {
             "case_id": "ready_handoff_unlimited_joint_rejected",
             "source_square": "e4",
             "target_square": "e5",
@@ -906,6 +983,12 @@ def summarize_case(
         ),
         "reviewed_mujoco_handoff_model_path": summary.get(
             "reviewed_mujoco_handoff_model_path"
+        ),
+        "reviewed_mujoco_handoff_declared_model_sha256": summary.get(
+            "reviewed_mujoco_handoff_declared_model_sha256"
+        ),
+        "reviewed_mujoco_handoff_observed_model_sha256": summary.get(
+            "reviewed_mujoco_handoff_observed_model_sha256"
         ),
         "reviewed_mujoco_handoff_joint_limit_enablement_ok": summary.get(
             "reviewed_mujoco_handoff_joint_limit_enablement_ok"
@@ -1253,6 +1336,9 @@ def summarize_case(
                 "ready_wrong_next_downstream_gate",
                 "ready_with_action_id_drift",
                 "ready_missing_model_identity",
+                "ready_missing_declared_model_sha",
+                "ready_missing_observed_model_sha",
+                "ready_mismatched_model_sha",
                 "ready_with_unlimited_joint",
                 "schema_mismatch_ready",
             }
@@ -1347,6 +1433,27 @@ def summarize_case(
             observations["reviewed_mujoco_handoff_model_identity_contract_ok"],
             expected_model_identity_contract_ok,
         )
+        if "expected_handoff_model_identity_matches" in spec:
+            add_error(
+                errors,
+                f"{case_id}.reviewed_mujoco_handoff_model_identity_matches",
+                observations["reviewed_mujoco_handoff_model_identity_matches"],
+                spec["expected_handoff_model_identity_matches"],
+            )
+        if "expected_handoff_declared_model_sha256" in spec:
+            add_error(
+                errors,
+                f"{case_id}.reviewed_mujoco_handoff_declared_model_sha256",
+                observations["reviewed_mujoco_handoff_declared_model_sha256"],
+                spec["expected_handoff_declared_model_sha256"],
+            )
+        if "expected_handoff_observed_model_sha256" in spec:
+            add_error(
+                errors,
+                f"{case_id}.reviewed_mujoco_handoff_observed_model_sha256",
+                observations["reviewed_mujoco_handoff_observed_model_sha256"],
+                spec["expected_handoff_observed_model_sha256"],
+            )
     expect_contains(
         errors,
         f"{case_id}.reviewed_mujoco_handoff_blockers",
@@ -1570,6 +1677,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "reviewed_mujoco_handoff_model_path": observations.get(
             "reviewed_mujoco_handoff_model_path"
+        ),
+        "reviewed_mujoco_handoff_declared_model_sha256": observations.get(
+            "reviewed_mujoco_handoff_declared_model_sha256"
+        ),
+        "reviewed_mujoco_handoff_observed_model_sha256": observations.get(
+            "reviewed_mujoco_handoff_observed_model_sha256"
         ),
         "reviewed_mujoco_handoff_joint_limit_enablement_ok": observations.get(
             "reviewed_mujoco_handoff_joint_limit_enablement_ok"

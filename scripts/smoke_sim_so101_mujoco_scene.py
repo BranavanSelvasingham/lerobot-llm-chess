@@ -589,6 +589,25 @@ def reviewed_handoff_intake(
         blockers.append("sync_reviewed_mujoco_handoff_pending_action_ids")
     if (raw_ready or fixture_ready) and not joint_limit_enablement_ok:
         blockers.append("provide_reviewed_mujoco_joint_limit_enablement_evidence")
+    if (raw_ready or fixture_ready) and not (
+        isinstance(reviewed_model_path, str) and bool(reviewed_model_path)
+    ):
+        blockers.append("provide_reviewed_mujoco_model_path_evidence")
+    if (raw_ready or fixture_ready) and not isinstance(
+        reviewed_model_declared_sha256, str
+    ):
+        blockers.append("provide_reviewed_mujoco_declared_model_sha256")
+    if (raw_ready or fixture_ready) and not isinstance(
+        reviewed_model_observed_sha256, str
+    ):
+        blockers.append("provide_reviewed_mujoco_observed_model_sha256")
+    if (
+        (raw_ready or fixture_ready)
+        and isinstance(reviewed_model_declared_sha256, str)
+        and isinstance(reviewed_model_observed_sha256, str)
+        and reviewed_model_declared_sha256 != reviewed_model_observed_sha256
+    ):
+        blockers.append("repair_reviewed_mujoco_model_sha256_mismatch")
     if (raw_ready or fixture_ready) and not reviewed_model_identity_contract_ok:
         blockers.append("provide_reviewed_mujoco_model_identity_evidence")
     if raw_ready and not physical_ready_contract_ok:
