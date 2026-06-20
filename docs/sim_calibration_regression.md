@@ -480,6 +480,9 @@ decisions so the CSV cannot silently drift from the recorded operator decision.
 The matrix includes an unpinned-ref case (`--upstream-commit main`) and requires
 `candidate_source_lock_ready_for_review: false` until the upstream commit is a
 full immutable SHA.
+It also includes an invalid model-selection case (`--model-relative-path
+README.md`) and requires `candidate_source_lock_ready_for_review: false` unless
+the selected model path is one of the SO101 new/old calibration URDF/MJCF files.
 Operators can record the chosen path without promoting the candidate to
 authority by rerunning the intake with
 `--operator-intake-decision external_pinned_source_root` or

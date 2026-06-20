@@ -98,6 +98,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "present_expected_file_count",
         "missing_expected_relative_paths",
         "model_present",
+        "selected_model_supported",
+        "selected_model_status",
         "model_sha256_observed",
         "model_authority",
         "candidate_review_observations_model_authority",
@@ -246,6 +248,43 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "candidate_intake_invalid_model_selection",
+            "args": [
+                "--source-root",
+                str(complete_root),
+                "--upstream-commit",
+                PINNED_FIXTURE_COMMIT,
+                "--model-relative-path",
+                "README.md",
+            ],
+            "expect": {
+                "status": "candidate_intake_model_selection_invalid",
+                "expected_file_count": len(EXPECTED_RELATIVE_PATHS),
+                "present_expected_file_count": len(EXPECTED_RELATIVE_PATHS),
+                "model_present": True,
+                "selected_model_supported": False,
+                "selected_model_status": "selected_model_not_supported",
+                "parsed_model_file_count": 5,
+                "readme_caveats": {
+                    "base_collision_meshes_removed": True,
+                    "gripper_linear_joint_mapping_not_reflected": True,
+                    "onshape_to_robot_generated": True,
+                    "relative_mesh_paths_declared": True,
+                },
+                "missing_exact": [],
+                "commit_action_present": False,
+                "upstream_commit_sha_valid": True,
+                "upstream_commit_status": "upstream_commit_sha_pinned",
+                "source_lock_status": "candidate_source_lock_incomplete",
+                "source_lock_ready_for_review": False,
+                "operator_plan_status": "candidate_operator_intake_inputs_incomplete",
+                "operator_decision_status": "vendor_or_external_intake_not_declared",
+                "selected_intake_option_id": None,
+                "selected_requirement_count": 0,
+                "selected_requirement_ids": [],
+            },
+        },
+        {
             "case_id": "candidate_intake_unpinned_commit_ref",
             "args": [
                 "--source-root",
@@ -258,6 +297,8 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "expected_file_count": len(EXPECTED_RELATIVE_PATHS),
                 "present_expected_file_count": len(EXPECTED_RELATIVE_PATHS),
                 "model_present": True,
+                "selected_model_supported": True,
+                "selected_model_status": "selectable_so101_model_selected",
                 "parsed_model_file_count": 5,
                 "readme_caveats": {
                     "base_collision_meshes_removed": True,
@@ -269,6 +310,9 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "commit_action_present": True,
                 "upstream_commit_sha_valid": False,
                 "upstream_commit_status": "upstream_commit_not_immutable_sha",
+                "source_lock_status": "candidate_source_lock_incomplete",
+                "source_lock_ready_for_review": False,
+                "operator_plan_status": "candidate_operator_intake_inputs_incomplete",
                 "operator_decision_status": "vendor_or_external_intake_not_declared",
                 "selected_intake_option_id": None,
                 "selected_requirement_count": 0,
@@ -288,6 +332,8 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "expected_file_count": len(EXPECTED_RELATIVE_PATHS),
                 "present_expected_file_count": len(EXPECTED_RELATIVE_PATHS),
                 "model_present": True,
+                "selected_model_supported": True,
+                "selected_model_status": "selectable_so101_model_selected",
                 "parsed_model_file_count": 5,
                 "readme_caveats": {
                     "base_collision_meshes_removed": True,
@@ -299,6 +345,9 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "commit_action_present": False,
                 "upstream_commit_sha_valid": True,
                 "upstream_commit_status": "upstream_commit_sha_pinned",
+                "source_lock_status": "candidate_source_lock_ready_for_review",
+                "source_lock_ready_for_review": True,
+                "operator_plan_status": "candidate_locked_operator_decision_required",
                 "operator_decision_status": "vendor_or_external_intake_not_declared",
                 "selected_intake_option_id": None,
                 "selected_requirement_count": 0,
@@ -320,6 +369,8 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "expected_file_count": len(EXPECTED_RELATIVE_PATHS),
                 "present_expected_file_count": len(EXPECTED_RELATIVE_PATHS),
                 "model_present": True,
+                "selected_model_supported": True,
+                "selected_model_status": "selectable_so101_model_selected",
                 "parsed_model_file_count": 5,
                 "readme_caveats": {
                     "base_collision_meshes_removed": True,
@@ -331,6 +382,9 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "commit_action_present": False,
                 "upstream_commit_sha_valid": True,
                 "upstream_commit_status": "upstream_commit_sha_pinned",
+                "source_lock_status": "candidate_source_lock_ready_for_review",
+                "source_lock_ready_for_review": True,
+                "operator_plan_status": "candidate_locked_operator_decision_required",
                 "operator_decision_status": "candidate_intake_decision_recorded_not_authority",
                 "selected_intake_option_id": "external_pinned_source_root",
                 "selected_requirement_count": 4,
@@ -357,6 +411,8 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "expected_file_count": len(EXPECTED_RELATIVE_PATHS),
                 "present_expected_file_count": len(EXPECTED_RELATIVE_PATHS),
                 "model_present": True,
+                "selected_model_supported": True,
+                "selected_model_status": "selectable_so101_model_selected",
                 "parsed_model_file_count": 5,
                 "readme_caveats": {
                     "base_collision_meshes_removed": True,
@@ -368,6 +424,9 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "commit_action_present": False,
                 "upstream_commit_sha_valid": True,
                 "upstream_commit_status": "upstream_commit_sha_pinned",
+                "source_lock_status": "candidate_source_lock_ready_for_review",
+                "source_lock_ready_for_review": True,
+                "operator_plan_status": "candidate_locked_operator_decision_required",
                 "operator_decision_status": "candidate_intake_decision_recorded_not_authority",
                 "selected_intake_option_id": "vendor_locked_bundle",
                 "selected_requirement_count": 5,
@@ -513,6 +572,25 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "model_present",
     ):
         check(key, summary.get(key), expect[key])
+    expected_selected_model_supported = expect.get("selected_model_supported", True)
+    expected_selected_model_status = expect.get("selected_model_status")
+    if expected_selected_model_status is None:
+        if not expect["model_present"]:
+            expected_selected_model_status = "selected_model_missing"
+        elif expected_selected_model_supported:
+            expected_selected_model_status = "selectable_so101_model_selected"
+        else:
+            expected_selected_model_status = "selected_model_not_supported"
+    check(
+        "selected_model_supported",
+        summary.get("selected_model_supported"),
+        expected_selected_model_supported,
+    )
+    check(
+        "selected_model_status",
+        summary.get("selected_model_status"),
+        expected_selected_model_status,
+    )
 
     check("model_authority", summary.get("model_authority"), "public_candidate_intake_not_authority")
     check(
@@ -612,12 +690,25 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         )
     source_lock = summary.get("candidate_source_lock")
     source_lock = source_lock if isinstance(source_lock, dict) else {}
-    expected_source_lock_status = (
-        "candidate_source_lock_ready_for_review"
-        if expect["model_present"] and not missing_paths and commit_action_present is False
-        else "candidate_source_lock_incomplete"
+    expected_source_lock_ready = bool(
+        expect.get(
+            "source_lock_ready_for_review",
+            (
+                expect["model_present"]
+                and expected_selected_model_supported
+                and not missing_paths
+                and commit_action_present is False
+            ),
+        )
     )
-    expected_source_lock_ready = expected_source_lock_status == "candidate_source_lock_ready_for_review"
+    expected_source_lock_status = expect.get(
+        "source_lock_status",
+        (
+            "candidate_source_lock_ready_for_review"
+            if expected_source_lock_ready
+            else "candidate_source_lock_incomplete"
+        ),
+    )
     if summary.get("candidate_source_lock_model_authority") != "candidate_source_lock_not_authority":
         errors.append(f"{case_id}.candidate_source_lock_model_authority invalid")
     if source_lock.get("model_authority") != "candidate_source_lock_not_authority":
@@ -640,6 +731,13 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         selected_model = selected_model if isinstance(selected_model, dict) else {}
         if selected_model.get("sha256") != summary.get("model_sha256_observed"):
             errors.append(f"{case_id}.candidate_source_lock selected model digest mismatch")
+    elif expect["model_present"] and not expected_selected_model_supported:
+        missing_inputs = source_lock.get("missing_inputs")
+        missing_inputs = missing_inputs if isinstance(missing_inputs, list) else []
+        if "selectable_so101_model_path" not in missing_inputs:
+            errors.append(
+                f"{case_id}.candidate_source_lock missing selectable model diagnostic"
+            )
     operator_plan = summary.get("candidate_operator_intake_plan")
     operator_plan = operator_plan if isinstance(operator_plan, dict) else {}
     if (
@@ -721,10 +819,13 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         errors.append(f"{case_id}.candidate_operator_intake_plan.ready_for_policy_training not false")
     if operator_plan.get("observed_evidence_is_physical_so101_authority") is not False:
         errors.append(f"{case_id}.candidate_operator_intake_plan physical authority not false")
-    expected_operator_plan_status = (
-        "candidate_locked_operator_decision_required"
-        if expected_source_lock_ready
-        else "candidate_operator_intake_inputs_incomplete"
+    expected_operator_plan_status = expect.get(
+        "operator_plan_status",
+        (
+            "candidate_locked_operator_decision_required"
+            if expected_source_lock_ready
+            else "candidate_operator_intake_inputs_incomplete"
+        ),
     )
     if operator_plan.get("status") != expected_operator_plan_status:
         errors.append(
@@ -765,8 +866,16 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         )
     manifest_template = seeded_template.get("manifest_template")
     manifest_template = manifest_template if isinstance(manifest_template, dict) else {}
-    if expect["model_present"] and manifest_template.get("model_path") != summary.get("model_path"):
+    if (
+        expect["model_present"]
+        and expected_selected_model_supported
+        and manifest_template.get("model_path") != summary.get("model_path")
+    ):
         errors.append(f"{case_id}.candidate_seeded_review_manifest_template.model_path not seeded")
+    if not expected_selected_model_supported and manifest_template.get("model_path") == summary.get("model_path"):
+        errors.append(
+            f"{case_id}.candidate_seeded_review_manifest_template seeded unsupported model_path"
+        )
     if manifest_template.get("model_sha256") != "<copy-reviewed-sha256-after-review>":
         errors.append(f"{case_id}.candidate_seeded_review_manifest_template.model_sha256 not placeholder")
     authority = manifest_template.get("authority")
@@ -884,6 +993,8 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "present_expected_file_count": summary.get("present_expected_file_count"),
         "missing_expected_relative_paths": missing_paths,
         "model_present": summary.get("model_present"),
+        "selected_model_supported": summary.get("selected_model_supported"),
+        "selected_model_status": summary.get("selected_model_status"),
         "model_sha256_observed": summary.get("model_sha256_observed"),
         "model_authority": summary.get("model_authority"),
         "candidate_review_observations_model_authority": summary.get(

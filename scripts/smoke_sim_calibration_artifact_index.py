@@ -3235,6 +3235,14 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
     unpinned_commit_case = (
         unpinned_commit_case if isinstance(unpinned_commit_case, dict) else {}
     )
+    invalid_model_selection_case = matrix.get(
+        "candidate_intake_invalid_model_selection"
+    )
+    invalid_model_selection_case = (
+        invalid_model_selection_case
+        if isinstance(invalid_model_selection_case, dict)
+        else {}
+    )
     external_decision_case = matrix.get("candidate_intake_checked_external_decision")
     external_decision_case = (
         external_decision_case if isinstance(external_decision_case, dict) else {}
@@ -3269,6 +3277,12 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "recorded_operator_intake_decision_options": recorded_decision_options,
         "candidate_intake_checked_status": checked_case.get("status"),
         "candidate_intake_checked_model_present": checked_case.get("model_present"),
+        "candidate_intake_checked_selected_model_supported": checked_case.get(
+            "selected_model_supported"
+        ),
+        "candidate_intake_checked_selected_model_status": checked_case.get(
+            "selected_model_status"
+        ),
         "candidate_intake_checked_review_checklist_row_count": checked_case.get(
             "candidate_review_checklist_row_count"
         ),
@@ -3316,6 +3330,32 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         ),
         "candidate_intake_unpinned_commit_ref_operator_intake_decision_status": (
             unpinned_commit_case.get("candidate_operator_intake_decision_status")
+        ),
+        "candidate_intake_invalid_model_selection_status": (
+            invalid_model_selection_case.get("status")
+        ),
+        "candidate_intake_invalid_model_selection_model_present": (
+            invalid_model_selection_case.get("model_present")
+        ),
+        "candidate_intake_invalid_model_selection_selected_model_supported": (
+            invalid_model_selection_case.get("selected_model_supported")
+        ),
+        "candidate_intake_invalid_model_selection_selected_model_status": (
+            invalid_model_selection_case.get("selected_model_status")
+        ),
+        "candidate_intake_invalid_model_selection_source_lock_status": (
+            invalid_model_selection_case.get("candidate_source_lock_status")
+        ),
+        "candidate_intake_invalid_model_selection_source_lock_ready_for_review": (
+            invalid_model_selection_case.get("candidate_source_lock_ready_for_review")
+        ),
+        "candidate_intake_invalid_model_selection_operator_intake_plan_status": (
+            invalid_model_selection_case.get("candidate_operator_intake_plan_status")
+        ),
+        "candidate_intake_invalid_model_selection_operator_intake_decision_status": (
+            invalid_model_selection_case.get(
+                "candidate_operator_intake_decision_status"
+            )
         ),
         "candidate_intake_checked_operator_intake_plan_model_authority": checked_case.get(
             "candidate_operator_intake_plan_model_authority"
@@ -3592,6 +3632,7 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "failed_case_ids": metrics["failed_case_ids"],
         "candidate_intake_checked": checked_case,
         "candidate_intake_unpinned_commit_ref": unpinned_commit_case,
+        "candidate_intake_invalid_model_selection": invalid_model_selection_case,
     }
 
 

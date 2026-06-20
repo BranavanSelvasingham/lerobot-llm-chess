@@ -3994,6 +3994,15 @@ def so101_public_candidate_intake_matrix_section(
         ),
         {},
     )
+    invalid_model_selection_case = next(
+        (
+            case
+            for case in cases
+            if isinstance(case, dict)
+            and case.get("case_id") == "candidate_intake_invalid_model_selection"
+        ),
+        {},
+    )
     external_decision_case = next(
         (
             case
@@ -4057,6 +4066,12 @@ def so101_public_candidate_intake_matrix_section(
         return {
             "status": case.get("status") if isinstance(case, dict) else None,
             "model_present": case.get("model_present") if isinstance(case, dict) else None,
+            "selected_model_supported": case.get("selected_model_supported")
+            if isinstance(case, dict)
+            else None,
+            "selected_model_status": case.get("selected_model_status")
+            if isinstance(case, dict)
+            else None,
             "candidate_source_lock_ready_for_review": case.get(
                 "candidate_source_lock_ready_for_review"
             )
@@ -4176,6 +4191,12 @@ def so101_public_candidate_intake_matrix_section(
         "candidate_intake_checked": {
             "status": checked_case.get("status") if isinstance(checked_case, dict) else None,
             "model_present": checked_case.get("model_present")
+            if isinstance(checked_case, dict)
+            else None,
+            "selected_model_supported": checked_case.get("selected_model_supported")
+            if isinstance(checked_case, dict)
+            else None,
+            "selected_model_status": checked_case.get("selected_model_status")
             if isinstance(checked_case, dict)
             else None,
             "present_expected_file_count": checked_case.get("present_expected_file_count")
@@ -4332,6 +4353,59 @@ def so101_public_candidate_intake_matrix_section(
                 "observed_evidence_is_physical_so101_authority"
             )
             if isinstance(unpinned_commit_case, dict)
+            else None,
+        },
+        "candidate_intake_invalid_model_selection": {
+            "status": invalid_model_selection_case.get("status")
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "model_present": invalid_model_selection_case.get("model_present")
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "selected_model_supported": invalid_model_selection_case.get(
+                "selected_model_supported"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "selected_model_status": invalid_model_selection_case.get(
+                "selected_model_status"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "model_sha256_observed": invalid_model_selection_case.get(
+                "model_sha256_observed"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_status": invalid_model_selection_case.get(
+                "candidate_source_lock_status"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_ready_for_review": invalid_model_selection_case.get(
+                "candidate_source_lock_ready_for_review"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_operator_intake_plan_status": invalid_model_selection_case.get(
+                "candidate_operator_intake_plan_status"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_operator_intake_decision_status": invalid_model_selection_case.get(
+                "candidate_operator_intake_decision_status"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "ready_for_model_backed_ik": invalid_model_selection_case.get(
+                "ready_for_model_backed_ik"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "observed_evidence_is_physical_so101_authority": invalid_model_selection_case.get(
+                "observed_evidence_is_physical_so101_authority"
+            )
+            if isinstance(invalid_model_selection_case, dict)
             else None,
         },
         "candidate_intake_checked_external_decision": {

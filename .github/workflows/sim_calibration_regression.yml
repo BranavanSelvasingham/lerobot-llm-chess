@@ -374,6 +374,7 @@ jobs:
               "source_root_not_supplied",
               "source_root_unavailable",
               "candidate_intake_incomplete",
+              "candidate_intake_invalid_model_selection",
               "candidate_intake_unpinned_commit_ref",
               "candidate_intake_checked",
               "candidate_intake_checked_external_decision",
@@ -405,6 +406,18 @@ jobs:
           assert incomplete["seeded_template_manifest_checker_physical_ready"] is False, incomplete
           assert "model_sha256" in incomplete["seeded_template_manifest_checker_missing_inputs"], incomplete
           assert "authority" in incomplete["seeded_template_manifest_checker_missing_inputs"], incomplete
+          invalid_model = by_case["candidate_intake_invalid_model_selection"]
+          assert invalid_model["status"] == "candidate_intake_model_selection_invalid", invalid_model
+          assert invalid_model["missing_expected_relative_paths"] == [], invalid_model
+          assert invalid_model["model_present"] is True, invalid_model
+          assert invalid_model["selected_model_supported"] is False, invalid_model
+          assert invalid_model["selected_model_status"] == "selected_model_not_supported", invalid_model
+          assert invalid_model["candidate_source_lock_status"] == "candidate_source_lock_incomplete", invalid_model
+          assert invalid_model["candidate_source_lock_ready_for_review"] is False, invalid_model
+          assert invalid_model["candidate_operator_intake_plan_status"] == "candidate_operator_intake_inputs_incomplete", invalid_model
+          assert invalid_model["candidate_operator_intake_decision_status"] == "vendor_or_external_intake_not_declared", invalid_model
+          assert invalid_model["ready_for_model_backed_ik"] is False, invalid_model
+          assert invalid_model["observed_evidence_is_physical_so101_authority"] is False, invalid_model
           unpinned_ref = by_case["candidate_intake_unpinned_commit_ref"]
           assert unpinned_ref["status"] == "candidate_intake_checked", unpinned_ref
           assert unpinned_ref["missing_expected_relative_paths"] == [], unpinned_ref
@@ -423,6 +436,8 @@ jobs:
           assert complete["status"] == "candidate_intake_checked", complete
           assert complete["missing_expected_relative_paths"] == [], complete
           assert complete["model_present"] is True, complete
+          assert complete["selected_model_supported"] is True, complete
+          assert complete["selected_model_status"] == "selectable_so101_model_selected", complete
           assert complete["model_sha256_observed"], complete
           assert complete["upstream_commit_sha_valid"] is True, complete
           assert complete["upstream_commit_status"] == "upstream_commit_sha_pinned", complete
@@ -4930,7 +4945,8 @@ jobs:
               row.get("label") == "so101_public_candidate_intake_matrix:summary"
               and row.get("kind") == "json"
               and row.get("exists") is True
-              and row.get("metrics", {}).get("case_count") == 7
+              and row.get("metrics", {}).get("case_count") == 8
+              and "candidate_intake_invalid_model_selection" in row.get("metrics", {}).get("case_ids", [])
               and "candidate_intake_unpinned_commit_ref" in row.get("metrics", {}).get("case_ids", [])
               and "candidate_intake_checked_external_decision" in row.get("metrics", {}).get("case_ids", [])
               and "candidate_intake_checked_vendor_decision" in row.get("metrics", {}).get("case_ids", [])
@@ -4949,9 +4965,19 @@ jobs:
               assert metrics.get("ready_for_model_backed_ik") is False, metrics
               assert metrics.get("ready_for_policy_training") is False, metrics
               assert metrics.get("candidate_intake_checked_operator_intake_plan_model_authority") == "candidate_operator_intake_plan_not_authority", metrics
+              assert metrics.get("candidate_intake_checked_selected_model_supported") is True, metrics
+              assert metrics.get("candidate_intake_checked_selected_model_status") == "selectable_so101_model_selected", metrics
               assert metrics.get("candidate_intake_checked_upstream_commit_sha_valid") is True, metrics
               assert metrics.get("candidate_intake_checked_upstream_commit_status") == "upstream_commit_sha_pinned", metrics
               assert metrics.get("candidate_intake_checked_operator_intake_decision_status") == "vendor_or_external_intake_not_declared", metrics
+              assert metrics.get("candidate_intake_invalid_model_selection_status") == "candidate_intake_model_selection_invalid", metrics
+              assert metrics.get("candidate_intake_invalid_model_selection_model_present") is True, metrics
+              assert metrics.get("candidate_intake_invalid_model_selection_selected_model_supported") is False, metrics
+              assert metrics.get("candidate_intake_invalid_model_selection_selected_model_status") == "selected_model_not_supported", metrics
+              assert metrics.get("candidate_intake_invalid_model_selection_source_lock_status") == "candidate_source_lock_incomplete", metrics
+              assert metrics.get("candidate_intake_invalid_model_selection_source_lock_ready_for_review") is False, metrics
+              assert metrics.get("candidate_intake_invalid_model_selection_operator_intake_plan_status") == "candidate_operator_intake_inputs_incomplete", metrics
+              assert metrics.get("candidate_intake_invalid_model_selection_operator_intake_decision_status") == "vendor_or_external_intake_not_declared", metrics
               assert metrics.get("candidate_intake_unpinned_commit_ref_status") == "candidate_intake_checked", metrics
               assert metrics.get("candidate_intake_unpinned_commit_ref_model_present") is True, metrics
               assert metrics.get("candidate_intake_unpinned_commit_ref_upstream_commit") == "main", metrics

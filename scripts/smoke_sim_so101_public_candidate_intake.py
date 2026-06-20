@@ -73,6 +73,12 @@ MODEL_RELATIVE_PATHS = (
     "so101_old_calib.urdf",
     "so101_old_calib.xml",
 )
+SELECTABLE_MODEL_RELATIVE_PATHS = (
+    "so101_new_calib.urdf",
+    "so101_new_calib.xml",
+    "so101_old_calib.urdf",
+    "so101_old_calib.xml",
+)
 REVIEW_CHECKLIST_FIELDNAMES = (
     "priority",
     "action_id",
@@ -370,6 +376,8 @@ def candidate_source_lock(summary: dict[str, Any]) -> dict[str, Any]:
     upstream_commit_supplied = bool(upstream.get("commit_supplied"))
     upstream_commit_sha_valid = upstream.get("commit_sha_valid") is True
     model_present = summary.get("model_present") is True
+    selected_model_supported = summary.get("selected_model_supported") is True
+    selected_model_supported = summary.get("selected_model_supported") is True
     model_sha_supplied = bool(summary.get("model_sha256_observed"))
     expected_count = int(summary.get("expected_file_count") or 0)
     present_expected = int(summary.get("present_expected_file_count") or 0)
@@ -377,6 +385,7 @@ def candidate_source_lock(summary: dict[str, Any]) -> dict[str, Any]:
     source_lock_ready_for_review = (
         upstream_commit_sha_valid
         and model_present
+        and selected_model_supported
         and model_sha_supplied
         and complete_expected
     )
@@ -389,6 +398,8 @@ def candidate_source_lock(summary: dict[str, Any]) -> dict[str, Any]:
         missing_inputs.append("expected_file_digest_lock")
     if not model_present:
         missing_inputs.append("selected_model_path")
+    elif not selected_model_supported:
+        missing_inputs.append("selectable_so101_model_path")
     if not model_sha_supplied:
         missing_inputs.append("selected_model_sha256")
     return {
@@ -411,7 +422,10 @@ def candidate_source_lock(summary: dict[str, Any]) -> dict[str, Any]:
             "relative_path": summary.get("model_relative_path"),
             "path": summary.get("model_path"),
             "sha256": summary.get("model_sha256_observed"),
+            "supported": selected_model_supported,
+            "status": summary.get("selected_model_status"),
         },
+        "selectable_model_relative_paths": list(SELECTABLE_MODEL_RELATIVE_PATHS),
         "expected_file_count": expected_count,
         "present_expected_file_count": present_expected,
         "missing_expected_relative_paths": summary.get("missing_expected_relative_paths")
@@ -877,6 +891,7 @@ def build_candidate_review_checklist(summary: dict[str, Any]) -> dict[str, Any]:
     caveats = caveats if isinstance(caveats, dict) else {}
     parsed_model_file_count = int(observations.get("parsed_model_file_count") or 0)
     model_present = summary.get("model_present") is True
+    selected_model_supported = summary.get("selected_model_supported") is True
     upstream = summary.get("upstream")
     upstream = upstream if isinstance(upstream, dict) else {}
     commit_supplied = bool(upstream.get("commit_supplied"))
@@ -926,11 +941,18 @@ def build_candidate_review_checklist(summary: dict[str, Any]) -> dict[str, Any]:
             "priority": 3,
             "action_id": "select_single_authoritative_model_variant",
             "gate": "reviewed_model_authority",
-            "status": checklist_status(model_present and bool(model_sha)),
+            "status": checklist_status(
+                model_present and bool(model_sha) and selected_model_supported
+            ),
             "title": "Select one SO-101 model variant",
             "detail": "Choose the reviewed new/old calibration URDF or MJCF file and reject other variants for this manifest.",
             "candidate_observation": {
                 "model_path": summary.get("model_path"),
+                "selected_model_supported": selected_model_supported,
+                "selected_model_status": summary.get("selected_model_status"),
+                "selectable_model_relative_paths": summary.get(
+                    "selectable_model_relative_paths"
+                ),
                 "model_sha256_observed": model_sha,
                 "parsed_model_file_count": parsed_model_file_count,
             },
@@ -1068,6 +1090,18 @@ def build_summary(args: argparse.Namespace, artifacts: dict[str, str]) -> dict[s
         None,
     )
     model_present = bool(model_row and model_row.get("exists") is True)
+    selected_model_supported = (
+        args.model_relative_path in SELECTABLE_MODEL_RELATIVE_PATHS
+    )
+    if not args.model_relative_path:
+        selected_model_status = "selected_model_not_supplied"
+    elif not model_present:
+        selected_model_status = "selected_model_missing"
+    elif selected_model_supported:
+        selected_model_status = "selectable_so101_model_selected"
+    else:
+        selected_model_status = "selected_model_not_supported"
+    selected_model_ready_for_template = model_present and selected_model_supported
     model_sha256 = str(model_row.get("sha256")) if model_present and model_row else None
     upstream_commit_value = str(args.upstream_commit or "").strip()
     upstream_commit_supplied = bool(upstream_commit_value)
@@ -1083,8 +1117,8 @@ def build_summary(args: argparse.Namespace, artifacts: dict[str, str]) -> dict[s
     )
     seeded_review_manifest_template = candidate_seeded_review_manifest_template(
         source_root=source_root if source_root_is_dir else None,
-        model_path=model_path if model_present else None,
-        model_sha256=model_sha256,
+        model_path=model_path if selected_model_ready_for_template else None,
+        model_sha256=model_sha256 if selected_model_ready_for_template else None,
         upstream_repository_url=args.upstream_repository_url,
         upstream_source_tree_url=args.upstream_source_tree_url,
         upstream_commit=args.upstream_commit,
@@ -1099,6 +1133,8 @@ def build_summary(args: argparse.Namespace, artifacts: dict[str, str]) -> dict[s
         status = "source_root_not_directory"
     elif missing_expected or not model_present:
         status = "candidate_intake_incomplete"
+    elif not selected_model_supported:
+        status = "candidate_intake_model_selection_invalid"
     else:
         status = "candidate_intake_checked"
 
@@ -1155,13 +1191,16 @@ def build_summary(args: argparse.Namespace, artifacts: dict[str, str]) -> dict[s
         ),
         "missing_expected_relative_paths": missing_expected,
         "model_relative_path": args.model_relative_path,
+        "selectable_model_relative_paths": list(SELECTABLE_MODEL_RELATIVE_PATHS),
+        "selected_model_supported": selected_model_supported,
+        "selected_model_status": selected_model_status,
         "model_path": str(model_path) if model_path else None,
         "model_present": model_present,
         "model_sha256_observed": model_sha256,
         "candidate_manifest_draft": candidate_manifest_draft(
             source_root=source_root if source_root_is_dir else None,
-            model_path=model_path if model_present else None,
-            model_sha256=model_sha256,
+            model_path=model_path if selected_model_ready_for_template else None,
+            model_sha256=model_sha256 if selected_model_ready_for_template else None,
             upstream_repository_url=args.upstream_repository_url,
             upstream_source_tree_url=args.upstream_source_tree_url,
             upstream_commit=args.upstream_commit,
@@ -1199,6 +1238,8 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `upstream_commit_status`: `{summary['upstream'].get('commit_status')}`",
         f"- `upstream_commit_sha_valid`: `{str(summary['upstream'].get('commit_sha_valid')).lower()}`",
         f"- `model_relative_path`: `{summary['model_relative_path']}`",
+        f"- `selected_model_status`: `{summary['selected_model_status']}`",
+        f"- `selected_model_supported`: `{str(summary['selected_model_supported']).lower()}`",
         f"- `model_sha256_observed`: `{summary.get('model_sha256_observed') or 'none'}`",
         f"- `candidate_review_observations_model_authority`: `{summary['candidate_review_observations_model_authority']}`",
         f"- `candidate_review_observations_ready_for_model_backed_ik`: `{str(summary['candidate_review_observations']['ready_for_model_backed_ik']).lower()}`",
