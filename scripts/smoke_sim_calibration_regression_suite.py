@@ -5014,6 +5014,34 @@ def so101_reviewed_model_authority_gate_section(
         if isinstance(public_candidate_checked_artifacts, dict)
         else {}
     )
+    recorded_operator_intake_decision_cases = public_candidate_intake_matrix.get(
+        "recorded_operator_intake_decision_cases"
+    )
+    recorded_operator_intake_decision_cases = (
+        recorded_operator_intake_decision_cases
+        if isinstance(recorded_operator_intake_decision_cases, dict)
+        else {}
+    )
+    recorded_operator_intake_decision_options = [
+        option
+        for option in (
+            "external_pinned_source_root",
+            "vendor_locked_bundle",
+        )
+        if isinstance(recorded_operator_intake_decision_cases.get(option), dict)
+    ]
+    recorded_operator_intake_selected_requirement_ids_by_option = {
+        option: recorded_operator_intake_decision_cases[option].get(
+            "candidate_operator_intake_selected_requirement_ids"
+        )
+        for option in recorded_operator_intake_decision_options
+    }
+    recorded_operator_intake_selected_requirement_counts_by_option = {
+        option: recorded_operator_intake_decision_cases[option].get(
+            "candidate_operator_intake_selected_requirement_count"
+        )
+        for option in recorded_operator_intake_decision_options
+    }
     public_candidate_source_lock_handoff = {
         "status": (
             "candidate_source_lock_ready_for_review"
@@ -5047,6 +5075,18 @@ def so101_reviewed_model_authority_gate_section(
         ),
         "operator_intake_option_count": public_candidate_checked.get(
             "candidate_operator_intake_option_count"
+        ),
+        "recorded_operator_intake_decision_options": (
+            recorded_operator_intake_decision_options
+        ),
+        "recorded_operator_intake_selected_requirement_ids_by_option": (
+            recorded_operator_intake_selected_requirement_ids_by_option
+        ),
+        "recorded_operator_intake_selected_requirement_counts_by_option": (
+            recorded_operator_intake_selected_requirement_counts_by_option
+        ),
+        "recorded_operator_intake_decision_cases": (
+            recorded_operator_intake_decision_cases
         ),
         "review_manifest_template_path": public_candidate_checked.get(
             "direct_manifest_path"
@@ -5617,6 +5657,21 @@ def so101_reviewed_model_authority_gate_section(
                 "operator_intake_plan_model_authority"
             ]
         ),
+        "public_candidate_recorded_operator_intake_decision_options": (
+            public_candidate_source_lock_handoff[
+                "recorded_operator_intake_decision_options"
+            ]
+        ),
+        "public_candidate_recorded_operator_intake_selected_requirement_ids_by_option": (
+            public_candidate_source_lock_handoff[
+                "recorded_operator_intake_selected_requirement_ids_by_option"
+            ]
+        ),
+        "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option": (
+            public_candidate_source_lock_handoff[
+                "recorded_operator_intake_selected_requirement_counts_by_option"
+            ]
+        ),
         "public_candidate_review_manifest_template_path": (
             public_candidate_source_lock_handoff["review_manifest_template_path"]
         ),
@@ -5829,6 +5884,21 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
             "public_candidate_operator_intake_plan_model_authority": (
                 public_candidate_source_lock_handoff.get(
                     "operator_intake_plan_model_authority"
+                )
+            ),
+            "public_candidate_recorded_operator_intake_decision_options": (
+                public_candidate_source_lock_handoff.get(
+                    "recorded_operator_intake_decision_options"
+                )
+            ),
+            "public_candidate_recorded_operator_intake_selected_requirement_ids_by_option": (
+                public_candidate_source_lock_handoff.get(
+                    "recorded_operator_intake_selected_requirement_ids_by_option"
+                )
+            ),
+            "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option": (
+                public_candidate_source_lock_handoff.get(
+                    "recorded_operator_intake_selected_requirement_counts_by_option"
                 )
             ),
             "public_candidate_review_manifest_template_path": (

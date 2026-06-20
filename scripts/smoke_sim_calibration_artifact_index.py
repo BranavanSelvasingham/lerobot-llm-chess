@@ -3559,6 +3559,22 @@ def collect_so101_reviewed_model_authority_gate_artifacts(
         "public_candidate_operator_intake_plan_model_authority": gate.get(
             "public_candidate_operator_intake_plan_model_authority"
         ),
+        "public_candidate_recorded_operator_intake_decision_options": gate.get(
+            "public_candidate_recorded_operator_intake_decision_options"
+        )
+        or [],
+        "public_candidate_recorded_operator_intake_selected_requirement_ids_by_option": (
+            gate.get(
+                "public_candidate_recorded_operator_intake_selected_requirement_ids_by_option"
+            )
+            or {}
+        ),
+        "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option": (
+            gate.get(
+                "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option"
+            )
+            or {}
+        ),
         "public_candidate_review_manifest_template_path": gate.get(
             "public_candidate_review_manifest_template_path"
         ),

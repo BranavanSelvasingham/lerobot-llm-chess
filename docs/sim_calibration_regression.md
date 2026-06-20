@@ -346,7 +346,8 @@ manifest. When the public SO-ARM100/SO101 intake matrix has a ready source-lock
 handoff, the gate carries it as `public_candidate_source_lock_handoff` and adds
 that context to the source-authority blocker/operator-action rows; this points
 reviewers to the candidate source-lock JSON, the unresolved operator intake
-plan, and the direct manifest template, but it does not satisfy source
+plan, the recorded external/vendor intake options, their selected requirement
+IDs, and the direct manifest template, but it does not satisfy source
 authority, bundle authority, or model-backed IK readiness by itself. The gate
 summary reports
 `model_authority: "reviewed_so101_model_authority_gate"` only when ready;

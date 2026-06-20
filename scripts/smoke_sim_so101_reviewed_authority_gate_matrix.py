@@ -372,6 +372,47 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
             "model_authority": "public_candidate_intake_matrix_not_authority",
         },
     )
+    external_requirement_ids = [
+        "external_checkout_path_declared",
+        "external_upstream_commit_pinned",
+        "external_file_digest_lock_reviewed",
+        "external_reviewed_bundle_manifest_supplied",
+    ]
+    vendor_requirement_ids = [
+        "vendor_import_path_declared",
+        "vendor_upstream_commit_pinned",
+        "vendor_license_provenance_reviewed",
+        "vendor_file_digest_manifest_reviewed",
+        "vendor_reviewed_bundle_manifest_supplied",
+    ]
+    recorded_decision_cases = {
+        "external_pinned_source_root": {
+            "candidate_operator_intake_decision_status": (
+                "candidate_intake_decision_recorded_not_authority"
+            ),
+            "candidate_operator_intake_selected_option": (
+                "external_pinned_source_root"
+            ),
+            "candidate_operator_intake_selected_requirement_count": (
+                len(external_requirement_ids)
+            ),
+            "candidate_operator_intake_selected_requirement_ids": (
+                external_requirement_ids
+            ),
+        },
+        "vendor_locked_bundle": {
+            "candidate_operator_intake_decision_status": (
+                "candidate_intake_decision_recorded_not_authority"
+            ),
+            "candidate_operator_intake_selected_option": "vendor_locked_bundle",
+            "candidate_operator_intake_selected_requirement_count": (
+                len(vendor_requirement_ids)
+            ),
+            "candidate_operator_intake_selected_requirement_ids": (
+                vendor_requirement_ids
+            ),
+        },
+    }
     return {
         "summary_path": str(matrix_summary_path),
         "status": "ok",
@@ -393,6 +434,7 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
             "candidate_operator_intake_option_count": 2,
             "direct_manifest_path": str(direct_manifest_path),
         },
+        "recorded_operator_intake_decision_cases": recorded_decision_cases,
         "child_records": [
             {
                 "case_id": "candidate_intake_checked",
@@ -757,6 +799,29 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "public_candidate_operator_intake_plan_model_authority": (
                     "candidate_operator_intake_plan_not_authority"
                 ),
+                "public_candidate_recorded_operator_intake_decision_options": [
+                    "external_pinned_source_root",
+                    "vendor_locked_bundle",
+                ],
+                "public_candidate_recorded_operator_intake_selected_requirement_ids_by_option": {
+                    "external_pinned_source_root": [
+                        "external_checkout_path_declared",
+                        "external_upstream_commit_pinned",
+                        "external_file_digest_lock_reviewed",
+                        "external_reviewed_bundle_manifest_supplied",
+                    ],
+                    "vendor_locked_bundle": [
+                        "vendor_import_path_declared",
+                        "vendor_upstream_commit_pinned",
+                        "vendor_license_provenance_reviewed",
+                        "vendor_file_digest_manifest_reviewed",
+                        "vendor_reviewed_bundle_manifest_supplied",
+                    ],
+                },
+                "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option": {
+                    "external_pinned_source_root": 4,
+                    "vendor_locked_bundle": 5,
+                },
                 "public_candidate_source_lock_paths_present": True,
                 "blockers_contain": [
                     "scan_or_supply_so101_model_source_root",
@@ -1895,6 +1960,67 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             "public_candidate_source_lock_handoff.operator_intake_plan_model_authority",
             source_lock_handoff.get("operator_intake_plan_model_authority"),
             expect["public_candidate_operator_intake_plan_model_authority"],
+        )
+    if "public_candidate_recorded_operator_intake_decision_options" in expect:
+        add_error(
+            errors,
+            "public_candidate_recorded_operator_intake_decision_options",
+            gate.get("public_candidate_recorded_operator_intake_decision_options"),
+            expect["public_candidate_recorded_operator_intake_decision_options"],
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.recorded_operator_intake_decision_options",
+            source_lock_handoff.get("recorded_operator_intake_decision_options"),
+            expect["public_candidate_recorded_operator_intake_decision_options"],
+        )
+    if (
+        "public_candidate_recorded_operator_intake_selected_requirement_ids_by_option"
+        in expect
+    ):
+        add_error(
+            errors,
+            "public_candidate_recorded_operator_intake_selected_requirement_ids_by_option",
+            gate.get(
+                "public_candidate_recorded_operator_intake_selected_requirement_ids_by_option"
+            ),
+            expect[
+                "public_candidate_recorded_operator_intake_selected_requirement_ids_by_option"
+            ],
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.recorded_operator_intake_selected_requirement_ids_by_option",
+            source_lock_handoff.get(
+                "recorded_operator_intake_selected_requirement_ids_by_option"
+            ),
+            expect[
+                "public_candidate_recorded_operator_intake_selected_requirement_ids_by_option"
+            ],
+        )
+    if (
+        "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option"
+        in expect
+    ):
+        add_error(
+            errors,
+            "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option",
+            gate.get(
+                "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option"
+            ),
+            expect[
+                "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option"
+            ],
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.recorded_operator_intake_selected_requirement_counts_by_option",
+            source_lock_handoff.get(
+                "recorded_operator_intake_selected_requirement_counts_by_option"
+            ),
+            expect[
+                "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option"
+            ],
         )
     if expect.get("public_candidate_source_lock_paths_present"):
         for path_field in (
