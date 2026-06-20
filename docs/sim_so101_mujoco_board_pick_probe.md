@@ -44,6 +44,10 @@ It also checks the machine-readable phase contract:
 each case records `phase_evidence_contract_errors`; these checks require the
 phase row `ok` values, failed-phase IDs, aggregate all-required flag, and
 top-level pick/place booleans to agree.
+Known gap cases also assert their exact failed-phase IDs: alternate target
+placement fails only `release_place`, while alternate/reversed source cases
+fail `two_finger_grasp`, `lift_clearance`, `transfer_toward_target`, and
+`release_place`.
 The probe and matrix also expose a stage-sequence contract:
 `required_stage_sequence`, `observed_stage_sequence`, `stage_sequence_order_ok`,
 `stage_sequence_contract_ok`, `stage_sequence_contract_errors`, and

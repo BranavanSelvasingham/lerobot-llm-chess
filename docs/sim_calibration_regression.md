@@ -884,6 +884,10 @@ each case records `phase_evidence_contract_ok` plus
 `phase_evidence_contract_errors`, so artifact review can see whether the
 phase rows, failed-phase IDs, all-required flag, and top-level pick/place
 booleans agree.
+Known gap cases also assert their exact failed-phase IDs: alternate target
+placement fails only `release_place`, while alternate/reversed source cases
+fail `two_finger_grasp`, `lift_clearance`, `transfer_toward_target`, and
+`release_place`.
 It additionally checks `expected_stage_sequence`,
 `stage_sequence_contract_ok`, `stage_sequence_contract_error_count`, each
 case's `observed_stage_sequence`, and

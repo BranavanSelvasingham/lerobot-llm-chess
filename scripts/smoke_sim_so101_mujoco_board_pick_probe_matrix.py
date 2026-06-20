@@ -186,6 +186,7 @@ def case_specs() -> list[dict[str, Any]]:
             "expect_release_contact_cleared_after_retreat": True,
             "expect_final_board_contact": True,
             "expect_final_target_within_tolerance": True,
+            "expected_failed_phase_ids": [],
         },
         {
             "case_id": "alternate_target_e4_d5_records_place_gap",
@@ -201,6 +202,7 @@ def case_specs() -> list[dict[str, Any]]:
             "expect_release_contact_cleared_after_retreat": True,
             "expect_final_board_contact": True,
             "expect_final_target_within_tolerance": False,
+            "expected_failed_phase_ids": ["release_place"],
         },
         {
             "case_id": "alternate_source_d4_e5_records_pick_gap",
@@ -216,6 +218,12 @@ def case_specs() -> list[dict[str, Any]]:
             "expect_release_contact_cleared_after_retreat": True,
             "expect_final_board_contact": True,
             "expect_final_target_within_tolerance": False,
+            "expected_failed_phase_ids": [
+                "two_finger_grasp",
+                "lift_clearance",
+                "transfer_toward_target",
+                "release_place",
+            ],
         },
         {
             "case_id": "reversed_source_e5_e4_records_pick_gap",
@@ -231,6 +239,12 @@ def case_specs() -> list[dict[str, Any]]:
             "expect_release_contact_cleared_after_retreat": True,
             "expect_final_board_contact": True,
             "expect_final_target_within_tolerance": False,
+            "expected_failed_phase_ids": [
+                "two_finger_grasp",
+                "lift_clearance",
+                "transfer_toward_target",
+                "release_place",
+            ],
         },
         {
             "case_id": "invalid_source_square_rejected",
@@ -668,6 +682,12 @@ def summarize_case(
             observations["pick_place_all_required_phases_verified"],
             spec["expect_board_pick_place"],
         )
+        add_error(
+            errors,
+            f"{case_id}.pick_place_failed_phase_ids",
+            observations["pick_place_failed_phase_ids"],
+            spec["expected_failed_phase_ids"],
+        )
         phase_evidence = observations["pick_place_phase_evidence"]
         if not isinstance(phase_evidence, list):
             errors.append(f"{case_id}.pick_place_phase_evidence: expected list")
@@ -692,15 +712,6 @@ def summarize_case(
                     errors.append(
                         f"{case_id}.{phase.get('phase_id')}.metrics: expected non-empty dict"
                     )
-        if spec["expect_board_pick_place"]:
-            add_error(
-                errors,
-                f"{case_id}.pick_place_failed_phase_ids",
-                observations["pick_place_failed_phase_ids"],
-                [],
-            )
-        elif not observations["pick_place_failed_phase_ids"]:
-            errors.append(f"{case_id}.pick_place_failed_phase_ids: expected at least one failed phase")
         add_error(
             errors,
             f"{case_id}.manual_piece_pose_used_after_reset",
@@ -807,6 +818,7 @@ def summarize_case(
             "source_square": spec["source_square"],
             "target_square": spec["target_square"],
             "board_source_pick_place_verified": spec.get("expect_board_pick_place", False),
+            "pick_place_failed_phase_ids": spec.get("expected_failed_phase_ids", []),
         },
         "observations": observations,
     }
@@ -945,7 +957,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "",
             "- All cases use generated `development_scaffold_not_reviewed` MJCF.",
             "- The passing case uses direct seeded source pose plus a scripted actuator sequence.",
-            "- Gap cases are expected evidence that the fixture does not replace reviewed model-backed IK.",
+            "- Gap cases assert exact failed phase IDs so the fixture boundary does not drift silently.",
             "- `ready_for_model_backed_ik` and `ready_for_policy_training` must remain false.",
         ]
     )

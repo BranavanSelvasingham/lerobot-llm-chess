@@ -2155,6 +2155,13 @@ jobs:
           assert place_gap["observations"]["release_contact_cleared_after_retreat"] is True, place_gap
           assert place_gap["observations"]["final_board_contact_observed"] is True, place_gap
           assert place_gap["observations"]["final_target_within_tolerance"] is False, place_gap
+          assert place_gap["observations"]["pick_place_failed_phase_ids"] == ["release_place"], place_gap
+          expected_pick_gap_phase_ids = [
+              "two_finger_grasp",
+              "lift_clearance",
+              "transfer_toward_target",
+              "release_place",
+          ]
           for case_id in (
               "alternate_source_d4_e5_records_pick_gap",
               "reversed_source_e5_e4_records_pick_gap",
@@ -2168,6 +2175,7 @@ jobs:
               assert case["observations"]["release_contact_cleared_after_retreat"] is True, case
               assert case["observations"]["final_board_contact_observed"] is True, case
               assert case["observations"]["final_target_within_tolerance"] is False, case
+              assert case["observations"]["pick_place_failed_phase_ids"] == expected_pick_gap_phase_ids, case
           for case in summary["cases"]:
               obs = case["observations"]
               assert obs["model_authority"] == "development_scaffold_not_reviewed", case
