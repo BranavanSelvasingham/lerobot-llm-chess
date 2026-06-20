@@ -163,6 +163,16 @@ def candidate_operator_command_plan(summary: dict[str, Any]) -> dict[str, Any]:
         "so101_public_candidate_review_manifest_template.direct.json>"
     )
     selected_option = operator_plan.get("selected_intake_option_id")
+    selected_requirement_ids = operator_plan.get(
+        "selected_option_review_requirement_ids"
+    )
+    selected_requirement_ids = (
+        selected_requirement_ids if isinstance(selected_requirement_ids, list) else []
+    )
+    selected_requirements = operator_plan.get("selected_option_review_requirements")
+    selected_requirements = (
+        selected_requirements if isinstance(selected_requirements, list) else []
+    )
     source_lock_ready = source_lock.get("source_lock_ready_for_review") is True
     command_status = (
         "candidate_operator_commands_ready_for_pinned_source_review"
@@ -416,18 +426,64 @@ def candidate_operator_command_plan(summary: dict[str, Any]) -> dict[str, Any]:
         "upstream_commit_sha_valid": upstream_commit_sha_valid,
         "selected_intake_option_id": selected_option,
         "selected_option_command_count": len(selected_commands),
+        "selected_option_review_requirement_count": len(selected_requirements),
+        "selected_option_review_requirement_ids": selected_requirement_ids,
+        "selected_option_review_requirements": selected_requirements,
         "external_pinned_source_root_commands": external_commands,
         "vendor_locked_bundle_commands": vendor_commands,
         "selected_option_commands": selected_commands,
         "candidate_artifacts": {
             "source_lock_json": artifacts.get("candidate_source_lock_json"),
+            "source_lock_digests_csv": artifacts.get(
+                "candidate_source_lock_digests_csv"
+            ),
+            "model_file_observations_csv": artifacts.get(
+                "candidate_model_file_observations_csv"
+            ),
             "operator_intake_plan_json": artifacts.get(
                 "candidate_operator_intake_plan_json"
             ),
+            "operator_intake_requirements_csv": artifacts.get(
+                "candidate_operator_intake_requirements_csv"
+            ),
+            "review_checklist_json": artifacts.get("candidate_review_checklist_json"),
+            "review_checklist_csv": artifacts.get("candidate_review_checklist_csv"),
             "direct_review_manifest_template_json": artifacts.get(
                 "candidate_direct_review_manifest_template_json"
             ),
         },
+        "review_handoff_artifacts": [
+            {
+                "artifact_id": "candidate_source_lock_json",
+                "path": artifacts.get("candidate_source_lock_json"),
+                "purpose": "pinned source, selected model, digest, and non-authority lock summary",
+                "authority_boundary": "candidate_source_lock_not_authority",
+            },
+            {
+                "artifact_id": "candidate_source_lock_digests_csv",
+                "path": artifacts.get("candidate_source_lock_digests_csv"),
+                "purpose": "complete expected and extra lockable file digest review rows",
+                "authority_boundary": "candidate_source_lock_digest_not_authority",
+            },
+            {
+                "artifact_id": "candidate_operator_intake_requirements_csv",
+                "path": artifacts.get("candidate_operator_intake_requirements_csv"),
+                "purpose": "selected external or vendor requirement checklist",
+                "authority_boundary": "candidate_operator_intake_requirement_not_authority",
+            },
+            {
+                "artifact_id": "candidate_direct_review_manifest_template_json",
+                "path": artifacts.get("candidate_direct_review_manifest_template_json"),
+                "purpose": "reviewer-editable bundle manifest template",
+                "authority_boundary": "candidate_seeded_review_manifest_template_not_authority",
+            },
+        ],
+        "authority_blockers_until_reviewed": [
+            "selected source-lock digest rows must be reviewed and copied only into reviewed authority fields",
+            "license and provenance review evidence must be recorded for the selected intake option",
+            "reviewed bundle manifest checker must report physical_so101_model_authority_ready",
+            "reviewed MuJoCo bundle gate must prove physical reviewed model motion",
+        ],
         "limitations": [
             "These commands are an operator checklist; this smoke does not execute network, copy, or vendor steps.",
             "A command plan with a pinned commit is review handoff evidence only, not reviewed physical SO-101 authority.",
@@ -1887,6 +1943,9 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `candidate_operator_intake_requirement_row_count`: `{summary['candidate_operator_intake_requirement_row_count']}`",
         f"- `candidate_operator_intake_selected_requirement_row_count`: `{summary['candidate_operator_intake_selected_requirement_row_count']}`",
         f"- `candidate_seeded_review_manifest_template_model_authority`: `{summary['candidate_seeded_review_manifest_template_model_authority']}`",
+        f"- `candidate_operator_command_plan_selected_requirement_count`: `{summary['candidate_operator_command_plan'].get('selected_option_review_requirement_count')}`",
+        f"- `candidate_operator_command_plan_selected_requirement_ids`: `{', '.join(summary['candidate_operator_command_plan'].get('selected_option_review_requirement_ids') or []) if summary['candidate_operator_command_plan'].get('selected_option_review_requirement_ids') else 'none'}`",
+        f"- `candidate_operator_command_plan_review_handoff_artifact_count`: `{len(summary['candidate_operator_command_plan'].get('review_handoff_artifacts') or [])}`",
         f"- `parsed_model_file_count`: `{summary['candidate_review_observations']['parsed_model_file_count']}`",
         f"- `expected_file_count`: `{summary['expected_file_count']}`",
         f"- `present_expected_file_count`: `{summary['present_expected_file_count']}`",
@@ -1934,6 +1993,8 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "The `candidate_operator_intake_plan` JSON records the unresolved vendor-vs-external-source decision, required inputs, command templates, and review flow. It does not clone, vendor, copy, or promote assets to reviewed physical SO-101 authority.",
             "",
             "The `candidate_operator_command_plan` JSON records explicit clone/fetch/checkout/intake/checker command steps for a pinned upstream checkout or vendored subset. The commands are not executed by this smoke and remain non-authoritative.",
+            "",
+            "The command plan also carries selected review requirement IDs, handoff artifact paths, and authority blockers so reviewers can trace digest, license/provenance, manifest, and reviewed-MuJoCo prerequisites without treating the plan as authority.",
             "",
             "The `candidate_operator_intake_requirements` CSV flattens the external and vendored requirement rows for review tracking. Selected rows only reflect the recorded operator decision and remain non-authoritative.",
             "",

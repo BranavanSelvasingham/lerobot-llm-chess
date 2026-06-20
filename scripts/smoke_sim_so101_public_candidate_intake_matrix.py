@@ -1324,6 +1324,77 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         errors.append(
             f"{case_id}.candidate_operator_command_plan.selected_option_command_count invalid"
         )
+    if (
+        operator_command_plan.get("selected_option_review_requirement_count")
+        != expected_requirement_count
+    ):
+        errors.append(
+            f"{case_id}.candidate_operator_command_plan.selected_option_review_requirement_count invalid"
+        )
+    if (
+        operator_command_plan.get("selected_option_review_requirement_ids")
+        != expected_requirement_ids
+    ):
+        errors.append(
+            f"{case_id}.candidate_operator_command_plan.selected_option_review_requirement_ids invalid"
+        )
+    command_plan_requirements = operator_command_plan.get(
+        "selected_option_review_requirements"
+    )
+    command_plan_requirements = (
+        command_plan_requirements
+        if isinstance(command_plan_requirements, list)
+        else []
+    )
+    if len(command_plan_requirements) != expected_requirement_count:
+        errors.append(
+            f"{case_id}.candidate_operator_command_plan.selected_option_review_requirements count invalid"
+        )
+    review_handoff_artifacts = operator_command_plan.get("review_handoff_artifacts")
+    review_handoff_artifacts = (
+        review_handoff_artifacts if isinstance(review_handoff_artifacts, list) else []
+    )
+    handoff_artifact_ids = {
+        str(artifact.get("artifact_id"))
+        for artifact in review_handoff_artifacts
+        if isinstance(artifact, dict)
+    }
+    required_handoff_artifact_ids = {
+        "candidate_source_lock_json",
+        "candidate_source_lock_digests_csv",
+        "candidate_operator_intake_requirements_csv",
+        "candidate_direct_review_manifest_template_json",
+    }
+    if not required_handoff_artifact_ids <= handoff_artifact_ids:
+        errors.append(
+            f"{case_id}.candidate_operator_command_plan.review_handoff_artifacts "
+            f"missing {sorted(required_handoff_artifact_ids - handoff_artifact_ids)!r}"
+        )
+    for artifact in review_handoff_artifacts:
+        if not isinstance(artifact, dict):
+            continue
+        if not artifact.get("path"):
+            errors.append(
+                f"{case_id}.candidate_operator_command_plan.review_handoff_artifacts missing path"
+            )
+        if artifact.get("authority_boundary") in {None, "", "reviewed"}:
+            errors.append(
+                f"{case_id}.candidate_operator_command_plan.review_handoff_artifacts invalid authority boundary"
+            )
+    blockers_until_reviewed = operator_command_plan.get("authority_blockers_until_reviewed")
+    blockers_until_reviewed = (
+        blockers_until_reviewed if isinstance(blockers_until_reviewed, list) else []
+    )
+    for blocker_fragment in (
+        "license and provenance review evidence",
+        "reviewed bundle manifest checker",
+        "reviewed MuJoCo bundle gate",
+    ):
+        if not any(blocker_fragment in str(blocker) for blocker in blockers_until_reviewed):
+            errors.append(
+                f"{case_id}.candidate_operator_command_plan.authority_blockers_until_reviewed "
+                f"missing {blocker_fragment!r}"
+            )
     for command_key, minimum_count in (
         ("external_pinned_source_root_commands", 7),
         ("vendor_locked_bundle_commands", 5),
