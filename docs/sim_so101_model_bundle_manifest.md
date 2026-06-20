@@ -484,8 +484,10 @@ Accepted target-frame review statuses are `reviewed`, `operator_reviewed`,
 plus `synthetic_fixture_reviewed_for_automation_only` only for explicitly
 hardware-free regression fixtures. Review evidence must include `reviewed_by`
 plus a stable artifact handle (`review_id` or `review_url`) and the
-`target_frame` review scope. A frame name without this metadata remains
-diagnostic evidence, not reviewed physical SO-101 TCP-frame truth.
+`target_frame` review scope. If more than one target-frame review alias is
+present, every supplied alias must be independently ready. A frame name without
+this metadata remains diagnostic evidence, not reviewed physical SO-101
+TCP-frame truth.
 
 TCP/gripper-tip offset authority must be declared in `tcp_offset_authority`,
 `tcp_offset_review`, `gripper_tip_offset_review`, or `tcp_calibration`.
@@ -495,7 +497,8 @@ Accepted TCP review statuses are `reviewed`, `operator_reviewed`,
 `synthetic_fixture_reviewed_for_automation_only` only for explicitly
 hardware-free regression fixtures. Review evidence must include `reviewed_by`
 plus a stable artifact handle (`review_id` or `review_url`) and the
-`tcp_offset` review scope.
+`tcp_offset` review scope. If more than one TCP/gripper-tip review alias is
+present, every supplied alias must be independently ready.
 Numeric TCP offsets must be finite; values such as `NaN` or `Infinity`, or
 offsets without this metadata, remain diagnostic evidence and are not reviewed
 physical SO-101 TCP truth. The checker also applies a conservative automation
@@ -512,7 +515,8 @@ Base-to-board alignment authority must be declared in
 `synthetic_fixture_reviewed_for_automation_only` only for explicitly
 hardware-free regression fixtures. Review evidence must include `reviewed_by`
 plus a stable artifact handle (`review_id` or `review_url`) and the
-`base_to_board_alignment` review scope.
+`base_to_board_alignment` review scope. If more than one base-to-board review
+alias is present, every supplied alias must be independently ready.
 The transform value must include finite x/y/z translation and roll/pitch/yaw
 rotation fields; the x/y/z translation norm must be no more than `2.00 m` under
 the current tabletop chess automation sanity bound. A non-empty object without

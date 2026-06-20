@@ -1878,19 +1878,16 @@ def inspect_review_metadata(
     review_note: str,
     required_review_scope_ids: tuple[str, ...],
 ) -> dict[str, Any]:
-    review_source = None
-    review_source_field = None
+    review_candidates: list[tuple[str, dict[str, Any]]] = []
     for candidate_field, candidate_value in candidates:
         if not isinstance(candidate_value, dict):
             continue
         has_status = has_any_non_empty_field(candidate_value, status_fields)
         has_review = bool(review_evidence_summary(candidate_value)["supplied_fields"])
         if has_status or has_review:
-            review_source = candidate_value
-            review_source_field = candidate_field
-            break
+            review_candidates.append((candidate_field, candidate_value))
 
-    if not isinstance(review_source, dict):
+    if not review_candidates:
         review_evidence = review_evidence_summary(
             {},
             required_review_scope_ids=required_review_scope_ids,
@@ -1903,51 +1900,118 @@ def inspect_review_metadata(
             **review_evidence_report_fields(review_evidence),
             "synthetic_fixture_only": False,
             "accepted_review_statuses": sorted(accepted_statuses),
+            "review_aliases": [],
+            "review_alias_conflict": False,
+            "review_alias_not_ready_fields": [],
             "diagnostics": [f"{diagnostic_prefix}_review_missing"],
         }
 
-    status_field, raw_status = first_non_empty_field(review_source, status_fields)
-    status_value = str(raw_status).strip().lower() if raw_status is not None else ""
-    review_evidence = review_evidence_summary(
-        review_source,
-        required_review_scope_ids=required_review_scope_ids,
-    )
-    diagnostics: list[str] = []
-    if not status_value:
-        diagnostics.append(f"{diagnostic_prefix}_review_status_missing")
-    elif status_value not in accepted_statuses and status_value != synthetic_status:
-        diagnostics.append(f"{diagnostic_prefix}_review_status_not_accepted:{status_value}")
-    if not review_evidence["present"]:
-        diagnostics.append(f"{diagnostic_prefix}_review_evidence_missing")
-    for group_name in review_evidence["missing_required_groups"]:
-        diagnostics.append(
-            f"{diagnostic_prefix}_review_evidence_missing_required_group:{group_name}"
+    reviews = []
+    for candidate_field, candidate_value in review_candidates:
+        status_field, raw_status = first_non_empty_field(candidate_value, status_fields)
+        status_value = str(raw_status).strip().lower() if raw_status is not None else ""
+        review_evidence = review_evidence_summary(
+            candidate_value,
+            required_review_scope_ids=required_review_scope_ids,
         )
-    for field_name in review_evidence["placeholder_fields"]:
-        diagnostics.append(f"{diagnostic_prefix}_review_evidence_placeholder:{field_name}")
-    for field_name in review_evidence["invalid_fields"]:
-        diagnostics.append(f"{diagnostic_prefix}_review_evidence_invalid:{field_name}")
-    for field_name in review_evidence["open_work_fields"]:
-        diagnostics.append(f"{diagnostic_prefix}_review_evidence_open_work:{field_name}")
-    for scope_id in review_evidence["missing_review_scope_ids"]:
-        diagnostics.append(f"{diagnostic_prefix}_review_scope_missing:{scope_id}")
+        diagnostics: list[str] = []
+        if not status_value:
+            diagnostics.append(f"{diagnostic_prefix}_review_status_missing")
+        elif status_value not in accepted_statuses and status_value != synthetic_status:
+            diagnostics.append(
+                f"{diagnostic_prefix}_review_status_not_accepted:{status_value}"
+            )
+        if not review_evidence["present"]:
+            diagnostics.append(f"{diagnostic_prefix}_review_evidence_missing")
+        for group_name in review_evidence["missing_required_groups"]:
+            diagnostics.append(
+                f"{diagnostic_prefix}_review_evidence_missing_required_group:{group_name}"
+            )
+        for field_name in review_evidence["placeholder_fields"]:
+            diagnostics.append(
+                f"{diagnostic_prefix}_review_evidence_placeholder:{field_name}"
+            )
+        for field_name in review_evidence["invalid_fields"]:
+            diagnostics.append(
+                f"{diagnostic_prefix}_review_evidence_invalid:{field_name}"
+            )
+        for field_name in review_evidence["open_work_fields"]:
+            diagnostics.append(
+                f"{diagnostic_prefix}_review_evidence_open_work:{field_name}"
+            )
+        for scope_id in review_evidence["missing_review_scope_ids"]:
+            diagnostics.append(f"{diagnostic_prefix}_review_scope_missing:{scope_id}")
 
-    is_synthetic_fixture = status_value == synthetic_status
-    if is_synthetic_fixture and "hardware-free" not in str(review_source.get("scope", "")).lower():
-        diagnostics.append(synthetic_scope_diagnostic)
+        is_synthetic_fixture = status_value == synthetic_status
+        if (
+            is_synthetic_fixture
+            and "hardware-free" not in str(candidate_value.get("scope", "")).lower()
+        ):
+            diagnostics.append(synthetic_scope_diagnostic)
 
-    review_status_ok = status_value in accepted_statuses or (
-        is_synthetic_fixture and synthetic_scope_diagnostic not in diagnostics
+        review_status_ok = status_value in accepted_statuses or (
+            is_synthetic_fixture and synthetic_scope_diagnostic not in diagnostics
+        )
+        reviews.append(
+            {
+                "status": (
+                    "present"
+                    if review_status_ok and review_evidence["ok"]
+                    else "needs_review"
+                ),
+                "field": candidate_field,
+                "value": candidate_value,
+                "review_status_field": status_field,
+                "review_status": status_value or None,
+                **review_evidence_report_fields(review_evidence),
+                "synthetic_fixture_only": is_synthetic_fixture,
+                "accepted_review_statuses": sorted(accepted_statuses),
+                "diagnostics": diagnostics,
+                "notes": synthetic_note if is_synthetic_fixture else review_note,
+            }
+        )
+
+    selected = reviews[0]
+    diagnostics = list(selected["diagnostics"])
+    alias_not_ready_fields = [
+        review["field"] for review in reviews if review["status"] != "present"
+    ]
+    diagnostics.extend(
+        f"{diagnostic_prefix}_review_alias_not_ready:{field_name}"
+        for field_name in alias_not_ready_fields
+    )
+    ready_alias_kinds = {
+        "synthetic" if review["synthetic_fixture_only"] else "reviewed"
+        for review in reviews
+        if review["status"] == "present"
+    }
+    alias_conflict = len(ready_alias_kinds) > 1
+    if alias_conflict:
+        diagnostics.append(f"{diagnostic_prefix}_review_alias_conflict")
+    is_synthetic_fixture = any(review["synthetic_fixture_only"] for review in reviews)
+    status = (
+        "present"
+        if selected["status"] == "present"
+        and not alias_not_ready_fields
+        and not alias_conflict
+        else "needs_review"
     )
     return {
-        "status": "present" if review_status_ok and review_evidence["ok"] else "needs_review",
-        "field": review_source_field,
-        "value": review_source,
-        "review_status_field": status_field,
-        "review_status": status_value or None,
-        **review_evidence_report_fields(review_evidence),
+        **selected,
+        "status": status,
         "synthetic_fixture_only": is_synthetic_fixture,
-        "accepted_review_statuses": sorted(accepted_statuses),
+        "review_aliases": [
+            {
+                "field": review["field"],
+                "status": review["status"],
+                "review_status": review["review_status"],
+                "synthetic_fixture_only": review["synthetic_fixture_only"],
+                "diagnostics": review["diagnostics"],
+            }
+            for review in reviews
+        ],
+        "review_alias_conflict": alias_conflict,
+        "review_alias_not_ready_fields": alias_not_ready_fields,
         "diagnostics": diagnostics,
         "notes": synthetic_note if is_synthetic_fixture else review_note,
     }

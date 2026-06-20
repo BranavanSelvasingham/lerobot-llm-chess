@@ -479,6 +479,7 @@ jobs:
               "weak_mesh_asset_authority_not_ready",
               "conflicting_mesh_asset_review_alias_not_ready",
               "weak_target_frame_authority_not_ready",
+              "conflicting_target_frame_review_alias_not_ready",
               "wrong_target_frame_not_ready",
               "weak_tcp_offset_authority_not_ready",
               "invalid_tcp_offset_shape_not_ready",
@@ -551,6 +552,11 @@ jobs:
           assert conflicting_mesh_review_alias["mesh_asset_review_alias_conflict"] is False, conflicting_mesh_review_alias
           assert conflicting_mesh_review_alias["mesh_asset_review_alias_not_ready_fields"] == ["mesh_assets_review"], conflicting_mesh_review_alias
           assert "mesh_asset_authority" in conflicting_mesh_review_alias["missing_inputs"], conflicting_mesh_review_alias
+          conflicting_target_frame_review_alias = by_case["conflicting_target_frame_review_alias_not_ready"]["observations"]
+          assert conflicting_target_frame_review_alias["target_frame_status"] == "needs_review", conflicting_target_frame_review_alias
+          assert conflicting_target_frame_review_alias["target_frame_review_alias_conflict"] is False, conflicting_target_frame_review_alias
+          assert conflicting_target_frame_review_alias["target_frame_review_alias_not_ready_fields"] == ["target_frame_review"], conflicting_target_frame_review_alias
+          assert "target_frame_authority" in conflicting_target_frame_review_alias["missing_inputs"], conflicting_target_frame_review_alias
           placeholder_review = by_case["placeholder_review_metadata_not_ready"]["observations"]
           for key in (
               "authority_status",
@@ -5191,6 +5197,10 @@ jobs:
           ), model_bundle_manifest_matrix
           assert (
               "conflicting_mesh_asset_review_alias_not_ready"
+              in model_bundle_manifest_matrix["case_ids"]
+          ), model_bundle_manifest_matrix
+          assert (
+              "conflicting_target_frame_review_alias_not_ready"
               in model_bundle_manifest_matrix["case_ids"]
           ), model_bundle_manifest_matrix
           assert (

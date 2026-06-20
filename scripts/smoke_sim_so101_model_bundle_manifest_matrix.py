@@ -100,6 +100,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "mesh_asset_review_alias_conflict",
         "mesh_asset_review_alias_not_ready_fields",
         "target_frame_status",
+        "target_frame_review_alias_conflict",
+        "target_frame_review_alias_not_ready_fields",
         "tcp_offset_status",
         "alignment_status",
         "contract_checker_status",
@@ -764,6 +766,18 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "conflicting_target_frame_review_alias_not_ready",
+            "manifest_path": fixtures[
+                "conflicting_target_frame_review_alias_manifest_path"
+            ],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "target_frame_status": "needs_review",
+                "missing_inputs": ["target_frame_authority"],
+            },
+        },
+        {
             "case_id": "wrong_target_frame_not_ready",
             "manifest_path": fixtures["wrong_target_frame_manifest_path"],
             "expect": {
@@ -1212,6 +1226,16 @@ def summarize_case(
                 )
             ),
             "target_frame_status": nested_status(summary, "target_frame"),
+            "target_frame_review_alias_conflict": (
+                ((summary.get("target_frame") or {}).get("review") or {}).get(
+                    "review_alias_conflict"
+                )
+            ),
+            "target_frame_review_alias_not_ready_fields": (
+                ((summary.get("target_frame") or {}).get("review") or {}).get(
+                    "review_alias_not_ready_fields"
+                )
+            ),
             "tcp_offset_status": nested_status(summary, "tcp_offset"),
             "tcp_offset_alias_conflict": (
                 summary.get("tcp_offset") or {}
@@ -1349,6 +1373,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
             "mesh_asset_review_alias_not_ready_fields"
         ),
         "target_frame_status": obs.get("target_frame_status"),
+        "target_frame_review_alias_conflict": obs.get(
+            "target_frame_review_alias_conflict"
+        ),
+        "target_frame_review_alias_not_ready_fields": obs.get(
+            "target_frame_review_alias_not_ready_fields"
+        ),
         "tcp_offset_status": obs.get("tcp_offset_status"),
         "tcp_offset_alias_conflict": obs.get("tcp_offset_alias_conflict"),
         "alignment_status": obs.get("alignment_status"),
