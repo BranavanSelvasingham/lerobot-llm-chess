@@ -492,7 +492,10 @@ command steps, plus flat external/vendor review requirements for either a local
 external checkout or a vendored locked bundle. The source-inventory command
 templates include both a candidate scan and a post-review authoritative-source
 rerun with reviewer/license/provenance placeholders; those commands are still
-operator guidance until real review metadata is supplied. The intake summary and artifact index
+operator guidance until real review metadata is supplied. The candidate review
+checklist keeps target-frame authority, TCP/gripper offset authority, and
+base-to-board alignment authority as separate prioritized rows so those missing
+review items cannot be collapsed into one broad placeholder. The intake summary and artifact index
 expose model-observation row counts, selected model observation row count, digest
 row counts, selected model digest row count, selected model expected-joint
 coverage status and counts, requirement row count, selected row count,

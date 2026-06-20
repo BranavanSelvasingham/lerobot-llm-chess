@@ -400,7 +400,7 @@ jobs:
           assert incomplete["candidate_model_observation_parsed_selectable_model_row_count"] == 4, incomplete
           assert incomplete["candidate_model_observation_selected_model_row_count"] == 1, incomplete
           assert incomplete["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", incomplete
-          assert incomplete["candidate_review_checklist_row_count"] == 8, incomplete
+          assert incomplete["candidate_review_checklist_row_count"] == 10, incomplete
           assert incomplete["candidate_source_lock_digest_model_authority"] == "candidate_source_lock_digest_not_authority", incomplete
           assert incomplete["candidate_source_lock_digest_row_count"] == 19, incomplete
           assert incomplete["candidate_source_lock_selected_model_digest_row_count"] == 1, incomplete
@@ -489,7 +489,7 @@ jobs:
           assert complete["candidate_model_observation_parsed_selectable_model_row_count"] == 4, complete
           assert complete["candidate_model_observation_selected_model_row_count"] == 1, complete
           assert complete["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", complete
-          assert complete["candidate_review_checklist_row_count"] == 8, complete
+          assert complete["candidate_review_checklist_row_count"] == 10, complete
           assert complete["candidate_source_lock_digest_model_authority"] == "candidate_source_lock_digest_not_authority", complete
           assert complete["candidate_source_lock_digest_row_count"] == 20, complete
           assert complete["candidate_source_lock_selected_model_digest_row_count"] == 1, complete
@@ -576,7 +576,7 @@ jobs:
               assert case["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", case
               assert case["candidate_model_observation_model_authority"] == "candidate_model_observation_not_authority", case
               assert case["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", case
-              assert case["candidate_review_checklist_row_count"] == 8, case
+              assert case["candidate_review_checklist_row_count"] == 10, case
               assert case["candidate_source_lock_digest_model_authority"] == "candidate_source_lock_digest_not_authority", case
               assert case["candidate_operator_intake_plan_model_authority"] == "candidate_operator_intake_plan_not_authority", case
               assert case["candidate_operator_command_plan_model_authority"] == "candidate_operator_command_plan_not_authority", case

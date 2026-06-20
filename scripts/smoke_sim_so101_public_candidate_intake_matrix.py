@@ -1310,7 +1310,7 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         errors.append(f"{case_id}.candidate_review_checklist.ready_for_model_backed_ik not false")
     if review_checklist.get("observed_evidence_is_physical_so101_authority") is not False:
         errors.append(f"{case_id}.candidate_review_checklist physical authority not false")
-    if review_checklist.get("row_count") != 8:
+    if review_checklist.get("row_count") != 10:
         errors.append(f"{case_id}.candidate_review_checklist.row_count invalid")
     checklist_action_ids = review_checklist.get("action_ids")
     checklist_action_ids = checklist_action_ids if isinstance(checklist_action_ids, list) else []
@@ -1318,7 +1318,9 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "pin_upstream_soarm100_commit",
         "select_single_authoritative_model_variant",
         "review_joint_limits_and_gripper_mapping",
-        "review_target_frame_tcp_and_base_board_alignment",
+        "review_target_frame_authority",
+        "review_tcp_offset_authority",
+        "review_base_to_board_alignment_authority",
         "rerun_reviewed_bundle_manifest_checker",
     ):
         if required_action_id not in checklist_action_ids:
