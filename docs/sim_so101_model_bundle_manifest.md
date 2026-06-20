@@ -178,6 +178,9 @@ still blocked. Ready synthetic fixture manifests must report
 `status: "fixture_ready_not_physical_authority"` and
 `fixture_ready_not_physical_so101_authority: true`; only a ready manifest with
 no synthetic fixture fields may report `status: "physical_authority_ready"`.
+The standalone manifest matrix includes a generated reviewed contract fixture
+for that positive branch, but the fixture is matrix data only; it proves the
+contract behavior and does not supply reviewed physical SO-101 model authority.
 The `model_identity` section records the
 declared digest field, observed `model_path` SHA-256, match status, and any
 `model_sha256_missing`, `model_sha256_invalid`, or `model_sha256_mismatch`

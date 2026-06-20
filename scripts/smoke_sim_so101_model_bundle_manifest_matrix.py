@@ -506,6 +506,27 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "reviewed_contract_manifest_physical_authority_ready",
+            "manifest_path": fixtures["reviewed_contract_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_ready_for_model_backed_ik",
+                "ready": True,
+                "model_authority": "reviewed_so101_model_bundle_manifest",
+                "physical_ready": True,
+                "fixture_ready": False,
+                "physical_authority_gate_status": "physical_reviewed_authority_ready",
+                "missing_inputs_exact": [],
+                "synthetic_fields_exact": [],
+                "authority_status": "present",
+                "provenance_status": "present",
+                "joint_limits_status": "present",
+                "mesh_assets_status": "present",
+                "target_frame_status": "present",
+                "tcp_offset_status": "present",
+                "alignment_status": "present",
+            },
+        },
+        {
             "case_id": "missing_model_file_not_ready",
             "manifest_path": fixtures["missing_model_file_manifest_path"],
             "expect": {
@@ -1564,12 +1585,20 @@ def summarize_case(
                 "mesh asset preflight non-blocking",
             ],
         )
-    expect_contains(
-        errors,
-        f"{case_id}.synthetic_fixture_authority_fields",
-        summary.get("synthetic_fixture_authority_fields"),
-        expect.get("synthetic_fields_contain", []),
-    )
+    if "synthetic_fields_exact" in expect:
+        add_error(
+            errors,
+            f"{case_id}.synthetic_fixture_authority_fields",
+            summary.get("synthetic_fixture_authority_fields"),
+            expect["synthetic_fields_exact"],
+        )
+    else:
+        expect_contains(
+            errors,
+            f"{case_id}.synthetic_fixture_authority_fields",
+            summary.get("synthetic_fixture_authority_fields"),
+            expect.get("synthetic_fields_contain", []),
+        )
     if "authority_open_work_fields" in expect:
         expect_contains(
             errors,
@@ -1987,6 +2016,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "## Authority Boundary",
             "",
             "- Placeholder review metadata, generic review scopes, invalid review URLs, malformed or future-dated review timestamps, weak field-specific authority, placeholder or malformed provenance, wrong target frame, invalid TCP/alignment, and model SHA mismatch all remain not ready.",
+            "- The reviewed contract fixture proves the physical-authority-ready branch only as generated matrix data; it is not itself reviewed physical SO-101 evidence.",
             "- The ready synthetic fixture cases may set `ready_for_model_backed_ik: true` but must keep `physical_so101_model_authority_ready: false`.",
             "- Review packets, intake checklists, and generated templates are operator intake only and never promote fixture evidence into physical SO-101 truth.",
         ]

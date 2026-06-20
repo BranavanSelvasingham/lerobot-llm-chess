@@ -460,6 +460,40 @@ def fixture_provenance_reviewed_authority_manifest_payload(model_filename: str) 
     return payload
 
 
+def reviewed_contract_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["_matrix_fixture_note"] = (
+        "Positive physical-authority contract fixture; generated test data, not a "
+        "reviewed physical SO-101 asset."
+    )
+    payload["provenance"] = {
+        "source_reference": "so101-reviewed-contract-candidate@abcdef0",
+        "export_tool": "cad-export-reviewed-pipeline",
+        "license_basis": "redistribution-approved-by-review-record",
+    }
+    for field_name, status_field, scope in (
+        ("authority", "source_authority_status", None),
+        ("target_frame_authority", "target_frame_authority_status", "target_frame"),
+        ("joint_limit_authority", "joint_limit_authority_status", "joint_limits"),
+        ("mesh_asset_authority", "mesh_asset_authority_status", "mesh_assets"),
+        ("tcp_offset_authority", "tcp_offset_authority_status", "tcp_offset"),
+        (
+            "base_to_board_alignment_authority",
+            "base_to_board_alignment_authority_status",
+            "base_to_board_alignment",
+        ),
+    ):
+        payload[field_name][status_field] = "reviewed"
+        payload[field_name]["reviewed_by"] = "so101-model-review-contract"
+        payload[field_name]["reviewed_at"] = "2026-06-18"
+        payload[field_name]["review_id"] = f"reviewed-contract:{field_name}"
+        payload[field_name].pop("scope", None)
+        if scope is not None:
+            payload[field_name]["review_scope"] = scope
+    payload["authority"]["review_scopes"] = ["model_identity", "provenance", "license"]
+    return payload
+
+
 def mismatched_model_sha_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload["model_sha256"] = "0" * 64
@@ -763,6 +797,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     fixture_dir = output_dir / "fixtures"
     raw_nonstandard_json_dir = fixture_dir / "raw_nonstandard_json_bundle"
     bundle_dir = fixture_dir / "ready_bundle"
+    reviewed_contract_dir = fixture_dir / "reviewed_contract_bundle"
     missing_model_file_dir = fixture_dir / "missing_model_file_bundle"
     invalid_model_path_type_dir = fixture_dir / "invalid_model_path_type_bundle"
     unsupported_suffix_dir = fixture_dir / "unsupported_suffix_bundle"
@@ -826,6 +861,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     raw_nonstandard_json_dir.mkdir(parents=True, exist_ok=True)
     for root in (
         bundle_dir,
+        reviewed_contract_dir,
         missing_model_file_dir,
         invalid_model_path_type_dir,
         unsupported_suffix_dir,
@@ -882,6 +918,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
 
     ready_model_path = bundle_dir / "model" / "synthetic_so101_mujoco.xml"
     ready_model_path.write_text(mjcf_with_mesh_reference())
+    reviewed_contract_model_path = (
+        reviewed_contract_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    reviewed_contract_model_path.write_text(mjcf_with_mesh_reference())
     unsupported_suffix_model_path = (
         unsupported_suffix_dir / "model" / "synthetic_so101_not_robot.txt"
     )
@@ -1028,6 +1068,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         raw_nonstandard_json_dir / "so101_model_bundle.raw_nonstandard_json_constant.json"
     )
     ready_manifest_path = bundle_dir / "so101_model_bundle.ready.json"
+    reviewed_contract_manifest_path = (
+        reviewed_contract_dir / "so101_model_bundle.reviewed_contract.json"
+    )
     missing_model_file_manifest_path = (
         missing_model_file_dir / "so101_model_bundle.missing_model_file.json"
     )
@@ -1157,6 +1200,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         ready_manifest_path,
         manifest_payload(ready=True, model_filename=ready_model_path.name),
         ready_model_path,
+    )
+    write_manifest_json(
+        reviewed_contract_manifest_path,
+        reviewed_contract_manifest_payload(
+            model_filename=reviewed_contract_model_path.name
+        ),
+        reviewed_contract_model_path,
     )
     missing_model_file_payload = manifest_payload(
         ready=True,
@@ -1438,6 +1488,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     return {
         "raw_nonstandard_json_manifest_path": raw_nonstandard_json_manifest_path,
         "ready_manifest_path": ready_manifest_path,
+        "reviewed_contract_manifest_path": reviewed_contract_manifest_path,
         "missing_model_file_manifest_path": missing_model_file_manifest_path,
         "invalid_model_path_type_manifest_path": invalid_model_path_type_manifest_path,
         "unsupported_suffix_manifest_path": unsupported_suffix_manifest_path,
@@ -1503,12 +1554,14 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
             conflicting_alignment_nested_alias_manifest_path
         ),
         "ready_model_path": ready_model_path,
+        "reviewed_contract_model_path": reviewed_contract_model_path,
         "unsupported_suffix_model_path": unsupported_suffix_model_path,
         "mismatched_model_sha_model_path": mismatched_model_sha_model_path,
         "conflicting_model_sha_alias_model_path": (
             conflicting_model_sha_alias_model_path
         ),
         "ready_asset_root": bundle_dir / "assets",
+        "reviewed_contract_asset_root": reviewed_contract_dir / "assets",
         "placeholder_review_model_path": placeholder_review_model_path,
         "thin_review_model_path": thin_review_model_path,
         "invalid_review_url_model_path": invalid_review_url_model_path,

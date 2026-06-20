@@ -752,15 +752,18 @@ It reports `model_authority: "model_bundle_manifest_matrix_not_authority"`,
 `observed_evidence_is_physical_so101_authority: false`, and
 `ready_for_policy_training: false`. It covers missing manifests, a ready
 synthetic fixture manifest that must stay
-`hardware_free_regression_fixture_not_physical_so101_authority`, a ready-shaped
-manifest whose referenced model file is missing, placeholder alignment,
-placeholder/thin/invalid review evidence, malformed or future-dated review
-timestamps, generic review scopes, ready-shaped review metadata with pending follow-up, weak
-field-specific authority, placeholder or malformed provenance, reviewed-status
-fixture provenance, unexpected/non-finite/reversed joint-limit entries, wrong
-target frame, invalid TCP/alignment payloads, and mismatched model SHA. Ready
-fixture cases exercise the manifest state machine only; they must keep
-`physical_so101_model_authority_ready: false`.
+`hardware_free_regression_fixture_not_physical_so101_authority`, a generated
+reviewed contract fixture that proves the `physical_reviewed_authority_ready`
+branch only as matrix data, a ready-shaped manifest whose referenced model file
+is missing, placeholder alignment, placeholder/thin/invalid review evidence,
+malformed or future-dated review timestamps, generic review scopes,
+ready-shaped review metadata with pending follow-up, weak field-specific
+authority, placeholder or malformed provenance, reviewed-status fixture
+provenance, unexpected/non-finite/reversed joint-limit entries, wrong target
+frame, invalid TCP/alignment payloads, and mismatched model SHA. Ready fixture
+cases exercise the manifest state machine only; synthetic fixtures must keep
+`physical_so101_model_authority_ready: false`, and the generated reviewed
+contract fixture is not a reviewed physical SO-101 asset.
 
 The standalone model-bundle probe matrix writes
 `so101_model_bundle_probe_matrix_summary.json`, `.csv`, and `README.md`. It
