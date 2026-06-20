@@ -839,6 +839,9 @@ The standalone board-pick probe matrix writes
 It reports
 `model_authority: "so101_mujoco_board_pick_probe_matrix_not_authority"`,
 `observed_evidence_is_physical_so101_authority: false`,
+`observed_evidence_is_policy_training_authority: false`,
+`development_fixture_evidence_not_physical_so101_truth: true`,
+`development_fixture_evidence_not_policy_training_truth: true`,
 `ready_for_model_backed_ik: false`, and `ready_for_policy_training: false`.
 It covers the current seeded `e4 -> e5` board-source pick/place fixture plus
 alternate target/source cases that must record expected place/pick gaps, plus

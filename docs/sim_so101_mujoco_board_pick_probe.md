@@ -71,6 +71,13 @@ contact-tuned piece, and a seeded source robot pose. Serious policy training
 still needs reviewed SO-101 model authority, calibrated TCP/gripper offset,
 base-to-board alignment, and the same board-source pick/place proof using
 reviewed model-backed IK instead of direct pose seeding.
+The summary and matrix keep this boundary explicit through
+`observed_evidence_is_physical_so101_authority: false`,
+`observed_evidence_is_policy_training_authority: false`,
+`development_fixture_evidence_not_physical_so101_truth: true`,
+`development_fixture_evidence_not_policy_training_truth: true`,
+`ready_for_model_backed_ik: false`, and
+`ready_for_policy_training: false`.
 The training-readiness gate reports that promotion boundary through
 `board_pick_authority_status` and `board_pick_authority_blockers`, so detailed
 phase/stage evidence can be distinguished from reviewed model-backed

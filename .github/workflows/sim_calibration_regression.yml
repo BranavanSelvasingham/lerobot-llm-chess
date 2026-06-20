@@ -1948,6 +1948,9 @@ jobs:
           assert summary["status"] == "ok", summary
           assert summary["model_authority"] == "so101_mujoco_board_pick_probe_matrix_not_authority", summary
           assert summary["observed_evidence_is_physical_so101_authority"] is False, summary
+          assert summary["observed_evidence_is_policy_training_authority"] is False, summary
+          assert summary["development_fixture_evidence_not_physical_so101_truth"] is True, summary
+          assert summary["development_fixture_evidence_not_policy_training_truth"] is True, summary
           assert summary["ready_for_model_backed_ik"] is False, summary
           assert summary["ready_for_policy_training"] is False, summary
           assert summary["hardware_skipped"] is True, summary
@@ -2029,6 +2032,8 @@ jobs:
           for case in summary["cases"]:
               obs = case["observations"]
               assert obs["model_authority"] == "development_scaffold_not_reviewed", case
+              assert obs["development_fixture_evidence_not_physical_so101_truth"] is True, case
+              assert obs["development_fixture_evidence_not_policy_training_truth"] is True, case
               assert obs["ready_for_model_backed_ik"] is False, case
               assert obs["ready_for_policy_training"] is False, case
               assert obs["physical_authority"] is False, case
@@ -4881,6 +4886,12 @@ jobs:
               and row.get("metrics", {}).get("board_contact_cleared_during_lift") is True
               and row.get("metrics", {}).get("manual_piece_pose_used_after_reset") is False
               and row.get("metrics", {}).get("robot_pose_seeded_for_source_fixture") is True
+              and row.get("metrics", {}).get("observed_evidence_is_physical_so101_authority") is False
+              and row.get("metrics", {}).get("observed_evidence_is_policy_training_authority") is False
+              and row.get("metrics", {}).get("development_fixture_evidence_not_physical_so101_truth") is True
+              and row.get("metrics", {}).get("development_fixture_evidence_not_policy_training_truth") is True
+              and row.get("metrics", {}).get("ready_for_model_backed_ik") is False
+              and row.get("metrics", {}).get("ready_for_policy_training") is False
               and row.get("metrics", {}).get("final_target_xy_error_m") <= row.get("metrics", {}).get("target_xy_tolerance_m")
               for row in artifacts_by_category["so101_mujoco_board_pick_probe"]
           ), artifacts_by_category["so101_mujoco_board_pick_probe"]

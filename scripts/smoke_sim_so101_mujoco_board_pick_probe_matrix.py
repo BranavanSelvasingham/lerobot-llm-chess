@@ -135,6 +135,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "ready_for_model_backed_ik",
         "ready_for_policy_training",
         "physical_authority",
+        "development_fixture_evidence_not_physical_so101_truth",
+        "development_fixture_evidence_not_policy_training_truth",
         "next_required_action_ids",
         "configuration_error",
         "model_xml_exists",
@@ -524,6 +526,12 @@ def summarize_case(
         "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
         "ready_for_policy_training": summary.get("ready_for_policy_training"),
         "physical_authority": summary.get("observed_evidence_is_physical_so101_authority"),
+        "development_fixture_evidence_not_physical_so101_truth": summary.get(
+            "development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "development_fixture_evidence_not_policy_training_truth": summary.get(
+            "development_fixture_evidence_not_policy_training_truth"
+        ),
         "next_required_for_goal": summary.get("next_required_for_goal"),
         "next_required_action_ids": summary.get("next_required_action_ids"),
         "next_required_action_count": summary.get("next_required_action_count"),
@@ -573,6 +581,18 @@ def summarize_case(
         False,
     )
     add_error(errors, f"{case_id}.physical_authority", observations["physical_authority"], False)
+    add_error(
+        errors,
+        f"{case_id}.development_fixture_evidence_not_physical_so101_truth",
+        observations["development_fixture_evidence_not_physical_so101_truth"],
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.development_fixture_evidence_not_policy_training_truth",
+        observations["development_fixture_evidence_not_policy_training_truth"],
+        True,
+    )
 
     if expect_ok:
         add_error(
@@ -870,6 +890,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "ready_for_model_backed_ik": observations.get("ready_for_model_backed_ik"),
         "ready_for_policy_training": observations.get("ready_for_policy_training"),
         "physical_authority": observations.get("physical_authority"),
+        "development_fixture_evidence_not_physical_so101_truth": observations.get(
+            "development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "development_fixture_evidence_not_policy_training_truth": observations.get(
+            "development_fixture_evidence_not_policy_training_truth"
+        ),
         "next_required_action_ids": observations.get("next_required_action_ids"),
         "configuration_error": observations.get("configuration_error"),
         "model_xml_exists": observations.get("model_xml_exists"),
@@ -970,6 +996,9 @@ def main() -> int:
         "output_dir": str(output_dir),
         "model_authority": "so101_mujoco_board_pick_probe_matrix_not_authority",
         "observed_evidence_is_physical_so101_authority": False,
+        "observed_evidence_is_policy_training_authority": False,
+        "development_fixture_evidence_not_physical_so101_truth": True,
+        "development_fixture_evidence_not_policy_training_truth": True,
         "ready_for_model_backed_ik": False,
         "ready_for_policy_training": False,
         "hardware_skipped": True,
