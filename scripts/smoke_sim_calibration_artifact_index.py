@@ -2264,6 +2264,16 @@ def collect_so101_mujoco_smoke_artifacts(
         ),
         "ready_for_model_backed_ik": smoke.get("ready_for_model_backed_ik"),
         "ready_for_policy_training": smoke.get("ready_for_policy_training"),
+        "training_authority_status": smoke.get("training_authority_status"),
+        "rollout_use": smoke.get("rollout_use"),
+        "serious_policy_training_blockers": smoke.get(
+            "serious_policy_training_blockers"
+        )
+        or [],
+        "serious_policy_training_blocker_action_ids": smoke.get(
+            "serious_policy_training_blocker_action_ids"
+        )
+        or [],
         "contact_model": smoke.get("contact_model"),
         "reviewed_model_motion_checked": smoke.get("reviewed_model_motion_checked"),
         "motion_authority_status": smoke.get("motion_authority_status"),
@@ -3581,6 +3591,36 @@ def collect_so101_training_readiness_gate_artifacts(
         "rollout_training_authority_status": gate.get("rollout_training_authority_status"),
         "rollout_model_authority": gate.get("rollout_model_authority"),
         "rollout_use": gate.get("rollout_use"),
+        "rollout_serious_policy_training_blocker_action_ids": gate.get(
+            "rollout_serious_policy_training_blocker_action_ids"
+        )
+        or [],
+        "rollout_next_required_action_ids": gate.get(
+            "rollout_next_required_action_ids"
+        )
+        or [],
+        "rollout_next_required_for_goal_action_ids": gate.get(
+            "rollout_next_required_for_goal_action_ids"
+        )
+        or [],
+        "rollout_next_required_action_ids_match_next_required": gate.get(
+            "rollout_next_required_action_ids_match_next_required"
+        ),
+        "rollout_next_required_action_ids_missing_from_next_required": gate.get(
+            "rollout_next_required_action_ids_missing_from_next_required"
+        )
+        or [],
+        "rollout_next_required_actions_missing_from_action_ids": gate.get(
+            "rollout_next_required_actions_missing_from_action_ids"
+        )
+        or [],
+        "rollout_next_required_action_count": gate.get(
+            "rollout_next_required_action_count"
+        ),
+        "rollout_action_ids_sync_ok": gate.get("rollout_action_ids_sync_ok"),
+        "rollout_ready_has_no_open_actions": gate.get(
+            "rollout_ready_has_no_open_actions"
+        ),
         "development_fixture_evidence_not_policy_training_truth": gate.get(
             "development_fixture_evidence_not_policy_training_truth"
         ),

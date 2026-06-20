@@ -1610,6 +1610,16 @@ def so101_training_readiness_gate_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("rollout_training_authority_status", ""),
         metrics.get("rollout_model_authority", ""),
         metrics.get("rollout_use", ""),
+        compact_list(metrics.get("rollout_serious_policy_training_blocker_action_ids")),
+        compact_list(metrics.get("rollout_next_required_for_goal_action_ids")),
+        metrics.get("rollout_action_ids_sync_ok", ""),
+        compact_list(
+            metrics.get("rollout_next_required_action_ids_missing_from_next_required")
+        ),
+        compact_list(
+            metrics.get("rollout_next_required_actions_missing_from_action_ids")
+        ),
+        metrics.get("rollout_ready_has_no_open_actions", ""),
         metrics.get("development_fixture_evidence_not_policy_training_truth", ""),
         compact_list(metrics.get("priority_gate_order")),
         metrics.get("next_priority_gate_id", ""),
@@ -3352,6 +3362,12 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Rollout Authority Status",
                 "Rollout Authority",
                 "Rollout Use",
+                "Rollout Explicit Actions",
+                "Rollout Derived Actions",
+                "Rollout Action Sync",
+                "Rollout Extra Actions",
+                "Rollout Missing Actions",
+                "Rollout No Open Actions",
                 "Fixture Caveat",
                 "Priority Order",
                 "Next Gate",

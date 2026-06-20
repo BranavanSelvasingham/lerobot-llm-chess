@@ -1202,6 +1202,11 @@ A passing summary should show:
   `rollout_training_authority_status`, `rollout_use`,
   `rollout_observed_evidence_is_policy_training_authority`,
   `rollout_serious_policy_training_blockers`,
+  `rollout_serious_policy_training_blocker_action_ids`,
+  `rollout_next_required_action_ids`,
+  `rollout_next_required_for_goal_action_ids`,
+  `rollout_action_ids_sync_ok`,
+  `rollout_ready_has_no_open_actions`,
   `development_fixture_evidence_not_policy_training_truth`, and
   summary/checklist/README artifact paths. `board_pick_detailed_evidence_ready`
   must require source-start, two-finger contact, lift, board-contact clearance,
@@ -1227,7 +1232,7 @@ A passing summary should show:
   policy-training authority claims, failed rollout status, wrong rollout
   authority status, debug rollout use, missing policy-authority evidence, and
   nonempty serious-policy blockers.
-- `so101_training_rollouts.status: "ok"` with `model_authority: "development_scaffold_not_reviewed"`, false physical-SO-101 and policy-training authority flags, true development-fixture-not-truth flags, `ready_for_model_backed_ik: false`, scripted episodes/transitions populated, `all_mujoco_fallback_free: true`, `all_mujoco_piece_release_synced: true`, `development_prerequisites_satisfied: true`, `training_authority_status: "development_rollouts_prerequisites_verified_not_policy_ready"`, `ready_for_policy_training: false`, `board_pick_prerequisite.status: "development_board_pick_prerequisite_verified"`, serious-policy blockers including `reviewed_model_backed_board_source_pick_place`, and summary/JSONL/CSV/model/manifest/README artifact paths populated
+- `so101_training_rollouts.status: "ok"` with `model_authority: "development_scaffold_not_reviewed"`, false physical-SO-101 and policy-training authority flags, true development-fixture-not-truth flags, `ready_for_model_backed_ik: false`, scripted episodes/transitions populated, `all_mujoco_fallback_free: true`, `all_mujoco_piece_release_synced: true`, `development_prerequisites_satisfied: true`, `training_authority_status: "development_rollouts_prerequisites_verified_not_policy_ready"`, `ready_for_policy_training: false`, `board_pick_prerequisite.status: "development_board_pick_prerequisite_verified"`, serious-policy blockers including `reviewed_model_backed_board_source_pick_place`, `serious_policy_training_blocker_action_ids` including `run_focused_training_rollouts_after_reviewed_pick_place`, synchronized `next_required_for_goal`/`next_required_action_ids` fields with empty two-way missing-action lists, and summary/JSONL/CSV/model/manifest/README artifact paths populated
 - `gripper_camera_pov_review.status: "ok"` with open/approach/grasp/release state IDs, frame paths, annotated-frame paths, metadata paths, metadata contract checks, target center geometry, gripper state, and piece visibility rows populated
 - `visual_review.status: "ok"` with gripper POV, pose fixture, and pick/place sequence contact-sheet PNG paths populated, distance-annotated pick/place sequence frames populated under `frame_sequences`, `depth_distance_scorecard.paths.png`/`.json` populated with the at-a-glance simulator-vs-baseline residual scorecard and missing-real-depth labels, `distance_metrics.paths.json`/`.csv` populated with simulator-ground-truth depth/distance fields, `perceived_depth_comparison.paths.json`/`.csv` populated with estimate-vs-ground-truth residual fields, `pnp_residual_diagnostics.paths.json`/`.csv` populated with source-comparability residual fields, `metadata_native_depth_view.paths.png`/`.json`/`.csv` populated with camera-model-aligned simulator projection/depth fields, and `recordings.*` populated with either a best-effort MP4 path or a skipped reason
 - `real_projection_intake.status: "missing_real_depth_reference"` in the current default state, with JSON/CSV/PNG paths populated, `real_reference_media_path` pointing at the selected image, `sim_metadata_native_depth_view_path` populated, `comparable: false`, missing real intrinsics/board-pose/depth inputs listed, residual paths unset, and sidecar valid/invalid/missing counts populated when a manifest declares sidecar paths

@@ -30,6 +30,12 @@ BOARD_PICK_REQUIRED_STAGE_SEQUENCE = (
     "retreat_after_release_without_manual_piece_pose",
 )
 ROLLOUT_SUMMARY_NAME = "so101_training_rollouts_summary.json"
+ROLLOUT_EXPECTED_NEXT_ACTION_IDS = [
+    "supply_reviewed_so101_model_bundle_manifest",
+    "calibrate_reviewed_tcp_and_base_to_board_alignment",
+    "repeat_board_pick_with_reviewed_model_backed_ik",
+    "run_focused_training_rollouts_after_reviewed_pick_place",
+]
 
 
 def parse_args() -> argparse.Namespace:
@@ -114,6 +120,13 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "policy_authority",
         "rollout_use",
         "configuration_error",
+        "serious_policy_training_blocker_action_ids",
+        "next_required_action_ids",
+        "next_required_for_goal_action_ids",
+        "next_required_action_ids_match_next_required",
+        "next_required_action_ids_missing_from_next_required",
+        "next_required_actions_missing_from_action_ids",
+        "next_required_action_count",
         "model_xml_exists",
         "manifest_json_exists",
         "summary_path",
@@ -684,6 +697,24 @@ def summarize_case(
         "board_pick_final_place_z_error_m": board_pick.get("final_place_z_error_m"),
         "board_pick_place_z_tolerance_m": board_pick.get("place_z_tolerance_m"),
         "serious_policy_training_blockers": blockers,
+        "serious_policy_training_blocker_action_ids": summary.get(
+            "serious_policy_training_blocker_action_ids"
+        ),
+        "next_required_for_goal": summary.get("next_required_for_goal"),
+        "next_required_action_ids": summary.get("next_required_action_ids"),
+        "next_required_for_goal_action_ids": summary.get(
+            "next_required_for_goal_action_ids"
+        ),
+        "next_required_action_ids_match_next_required": summary.get(
+            "next_required_action_ids_match_next_required"
+        ),
+        "next_required_action_ids_missing_from_next_required": summary.get(
+            "next_required_action_ids_missing_from_next_required"
+        ),
+        "next_required_actions_missing_from_action_ids": summary.get(
+            "next_required_actions_missing_from_action_ids"
+        ),
+        "next_required_action_count": summary.get("next_required_action_count"),
         "configuration_error": summary.get("configuration_error"),
         "artifacts": artifacts,
         "model_xml_exists": isinstance(model_xml_path, str) and Path(model_xml_path).is_file(),
@@ -783,6 +814,68 @@ def summarize_case(
                 errors.append(f"{case_id}.configuration_error.message: expected {expected!r} in {message!r}")
     if "reviewed_model_backed_board_source_pick_place" not in blockers:
         errors.append(f"{case_id}.serious_policy_training_blockers: missing reviewed_model_backed_board_source_pick_place")
+    expected_next_action_ids = (
+        ["provide_valid_rollout_task_configuration", *ROLLOUT_EXPECTED_NEXT_ACTION_IDS]
+        if observations["status"] == "invalid_task_configuration"
+        else ROLLOUT_EXPECTED_NEXT_ACTION_IDS
+    )
+    next_required_for_goal = observations["next_required_for_goal"]
+    if not isinstance(next_required_for_goal, list):
+        errors.append(f"{case_id}.next_required_for_goal: expected list, got {next_required_for_goal!r}")
+    else:
+        add_error(
+            errors,
+            f"{case_id}.next_required_action_count",
+            observations["next_required_action_count"],
+            len(next_required_for_goal),
+        )
+        derived_action_ids = [
+            action.get("action_id")
+            for action in next_required_for_goal
+            if isinstance(action, dict)
+        ]
+        add_error(
+            errors,
+            f"{case_id}.next_required_for_goal derived action ids",
+            derived_action_ids,
+            expected_next_action_ids,
+        )
+    add_error(
+        errors,
+        f"{case_id}.next_required_action_ids",
+        observations["next_required_action_ids"],
+        expected_next_action_ids,
+    )
+    add_error(
+        errors,
+        f"{case_id}.next_required_for_goal_action_ids",
+        observations["next_required_for_goal_action_ids"],
+        expected_next_action_ids,
+    )
+    add_error(
+        errors,
+        f"{case_id}.serious_policy_training_blocker_action_ids",
+        observations["serious_policy_training_blocker_action_ids"],
+        expected_next_action_ids,
+    )
+    add_error(
+        errors,
+        f"{case_id}.next_required_action_ids_match_next_required",
+        observations["next_required_action_ids_match_next_required"],
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.next_required_action_ids_missing_from_next_required",
+        observations["next_required_action_ids_missing_from_next_required"],
+        [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.next_required_actions_missing_from_action_ids",
+        observations["next_required_actions_missing_from_action_ids"],
+        [],
+    )
     for key in ("summary_json", "transitions_jsonl", "episodes_csv", "readme"):
         artifact_path = artifacts.get(key)
         if not isinstance(artifact_path, str) or not Path(artifact_path).is_file():
@@ -882,6 +975,23 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "policy_authority": observations.get("observed_evidence_is_policy_training_authority"),
         "rollout_use": observations.get("rollout_use"),
         "configuration_error": observations.get("configuration_error"),
+        "serious_policy_training_blocker_action_ids": observations.get(
+            "serious_policy_training_blocker_action_ids"
+        ),
+        "next_required_action_ids": observations.get("next_required_action_ids"),
+        "next_required_for_goal_action_ids": observations.get(
+            "next_required_for_goal_action_ids"
+        ),
+        "next_required_action_ids_match_next_required": observations.get(
+            "next_required_action_ids_match_next_required"
+        ),
+        "next_required_action_ids_missing_from_next_required": observations.get(
+            "next_required_action_ids_missing_from_next_required"
+        ),
+        "next_required_actions_missing_from_action_ids": observations.get(
+            "next_required_actions_missing_from_action_ids"
+        ),
+        "next_required_action_count": observations.get("next_required_action_count"),
         "model_xml_exists": observations.get("model_xml_exists"),
         "manifest_json_exists": observations.get("manifest_json_exists"),
         "summary_path": case["summary_path"],
@@ -933,6 +1043,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "- Invalid rollout task configurations must write summary/CSV/README artifacts without generating model XML or manifests.",
             "- Short-budget rollouts must record incomplete episodes instead of becoming policy-ready.",
             "- `ready_for_policy_training` and policy authority flags must remain false.",
+            "- `next_required_action_ids` must match `next_required_for_goal_action_ids` and `serious_policy_training_blocker_action_ids`.",
         ]
     )
     path.parent.mkdir(parents=True, exist_ok=True)

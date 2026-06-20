@@ -52,6 +52,60 @@ BOARD_PICK_REQUIRED_STAGE_SEQUENCE: tuple[str, ...] = (
     "release_on_target_without_manual_piece_pose",
     "retreat_after_release_without_manual_piece_pose",
 )
+ROLLOUT_NEXT_REQUIRED_FOR_GOAL: tuple[dict[str, Any], ...] = (
+    {
+        "priority": 1,
+        "missing_input": "reviewed_so101_model_bundle",
+        "action_id": "supply_reviewed_so101_model_bundle_manifest",
+        "gate": "reviewed_model_authority",
+    },
+    {
+        "priority": 2,
+        "missing_input": "reviewed_tcp_and_base_to_board_alignment",
+        "action_id": "calibrate_reviewed_tcp_and_base_to_board_alignment",
+        "gate": "reviewed_model_authority",
+    },
+    {
+        "priority": 3,
+        "missing_input": "reviewed_model_backed_board_source_pick_place",
+        "action_id": "repeat_board_pick_with_reviewed_model_backed_ik",
+        "gate": "scripted_contact_grasp_pick_place",
+    },
+    {
+        "priority": 4,
+        "missing_input": "reviewed_model_backed_training_rollouts",
+        "action_id": "run_focused_training_rollouts_after_reviewed_pick_place",
+        "gate": "focused_training_rollouts",
+    },
+)
+ROLLOUT_SERIOUS_POLICY_TRAINING_BLOCKERS: tuple[str, ...] = tuple(
+    str(action["missing_input"]) for action in ROLLOUT_NEXT_REQUIRED_FOR_GOAL
+)
+
+
+def rollout_next_required_for_goal() -> list[dict[str, Any]]:
+    return [dict(action) for action in ROLLOUT_NEXT_REQUIRED_FOR_GOAL]
+
+
+def action_ids_from_next_required(next_required_for_goal: list[dict[str, Any]]) -> list[str]:
+    return [
+        str(action["action_id"])
+        for action in next_required_for_goal
+        if isinstance(action, dict) and action.get("action_id")
+    ]
+
+
+def rollout_action_contract(next_required_for_goal: list[dict[str, Any]]) -> dict[str, Any]:
+    action_ids = action_ids_from_next_required(next_required_for_goal)
+    return {
+        "serious_policy_training_blocker_action_ids": action_ids,
+        "next_required_action_ids": action_ids,
+        "next_required_for_goal_action_ids": action_ids,
+        "next_required_action_ids_match_next_required": True,
+        "next_required_action_ids_missing_from_next_required": [],
+        "next_required_actions_missing_from_action_ids": [],
+        "next_required_action_count": len(action_ids),
+    }
 
 
 def json_number(value: Any) -> float | None:
@@ -476,6 +530,8 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- Development fixture not physical truth: `{summary.get('development_fixture_evidence_not_physical_so101_truth')}`",
         f"- Development fixture not policy truth: `{summary.get('development_fixture_evidence_not_policy_training_truth')}`",
         f"- Ready for serious policy training: `{summary['ready_for_policy_training']}`",
+        f"- Serious-policy blocker actions: `{summary.get('serious_policy_training_blocker_action_ids')}`",
+        f"- Next action IDs sync: `{summary.get('next_required_action_ids_match_next_required')}`",
         f"- Rollouts JSONL: `{summary['artifacts']['transitions_jsonl']}`",
         "",
         "The rollouts use the development MJCF scaffold and are not physical SO-101 training truth.",
@@ -496,6 +552,15 @@ def invalid_task_summary(
     readme_path: Path,
     message: str,
 ) -> dict[str, Any]:
+    next_required_for_goal = [
+        {
+            "priority": 0,
+            "missing_input": "valid_rollout_task_configuration",
+            "action_id": "provide_valid_rollout_task_configuration",
+            "gate": "focused_training_rollouts",
+        },
+        *rollout_next_required_for_goal(),
+    ]
     return {
         "schema": SCHEMA,
         "ok": False,
@@ -530,10 +595,9 @@ def invalid_task_summary(
         "rollout_use": "not_collected_invalid_task_configuration",
         "serious_policy_training_blockers": [
             "valid_rollout_task_configuration",
-            "reviewed_so101_model_bundle",
-            "reviewed_tcp_and_base_to_board_alignment",
-            "reviewed_model_backed_board_source_pick_place",
+            *ROLLOUT_SERIOUS_POLICY_TRAINING_BLOCKERS,
         ],
+        **rollout_action_contract(next_required_for_goal),
         "tasks": [],
         "episodes": [],
         "artifacts": {
@@ -549,10 +613,7 @@ def invalid_task_summary(
             "No MuJoCo model generation, Gymnasium rollout, or transition collection is attempted.",
             "This failure is hardware-free and does not claim physical SO-101 or policy-training evidence.",
         ],
-        "next_required_for_goal": [
-            "Provide valid SOURCE:TARGET chess task pairs with distinct source and target squares.",
-            "Use a positive rollout step budget.",
-        ],
+        "next_required_for_goal": next_required_for_goal,
     }
 
 
@@ -592,6 +653,7 @@ def main() -> int:
         print(json.dumps({"ok": False, "status": summary["status"], "summary_json": str(summary_path)}, indent=2))
         return 1
     if missing:
+        next_required_for_goal = rollout_next_required_for_goal()
         summary = {
             "schema": SCHEMA,
             "ok": False,
@@ -618,11 +680,9 @@ def main() -> int:
                 "ok": False,
                 "status": "not_checked_due_to_missing_runtime_dependencies",
             },
-            "serious_policy_training_blockers": [
-                "reviewed_so101_model_bundle",
-                "reviewed_tcp_and_base_to_board_alignment",
-                "reviewed_model_backed_board_source_pick_place",
-            ],
+            "serious_policy_training_blockers": list(ROLLOUT_SERIOUS_POLICY_TRAINING_BLOCKERS),
+            **rollout_action_contract(next_required_for_goal),
+            "next_required_for_goal": next_required_for_goal,
             "artifacts": {
                 "summary_json": str(summary_path),
                 "transitions_jsonl": str(transitions_path),
@@ -674,6 +734,7 @@ def main() -> int:
     all_fallback_free = all(row["mujoco_active"] and row["fallback"] is None for row in episode_rows)
     all_release_synced = all(row["mujoco_piece_release_synced"] for row in episode_rows)
     development_prerequisites_satisfied = bool(board_pick_prerequisite.get("ok"))
+    next_required_for_goal = rollout_next_required_for_goal()
     ok = (
         bool(episode_rows)
         and bool(transitions)
@@ -702,11 +763,8 @@ def main() -> int:
         ),
         "ready_for_policy_training": False,
         "rollout_use": "debug_imitation_curriculum_only",
-        "serious_policy_training_blockers": [
-            "reviewed_so101_model_bundle",
-            "reviewed_tcp_and_base_to_board_alignment",
-            "reviewed_model_backed_board_source_pick_place",
-        ],
+        "serious_policy_training_blockers": list(ROLLOUT_SERIOUS_POLICY_TRAINING_BLOCKERS),
+        **rollout_action_contract(next_required_for_goal),
         "development_manifest": manifest,
         "tasks": [{"source_square": source, "target_square": target} for source, target in tasks],
         "episode_count": len(episode_rows),
@@ -729,12 +787,7 @@ def main() -> int:
             "The piece transfer in the environment remains symbolic until reviewed MuJoCo contact manipulation is implemented.",
             "The development board-pick prerequisite uses seeded source pose and is not reviewed model-backed IK.",
         ],
-        "next_required_for_goal": [
-            "Replace the development MJCF scaffold with reviewed model bundle evidence.",
-            "Add contact-validated grasp/lift/place physics after TCP and base-to-board alignment are reviewed.",
-            "Repeat board-source pick/place with reviewed model-backed IK instead of seeded development pose.",
-            "Use these JSONL transitions as a narrow imitation-learning/debug curriculum, not final policy training truth.",
-        ],
+        "next_required_for_goal": next_required_for_goal,
     }
     write_json(summary_path, summary)
     append_jsonl(transitions_path, transitions)

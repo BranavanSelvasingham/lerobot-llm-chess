@@ -3628,6 +3628,7 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "ready_for_policy_training",
         "rollout_use",
         "serious_policy_training_blockers",
+        "serious_policy_training_blocker_action_ids",
         "manifest_status",
         "manifest_request",
         "model_path",
@@ -7073,6 +7074,96 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
     }
 
 
+def so101_rollout_action_contract(training_rollouts: dict[str, Any]) -> dict[str, Any]:
+    next_required_for_goal = training_rollouts.get("next_required_for_goal")
+    next_required_for_goal = (
+        next_required_for_goal if isinstance(next_required_for_goal, list) else []
+    )
+    next_required_for_goal_action_ids = training_rollouts.get(
+        "next_required_for_goal_action_ids"
+    )
+    next_required_for_goal_action_ids = (
+        unique_string_values(next_required_for_goal_action_ids)
+        if isinstance(next_required_for_goal_action_ids, list)
+        else unique_string_values(
+            [
+                action.get("action_id")
+                for action in next_required_for_goal
+                if isinstance(action, dict)
+            ]
+        )
+    )
+    next_required_action_ids = training_rollouts.get("next_required_action_ids")
+    next_required_action_ids = (
+        unique_string_values(next_required_action_ids)
+        if isinstance(next_required_action_ids, list)
+        else next_required_for_goal_action_ids
+    )
+    blocker_action_ids = training_rollouts.get(
+        "serious_policy_training_blocker_action_ids"
+    )
+    blocker_action_ids = (
+        unique_string_values(blocker_action_ids)
+        if isinstance(blocker_action_ids, list)
+        else next_required_action_ids
+    )
+    missing_from_next_required = [
+        action_id
+        for action_id in next_required_action_ids
+        if action_id not in next_required_for_goal_action_ids
+    ]
+    missing_from_action_ids = [
+        action_id
+        for action_id in next_required_for_goal_action_ids
+        if action_id not in next_required_action_ids
+    ]
+    explicit_missing_from_next_required = training_rollouts.get(
+        "next_required_action_ids_missing_from_next_required"
+    )
+    explicit_missing_from_action_ids = training_rollouts.get(
+        "next_required_actions_missing_from_action_ids"
+    )
+    if isinstance(explicit_missing_from_next_required, list):
+        missing_from_next_required = unique_string_values(
+            explicit_missing_from_next_required
+        )
+    if isinstance(explicit_missing_from_action_ids, list):
+        missing_from_action_ids = unique_string_values(
+            explicit_missing_from_action_ids
+        )
+    action_ids_match = (
+        training_rollouts.get("next_required_action_ids_match_next_required")
+        if isinstance(
+            training_rollouts.get("next_required_action_ids_match_next_required"),
+            bool,
+        )
+        else next_required_action_ids == next_required_for_goal_action_ids
+    )
+    action_ids_sync_ok = (
+        action_ids_match is True
+        and missing_from_next_required == []
+        and missing_from_action_ids == []
+        and blocker_action_ids == next_required_action_ids
+    )
+    no_open_actions = (
+        next_required_for_goal == []
+        and next_required_action_ids == []
+        and blocker_action_ids == []
+    )
+    return {
+        "next_required_for_goal": next_required_for_goal,
+        "next_required_action_ids": next_required_action_ids,
+        "next_required_for_goal_action_ids": next_required_for_goal_action_ids,
+        "serious_policy_training_blocker_action_ids": blocker_action_ids,
+        "next_required_action_ids_match_next_required": action_ids_match,
+        "next_required_action_ids_missing_from_next_required": missing_from_next_required,
+        "next_required_actions_missing_from_action_ids": missing_from_action_ids,
+        "next_required_action_count": len(next_required_for_goal),
+        "action_ids_sync_ok": action_ids_sync_ok,
+        "ready_has_no_open_actions": no_open_actions,
+    }
+
+
 def so101_training_priority_gate_queue(
     reviewed_authority_gate: dict[str, Any],
     board_pick: dict[str, Any],
@@ -7149,6 +7240,7 @@ def so101_training_priority_gate_queue(
     scripted_pick_place_training_ready = (
         gym_training_ready and reviewed_model_backed_board_pick_place
     )
+    rollout_action_contract = so101_rollout_action_contract(training_rollouts)
     rollout_policy_training_authority_ready = (
         training_rollouts.get("ready_for_policy_training") is True
         and training_rollouts.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
@@ -7163,6 +7255,8 @@ def so101_training_priority_gate_queue(
             is True
         )
         and not training_rollouts.get("serious_policy_training_blockers")
+        and rollout_action_contract.get("action_ids_sync_ok") is True
+        and rollout_action_contract.get("ready_has_no_open_actions") is True
     )
     rollout_automation_ready = training_rollouts.get("status") == "ok"
     rollout_training_ready = (
@@ -7240,7 +7334,8 @@ def so101_training_priority_gate_queue(
             "training_ready": rollout_training_ready,
             "automation_evidence_ready": rollout_automation_ready,
             "next_action_ids": (
-                training_rollouts.get("serious_policy_training_blockers")
+                rollout_action_contract.get("serious_policy_training_blocker_action_ids")
+                or rollout_action_contract.get("next_required_action_ids")
                 or ["run_focused_training_rollouts_after_reviewed_pick_place"]
             ),
             "evidence_artifact_paths": [
@@ -7381,6 +7476,7 @@ def so101_training_readiness_gate_section(
     reviewed_model_backed_board_pick_place = (
         board_pick_authority_contract.get("ready") is True
     )
+    rollout_action_contract = so101_rollout_action_contract(training_rollouts)
     rollout_policy_training_authority_ready = (
         training_rollouts.get("ready_for_policy_training") is True
         and training_rollouts.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
@@ -7395,6 +7491,8 @@ def so101_training_readiness_gate_section(
             is True
         )
         and not training_rollouts.get("serious_policy_training_blockers")
+        and rollout_action_contract.get("action_ids_sync_ok") is True
+        and rollout_action_contract.get("ready_has_no_open_actions") is True
     )
     priority_queue = so101_training_priority_gate_queue(
         reviewed_authority_gate,
@@ -7431,8 +7529,12 @@ def so101_training_readiness_gate_section(
                 []
                 if rollout_policy_training_authority_ready
                 else (
-                    training_rollouts.get("serious_policy_training_blockers")
-                    or ["reviewed_model_backed_training_rollouts"]
+                    rollout_action_contract.get(
+                        "serious_policy_training_blocker_action_ids"
+                    )
+                    or rollout_action_contract.get("next_required_action_ids")
+                    or training_rollouts.get("serious_policy_training_blockers")
+                    or ["run_focused_training_rollouts_after_reviewed_pick_place"]
                 )
             ),
             *(
@@ -7738,6 +7840,40 @@ def so101_training_readiness_gate_section(
         "rollout_serious_policy_training_blockers": training_rollouts.get(
             "serious_policy_training_blockers"
         ),
+        "rollout_serious_policy_training_blocker_action_ids": (
+            rollout_action_contract.get("serious_policy_training_blocker_action_ids")
+        ),
+        "rollout_next_required_for_goal": rollout_action_contract.get(
+            "next_required_for_goal"
+        ),
+        "rollout_next_required_action_ids": rollout_action_contract.get(
+            "next_required_action_ids"
+        ),
+        "rollout_next_required_for_goal_action_ids": rollout_action_contract.get(
+            "next_required_for_goal_action_ids"
+        ),
+        "rollout_next_required_action_ids_match_next_required": (
+            rollout_action_contract.get("next_required_action_ids_match_next_required")
+        ),
+        "rollout_next_required_action_ids_missing_from_next_required": (
+            rollout_action_contract.get(
+                "next_required_action_ids_missing_from_next_required"
+            )
+        ),
+        "rollout_next_required_actions_missing_from_action_ids": (
+            rollout_action_contract.get(
+                "next_required_actions_missing_from_action_ids"
+            )
+        ),
+        "rollout_next_required_action_count": rollout_action_contract.get(
+            "next_required_action_count"
+        ),
+        "rollout_action_ids_sync_ok": rollout_action_contract.get(
+            "action_ids_sync_ok"
+        ),
+        "rollout_ready_has_no_open_actions": rollout_action_contract.get(
+            "ready_has_no_open_actions"
+        ),
         "development_fixture_evidence_not_policy_training_truth": (
             not ready
             or not board_pick_reviewed_model_authority_ready
@@ -8016,6 +8152,14 @@ def write_so101_training_readiness_gate_artifacts(
                 f"`{markdown_bool(gate.get('rollout_ready_for_policy_training'))}`",
                 "- Rollout policy-training authority ready: "
                 f"`{markdown_bool(gate.get('rollout_policy_training_authority_ready'))}`",
+                "- Rollout blocker action IDs: "
+                f"`{markdown_list_value(gate.get('rollout_serious_policy_training_blocker_action_ids'))}`",
+                "- Rollout derived action IDs: "
+                f"`{markdown_list_value(gate.get('rollout_next_required_for_goal_action_ids'))}`",
+                "- Rollout action IDs sync: "
+                f"`{markdown_bool(gate.get('rollout_action_ids_sync_ok'))}`",
+                "- Rollout has no open actions: "
+                f"`{markdown_bool(gate.get('rollout_ready_has_no_open_actions'))}`",
                 "- Development fixture evidence is not policy training truth: "
                 f"`{markdown_bool(gate.get('development_fixture_evidence_not_policy_training_truth'))}`",
                 "- Next priority gate: "

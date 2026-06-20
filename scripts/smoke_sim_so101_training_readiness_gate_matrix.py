@@ -55,6 +55,32 @@ BOARD_PICK_DEVELOPMENT_NEXT_REQUIRED_FOR_GOAL = (
         "gate": "scripted_contact_grasp_pick_place",
     },
 )
+ROLLOUT_BLOCKER_ACTIONS = {
+    "reviewed_so101_model_bundle": {
+        "priority": 1,
+        "missing_input": "reviewed_so101_model_bundle",
+        "action_id": "supply_reviewed_so101_model_bundle_manifest",
+        "gate": "reviewed_model_authority",
+    },
+    "reviewed_tcp_and_base_to_board_alignment": {
+        "priority": 2,
+        "missing_input": "reviewed_tcp_and_base_to_board_alignment",
+        "action_id": "calibrate_reviewed_tcp_and_base_to_board_alignment",
+        "gate": "reviewed_model_authority",
+    },
+    "reviewed_model_backed_board_source_pick_place": {
+        "priority": 3,
+        "missing_input": "reviewed_model_backed_board_source_pick_place",
+        "action_id": "repeat_board_pick_with_reviewed_model_backed_ik",
+        "gate": "scripted_contact_grasp_pick_place",
+    },
+    "reviewed_model_backed_training_rollouts": {
+        "priority": 4,
+        "missing_input": "reviewed_model_backed_training_rollouts",
+        "action_id": "run_focused_training_rollouts_after_reviewed_pick_place",
+        "gate": "focused_training_rollouts",
+    },
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -173,6 +199,15 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "rollout_status",
         "rollout_training_authority_status",
         "rollout_use",
+        "rollout_serious_policy_training_blocker_action_ids",
+        "rollout_next_required_action_ids",
+        "rollout_next_required_for_goal_action_ids",
+        "rollout_next_required_action_ids_match_next_required",
+        "rollout_next_required_action_ids_missing_from_next_required",
+        "rollout_next_required_actions_missing_from_action_ids",
+        "rollout_next_required_action_count",
+        "rollout_action_ids_sync_ok",
+        "rollout_ready_has_no_open_actions",
         "rollout_observed_evidence_is_policy_training_authority",
         "rollout_policy_training_authority_ready",
         "development_fixture_evidence_not_policy_training_truth",
@@ -267,6 +302,29 @@ def board_pick_next_required_fields(
     ]
     return {
         "next_required_for_goal": next_required_for_goal,
+        "next_required_action_ids": action_ids,
+        "next_required_for_goal_action_ids": action_ids,
+        "next_required_action_ids_match_next_required": True,
+        "next_required_action_ids_missing_from_next_required": [],
+        "next_required_actions_missing_from_action_ids": [],
+        "next_required_action_count": len(action_ids),
+    }
+
+
+def rollout_next_required_fields(blockers: list[str]) -> dict[str, Any]:
+    next_required_for_goal = [
+        dict(ROLLOUT_BLOCKER_ACTIONS[blocker])
+        for blocker in ROLLOUT_BLOCKER_ACTIONS
+        if blocker in blockers
+    ]
+    action_ids = [
+        str(action["action_id"])
+        for action in next_required_for_goal
+        if isinstance(action, dict) and "action_id" in action
+    ]
+    return {
+        "next_required_for_goal": next_required_for_goal,
+        "serious_policy_training_blocker_action_ids": action_ids,
         "next_required_action_ids": action_ids,
         "next_required_for_goal_action_ids": action_ids,
         "next_required_action_ids_match_next_required": True,
@@ -400,6 +458,11 @@ def rollout_state(
     reviewed_ready = (
         ready_for_policy_training and model_authority == REVIEWED_SO101_MODEL_AUTHORITY
     )
+    serious_policy_training_blockers = (
+        blockers
+        if blockers is not None
+        else ([] if ready_for_policy_training else ["reviewed_model_backed_training_rollouts"])
+    )
     return {
         "status": (
             status
@@ -431,10 +494,9 @@ def rollout_state(
             if reviewed_ready
             else "debug_imitation_curriculum_only"
         ),
-        "serious_policy_training_blockers": blockers
-        if blockers is not None
-        else ([] if ready_for_policy_training else ["reviewed_model_backed_training_rollouts"]),
+        "serious_policy_training_blockers": serious_policy_training_blockers,
         "summary_path": str(summary_path),
+        **rollout_next_required_fields(serious_policy_training_blockers),
     }
 
 
@@ -1745,7 +1807,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "rollout_raw": True,
                 "rollout_authority": False,
                 "development_caveat": True,
-                "blockers_contain": ["reviewed_model_backed_training_rollouts"],
+                "blockers_contain": ["run_focused_training_rollouts_after_reviewed_pick_place"],
                 "next_priority_gate": "focused_training_rollouts",
             },
         },
@@ -1773,7 +1835,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "rollout_raw": False,
                 "rollout_authority": False,
                 "development_caveat": True,
-                "blockers_contain": ["reviewed_model_backed_training_rollouts"],
+                "blockers_contain": ["run_focused_training_rollouts_after_reviewed_pick_place"],
                 "next_priority_gate": "focused_training_rollouts",
             },
         },
@@ -1802,7 +1864,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "rollout_status": "failed_rollout_validation",
                 "rollout_authority": False,
                 "development_caveat": True,
-                "blockers_contain": ["reviewed_model_backed_training_rollouts"],
+                "blockers_contain": ["run_focused_training_rollouts_after_reviewed_pick_place"],
                 "next_priority_gate": "focused_training_rollouts",
             },
         },
@@ -1831,7 +1893,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "rollout_training_authority_status": "development_rollouts_prerequisites_verified_not_policy_ready",
                 "rollout_authority": False,
                 "development_caveat": True,
-                "blockers_contain": ["reviewed_model_backed_training_rollouts"],
+                "blockers_contain": ["run_focused_training_rollouts_after_reviewed_pick_place"],
                 "next_priority_gate": "focused_training_rollouts",
             },
         },
@@ -1860,7 +1922,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "rollout_use": "debug_imitation_curriculum_only",
                 "rollout_authority": False,
                 "development_caveat": True,
-                "blockers_contain": ["reviewed_model_backed_training_rollouts"],
+                "blockers_contain": ["run_focused_training_rollouts_after_reviewed_pick_place"],
                 "next_priority_gate": "focused_training_rollouts",
             },
         },
@@ -1889,7 +1951,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "rollout_observed_policy_authority": False,
                 "rollout_authority": False,
                 "development_caveat": True,
-                "blockers_contain": ["reviewed_model_backed_training_rollouts"],
+                "blockers_contain": ["run_focused_training_rollouts_after_reviewed_pick_place"],
                 "next_priority_gate": "focused_training_rollouts",
             },
         },
@@ -1917,7 +1979,7 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "rollout_raw": True,
                 "rollout_authority": False,
                 "development_caveat": True,
-                "blockers_contain": ["reviewed_model_backed_training_rollouts"],
+                "blockers_contain": ["run_focused_training_rollouts_after_reviewed_pick_place"],
                 "next_priority_gate": "focused_training_rollouts",
             },
         },
@@ -2386,6 +2448,67 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         gate.get("rollout_policy_training_authority_ready"),
         expect["rollout_authority"],
     )
+    rollout_blockers = spec["rollouts"].get("serious_policy_training_blockers")
+    rollout_blockers = rollout_blockers if isinstance(rollout_blockers, list) else []
+    expected_rollout_action_ids = [
+        str(ROLLOUT_BLOCKER_ACTIONS[blocker]["action_id"])
+        for blocker in ROLLOUT_BLOCKER_ACTIONS
+        if blocker in rollout_blockers
+    ]
+    add_error(
+        errors,
+        "rollout_serious_policy_training_blocker_action_ids",
+        gate.get("rollout_serious_policy_training_blocker_action_ids"),
+        expected_rollout_action_ids,
+    )
+    add_error(
+        errors,
+        "rollout_next_required_action_ids",
+        gate.get("rollout_next_required_action_ids"),
+        expected_rollout_action_ids,
+    )
+    add_error(
+        errors,
+        "rollout_next_required_for_goal_action_ids",
+        gate.get("rollout_next_required_for_goal_action_ids"),
+        expected_rollout_action_ids,
+    )
+    add_error(
+        errors,
+        "rollout_next_required_action_ids_match_next_required",
+        gate.get("rollout_next_required_action_ids_match_next_required"),
+        True,
+    )
+    add_error(
+        errors,
+        "rollout_next_required_action_ids_missing_from_next_required",
+        gate.get("rollout_next_required_action_ids_missing_from_next_required"),
+        [],
+    )
+    add_error(
+        errors,
+        "rollout_next_required_actions_missing_from_action_ids",
+        gate.get("rollout_next_required_actions_missing_from_action_ids"),
+        [],
+    )
+    add_error(
+        errors,
+        "rollout_next_required_action_count",
+        gate.get("rollout_next_required_action_count"),
+        len(gate.get("rollout_next_required_for_goal") or []),
+    )
+    add_error(
+        errors,
+        "rollout_action_ids_sync_ok",
+        gate.get("rollout_action_ids_sync_ok"),
+        True,
+    )
+    add_error(
+        errors,
+        "rollout_ready_has_no_open_actions",
+        gate.get("rollout_ready_has_no_open_actions"),
+        expected_rollout_action_ids == [],
+    )
     add_error(
         errors,
         "development_fixture_evidence_not_policy_training_truth",
@@ -2747,6 +2870,31 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "rollout_status": gate.get("rollout_status"),
         "rollout_training_authority_status": gate.get("rollout_training_authority_status"),
         "rollout_use": gate.get("rollout_use"),
+        "rollout_serious_policy_training_blocker_action_ids": gate.get(
+            "rollout_serious_policy_training_blocker_action_ids"
+        ),
+        "rollout_next_required_action_ids": gate.get(
+            "rollout_next_required_action_ids"
+        ),
+        "rollout_next_required_for_goal_action_ids": gate.get(
+            "rollout_next_required_for_goal_action_ids"
+        ),
+        "rollout_next_required_action_ids_match_next_required": gate.get(
+            "rollout_next_required_action_ids_match_next_required"
+        ),
+        "rollout_next_required_action_ids_missing_from_next_required": gate.get(
+            "rollout_next_required_action_ids_missing_from_next_required"
+        ),
+        "rollout_next_required_actions_missing_from_action_ids": gate.get(
+            "rollout_next_required_actions_missing_from_action_ids"
+        ),
+        "rollout_next_required_action_count": gate.get(
+            "rollout_next_required_action_count"
+        ),
+        "rollout_action_ids_sync_ok": gate.get("rollout_action_ids_sync_ok"),
+        "rollout_ready_has_no_open_actions": gate.get(
+            "rollout_ready_has_no_open_actions"
+        ),
         "rollout_observed_evidence_is_policy_training_authority": gate.get(
             "rollout_observed_evidence_is_policy_training_authority"
         ),
@@ -2819,6 +2967,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "- Draft, development, and fixture-only model-authority labels are rejected even when raw readiness booleans are true.",
             "- Reviewed-MuJoCo downstream handoff readiness requires a complete current-schema summary-level handoff contract; raw-ready, fixture-only, stale-schema, incomplete, or physical-truth-claiming handoffs cannot unblock training.",
             "- Board-pick readiness requires detailed source-start, contact, lift, transfer, place, release, final-board-contact, and target-tolerance evidence without physical SO-101 truth or policy-training authority overclaims.",
+            "- Focused rollout blocker action IDs must sync with `next_required_for_goal`; the ready branch requires empty rollout blockers and empty rollout action IDs.",
             "- Reviewed rollout readiness requires status `ok`, reviewed-policy-ready authority status, `policy_training` use, policy-authority evidence, and no serious-policy blockers.",
             "- Use this smoke to protect training-readiness gate logic. Use reviewed SO-101 model-backed pick/place and rollout evidence before serious training.",
         ]

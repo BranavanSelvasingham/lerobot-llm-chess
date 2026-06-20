@@ -88,6 +88,10 @@ The summary must report:
 - `ready_for_model_backed_ik: false`
 - `ready_for_policy_training: false`
 - `serious_policy_training_blockers` includes `reviewed_model_backed_board_source_pick_place`
+- `serious_policy_training_blocker_action_ids` includes `run_focused_training_rollouts_after_reviewed_pick_place`
+- `next_required_action_ids` matches `next_required_for_goal_action_ids`
+- `next_required_action_ids_missing_from_next_required: []`
+- `next_required_actions_missing_from_action_ids: []`
 
 These rollouts are useful as a narrow debugging/imitation-learning curriculum,
 but they are not final robot-training evidence. The environment still uses
