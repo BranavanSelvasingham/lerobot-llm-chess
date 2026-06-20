@@ -90,6 +90,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "physical_so101_model_authority_ready",
         "hardware_free_regression_fixture_ready",
         "physical_authority_gate_status",
+        "physical_authority_contract_status",
+        "physical_authority_contract_ok",
+        "physical_authority_contract_errors",
+        "physical_authority_contract_fixture_ready_not_physical_so101_authority",
         "model_path_status",
         "model_identity_status",
         "authority_status",
@@ -1093,6 +1097,107 @@ def summarize_case(
             summary.get("physical_authority_gate_status"),
             expect["physical_authority_gate_status"],
         )
+    physical_authority_contract = summary.get("physical_authority_contract")
+    if not isinstance(physical_authority_contract, dict):
+        errors.append(f"{case_id}.physical_authority_contract: expected dict")
+        physical_authority_contract = {}
+    expected_contract_status = (
+        "physical_authority_ready"
+        if expect.get("physical_ready", False)
+        else "fixture_ready_not_physical_authority"
+        if expect.get("fixture_ready", False)
+        else "physical_authority_blocked"
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.ok",
+        physical_authority_contract.get("ok"),
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.status",
+        physical_authority_contract.get("status"),
+        expected_contract_status,
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.ready_for_model_backed_ik",
+        physical_authority_contract.get("ready_for_model_backed_ik"),
+        expect["ready"],
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.model_authority",
+        physical_authority_contract.get("model_authority"),
+        summary.get("model_authority"),
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.physical_authority_gate_status",
+        physical_authority_contract.get("physical_authority_gate_status"),
+        summary.get("physical_authority_gate_status"),
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.physical_so101_model_authority_ready",
+        physical_authority_contract.get("physical_so101_model_authority_ready"),
+        expect.get("physical_ready", False),
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.hardware_free_regression_fixture_ready",
+        physical_authority_contract.get("hardware_free_regression_fixture_ready"),
+        expect.get("fixture_ready", False),
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.fixture_ready_not_physical_so101_authority",
+        physical_authority_contract.get(
+            "fixture_ready_not_physical_so101_authority"
+        ),
+        expect.get("fixture_ready", False),
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.synthetic_fixture_authority_fields",
+        physical_authority_contract.get("synthetic_fixture_authority_fields"),
+        summary.get("synthetic_fixture_authority_fields"),
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.physical_authority_blockers",
+        physical_authority_contract.get("physical_authority_blockers"),
+        summary.get("physical_authority_blockers"),
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.next_required_action_ids",
+        physical_authority_contract.get("next_required_action_ids"),
+        summary.get("next_required_action_ids") or [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.physical_ready_requires_no_synthetic_fixture_fields",
+        physical_authority_contract.get(
+            "physical_ready_requires_no_synthetic_fixture_fields"
+        ),
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.fixture_ready_requires_synthetic_fixture_fields",
+        physical_authority_contract.get(
+            "fixture_ready_requires_synthetic_fixture_fields"
+        ),
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.errors",
+        physical_authority_contract.get("errors"),
+        [],
+    )
 
     for key, summary_key in (
         ("model_path_status", ("model_path",)),
@@ -1311,6 +1416,18 @@ def summarize_case(
             "physical_authority_gate_status": summary.get(
                 "physical_authority_gate_status"
             ),
+            "physical_authority_contract_status": (
+                physical_authority_contract.get("status")
+            ),
+            "physical_authority_contract_ok": physical_authority_contract.get("ok"),
+            "physical_authority_contract_errors": (
+                physical_authority_contract.get("errors")
+            ),
+            "physical_authority_contract_fixture_ready_not_physical_so101_authority": (
+                physical_authority_contract.get(
+                    "fixture_ready_not_physical_so101_authority"
+                )
+            ),
             "model_path_status": nested_status(summary, "model_path"),
             "model_identity_status": nested_status(summary, "model_identity"),
             "authority_status": nested_status(summary, "authority"),
@@ -1474,6 +1591,16 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
             "hardware_free_regression_fixture_ready"
         ),
         "physical_authority_gate_status": obs.get("physical_authority_gate_status"),
+        "physical_authority_contract_status": obs.get(
+            "physical_authority_contract_status"
+        ),
+        "physical_authority_contract_ok": obs.get("physical_authority_contract_ok"),
+        "physical_authority_contract_errors": obs.get(
+            "physical_authority_contract_errors"
+        ),
+        "physical_authority_contract_fixture_ready_not_physical_so101_authority": obs.get(
+            "physical_authority_contract_fixture_ready_not_physical_so101_authority"
+        ),
         "model_path_status": obs.get("model_path_status"),
         "model_identity_status": obs.get("model_identity_status"),
         "authority_status": obs.get("authority_status"),

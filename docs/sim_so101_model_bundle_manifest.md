@@ -168,7 +168,16 @@ Every summary also reports `model_authority`,
 `physical_authority_gate_status`, `physical_authority_blockers`,
 `physical_so101_model_authority_ready`,
 `hardware_free_regression_fixture_ready`, and
-`synthetic_fixture_authority_fields`. The `model_identity` section records the
+`synthetic_fixture_authority_fields`. It also reports
+`physical_authority_contract`, a compact contract object with `ok`, `status`,
+`ready_for_model_backed_ik`, physical-ready, fixture-ready, blocker, and
+synthetic-fixture fields. This object is the quickest machine-readable check
+for whether the manifest is physically authoritative, fixture-ready only, or
+still blocked. Ready synthetic fixture manifests must report
+`status: "fixture_ready_not_physical_authority"` and
+`fixture_ready_not_physical_so101_authority: true`; only a ready manifest with
+no synthetic fixture fields may report `status: "physical_authority_ready"`.
+The `model_identity` section records the
 declared digest field, observed `model_path` SHA-256, match status, and any
 `model_sha256_missing`, `model_sha256_invalid`, or `model_sha256_mismatch`
 diagnostics. It also reports

@@ -3022,6 +3022,86 @@ def build_physical_authority_blockers(
     return blockers
 
 
+def build_physical_authority_contract(
+    *,
+    ready: bool,
+    synthetic_flags: dict[str, bool],
+    synthetic_fields: list[str],
+    model_authority: str,
+    physical_authority_gate_status_value: str,
+    physical_authority_ready: bool,
+    hardware_free_regression_fixture_ready: bool,
+    physical_authority_blockers: list[str],
+    next_required_action_ids: list[str],
+) -> dict[str, Any]:
+    expected_model_authority = model_authority_class(ready, synthetic_flags)
+    expected_physical_ready = ready and not synthetic_fields
+    expected_fixture_ready = ready and bool(synthetic_fields)
+    expected_gate_status = physical_authority_gate_status(
+        ready,
+        expected_physical_ready,
+        synthetic_fields,
+    )
+    expected_blockers = build_physical_authority_blockers(
+        [{"action_id": action_id} for action_id in next_required_action_ids],
+        synthetic_fields,
+    )
+    errors: list[str] = []
+    if model_authority != expected_model_authority:
+        errors.append("model_authority_mismatch")
+    if physical_authority_ready != expected_physical_ready:
+        errors.append("physical_authority_ready_mismatch")
+    if hardware_free_regression_fixture_ready != expected_fixture_ready:
+        errors.append("hardware_free_fixture_ready_mismatch")
+    if physical_authority_gate_status_value != expected_gate_status:
+        errors.append("physical_authority_gate_status_mismatch")
+    if physical_authority_blockers != expected_blockers:
+        errors.append("physical_authority_blockers_mismatch")
+
+    if errors:
+        status = "physical_authority_contract_invalid"
+    elif physical_authority_ready:
+        status = "physical_authority_ready"
+    elif hardware_free_regression_fixture_ready:
+        status = "fixture_ready_not_physical_authority"
+    else:
+        status = "physical_authority_blocked"
+
+    return {
+        "schema": "lerobot.sim.so101_model_bundle_manifest_physical_authority_contract.v1",
+        "ok": not errors,
+        "status": status,
+        "ready_for_model_backed_ik": ready,
+        "model_authority": model_authority,
+        "expected_model_authority": expected_model_authority,
+        "physical_authority_gate_status": physical_authority_gate_status_value,
+        "expected_physical_authority_gate_status": expected_gate_status,
+        "physical_so101_model_authority_ready": physical_authority_ready,
+        "expected_physical_so101_model_authority_ready": expected_physical_ready,
+        "hardware_free_regression_fixture_ready": hardware_free_regression_fixture_ready,
+        "expected_hardware_free_regression_fixture_ready": expected_fixture_ready,
+        "fixture_ready_not_physical_so101_authority": (
+            hardware_free_regression_fixture_ready and not physical_authority_ready
+        ),
+        "synthetic_fixture_authority_fields": synthetic_fields,
+        "physical_authority_blockers": physical_authority_blockers,
+        "expected_physical_authority_blockers": expected_blockers,
+        "next_required_action_ids": next_required_action_ids,
+        "physical_ready_requires_no_synthetic_fixture_fields": (
+            not physical_authority_ready or not synthetic_fields
+        ),
+        "fixture_ready_requires_synthetic_fixture_fields": (
+            not hardware_free_regression_fixture_ready or bool(synthetic_fields)
+        ),
+        "errors": errors,
+        "notes": [
+            "This contract summarizes the manifest checker's physical-authority boundary.",
+            "A manifest can be ready for hardware-free automation while this contract still reports fixture_ready_not_physical_authority.",
+            "Only physical_so101_model_authority_ready true with no synthetic fixture fields closes reviewed SO-101 model authority.",
+        ],
+    }
+
+
 def review_packet_status(summary: dict[str, Any]) -> str:
     if summary["manifest_request"]["status"] != "model_bundle_manifest_loaded":
         return "review_packet_waiting_for_manifest"
@@ -4149,25 +4229,45 @@ def build_summary(
     )
     synthetic_fields = [field for field, enabled in synthetic_flags.items() if enabled]
     physical_authority_ready = ready and not synthetic_fields
+    hardware_free_regression_fixture_ready = ready and bool(synthetic_fields)
     physical_authority_blockers = build_physical_authority_blockers(
         next_required_for_goal,
         synthetic_fields,
+    )
+    next_required_action_ids = [
+        action["action_id"]
+        for action in next_required_for_goal
+        if isinstance(action.get("action_id"), str) and action["action_id"]
+    ]
+    model_authority = model_authority_class(ready, synthetic_flags)
+    physical_authority_gate_status_value = physical_authority_gate_status(
+        ready,
+        physical_authority_ready,
+        synthetic_fields,
+    )
+    physical_authority_contract = build_physical_authority_contract(
+        ready=ready,
+        synthetic_flags=synthetic_flags,
+        synthetic_fields=synthetic_fields,
+        model_authority=model_authority,
+        physical_authority_gate_status_value=physical_authority_gate_status_value,
+        physical_authority_ready=physical_authority_ready,
+        hardware_free_regression_fixture_ready=hardware_free_regression_fixture_ready,
+        physical_authority_blockers=physical_authority_blockers,
+        next_required_action_ids=next_required_action_ids,
     )
     summary = {
         "schema": SCHEMA,
         "ok": True,
         "status": status_for(manifest_request, ready),
         "ready_for_model_backed_ik": ready,
-        "model_authority": model_authority_class(ready, synthetic_flags),
-        "physical_authority_gate_status": physical_authority_gate_status(
-            ready,
-            physical_authority_ready,
-            synthetic_fields,
-        ),
+        "model_authority": model_authority,
+        "physical_authority_gate_status": physical_authority_gate_status_value,
         "physical_so101_model_authority_ready": physical_authority_ready,
         "physical_authority_blockers": physical_authority_blockers,
-        "hardware_free_regression_fixture_ready": ready and bool(synthetic_fields),
+        "hardware_free_regression_fixture_ready": hardware_free_regression_fixture_ready,
         "synthetic_fixture_authority_fields": synthetic_fields,
+        "physical_authority_contract": physical_authority_contract,
         "hardware_skipped": True,
         "gui_skipped": True,
         "openai_skipped": True,
