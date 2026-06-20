@@ -105,6 +105,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_operator_intake_plan_model_authority",
         "candidate_operator_intake_plan_status",
         "candidate_operator_intake_decision_status",
+        "candidate_operator_intake_selected_option",
         "candidate_operator_intake_option_count",
         "candidate_review_checklist_model_authority",
         "candidate_review_checklist_row_count",
@@ -257,6 +258,36 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 },
                 "missing_exact": [],
                 "commit_action_present": False,
+                "operator_decision_status": "vendor_or_external_intake_not_declared",
+                "selected_intake_option_id": None,
+            },
+        },
+        {
+            "case_id": "candidate_intake_checked_external_decision",
+            "args": [
+                "--source-root",
+                str(complete_root),
+                "--upstream-commit",
+                PINNED_FIXTURE_COMMIT,
+                "--operator-intake-decision",
+                "external_pinned_source_root",
+            ],
+            "expect": {
+                "status": "candidate_intake_checked",
+                "expected_file_count": len(EXPECTED_RELATIVE_PATHS),
+                "present_expected_file_count": len(EXPECTED_RELATIVE_PATHS),
+                "model_present": True,
+                "parsed_model_file_count": 5,
+                "readme_caveats": {
+                    "base_collision_meshes_removed": True,
+                    "gripper_linear_joint_mapping_not_reflected": True,
+                    "onshape_to_robot_generated": True,
+                    "relative_mesh_paths_declared": True,
+                },
+                "missing_exact": [],
+                "commit_action_present": False,
+                "operator_decision_status": "candidate_intake_decision_recorded_not_authority",
+                "selected_intake_option_id": "external_pinned_source_root",
             },
         },
     ]
@@ -509,8 +540,18 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         errors.append(f"{case_id}.candidate_operator_intake_plan_model_authority invalid")
     if operator_plan.get("model_authority") != "candidate_operator_intake_plan_not_authority":
         errors.append(f"{case_id}.candidate_operator_intake_plan.model_authority invalid")
-    if operator_plan.get("decision_status") != "vendor_or_external_intake_not_declared":
+    expected_operator_decision_status = expect.get(
+        "operator_decision_status", "vendor_or_external_intake_not_declared"
+    )
+    expected_selected_option = expect.get("selected_intake_option_id")
+    if operator_plan.get("decision_status") != expected_operator_decision_status:
         errors.append(f"{case_id}.candidate_operator_intake_plan.decision_status invalid")
+    if operator_plan.get("selected_intake_option_id") != expected_selected_option:
+        errors.append(
+            f"{case_id}.candidate_operator_intake_plan.selected_intake_option_id "
+            f"expected {expected_selected_option!r}, got "
+            f"{operator_plan.get('selected_intake_option_id')!r}"
+        )
     if operator_plan.get("ready_for_model_backed_ik") is not False:
         errors.append(f"{case_id}.candidate_operator_intake_plan.ready_for_model_backed_ik not false")
     if operator_plan.get("ready_for_policy_training") is not False:
@@ -547,14 +588,18 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
     operator_next_actions = (
         operator_next_actions if isinstance(operator_next_actions, list) else []
     )
-    for required_action_id in (
-        "declare_vendor_or_external_intake_decision",
-        "run_reviewed_bundle_manifest_checker",
-    ):
+    required_operator_action_ids = ["run_reviewed_bundle_manifest_checker"]
+    if expected_selected_option is None:
+        required_operator_action_ids.append("declare_vendor_or_external_intake_decision")
+    for required_action_id in required_operator_action_ids:
         if required_action_id not in operator_next_actions:
             errors.append(
                 f"{case_id}.candidate_operator_intake_plan missing action {required_action_id!r}"
             )
+    if expected_selected_option is not None and "declare_vendor_or_external_intake_decision" in operator_next_actions:
+        errors.append(
+            f"{case_id}.candidate_operator_intake_plan kept decision action after selected option"
+        )
     manifest_template = seeded_template.get("manifest_template")
     manifest_template = manifest_template if isinstance(manifest_template, dict) else {}
     if expect["model_present"] and manifest_template.get("model_path") != summary.get("model_path"):
@@ -692,6 +737,9 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "candidate_operator_intake_plan_status": operator_plan.get("status"),
         "candidate_operator_intake_decision_status": operator_plan.get(
             "decision_status"
+        ),
+        "candidate_operator_intake_selected_option": operator_plan.get(
+            "selected_intake_option_id"
         ),
         "candidate_operator_intake_option_count": len(intake_options),
         "candidate_review_checklist_model_authority": summary.get(

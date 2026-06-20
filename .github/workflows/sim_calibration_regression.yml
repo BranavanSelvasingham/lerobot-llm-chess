@@ -375,6 +375,7 @@ jobs:
               "source_root_unavailable",
               "candidate_intake_incomplete",
               "candidate_intake_checked",
+              "candidate_intake_checked_external_decision",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
           by_case = {case["case_id"]: case for case in summary["cases"]}
@@ -423,13 +424,26 @@ jobs:
           assert complete["seeded_template_manifest_checker_physical_ready"] is False, complete
           assert "model_sha256" in complete["seeded_template_manifest_checker_missing_inputs"], complete
           assert "authority" in complete["seeded_template_manifest_checker_missing_inputs"], complete
+          external_decision = by_case["candidate_intake_checked_external_decision"]
+          assert external_decision["status"] == "candidate_intake_checked", external_decision
+          assert external_decision["missing_expected_relative_paths"] == [], external_decision
+          assert external_decision["candidate_operator_intake_plan_model_authority"] == "candidate_operator_intake_plan_not_authority", external_decision
+          assert external_decision["candidate_operator_intake_plan_status"] == "candidate_locked_operator_decision_required", external_decision
+          assert external_decision["candidate_operator_intake_decision_status"] == "candidate_intake_decision_recorded_not_authority", external_decision
+          assert external_decision["candidate_operator_intake_selected_option"] == "external_pinned_source_root", external_decision
+          assert external_decision["candidate_operator_intake_option_count"] == 2, external_decision
+          assert external_decision["ready_for_model_backed_ik"] is False, external_decision
+          assert external_decision["observed_evidence_is_physical_so101_authority"] is False, external_decision
           for case in summary["cases"]:
               assert case["model_authority"] == "public_candidate_intake_not_authority", case
               assert case["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", case
               assert case["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", case
               assert case["candidate_review_checklist_row_count"] == 8, case
               assert case["candidate_operator_intake_plan_model_authority"] == "candidate_operator_intake_plan_not_authority", case
-              assert case["candidate_operator_intake_decision_status"] == "vendor_or_external_intake_not_declared", case
+              assert case["candidate_operator_intake_decision_status"] in {
+                  "vendor_or_external_intake_not_declared",
+                  "candidate_intake_decision_recorded_not_authority",
+              }, case
               assert case["candidate_operator_intake_option_count"] == 2, case
               assert case["candidate_seeded_review_manifest_template_model_authority"] == "candidate_seeded_review_manifest_template_not_authority", case
               assert case["seeded_template_manifest_checker_ready_for_model_backed_ik"] is False, case

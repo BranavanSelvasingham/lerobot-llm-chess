@@ -36,6 +36,12 @@ REQUIRED_REVIEW_SCOPES = (
     "tcp_offset",
     "base_to_board_alignment",
 )
+UNDECLARED_INTAKE_DECISION = "undeclared"
+INTAKE_DECISION_CHOICES = (
+    UNDECLARED_INTAKE_DECISION,
+    "external_pinned_source_root",
+    "vendor_locked_bundle",
+)
 EXPECTED_RELATIVE_PATHS = (
     "README.md",
     "joints_properties.xml",
@@ -89,8 +95,36 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
     source_lock = source_lock if isinstance(source_lock, dict) else {}
     source_lock_ready = source_lock.get("source_lock_ready_for_review") is True
     upstream_commit = upstream.get("commit")
+    intake_decision = summary.get("operator_intake_decision")
+    intake_decision = (
+        str(intake_decision)
+        if intake_decision in INTAKE_DECISION_CHOICES
+        else UNDECLARED_INTAKE_DECISION
+    )
+    selected_intake_option_id = (
+        intake_decision if intake_decision != UNDECLARED_INTAKE_DECISION else None
+    )
+    if selected_intake_option_id is None:
+        decision_status = "vendor_or_external_intake_not_declared"
+    elif not source_lock_ready:
+        decision_status = "candidate_intake_decision_waiting_for_source_lock"
+    else:
+        decision_status = "candidate_intake_decision_recorded_not_authority"
     selected_model = source_lock.get("selected_model")
     selected_model = selected_model if isinstance(selected_model, dict) else {}
+    next_required_action_ids = [
+        "declare_vendor_or_external_intake_decision",
+        "pin_or_vendor_soarm100_so101_assets",
+        "review_candidate_source_lock",
+        "edit_direct_review_manifest_template_with_reviewed_values",
+        "run_reviewed_bundle_manifest_checker",
+    ]
+    if selected_intake_option_id is not None:
+        next_required_action_ids = [
+            action_id
+            for action_id in next_required_action_ids
+            if action_id != "declare_vendor_or_external_intake_decision"
+        ]
     return {
         "schema": "lerobot.sim.so101_public_candidate_operator_intake_plan.v1",
         "ok": True,
@@ -100,7 +134,8 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
             else "candidate_operator_intake_inputs_incomplete"
         ),
         "model_authority": "candidate_operator_intake_plan_not_authority",
-        "decision_status": "vendor_or_external_intake_not_declared",
+        "decision_status": decision_status,
+        "selected_intake_option_id": selected_intake_option_id,
         "observed_evidence_is_physical_so101_authority": False,
         "ready_for_model_backed_ik": False,
         "ready_for_policy_training": False,
@@ -177,11 +212,7 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
             "Use the reviewed bundle downstream only when physical_so101_model_authority_ready and ready_for_model_backed_ik are true.",
         ],
         "next_required_action_ids": [
-            "declare_vendor_or_external_intake_decision",
-            "pin_or_vendor_soarm100_so101_assets",
-            "review_candidate_source_lock",
-            "edit_direct_review_manifest_template_with_reviewed_values",
-            "run_reviewed_bundle_manifest_checker",
+            *next_required_action_ids,
         ],
         "limitations": [
             "This plan does not clone, vendor, copy, or verify remote Git state.",
@@ -309,6 +340,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--upstream-source-tree-url", default=DEFAULT_SOURCE_TREE_URL)
     parser.add_argument("--upstream-commit", default=None)
     parser.add_argument("--model-relative-path", default=DEFAULT_MODEL_RELATIVE_PATH)
+    parser.add_argument(
+        "--operator-intake-decision",
+        choices=INTAKE_DECISION_CHOICES,
+        default=UNDECLARED_INTAKE_DECISION,
+        help=(
+            "Record the operator's candidate intake decision without promoting it "
+            "to reviewed SO-101 authority."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -956,6 +996,7 @@ def build_summary(args: argparse.Namespace, artifacts: dict[str, str]) -> dict[s
             "commit": args.upstream_commit,
             "commit_supplied": upstream_commit_supplied,
         },
+        "operator_intake_decision": args.operator_intake_decision,
         "source_root": str(source_root) if source_root else None,
         "source_root_supplied": source_root_supplied,
         "source_root_exists": source_root_exists,
@@ -1019,6 +1060,7 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `candidate_operator_intake_plan_model_authority`: `{summary['candidate_operator_intake_plan_model_authority']}`",
         f"- `candidate_operator_intake_plan_status`: `{summary['candidate_operator_intake_plan_status']}`",
         f"- `candidate_operator_intake_decision_status`: `{summary['candidate_operator_intake_decision_status']}`",
+        f"- `candidate_operator_intake_selected_option`: `{summary['candidate_operator_intake_plan'].get('selected_intake_option_id') or 'none'}`",
         f"- `candidate_seeded_review_manifest_template_model_authority`: `{summary['candidate_seeded_review_manifest_template_model_authority']}`",
         f"- `parsed_model_file_count`: `{summary['candidate_review_observations']['parsed_model_file_count']}`",
         f"- `expected_file_count`: `{summary['expected_file_count']}`",
@@ -1183,6 +1225,9 @@ def main() -> int:
                 "candidate_operator_intake_decision_status": summary[
                     "candidate_operator_intake_decision_status"
                 ],
+                "candidate_operator_intake_selected_option": summary[
+                    "candidate_operator_intake_plan"
+                ].get("selected_intake_option_id"),
                 "candidate_seeded_review_manifest_template_model_authority": summary[
                     "candidate_seeded_review_manifest_template_model_authority"
                 ],

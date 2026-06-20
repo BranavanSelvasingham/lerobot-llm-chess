@@ -469,9 +469,15 @@ mesh authority, joint-limit/TCP/base-board review, and bundle-manifest
 validation before treating it as reviewed physical SO-101 truth. The public
 candidate intake smoke now writes
 `so101_public_candidate_operator_intake_plan.json` for each case; that plan
-keeps `candidate_operator_intake_plan_not_authority`, leaves the
-vendor-vs-external-source decision unresolved, and lists the command templates
-for either a local external checkout or a vendored locked bundle.
+keeps `candidate_operator_intake_plan_not_authority` and lists the command
+templates for either a local external checkout or a vendored locked bundle.
+Operators can record the chosen path without promoting the candidate to
+authority by rerunning the intake with
+`--operator-intake-decision external_pinned_source_root` or
+`--operator-intake-decision vendor_locked_bundle`; a recorded decision remains
+`candidate_intake_decision_recorded_not_authority` until the source lock,
+reviewed manifest, digest/provenance/license review, joint/TCP/base-board
+review, and downstream reviewed MuJoCo checks pass.
 
 To guard the source-authority state machine without hardware or repo-local
 SO-101 assets, run the focused source-authority matrix smoke:
