@@ -787,6 +787,11 @@ match physical reviewed motion. The matrix also includes physical-motion child
 ready states with missing or mismatched reviewed model path and missing or
 mismatched reviewed model digest; all stay blocked and point operators back to
 regenerating or aligning the motion evidence with the reviewed bundle identity.
+It also includes a root-only authority ready branch: a source inventory that
+declares an authoritative root can close source/bundle consistency only when
+the selected candidate inside that root, the bundle model path, and the reviewed
+digest all match. A different sibling model under the same root remains blocked
+by the existing same-root unselected-model case.
 Every case also asserts the first-gate serious-training boundary fields:
 `training_priority_gate_id`, `training_priority_gate_order`,
 `next_training_gate_after_ready`,

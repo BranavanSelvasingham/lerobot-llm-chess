@@ -248,6 +248,28 @@ def source_ready(
     }
 
 
+def source_ready_root_only(
+    summary_path: Path,
+    model_path: Path,
+    *,
+    sha256: str | None = SOURCE_MODEL_SHA256,
+) -> dict[str, Any]:
+    model = normalize_path(model_path)
+    return {
+        "source_authority_gate_status": "source_authority_ready",
+        "source_authority_blockers": [],
+        "next_required_for_goal": [],
+        "next_required_action_ids": [],
+        "selected_authoritative_candidate_path": model,
+        "selected_authoritative_candidate_sha256": sha256,
+        "source_configuration": {
+            "authoritative_model_paths": [],
+            "authoritative_model_roots": [normalize_path(model_path.parent)],
+        },
+        "summary_path": str(summary_path),
+    }
+
+
 def source_ready_with_stale_blocker(
     summary_path: Path,
     model_path: Path,
@@ -971,6 +993,30 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                     "prove_physical_reviewed_model_motion",
                 ],
                 "action_required_contains": ["physical_reviewed_mujoco_motion_checked"],
+            },
+        },
+        {
+            "case_id": "source_ready_root_only_bundle_motion_ready",
+            "source": source_ready_root_only(
+                summary_dir / "source_ready_root_only.json",
+                source_model,
+            ),
+            "bundle": bundle_physical_ready(summary_dir / "bundle_ready.json", source_model),
+            "motion": motion_physical_ready(summary_dir / "motion_ready.json", model_path=source_model),
+            "expect": {
+                "ready": True,
+                "consistency_status": "source_bundle_model_path_and_digest_consistent",
+                "consistency_ready": True,
+                "development_fixture": False,
+                "selected_path_matches_bundle": True,
+                "selected_digest_matches_bundle": True,
+                "selected_declared_by_path": False,
+                "selected_within_root": True,
+                "selected_covered_by_source_configuration": True,
+                "blockers_exact": [],
+                "actions_exact": [],
+                "action_required_exact": [],
+                "blocked_prior_exact": [],
             },
         },
         {
