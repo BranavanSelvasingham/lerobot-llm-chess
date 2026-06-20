@@ -5499,6 +5499,21 @@ def write_so101_reviewed_model_authority_gate_artifacts(
             "summary_path": str(summary_path),
         }
     )
+    gate_next_action_ids = unique_string_values(
+        gate.get("next_required_action_ids")
+        if isinstance(gate.get("next_required_action_ids"), list)
+        else []
+    )
+    blocker_packet_next_action_ids = unique_string_values(
+        blocker_packet.get("next_action_ids")
+        if isinstance(blocker_packet.get("next_action_ids"), list)
+        else []
+    )
+    blocker_packet_actions_missing_from_gate_queue = [
+        action_id
+        for action_id in blocker_packet_next_action_ids
+        if action_id not in gate_next_action_ids
+    ]
     payload = {
         "schema": SO101_REVIEWED_MODEL_AUTHORITY_GATE_SCHEMA,
         **gate,
@@ -5532,6 +5547,13 @@ def write_so101_reviewed_model_authority_gate_artifacts(
             "blocked_by_prior_requirements_item_ids"
         ],
         "blocker_packet_next_action_ids": blocker_packet["next_action_ids"],
+        "blocker_packet_next_actions_in_gate_queue": (
+            not blocker_packet_actions_missing_from_gate_queue
+        ),
+        "blocker_packet_next_actions_missing_from_gate_queue": (
+            blocker_packet_actions_missing_from_gate_queue
+        ),
+        "gate_next_actions_checked_against_blocker_packet": gate_next_action_ids,
         "blocker_packet": blocker_packet,
     }
     blocker_items_by_id = {
@@ -5814,6 +5836,10 @@ def write_so101_reviewed_model_authority_gate_artifacts(
                 f"`{markdown_list_value(payload.get('blocker_packet_action_required_item_ids'))}`",
                 "- Prioritized next required actions: "
                 f"`{markdown_list_value(gate.get('next_required_action_ids'))}`",
+                "- Blocker packet next actions are in gate queue: "
+                f"`{markdown_bool(payload.get('blocker_packet_next_actions_in_gate_queue'))}`",
+                "- Blocker packet next actions missing from gate queue: "
+                f"`{markdown_list_value(payload.get('blocker_packet_next_actions_missing_from_gate_queue'))}`",
                 "- Blocked by prior requirement items: "
                 f"`{markdown_list_value(payload.get('blocker_packet_blocked_by_prior_requirements_item_ids'))}`",
                 "- Blocked prior requirement statuses: "

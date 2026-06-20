@@ -350,7 +350,11 @@ reviewed-MuJoCo missing work into ordered `next_required_for_goal`,
 packet is review intake only
 (`blocker_packet_not_authority`); its immediate `blocker_packet_next_action_ids`
 must be included in that ordered gate queue while development fixture evidence
-stays outside reviewed physical SO-101 truth. The source/bundle consistency
+stays outside reviewed physical SO-101 truth. The written gate summary exposes
+`blocker_packet_next_actions_in_gate_queue` and
+`blocker_packet_next_actions_missing_from_gate_queue` so CI can fail if the
+review packet's immediate actions drift out of the top-level gate queue. The
+source/bundle consistency
 item must point at the exact failed sub-step: missing model path, path mismatch,
 missing model SHA-256, or digest mismatch.
 

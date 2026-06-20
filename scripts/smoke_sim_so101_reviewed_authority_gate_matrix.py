@@ -111,6 +111,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "blocker_packet_action_required_item_ids",
         "blocker_packet_blocked_by_prior_requirements_item_ids",
         "blocker_packet_next_action_ids",
+        "blocker_packet_next_actions_in_gate_queue",
+        "blocker_packet_next_actions_missing_from_gate_queue",
+        "gate_next_actions_checked_against_blocker_packet",
         "blocker_source_bundle_consistency_status",
         "blocker_source_bundle_consistency_blocker",
         "blocker_selected_authoritative_candidate_path",
@@ -2067,6 +2070,27 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         blocker_packet.get("next_action_ids"),
         expect.get("blocker_packet_next_actions_contain", []),
     )
+    blocker_packet_next_action_ids = blocker_packet.get("next_action_ids")
+    blocker_packet_next_action_ids = (
+        blocker_packet_next_action_ids
+        if isinstance(blocker_packet_next_action_ids, list)
+        else []
+    )
+    gate_next_action_ids = gate.get("next_required_action_ids")
+    gate_next_action_ids = (
+        gate_next_action_ids if isinstance(gate_next_action_ids, list) else []
+    )
+    missing_blocker_actions_from_gate_queue = [
+        action_id
+        for action_id in blocker_packet_next_action_ids
+        if action_id not in gate_next_action_ids
+    ]
+    add_error(
+        errors,
+        "blocker_packet_next_actions_missing_from_gate_queue",
+        missing_blocker_actions_from_gate_queue,
+        [],
+    )
     if "blocked_prior_exact" in expect:
         add_error(
             errors,
@@ -2086,6 +2110,26 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
     checklist_path = Path(gate_artifacts["artifacts"]["checklist_csv"])
     readme_path = Path(gate_artifacts["artifacts"]["readme_md"])
     readme_text = readme_path.read_text()
+    add_error(
+        errors,
+        "artifact_blocker_packet_next_actions_in_gate_queue",
+        gate_artifacts.get("blocker_packet_next_actions_in_gate_queue"),
+        True,
+    )
+    add_error(
+        errors,
+        "artifact_blocker_packet_next_actions_missing_from_gate_queue",
+        gate_artifacts.get("blocker_packet_next_actions_missing_from_gate_queue"),
+        [],
+    )
+    expected_queue_contract_line = (
+        "- Blocker packet next actions are in gate queue: `true`"
+    )
+    if expected_queue_contract_line not in readme_text:
+        errors.append(
+            "readme_queue_contract: expected "
+            f"{expected_queue_contract_line!r}"
+        )
     readme_prior_statuses = gate_artifacts.get(
         "checklist_blocked_by_prior_requirement_statuses_by_requirement_id"
     )
@@ -2206,6 +2250,8 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
 def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
     gate = case["gate"]
     blocker_packet = case["blocker_packet"]
+    gate_artifacts = case.get("gate_artifacts")
+    gate_artifacts = gate_artifacts if isinstance(gate_artifacts, dict) else {}
     consistency = gate.get("source_bundle_consistency")
     consistency = consistency if isinstance(consistency, dict) else {}
     motion_consistency = gate.get("reviewed_mujoco_motion_bundle_consistency")
@@ -2329,6 +2375,15 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
             "blocked_by_prior_requirements_item_ids"
         ),
         "blocker_packet_next_action_ids": blocker_packet.get("next_action_ids"),
+        "blocker_packet_next_actions_in_gate_queue": gate_artifacts.get(
+            "blocker_packet_next_actions_in_gate_queue"
+        ),
+        "blocker_packet_next_actions_missing_from_gate_queue": gate_artifacts.get(
+            "blocker_packet_next_actions_missing_from_gate_queue"
+        ),
+        "gate_next_actions_checked_against_blocker_packet": gate_artifacts.get(
+            "gate_next_actions_checked_against_blocker_packet"
+        ),
         "blocker_source_bundle_consistency_status": source_bundle_item.get(
             "source_bundle_consistency_status"
         ),
