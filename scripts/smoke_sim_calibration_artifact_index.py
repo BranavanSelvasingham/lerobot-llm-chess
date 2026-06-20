@@ -2202,6 +2202,42 @@ def collect_so101_mujoco_smoke_artifacts(
     next_required = smoke.get("next_required_for_goal")
     next_required = next_required if isinstance(next_required, list) else []
     next_required_action_ids = next_required_action_labels(next_required)
+    explicit_next_required_action_ids = smoke.get("next_required_action_ids")
+    explicit_next_required_action_ids = (
+        unique_string_values(explicit_next_required_action_ids)
+        if isinstance(explicit_next_required_action_ids, list)
+        else []
+    )
+    next_required_for_goal_action_ids = smoke.get("next_required_for_goal_action_ids")
+    next_required_for_goal_action_ids = (
+        unique_string_values(next_required_for_goal_action_ids)
+        if isinstance(next_required_for_goal_action_ids, list)
+        else next_required_action_ids
+    )
+    next_required_action_ids_missing_from_next_required = (
+        smoke.get("next_required_action_ids_missing_from_next_required")
+    )
+    next_required_action_ids_missing_from_next_required = (
+        unique_string_values(next_required_action_ids_missing_from_next_required)
+        if isinstance(next_required_action_ids_missing_from_next_required, list)
+        else [
+            action_id
+            for action_id in explicit_next_required_action_ids
+            if action_id not in next_required_for_goal_action_ids
+        ]
+    )
+    next_required_actions_missing_from_action_ids = smoke.get(
+        "next_required_actions_missing_from_action_ids"
+    )
+    next_required_actions_missing_from_action_ids = (
+        unique_string_values(next_required_actions_missing_from_action_ids)
+        if isinstance(next_required_actions_missing_from_action_ids, list)
+        else [
+            action_id
+            for action_id in next_required_for_goal_action_ids
+            if action_id not in explicit_next_required_action_ids
+        ]
+    )
     mujoco_joint_limit_enablement = smoke.get("mujoco_joint_limit_enablement")
     mujoco_joint_limit_enablement = (
         mujoco_joint_limit_enablement
@@ -2423,6 +2459,19 @@ def collect_so101_mujoco_smoke_artifacts(
         "all_mujoco_piece_release_synced": smoke.get("all_mujoco_piece_release_synced"),
         "next_required_for_goal": next_required,
         "next_required_action_ids": next_required_action_ids,
+        "explicit_next_required_action_ids": explicit_next_required_action_ids,
+        "next_required_for_goal_action_ids": next_required_for_goal_action_ids,
+        "next_required_action_ids_match_next_required": smoke.get(
+            "next_required_action_ids_match_next_required"
+        )
+        if isinstance(smoke.get("next_required_action_ids_match_next_required"), bool)
+        else explicit_next_required_action_ids == next_required_for_goal_action_ids,
+        "next_required_action_ids_missing_from_next_required": (
+            next_required_action_ids_missing_from_next_required
+        ),
+        "next_required_actions_missing_from_action_ids": (
+            next_required_actions_missing_from_action_ids
+        ),
         "next_required_action_count": len(next_required),
     }
     for key, value in sorted(artifact_paths.items()):
@@ -3500,6 +3549,25 @@ def collect_so101_training_readiness_gate_artifacts(
         "board_pick_ready_for_model_backed_ik": gate.get(
             "board_pick_ready_for_model_backed_ik"
         ),
+        "board_pick_next_required_action_ids": gate.get(
+            "board_pick_next_required_action_ids"
+        )
+        or [],
+        "board_pick_next_required_for_goal_action_ids": gate.get(
+            "board_pick_next_required_for_goal_action_ids"
+        )
+        or [],
+        "board_pick_next_required_action_ids_match_next_required": gate.get(
+            "board_pick_next_required_action_ids_match_next_required"
+        ),
+        "board_pick_next_required_action_ids_missing_from_next_required": gate.get(
+            "board_pick_next_required_action_ids_missing_from_next_required"
+        )
+        or [],
+        "board_pick_next_required_actions_missing_from_action_ids": gate.get(
+            "board_pick_next_required_actions_missing_from_action_ids"
+        )
+        or [],
         "board_pick_robot_pose_seeded_for_source_fixture": gate.get(
             "board_pick_robot_pose_seeded_for_source_fixture"
         ),

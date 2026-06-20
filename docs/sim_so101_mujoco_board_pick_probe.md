@@ -90,8 +90,14 @@ The training-readiness gate reports that promotion boundary through
 phase/stage evidence can be distinguished from reviewed model-backed
 pick/place authority.
 The summary keeps that handoff machine-readable through
-`next_required_for_goal`, `next_required_action_ids`, and
-`next_required_action_count`; current action IDs include
+`next_required_for_goal`, `next_required_action_ids`,
+`next_required_for_goal_action_ids`,
+`next_required_action_ids_match_next_required`,
+`next_required_action_ids_missing_from_next_required`,
+`next_required_actions_missing_from_action_ids`, and
+`next_required_action_count`. Current action IDs include
 `supply_reviewed_so101_model_bundle_manifest`,
 `calibrate_reviewed_tcp_and_base_to_board_alignment`, and
-`repeat_board_pick_with_reviewed_model_backed_ik`.
+`repeat_board_pick_with_reviewed_model_backed_ik`, and the matrix requires the
+explicit action list to match the IDs derived from `next_required_for_goal`
+with empty two-way drift lists.

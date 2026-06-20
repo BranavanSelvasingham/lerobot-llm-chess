@@ -144,6 +144,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "development_fixture_evidence_not_physical_so101_truth",
         "development_fixture_evidence_not_policy_training_truth",
         "next_required_action_ids",
+        "next_required_for_goal_action_ids",
+        "next_required_action_ids_match_next_required",
+        "next_required_action_ids_missing_from_next_required",
+        "next_required_actions_missing_from_action_ids",
         "configuration_error",
         "model_xml_exists",
         "manifest_json_exists",
@@ -320,20 +324,6 @@ def run_child(
 def add_error(errors: list[str], label: str, actual: Any, expected: Any) -> None:
     if actual != expected:
         errors.append(f"{label}: expected {expected!r}, got {actual!r}")
-
-
-def add_contains_errors(
-    errors: list[str],
-    label: str,
-    actual: Any,
-    expected_values: list[str],
-) -> None:
-    if not isinstance(actual, list):
-        errors.append(f"{label}: expected list containing {expected_values!r}, got {actual!r}")
-        return
-    missing = [value for value in expected_values if value not in actual]
-    if missing:
-        errors.append(f"{label}: missing {missing!r} from {actual!r}")
 
 
 def phase_evidence_contract_errors(
@@ -613,6 +603,18 @@ def summarize_case(
         ),
         "next_required_for_goal": summary.get("next_required_for_goal"),
         "next_required_action_ids": summary.get("next_required_action_ids"),
+        "next_required_for_goal_action_ids": summary.get(
+            "next_required_for_goal_action_ids"
+        ),
+        "next_required_action_ids_match_next_required": summary.get(
+            "next_required_action_ids_match_next_required"
+        ),
+        "next_required_action_ids_missing_from_next_required": summary.get(
+            "next_required_action_ids_missing_from_next_required"
+        ),
+        "next_required_actions_missing_from_action_ids": summary.get(
+            "next_required_actions_missing_from_action_ids"
+        ),
         "next_required_action_count": summary.get("next_required_action_count"),
         "configuration_error": summary.get("configuration_error"),
         "artifacts": artifacts,
@@ -671,6 +673,45 @@ def summarize_case(
         f"{case_id}.development_fixture_evidence_not_policy_training_truth",
         observations["development_fixture_evidence_not_policy_training_truth"],
         True,
+    )
+    expected_action_ids = (
+        [
+            "supply_reviewed_so101_model_bundle_manifest",
+            "calibrate_reviewed_tcp_and_base_to_board_alignment",
+            "repeat_board_pick_with_reviewed_model_backed_ik",
+        ]
+        if expect_ok
+        else ["provide_valid_distinct_source_and_target_squares"]
+    )
+    add_error(
+        errors,
+        f"{case_id}.next_required_action_ids",
+        observations["next_required_action_ids"],
+        expected_action_ids,
+    )
+    add_error(
+        errors,
+        f"{case_id}.next_required_for_goal_action_ids",
+        observations["next_required_for_goal_action_ids"],
+        expected_action_ids,
+    )
+    add_error(
+        errors,
+        f"{case_id}.next_required_action_ids_match_next_required",
+        observations["next_required_action_ids_match_next_required"],
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.next_required_action_ids_missing_from_next_required",
+        observations["next_required_action_ids_missing_from_next_required"],
+        [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.next_required_actions_missing_from_action_ids",
+        observations["next_required_actions_missing_from_action_ids"],
+        [],
     )
 
     if expect_ok:
@@ -815,21 +856,11 @@ def summarize_case(
         )
         if not observations["next_required_for_goal"]:
             errors.append(f"{case_id}.next_required_for_goal: expected non-empty list")
-        add_contains_errors(
-            errors,
-            f"{case_id}.next_required_action_ids",
-            observations["next_required_action_ids"],
-            [
-                "supply_reviewed_so101_model_bundle_manifest",
-                "calibrate_reviewed_tcp_and_base_to_board_alignment",
-                "repeat_board_pick_with_reviewed_model_backed_ik",
-            ],
-        )
         add_error(
             errors,
             f"{case_id}.next_required_action_count",
             observations["next_required_action_count"],
-            3,
+            len(expected_action_ids),
         )
         for key in ("summary_json", "rows_csv", "model_xml", "manifest_json", "readme"):
             artifact_path = artifacts.get(key)
@@ -873,17 +904,11 @@ def summarize_case(
                 errors.append(
                     f"{case_id}.configuration_error.message: expected to contain {expected_error!r}, got {message!r}"
                 )
-        add_contains_errors(
-            errors,
-            f"{case_id}.next_required_action_ids",
-            observations["next_required_action_ids"],
-            ["provide_valid_distinct_source_and_target_squares"],
-        )
         add_error(
             errors,
             f"{case_id}.next_required_action_count",
             observations["next_required_action_count"],
-            1,
+            len(expected_action_ids),
         )
         for key in ("summary_json", "rows_csv", "readme"):
             artifact_path = artifacts.get(key)
@@ -1016,6 +1041,18 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
             "development_fixture_evidence_not_policy_training_truth"
         ),
         "next_required_action_ids": observations.get("next_required_action_ids"),
+        "next_required_for_goal_action_ids": observations.get(
+            "next_required_for_goal_action_ids"
+        ),
+        "next_required_action_ids_match_next_required": observations.get(
+            "next_required_action_ids_match_next_required"
+        ),
+        "next_required_action_ids_missing_from_next_required": observations.get(
+            "next_required_action_ids_missing_from_next_required"
+        ),
+        "next_required_actions_missing_from_action_ids": observations.get(
+            "next_required_actions_missing_from_action_ids"
+        ),
         "configuration_error": observations.get("configuration_error"),
         "model_xml_exists": observations.get("model_xml_exists"),
         "manifest_json_exists": observations.get("manifest_json_exists"),
@@ -1033,6 +1070,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `verified_pick_place_case_count`: `{summary['verified_pick_place_case_count']}`",
         f"- `expected_gap_case_count`: `{summary['expected_gap_case_count']}`",
         f"- `invalid_task_case_count`: `{summary['invalid_task_case_count']}`",
+        f"- `next_required_action_sync_ok`: `{summary['next_required_action_sync_ok']}`",
         f"- `failed_cases`: `{', '.join(summary['failed_case_ids']) if summary['failed_case_ids'] else 'none'}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `cases_csv`: `{summary['artifacts']['cases_csv']}`",
@@ -1065,6 +1103,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "- All cases use generated `development_scaffold_not_reviewed` MJCF.",
             "- The passing case uses direct seeded source pose plus a scripted actuator sequence.",
             "- Gap cases assert exact failed phase IDs so the fixture boundary does not drift silently.",
+            "- `next_required_action_ids` must exactly match the actions derived from `next_required_for_goal`.",
             "- `ready_for_model_backed_ik` and `ready_for_policy_training` must remain false.",
         ]
     )
@@ -1104,6 +1143,21 @@ def main() -> int:
         len(case["observations"].get("stage_sequence_contract_errors") or [])
         for case in cases
     )
+    action_sync_error_count = sum(
+        0
+        if case["observations"].get("next_required_action_ids_match_next_required")
+        is True
+        and case["observations"].get(
+            "next_required_action_ids_missing_from_next_required"
+        )
+        == []
+        and case["observations"].get(
+            "next_required_actions_missing_from_action_ids"
+        )
+        == []
+        else 1
+        for case in cases
+    )
     summary_path = output_dir / "so101_mujoco_board_pick_probe_matrix_summary.json"
     csv_path = output_dir / "so101_mujoco_board_pick_probe_matrix_cases.csv"
     readme_path = output_dir / "README.md"
@@ -1132,6 +1186,8 @@ def main() -> int:
         "expected_stage_sequence": EXPECTED_STAGE_SEQUENCE,
         "stage_sequence_contract_ok": stage_contract_error_count == 0,
         "stage_sequence_contract_error_count": stage_contract_error_count,
+        "next_required_action_sync_ok": action_sync_error_count == 0,
+        "next_required_action_sync_error_count": action_sync_error_count,
         "case_ids": [case["case_id"] for case in cases],
         "failed_case_ids": [case["case_id"] for case in cases if not case["ok"]],
         "verified_pick_place_case_ids": [case["case_id"] for case in verified_cases],

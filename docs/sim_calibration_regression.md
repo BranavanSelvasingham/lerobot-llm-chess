@@ -640,7 +640,11 @@ expected place/pick gaps for alternate target/source squares and fail-closed
 invalid source/target task requests without generating model XML or manifests.
 These gap and invalid-task cases are required evidence that the fixture is not
 generalized reviewed model-backed IK, and every case remains non-authoritative
-and not policy-ready.
+and not policy-ready. The matrix also asserts
+`next_required_action_ids_match_next_required: true`, exact explicit and
+derived action IDs, and empty two-way action-drift lists so the board-pick gate
+cannot silently lose the prioritized actions needed before reviewed
+model-backed pick/place.
 It also runs the focused
 `so101_training_rollouts_matrix` smoke to prove valid development prerequisites
 allow debug imitation rollouts while missing/failed board-pick prerequisites,
@@ -1150,6 +1154,13 @@ A passing summary should show:
 - `so101_mujoco_contact_probe.status: "ok"` with `model_authority: "development_scaffold_not_reviewed"`, false physical-SO-101 and policy-training authority flags, true development-fixture-not-truth flags, `ready_for_model_backed_ik: false`, `ready_for_policy_training: false`, `all_piece_resets_ok: true`, `all_board_contacts_observed: true`, probe count populated, and summary/CSV/model/manifest/README artifact paths populated
 - `so101_mujoco_grasp_probe.status: "contact_grasp_lift_place_physics_verified"` with `model_authority: "development_scaffold_not_reviewed"`, false physical-SO-101 and policy-training authority flags, true development-fixture-not-truth flags, `ready_for_model_backed_ik: false`, `ready_for_policy_training: false`, `gripper_contact_observed: true`, `two_finger_contact_observed: true`, `lift_verified: true`, `transfer_verified: true`, `place_without_manual_piece_pose_verified: true`, `release_contact_cleared: true`, `final_board_contact_observed: true`, `final_target_xy_error_m <= target_xy_tolerance_m`, `manual_piece_pose_used_after_fixture: false`, probe count populated, open `next_required_for_goal` items, and summary/CSV/model/manifest/README artifact paths populated
 - `so101_mujoco_board_pick_probe.status: "development_board_source_pick_place_verified"` with `model_authority: "development_scaffold_not_reviewed"`, `observed_evidence_is_physical_so101_authority: false`, `ready_for_model_backed_ik: false`, `ready_for_policy_training: false`, `source_pick_started_at_source: true`, `close_two_finger_contact_observed: true`, `lift_verified: true`, `board_contact_cleared_during_lift: true`, `transfer_verified: true`, lower-before-release contact/board-contact/target-XY/Z tolerance fields true, `place_without_manual_piece_pose_verified: true`, `board_source_pick_place_verified: true`, `release_contact_cleared_after_retreat: true`, `final_board_contact_observed: true`, `lower_target_xy_error_m <= target_xy_tolerance_m`, `final_target_xy_error_m <= target_xy_tolerance_m`, `lower_place_z_error_m <= place_z_tolerance_m`, `final_place_z_error_m <= place_z_tolerance_m`, `pick_place_phase_ids` covering `source_reset`, `two_finger_grasp`, `lift_clearance`, `transfer_toward_target`, and `release_place`, empty `pick_place_failed_phase_ids`, `pick_place_all_required_phases_verified: true`, required and observed stage sequences matching the reset/lower/close/lift/transfer/lower/release/retreat contract, `stage_sequence_contract_ok: true`, empty `manual_piece_pose_after_reset_stage_ids`, `manual_piece_pose_used_after_reset: false`, `robot_pose_seeded_for_source_fixture: true`, open structured `next_required_for_goal` items, `next_required_action_ids` including `supply_reviewed_so101_model_bundle_manifest`, `calibrate_reviewed_tcp_and_base_to_board_alignment`, and `repeat_board_pick_with_reviewed_model_backed_ik`, and summary/CSV/model/manifest/README artifact paths populated
+- `so101_mujoco_board_pick_probe` also records
+  `next_required_for_goal_action_ids`,
+  `next_required_action_ids_match_next_required: true`, and empty
+  `next_required_action_ids_missing_from_next_required` /
+  `next_required_actions_missing_from_action_ids` lists, and the
+  training-readiness gate and artifact index expose matching board-pick action
+  sync fields
 - `so101_training_readiness_gate.status: "serious_training_blocked"` until
   reviewed model authority, reviewed physical MuJoCo motion, reviewed MuJoCo
   downstream handoff, reviewed model-backed board-source pick/place, and

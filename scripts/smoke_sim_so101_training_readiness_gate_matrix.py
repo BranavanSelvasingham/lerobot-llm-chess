@@ -35,6 +35,26 @@ DEFAULT_OUTPUT_DIR = (
 )
 SCHEMA = "lerobot.sim.so101_training_readiness_gate_matrix.v1"
 DEV_AUTHORITY = "development_scaffold_not_reviewed"
+BOARD_PICK_DEVELOPMENT_NEXT_REQUIRED_FOR_GOAL = (
+    {
+        "priority": 1,
+        "missing_input": "reviewed_so101_model_bundle",
+        "action_id": "supply_reviewed_so101_model_bundle_manifest",
+        "gate": "reviewed_model_authority",
+    },
+    {
+        "priority": 2,
+        "missing_input": "reviewed_tcp_and_base_to_board_alignment",
+        "action_id": "calibrate_reviewed_tcp_and_base_to_board_alignment",
+        "gate": "reviewed_model_authority",
+    },
+    {
+        "priority": 3,
+        "missing_input": "reviewed_model_backed_board_source_pick_place",
+        "action_id": "repeat_board_pick_with_reviewed_model_backed_ik",
+        "gate": "scripted_contact_grasp_pick_place",
+    },
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -119,6 +139,11 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "board_pick_physical_truth_claimed",
         "board_pick_policy_training_claimed",
         "board_pick_policy_authority_claimed",
+        "board_pick_next_required_action_ids",
+        "board_pick_next_required_for_goal_action_ids",
+        "board_pick_next_required_action_ids_match_next_required",
+        "board_pick_next_required_action_ids_missing_from_next_required",
+        "board_pick_next_required_actions_missing_from_action_ids",
         "board_pick_phase_evidence_ready",
         "board_pick_stage_sequence_ready",
         "board_pick_phase_ids",
@@ -226,6 +251,31 @@ def board_pick_phase_evidence(verified: bool = True) -> list[dict[str, Any]]:
     return rows
 
 
+def board_pick_next_required_fields(
+    *,
+    reviewed_model_backed_ready: bool,
+) -> dict[str, Any]:
+    next_required_for_goal = (
+        []
+        if reviewed_model_backed_ready
+        else [dict(action) for action in BOARD_PICK_DEVELOPMENT_NEXT_REQUIRED_FOR_GOAL]
+    )
+    action_ids = [
+        str(action["action_id"])
+        for action in next_required_for_goal
+        if isinstance(action, dict) and "action_id" in action
+    ]
+    return {
+        "next_required_for_goal": next_required_for_goal,
+        "next_required_action_ids": action_ids,
+        "next_required_for_goal_action_ids": action_ids,
+        "next_required_action_ids_match_next_required": True,
+        "next_required_action_ids_missing_from_next_required": [],
+        "next_required_actions_missing_from_action_ids": [],
+        "next_required_action_count": len(action_ids),
+    }
+
+
 def board_pick_state(
     summary_path: Path,
     *,
@@ -267,6 +317,17 @@ def board_pick_state(
         stage_sequence_contract_errors.append(
             "manual_piece_pose_after_reset_detected"
         )
+    reviewed_model_backed_ready = (
+        model_authority == REVIEWED_SO101_MODEL_AUTHORITY
+        and ready_for_model_backed_ik
+        and not seeded_source_pose
+        and not manual_piece_pose_after_reset
+        and verified
+        and not stage_sequence_contract_errors
+        and not ready_for_policy_training
+        and not observed_physical_authority
+        and not observed_policy_authority
+    )
     return {
         "status": (
             "reviewed_model_backed_board_source_pick_place_verified"
@@ -319,6 +380,9 @@ def board_pick_state(
         "robot_pose_seeded_for_source_fixture": seeded_source_pose,
         "manual_piece_pose_used_after_reset": manual_piece_pose_after_reset,
         "summary_path": str(summary_path),
+        **board_pick_next_required_fields(
+            reviewed_model_backed_ready=reviewed_model_backed_ready
+        ),
     }
 
 
@@ -2093,6 +2157,30 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         gate.get("board_pick_authority_blockers"),
         expect.get("board_authority_blockers_contain", []),
     )
+    add_error(
+        errors,
+        "board_pick_next_required_action_ids_match_next_required",
+        gate.get("board_pick_next_required_action_ids_match_next_required"),
+        True,
+    )
+    add_error(
+        errors,
+        "board_pick_next_required_action_ids_missing_from_next_required",
+        gate.get("board_pick_next_required_action_ids_missing_from_next_required"),
+        [],
+    )
+    add_error(
+        errors,
+        "board_pick_next_required_actions_missing_from_action_ids",
+        gate.get("board_pick_next_required_actions_missing_from_action_ids"),
+        [],
+    )
+    add_error(
+        errors,
+        "board_pick_next_required_action_ids",
+        gate.get("board_pick_next_required_action_ids"),
+        gate.get("board_pick_next_required_for_goal_action_ids"),
+    )
     if "board_detail" in expect:
         add_error(
             errors,
@@ -2588,6 +2676,21 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "board_pick_policy_authority_claimed": gate.get(
             "board_pick_policy_authority_claimed"
+        ),
+        "board_pick_next_required_action_ids": gate.get(
+            "board_pick_next_required_action_ids"
+        ),
+        "board_pick_next_required_for_goal_action_ids": gate.get(
+            "board_pick_next_required_for_goal_action_ids"
+        ),
+        "board_pick_next_required_action_ids_match_next_required": gate.get(
+            "board_pick_next_required_action_ids_match_next_required"
+        ),
+        "board_pick_next_required_action_ids_missing_from_next_required": gate.get(
+            "board_pick_next_required_action_ids_missing_from_next_required"
+        ),
+        "board_pick_next_required_actions_missing_from_action_ids": gate.get(
+            "board_pick_next_required_actions_missing_from_action_ids"
         ),
         "board_pick_phase_evidence_ready": gate.get("board_pick_phase_evidence_ready"),
         "board_pick_stage_sequence_ready": gate.get("board_pick_stage_sequence_ready"),

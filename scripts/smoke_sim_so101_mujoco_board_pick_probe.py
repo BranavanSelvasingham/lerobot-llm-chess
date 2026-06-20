@@ -76,6 +76,40 @@ NEXT_REQUIRED_FOR_GOAL = (
         "detail": "Repeat the board-source pick/place proof with calibrated gripper geometry before treating training rollouts as physical truth.",
     },
 )
+
+
+def next_required_action_ids(actions: list[dict[str, Any]]) -> list[str]:
+    return [
+        str(action["action_id"])
+        for action in actions
+        if isinstance(action, dict) and "action_id" in action
+    ]
+
+
+def next_required_action_sync_fields(
+    *,
+    next_required_for_goal: list[dict[str, Any]],
+    explicit_action_ids: list[str],
+) -> dict[str, Any]:
+    derived_action_ids = next_required_action_ids(next_required_for_goal)
+    return {
+        "next_required_for_goal_action_ids": derived_action_ids,
+        "next_required_action_ids_match_next_required": (
+            explicit_action_ids == derived_action_ids
+        ),
+        "next_required_action_ids_missing_from_next_required": [
+            action_id
+            for action_id in explicit_action_ids
+            if action_id not in derived_action_ids
+        ],
+        "next_required_actions_missing_from_action_ids": [
+            action_id
+            for action_id in derived_action_ids
+            if action_id not in explicit_action_ids
+        ],
+    }
+
+
 PICK_PLACE_PHASE_IDS = (
     "source_reset",
     "two_finger_grasp",
@@ -480,6 +514,17 @@ def invalid_task_summary(
     readme_path: Path,
     message: str,
 ) -> dict[str, Any]:
+    next_required_for_goal = [
+        {
+            "priority": 1,
+            "missing_input": "valid_board_pick_task_configuration",
+            "action_id": "provide_valid_distinct_source_and_target_squares",
+            "gate": "scripted_contact_grasp_pick_place",
+            "title": "Provide valid distinct source and target board squares",
+            "detail": "Use valid, distinct chess squares before generating the development board-pick probe.",
+        }
+    ]
+    next_required_actions = next_required_action_ids(next_required_for_goal)
     return {
         "schema": SCHEMA,
         "ok": False,
@@ -546,18 +591,13 @@ def invalid_task_summary(
             "No MuJoCo model generation, contact probe, grasp, lift, transfer, or release is attempted.",
             "This failure is hardware-free and does not claim physical SO-101 evidence.",
         ],
-        "next_required_for_goal": [
-            {
-                "priority": 1,
-                "missing_input": "valid_board_pick_task_configuration",
-                "action_id": "provide_valid_distinct_source_and_target_squares",
-                "gate": "scripted_contact_grasp_pick_place",
-                "title": "Provide valid distinct source and target board squares",
-                "detail": "Use valid, distinct chess squares before generating the development board-pick probe.",
-            }
-        ],
-        "next_required_action_ids": ["provide_valid_distinct_source_and_target_squares"],
-        "next_required_action_count": 1,
+        "next_required_for_goal": next_required_for_goal,
+        "next_required_action_ids": next_required_actions,
+        "next_required_action_count": len(next_required_actions),
+        **next_required_action_sync_fields(
+            next_required_for_goal=next_required_for_goal,
+            explicit_action_ids=next_required_actions,
+        ),
     }
 
 
@@ -977,6 +1017,8 @@ def main() -> int:
     else:
         status = "development_board_source_pick_gap_recorded"
 
+    next_required_for_goal = [dict(action) for action in NEXT_REQUIRED_FOR_GOAL]
+    next_required_actions = next_required_action_ids(next_required_for_goal)
     summary = {
         "schema": SCHEMA,
         "ok": True,
@@ -1074,11 +1116,13 @@ def main() -> int:
             "The robot source pose is seeded directly in qpos/ctrl; reviewed model-backed IK remains required.",
             "The piece freejoint is reset onto the source square once before the run and is not manually moved after that reset.",
         ],
-        "next_required_for_goal": [dict(action) for action in NEXT_REQUIRED_FOR_GOAL],
-        "next_required_action_ids": [
-            action["action_id"] for action in NEXT_REQUIRED_FOR_GOAL
-        ],
-        "next_required_action_count": len(NEXT_REQUIRED_FOR_GOAL),
+        "next_required_for_goal": next_required_for_goal,
+        "next_required_action_ids": next_required_actions,
+        "next_required_action_count": len(next_required_actions),
+        **next_required_action_sync_fields(
+            next_required_for_goal=next_required_for_goal,
+            explicit_action_ids=next_required_actions,
+        ),
     }
     write_json(summary_path, summary)
     write_rows(rows_path, rows)

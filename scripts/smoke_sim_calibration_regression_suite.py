@@ -3408,6 +3408,31 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         if isinstance(next_required_action_ids, list)
         else unique_string_values([action.get("action_id") for action in next_required if isinstance(action, dict)])
     )
+    next_required_for_goal_action_ids = smoke.get("next_required_for_goal_action_ids")
+    next_required_for_goal_action_ids = (
+        unique_string_values(next_required_for_goal_action_ids)
+        if isinstance(next_required_for_goal_action_ids, list)
+        else unique_string_values(
+            [
+                action.get("action_id")
+                for action in next_required
+                if isinstance(action, dict)
+            ]
+        )
+    )
+    next_required_action_ids_missing_from_next_required = [
+        action_id
+        for action_id in next_required_action_ids
+        if action_id not in next_required_for_goal_action_ids
+    ]
+    next_required_actions_missing_from_action_ids = [
+        action_id
+        for action_id in next_required_for_goal_action_ids
+        if action_id not in next_required_action_ids
+    ]
+    next_required_action_ids_match_next_required = (
+        next_required_action_ids == next_required_for_goal_action_ids
+    )
     next_required_action_count = smoke.get("next_required_action_count")
     if not isinstance(next_required_action_count, int):
         next_required_action_count = len(next_required)
@@ -3441,6 +3466,30 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "limitations": smoke.get("limitations"),
         "next_required_for_goal": next_required,
         "next_required_action_ids": next_required_action_ids,
+        "next_required_for_goal_action_ids": next_required_for_goal_action_ids,
+        "next_required_action_ids_match_next_required": (
+            smoke.get("next_required_action_ids_match_next_required")
+            if isinstance(
+                smoke.get("next_required_action_ids_match_next_required"), bool
+            )
+            else next_required_action_ids_match_next_required
+        ),
+        "next_required_action_ids_missing_from_next_required": (
+            smoke.get("next_required_action_ids_missing_from_next_required")
+            if isinstance(
+                smoke.get("next_required_action_ids_missing_from_next_required"),
+                list,
+            )
+            else next_required_action_ids_missing_from_next_required
+        ),
+        "next_required_actions_missing_from_action_ids": (
+            smoke.get("next_required_actions_missing_from_action_ids")
+            if isinstance(
+                smoke.get("next_required_actions_missing_from_action_ids"),
+                list,
+            )
+            else next_required_actions_missing_from_action_ids
+        ),
         "next_required_action_count": next_required_action_count,
     }
     for key in (
@@ -7567,6 +7616,21 @@ def so101_training_readiness_gate_section(
             "policy_authority_claimed"
         ),
         "board_pick_ready_for_model_backed_ik": board_pick.get("ready_for_model_backed_ik"),
+        "board_pick_next_required_action_ids": board_pick.get(
+            "next_required_action_ids"
+        ),
+        "board_pick_next_required_for_goal_action_ids": board_pick.get(
+            "next_required_for_goal_action_ids"
+        ),
+        "board_pick_next_required_action_ids_match_next_required": board_pick.get(
+            "next_required_action_ids_match_next_required"
+        ),
+        "board_pick_next_required_action_ids_missing_from_next_required": (
+            board_pick.get("next_required_action_ids_missing_from_next_required")
+        ),
+        "board_pick_next_required_actions_missing_from_action_ids": board_pick.get(
+            "next_required_actions_missing_from_action_ids"
+        ),
         "board_pick_source_pick_started_at_source": board_pick.get(
             "source_pick_started_at_source"
         ),

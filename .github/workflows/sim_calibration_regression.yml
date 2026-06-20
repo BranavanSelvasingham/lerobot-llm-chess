@@ -2200,6 +2200,8 @@ jobs:
           assert summary["expected_stage_sequence"] == expected_stage_sequence, summary
           assert summary["stage_sequence_contract_ok"] is True, summary
           assert summary["stage_sequence_contract_error_count"] == 0, summary
+          assert summary["next_required_action_sync_ok"] is True, summary
+          assert summary["next_required_action_sync_error_count"] == 0, summary
           assert summary["case_ids"] == [
               "seeded_fixture_e4_e5_pick_place_verified",
               "alternate_target_e4_d5_records_place_gap",
@@ -2229,6 +2231,10 @@ jobs:
               assert case["observations"]["phase_evidence_contract_errors"] == [], case
               assert case["observations"]["stage_sequence_contract_ok"] is True, case
               assert case["observations"]["stage_sequence_contract_errors"] == [], case
+              assert case["observations"]["next_required_action_ids_match_next_required"] is True, case
+              assert case["observations"]["next_required_action_ids_missing_from_next_required"] == [], case
+              assert case["observations"]["next_required_actions_missing_from_action_ids"] == [], case
+              assert case["observations"]["next_required_action_ids"] == case["observations"]["next_required_for_goal_action_ids"], case
           verified = by_case["seeded_fixture_e4_e5_pick_place_verified"]
           assert verified["observations"]["status"] == "development_board_source_pick_place_verified", verified
           assert verified["observations"]["board_source_pick_place_verified"] is True, verified
@@ -4274,6 +4280,16 @@ jobs:
           assert so101_mujoco_board_pick_probe["robot_pose_seeded_for_source_fixture"] is True, so101_mujoco_board_pick_probe
           assert isinstance(so101_mujoco_board_pick_probe["probe_count"], int) and so101_mujoco_board_pick_probe["probe_count"] > 0, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["next_required_for_goal"], so101_mujoco_board_pick_probe
+          expected_board_pick_next_actions = [
+              "supply_reviewed_so101_model_bundle_manifest",
+              "calibrate_reviewed_tcp_and_base_to_board_alignment",
+              "repeat_board_pick_with_reviewed_model_backed_ik",
+          ]
+          assert so101_mujoco_board_pick_probe["next_required_action_ids"] == expected_board_pick_next_actions, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["next_required_for_goal_action_ids"] == expected_board_pick_next_actions, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["next_required_action_ids_match_next_required"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["next_required_action_ids_missing_from_next_required"] == [], so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["next_required_actions_missing_from_action_ids"] == [], so101_mujoco_board_pick_probe
           for key in ("summary_json", "rows_csv", "model_xml", "manifest_json", "readme"):
               assert isinstance(so101_mujoco_board_pick_probe["artifacts"].get(key), str) and Path(so101_mujoco_board_pick_probe["artifacts"][key]).is_file(), (
                   key,
@@ -4369,6 +4385,11 @@ jobs:
           assert training_readiness_gate["board_pick_physical_truth_claimed"] is False, training_readiness_gate
           assert training_readiness_gate["board_pick_policy_training_claimed"] is False, training_readiness_gate
           assert training_readiness_gate["board_pick_policy_authority_claimed"] is False, training_readiness_gate
+          assert training_readiness_gate["board_pick_next_required_action_ids"] == expected_board_pick_next_actions, training_readiness_gate
+          assert training_readiness_gate["board_pick_next_required_for_goal_action_ids"] == expected_board_pick_next_actions, training_readiness_gate
+          assert training_readiness_gate["board_pick_next_required_action_ids_match_next_required"] is True, training_readiness_gate
+          assert training_readiness_gate["board_pick_next_required_action_ids_missing_from_next_required"] == [], training_readiness_gate
+          assert training_readiness_gate["board_pick_next_required_actions_missing_from_action_ids"] == [], training_readiness_gate
           assert training_readiness_gate["board_pick_phase_ids"] == [
               "source_reset",
               "two_finger_grasp",
@@ -5496,6 +5517,19 @@ jobs:
               and row.get("metrics", {}).get("development_fixture_evidence_not_policy_training_truth") is True
               and row.get("metrics", {}).get("ready_for_model_backed_ik") is False
               and row.get("metrics", {}).get("ready_for_policy_training") is False
+              and row.get("metrics", {}).get("explicit_next_required_action_ids") == [
+                  "supply_reviewed_so101_model_bundle_manifest",
+                  "calibrate_reviewed_tcp_and_base_to_board_alignment",
+                  "repeat_board_pick_with_reviewed_model_backed_ik",
+              ]
+              and row.get("metrics", {}).get("next_required_for_goal_action_ids") == [
+                  "supply_reviewed_so101_model_bundle_manifest",
+                  "calibrate_reviewed_tcp_and_base_to_board_alignment",
+                  "repeat_board_pick_with_reviewed_model_backed_ik",
+              ]
+              and row.get("metrics", {}).get("next_required_action_ids_match_next_required") is True
+              and row.get("metrics", {}).get("next_required_action_ids_missing_from_next_required") == []
+              and row.get("metrics", {}).get("next_required_actions_missing_from_action_ids") == []
               and row.get("metrics", {}).get("final_target_xy_error_m") <= row.get("metrics", {}).get("target_xy_tolerance_m")
               for row in artifacts_by_category["so101_mujoco_board_pick_probe"]
           ), artifacts_by_category["so101_mujoco_board_pick_probe"]
@@ -5540,6 +5574,15 @@ jobs:
               assert isinstance(metrics.get("reviewed_mujoco_downstream_handoff_missing_item_ids"), list), metrics
               assert metrics.get("reviewed_model_backed_board_source_pick_place") in {True, False, None}, metrics
               assert metrics.get("board_pick_reviewed_model_authority_ready") in {True, False, None}, metrics
+              assert metrics.get("board_pick_next_required_action_ids_match_next_required") in {True, False, None}, metrics
+              assert isinstance(metrics.get("board_pick_next_required_action_ids"), list), metrics
+              assert isinstance(metrics.get("board_pick_next_required_for_goal_action_ids"), list), metrics
+              assert isinstance(metrics.get("board_pick_next_required_action_ids_missing_from_next_required"), list), metrics
+              assert isinstance(metrics.get("board_pick_next_required_actions_missing_from_action_ids"), list), metrics
+              if metrics.get("board_pick_next_required_action_ids_match_next_required") is True:
+                  assert metrics.get("board_pick_next_required_action_ids") == metrics.get("board_pick_next_required_for_goal_action_ids"), metrics
+                  assert metrics.get("board_pick_next_required_action_ids_missing_from_next_required") == [], metrics
+                  assert metrics.get("board_pick_next_required_actions_missing_from_action_ids") == [], metrics
               assert metrics.get("board_pick_authority_status") in {
                   None,
                   "reviewed_model_backed_board_source_pick_place_verified",
