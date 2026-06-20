@@ -3369,6 +3369,17 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "candidate_intake_checked_operator_intake_selected_option": checked_case.get(
             "candidate_operator_intake_selected_option"
         ),
+        "candidate_intake_checked_operator_command_plan_model_authority": checked_case.get(
+            "candidate_operator_command_plan_model_authority"
+        ),
+        "candidate_intake_checked_operator_command_plan_status": checked_case.get(
+            "candidate_operator_command_plan_status"
+        ),
+        "candidate_intake_checked_operator_command_plan_selected_option_command_count": (
+            checked_case.get(
+                "candidate_operator_command_plan_selected_option_command_count"
+            )
+        ),
         "candidate_intake_checked_operator_intake_option_count": checked_case.get(
             "candidate_operator_intake_option_count"
         ),
@@ -3405,6 +3416,14 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         ),
         "candidate_intake_checked_external_decision_operator_intake_selected_option": (
             external_decision_case.get("candidate_operator_intake_selected_option")
+        ),
+        "candidate_intake_checked_external_decision_operator_command_plan_status": (
+            external_decision_case.get("candidate_operator_command_plan_status")
+        ),
+        "candidate_intake_checked_external_decision_operator_command_plan_selected_option_command_count": (
+            external_decision_case.get(
+                "candidate_operator_command_plan_selected_option_command_count"
+            )
         ),
         "candidate_intake_checked_external_decision_operator_intake_selected_requirement_count": (
             external_decision_case.get(
@@ -3459,6 +3478,14 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         ),
         "candidate_intake_checked_vendor_decision_operator_intake_selected_option": (
             vendor_decision_case.get("candidate_operator_intake_selected_option")
+        ),
+        "candidate_intake_checked_vendor_decision_operator_command_plan_status": (
+            vendor_decision_case.get("candidate_operator_command_plan_status")
+        ),
+        "candidate_intake_checked_vendor_decision_operator_command_plan_selected_option_command_count": (
+            vendor_decision_case.get(
+                "candidate_operator_command_plan_selected_option_command_count"
+            )
         ),
         "candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_count": (
             vendor_decision_case.get(
@@ -3568,6 +3595,20 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
             source=(
                 "so101_public_candidate_intake_matrix.child_records."
                 f"{case_id}.artifacts.candidate_operator_intake_plan_json"
+            ),
+            metrics=case_metrics,
+        )
+        add_path(
+            artifacts,
+            category="so101_public_candidate_intake_matrix",
+            label=f"so101_public_candidate_intake_matrix:{case_id}:operator_command_plan",
+            value=record_artifacts.get("candidate_operator_command_plan_json"),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=(
+                "so101_public_candidate_intake_matrix.child_records."
+                f"{case_id}.artifacts.candidate_operator_command_plan_json"
             ),
             metrics=case_metrics,
         )

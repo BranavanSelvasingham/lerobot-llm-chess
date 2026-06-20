@@ -102,8 +102,208 @@ OPERATOR_REQUIREMENT_FIELDNAMES = (
 )
 
 
+def command_string(parts: list[str]) -> str:
+    return " ".join(parts)
+
+
 def is_full_git_commit_sha(value: str | None) -> bool:
     return bool(value and re.fullmatch(r"[0-9a-fA-F]{40}", value.strip()))
+
+
+def candidate_operator_command_plan(summary: dict[str, Any]) -> dict[str, Any]:
+    upstream = summary.get("upstream")
+    upstream = upstream if isinstance(upstream, dict) else {}
+    source_lock = summary.get("candidate_source_lock")
+    source_lock = source_lock if isinstance(source_lock, dict) else {}
+    operator_plan = summary.get("candidate_operator_intake_plan")
+    operator_plan = operator_plan if isinstance(operator_plan, dict) else {}
+    artifacts = summary.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    upstream_commit = upstream.get("commit")
+    upstream_commit_sha_valid = upstream.get("commit_sha_valid") is True
+    model_relative_path = summary.get("model_relative_path") or DEFAULT_MODEL_RELATIVE_PATH
+    checkout_root = "<local-SO-ARM100-checkout>"
+    so101_source_root = f"{checkout_root}/Simulation/SO101"
+    reviewed_manifest_path = (
+        "<reviewed-edited-copy-of-"
+        "so101_public_candidate_review_manifest_template.direct.json>"
+    )
+    selected_option = operator_plan.get("selected_intake_option_id")
+    source_lock_ready = source_lock.get("source_lock_ready_for_review") is True
+    command_status = (
+        "candidate_operator_commands_ready_for_pinned_source_review"
+        if upstream_commit_sha_valid
+        else "candidate_operator_commands_need_pinned_commit"
+    )
+    external_commands = [
+        {
+            "step_id": "clone_soarm100_repository_if_missing",
+            "command": command_string(
+                [
+                    "git",
+                    "clone",
+                    "--filter=blob:none",
+                    str(upstream.get("repository_url") or DEFAULT_REPOSITORY_URL),
+                    checkout_root,
+                ]
+            ),
+            "network_required": True,
+            "executes_in_smoke": False,
+        },
+        {
+            "step_id": "fetch_pinned_soarm100_commit",
+            "command": command_string(
+                [
+                    "git",
+                    "-C",
+                    checkout_root,
+                    "fetch",
+                    "--depth=1",
+                    "origin",
+                    str(upstream_commit or "<immutable-upstream-commit-sha>"),
+                ]
+            ),
+            "network_required": True,
+            "executes_in_smoke": False,
+        },
+        {
+            "step_id": "checkout_pinned_soarm100_commit",
+            "command": command_string(
+                [
+                    "git",
+                    "-C",
+                    checkout_root,
+                    "checkout",
+                    "--detach",
+                    str(upstream_commit or "<immutable-upstream-commit-sha>"),
+                ]
+            ),
+            "network_required": False,
+            "executes_in_smoke": False,
+        },
+        {
+            "step_id": "run_candidate_intake_on_pinned_checkout",
+            "command": command_string(
+                [
+                    "python",
+                    "scripts/smoke_sim_so101_public_candidate_intake.py",
+                    "--source-root",
+                    so101_source_root,
+                    "--upstream-commit",
+                    str(upstream_commit or "<immutable-upstream-commit-sha>"),
+                    "--model-relative-path",
+                    str(model_relative_path),
+                    "--operator-intake-decision",
+                    "external_pinned_source_root",
+                    "--output-dir",
+                    "/private/tmp/lerobot_sim/so101_public_candidate_intake_external",
+                ]
+            ),
+            "network_required": False,
+            "executes_in_smoke": False,
+        },
+        {
+            "step_id": "run_reviewed_bundle_manifest_checker_after_review",
+            "command": command_string(
+                [
+                    "python",
+                    "scripts/smoke_sim_so101_model_bundle_manifest.py",
+                    "--manifest-path",
+                    reviewed_manifest_path,
+                    "--output-dir",
+                    "/private/tmp/lerobot_sim/so101_model_bundle_manifest_reviewed_candidate",
+                    "--python",
+                    "<python-executable>",
+                ]
+            ),
+            "network_required": False,
+            "executes_in_smoke": False,
+        },
+    ]
+    vendor_commands = [
+        {
+            "step_id": "copy_reviewed_so101_subset_into_repo",
+            "command": (
+                "copy reviewed Simulation/SO101 files into "
+                "<repo-vendored-SO101-asset-root>"
+            ),
+            "network_required": False,
+            "executes_in_smoke": False,
+        },
+        {
+            "step_id": "run_candidate_intake_on_vendored_subset",
+            "command": command_string(
+                [
+                    "python",
+                    "scripts/smoke_sim_so101_public_candidate_intake.py",
+                    "--source-root",
+                    "<repo-vendored-SO101-asset-root>",
+                    "--upstream-commit",
+                    str(upstream_commit or "<immutable-upstream-commit-sha>"),
+                    "--model-relative-path",
+                    str(model_relative_path),
+                    "--operator-intake-decision",
+                    "vendor_locked_bundle",
+                    "--output-dir",
+                    "/private/tmp/lerobot_sim/so101_public_candidate_intake_vendored",
+                ]
+            ),
+            "network_required": False,
+            "executes_in_smoke": False,
+        },
+        {
+            "step_id": "run_reviewed_bundle_manifest_checker_after_vendor_review",
+            "command": command_string(
+                [
+                    "python",
+                    "scripts/smoke_sim_so101_model_bundle_manifest.py",
+                    "--manifest-path",
+                    reviewed_manifest_path,
+                    "--output-dir",
+                    "/private/tmp/lerobot_sim/so101_model_bundle_manifest_reviewed_vendored_candidate",
+                    "--python",
+                    "<python-executable>",
+                ]
+            ),
+            "network_required": False,
+            "executes_in_smoke": False,
+        },
+    ]
+    option_commands = {
+        "external_pinned_source_root": external_commands,
+        "vendor_locked_bundle": vendor_commands,
+    }
+    selected_commands = option_commands.get(selected_option, [])
+    return {
+        "schema": "lerobot.sim.so101_public_candidate_operator_command_plan.v1",
+        "ok": True,
+        "status": command_status,
+        "model_authority": "candidate_operator_command_plan_not_authority",
+        "observed_evidence_is_physical_so101_authority": False,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "source_lock_ready_for_review": source_lock_ready,
+        "upstream_commit_sha_valid": upstream_commit_sha_valid,
+        "selected_intake_option_id": selected_option,
+        "selected_option_command_count": len(selected_commands),
+        "external_pinned_source_root_commands": external_commands,
+        "vendor_locked_bundle_commands": vendor_commands,
+        "selected_option_commands": selected_commands,
+        "candidate_artifacts": {
+            "source_lock_json": artifacts.get("candidate_source_lock_json"),
+            "operator_intake_plan_json": artifacts.get(
+                "candidate_operator_intake_plan_json"
+            ),
+            "direct_review_manifest_template_json": artifacts.get(
+                "candidate_direct_review_manifest_template_json"
+            ),
+        },
+        "limitations": [
+            "These commands are an operator checklist; this smoke does not execute network, copy, or vendor steps.",
+            "A command plan with a pinned commit is review handoff evidence only, not reviewed physical SO-101 authority.",
+            "The reviewed bundle manifest checker must still pass after reviewer-edited authority fields are supplied.",
+        ],
+    }
 
 
 def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
@@ -376,7 +576,6 @@ def candidate_source_lock(summary: dict[str, Any]) -> dict[str, Any]:
     upstream_commit_supplied = bool(upstream.get("commit_supplied"))
     upstream_commit_sha_valid = upstream.get("commit_sha_valid") is True
     model_present = summary.get("model_present") is True
-    selected_model_supported = summary.get("selected_model_supported") is True
     selected_model_supported = summary.get("selected_model_supported") is True
     model_sha_supplied = bool(summary.get("model_sha256_observed"))
     expected_count = int(summary.get("expected_file_count") or 0)
@@ -1250,6 +1449,8 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `candidate_operator_intake_plan_status`: `{summary['candidate_operator_intake_plan_status']}`",
         f"- `candidate_operator_intake_decision_status`: `{summary['candidate_operator_intake_decision_status']}`",
         f"- `candidate_operator_intake_selected_option`: `{summary['candidate_operator_intake_plan'].get('selected_intake_option_id') or 'none'}`",
+        f"- `candidate_operator_command_plan_model_authority`: `{summary['candidate_operator_command_plan_model_authority']}`",
+        f"- `candidate_operator_command_plan_status`: `{summary['candidate_operator_command_plan_status']}`",
         f"- `candidate_operator_intake_requirement_model_authority`: `{summary['candidate_operator_intake_requirement_model_authority']}`",
         f"- `candidate_operator_intake_requirement_row_count`: `{summary['candidate_operator_intake_requirement_row_count']}`",
         f"- `candidate_operator_intake_selected_requirement_row_count`: `{summary['candidate_operator_intake_selected_requirement_row_count']}`",
@@ -1267,6 +1468,7 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `candidate_review_checklist_json`: `{summary['artifacts']['candidate_review_checklist_json']}`",
         f"- `candidate_review_checklist_csv`: `{summary['artifacts']['candidate_review_checklist_csv']}`",
         f"- `candidate_operator_intake_plan_json`: `{summary['artifacts']['candidate_operator_intake_plan_json']}`",
+        f"- `candidate_operator_command_plan_json`: `{summary['artifacts']['candidate_operator_command_plan_json']}`",
         f"- `candidate_operator_intake_requirements_csv`: `{summary['artifacts']['candidate_operator_intake_requirements_csv']}`",
         "",
         "## Next Required Actions",
@@ -1292,6 +1494,8 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "## Candidate Operator Intake Plan",
             "",
             "The `candidate_operator_intake_plan` JSON records the unresolved vendor-vs-external-source decision, required inputs, command templates, and review flow. It does not clone, vendor, copy, or promote assets to reviewed physical SO-101 authority.",
+            "",
+            "The `candidate_operator_command_plan` JSON records explicit clone/fetch/checkout/intake/checker command steps for a pinned upstream checkout or vendored subset. The commands are not executed by this smoke and remain non-authoritative.",
             "",
             "The `candidate_operator_intake_requirements` CSV flattens the external and vendored requirement rows for review tracking. Selected rows only reflect the recorded operator decision and remain non-authoritative.",
             "",
@@ -1326,6 +1530,9 @@ def main() -> int:
     review_checklist_path = output_dir / "so101_public_candidate_review_checklist.json"
     review_checklist_csv_path = output_dir / "so101_public_candidate_review_checklist.csv"
     operator_plan_path = output_dir / "so101_public_candidate_operator_intake_plan.json"
+    operator_command_plan_path = (
+        output_dir / "so101_public_candidate_operator_command_plan.json"
+    )
     operator_requirements_csv_path = (
         output_dir / "so101_public_candidate_operator_intake_requirements.csv"
     )
@@ -1340,6 +1547,7 @@ def main() -> int:
         "candidate_review_checklist_json": str(review_checklist_path),
         "candidate_review_checklist_csv": str(review_checklist_csv_path),
         "candidate_operator_intake_plan_json": str(operator_plan_path),
+        "candidate_operator_command_plan_json": str(operator_command_plan_path),
         "candidate_operator_intake_requirements_csv": str(
             operator_requirements_csv_path
         ),
@@ -1363,6 +1571,12 @@ def main() -> int:
         "decision_status"
     ]
     summary["candidate_operator_intake_plan"] = operator_intake_plan
+    operator_command_plan = candidate_operator_command_plan(summary)
+    summary["candidate_operator_command_plan_model_authority"] = (
+        operator_command_plan["model_authority"]
+    )
+    summary["candidate_operator_command_plan_status"] = operator_command_plan["status"]
+    summary["candidate_operator_command_plan"] = operator_command_plan
     operator_requirement_rows = candidate_operator_intake_requirement_rows(
         operator_intake_plan
     )
@@ -1399,6 +1613,7 @@ def main() -> int:
     )
     write_json(review_checklist_path, candidate_review_checklist)
     write_json(operator_plan_path, operator_intake_plan)
+    write_json(operator_command_plan_path, operator_command_plan)
     write_csv(
         operator_requirements_csv_path,
         operator_requirement_rows,
@@ -1453,6 +1668,12 @@ def main() -> int:
                 ],
                 "candidate_operator_intake_decision_status": summary[
                     "candidate_operator_intake_decision_status"
+                ],
+                "candidate_operator_command_plan_model_authority": summary[
+                    "candidate_operator_command_plan_model_authority"
+                ],
+                "candidate_operator_command_plan_status": summary[
+                    "candidate_operator_command_plan_status"
                 ],
                 "candidate_operator_intake_selected_option": summary[
                     "candidate_operator_intake_plan"

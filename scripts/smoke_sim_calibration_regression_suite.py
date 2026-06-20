@@ -4106,6 +4106,21 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(case, dict)
             else None,
+            "candidate_operator_command_plan_model_authority": case.get(
+                "candidate_operator_command_plan_model_authority"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_command_plan_status": case.get(
+                "candidate_operator_command_plan_status"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_command_plan_selected_option_command_count": case.get(
+                "candidate_operator_command_plan_selected_option_command_count"
+            )
+            if isinstance(case, dict)
+            else None,
             "candidate_operator_intake_option_count": case.get(
                 "candidate_operator_intake_option_count"
             )
@@ -4159,6 +4174,9 @@ def so101_public_candidate_intake_matrix_section(
             else None,
             "operator_intake_plan_json_path": artifacts.get(
                 "candidate_operator_intake_plan_json"
+            ),
+            "operator_command_plan_json_path": artifacts.get(
+                "candidate_operator_command_plan_json"
             ),
         }
 
@@ -4256,6 +4274,21 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(checked_case, dict)
             else None,
+            "candidate_operator_command_plan_model_authority": checked_case.get(
+                "candidate_operator_command_plan_model_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_command_plan_status": checked_case.get(
+                "candidate_operator_command_plan_status"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_command_plan_selected_option_command_count": checked_case.get(
+                "candidate_operator_command_plan_selected_option_command_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
             "candidate_operator_intake_option_count": checked_case.get(
                 "candidate_operator_intake_option_count"
             )
@@ -4344,6 +4377,11 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(unpinned_commit_case, dict)
             else None,
+            "candidate_operator_command_plan_status": unpinned_commit_case.get(
+                "candidate_operator_command_plan_status"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
             "ready_for_model_backed_ik": unpinned_commit_case.get(
                 "ready_for_model_backed_ik"
             )
@@ -4394,6 +4432,11 @@ def so101_public_candidate_intake_matrix_section(
             else None,
             "candidate_operator_intake_decision_status": invalid_model_selection_case.get(
                 "candidate_operator_intake_decision_status"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_operator_command_plan_status": invalid_model_selection_case.get(
+                "candidate_operator_command_plan_status"
             )
             if isinstance(invalid_model_selection_case, dict)
             else None,

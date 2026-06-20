@@ -110,6 +110,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_operator_intake_plan_status",
         "candidate_operator_intake_decision_status",
         "candidate_operator_intake_selected_option",
+        "candidate_operator_command_plan_model_authority",
+        "candidate_operator_command_plan_status",
+        "candidate_operator_command_plan_selected_option_command_count",
         "candidate_operator_intake_option_count",
         "candidate_operator_intake_selected_requirement_count",
         "candidate_operator_intake_selected_requirement_ids",
@@ -655,6 +658,7 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "candidate_review_checklist_json",
         "candidate_review_checklist_csv",
         "candidate_operator_intake_plan_json",
+        "candidate_operator_command_plan_json",
         "candidate_operator_intake_requirements_csv",
         "readme_md",
     ):
@@ -836,6 +840,102 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         errors.append(
             f"{case_id}.candidate_operator_intake_plan.source_lock_ready_for_review invalid"
         )
+    operator_command_plan = summary.get("candidate_operator_command_plan")
+    operator_command_plan = (
+        operator_command_plan if isinstance(operator_command_plan, dict) else {}
+    )
+    if (
+        summary.get("candidate_operator_command_plan_model_authority")
+        != "candidate_operator_command_plan_not_authority"
+    ):
+        errors.append(
+            f"{case_id}.candidate_operator_command_plan_model_authority invalid"
+        )
+    if (
+        operator_command_plan.get("model_authority")
+        != "candidate_operator_command_plan_not_authority"
+    ):
+        errors.append(f"{case_id}.candidate_operator_command_plan.model_authority invalid")
+    expected_command_plan_status = (
+        "candidate_operator_commands_ready_for_pinned_source_review"
+        if expected_commit_sha_valid
+        else "candidate_operator_commands_need_pinned_commit"
+    )
+    if operator_command_plan.get("status") != expected_command_plan_status:
+        errors.append(
+            f"{case_id}.candidate_operator_command_plan.status expected "
+            f"{expected_command_plan_status!r}, got {operator_command_plan.get('status')!r}"
+        )
+    if (
+        summary.get("candidate_operator_command_plan_status")
+        != expected_command_plan_status
+    ):
+        errors.append(
+            f"{case_id}.candidate_operator_command_plan_status expected "
+            f"{expected_command_plan_status!r}, got "
+            f"{summary.get('candidate_operator_command_plan_status')!r}"
+        )
+    if operator_command_plan.get("ready_for_model_backed_ik") is not False:
+        errors.append(
+            f"{case_id}.candidate_operator_command_plan.ready_for_model_backed_ik not false"
+        )
+    if operator_command_plan.get("ready_for_policy_training") is not False:
+        errors.append(
+            f"{case_id}.candidate_operator_command_plan.ready_for_policy_training not false"
+        )
+    if (
+        operator_command_plan.get("observed_evidence_is_physical_so101_authority")
+        is not False
+    ):
+        errors.append(f"{case_id}.candidate_operator_command_plan physical authority not false")
+    if operator_command_plan.get("source_lock_ready_for_review") is not expected_source_lock_ready:
+        errors.append(
+            f"{case_id}.candidate_operator_command_plan.source_lock_ready_for_review invalid"
+        )
+    if operator_command_plan.get("upstream_commit_sha_valid") is not expected_commit_sha_valid:
+        errors.append(
+            f"{case_id}.candidate_operator_command_plan.upstream_commit_sha_valid invalid"
+        )
+    if operator_command_plan.get("selected_intake_option_id") != expected_selected_option:
+        errors.append(
+            f"{case_id}.candidate_operator_command_plan.selected_intake_option_id invalid"
+        )
+    expected_selected_command_count = 0
+    if expected_selected_option == "external_pinned_source_root":
+        expected_selected_command_count = 5
+    elif expected_selected_option == "vendor_locked_bundle":
+        expected_selected_command_count = 3
+    if (
+        operator_command_plan.get("selected_option_command_count")
+        != expected_selected_command_count
+    ):
+        errors.append(
+            f"{case_id}.candidate_operator_command_plan.selected_option_command_count invalid"
+        )
+    for command_key, minimum_count in (
+        ("external_pinned_source_root_commands", 5),
+        ("vendor_locked_bundle_commands", 3),
+    ):
+        commands = operator_command_plan.get(command_key)
+        commands = commands if isinstance(commands, list) else []
+        if len(commands) < minimum_count:
+            errors.append(
+                f"{case_id}.candidate_operator_command_plan.{command_key} too short"
+            )
+        for command in commands:
+            if not isinstance(command, dict):
+                errors.append(
+                    f"{case_id}.candidate_operator_command_plan.{command_key} has invalid row"
+                )
+                continue
+            if command.get("executes_in_smoke") is not False:
+                errors.append(
+                    f"{case_id}.candidate_operator_command_plan.{command_key} executes in smoke"
+                )
+            if not command.get("step_id") or not command.get("command"):
+                errors.append(
+                    f"{case_id}.candidate_operator_command_plan.{command_key} missing step/command"
+                )
     intake_options = operator_plan.get("intake_options")
     intake_options = intake_options if isinstance(intake_options, list) else []
     option_ids = [
@@ -1016,6 +1116,13 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         ),
         "candidate_operator_intake_selected_option": operator_plan.get(
             "selected_intake_option_id"
+        ),
+        "candidate_operator_command_plan_model_authority": summary.get(
+            "candidate_operator_command_plan_model_authority"
+        ),
+        "candidate_operator_command_plan_status": operator_command_plan.get("status"),
+        "candidate_operator_command_plan_selected_option_command_count": (
+            operator_command_plan.get("selected_option_command_count")
         ),
         "candidate_operator_intake_option_count": len(intake_options),
         "candidate_operator_intake_selected_requirement_count": operator_plan.get(
