@@ -394,6 +394,9 @@ jobs:
           assert incomplete["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", incomplete
           assert incomplete["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", incomplete
           assert incomplete["candidate_review_checklist_row_count"] == 8, incomplete
+          assert incomplete["candidate_source_lock_digest_model_authority"] == "candidate_source_lock_digest_not_authority", incomplete
+          assert incomplete["candidate_source_lock_digest_row_count"] == 19, incomplete
+          assert incomplete["candidate_source_lock_selected_model_digest_row_count"] == 1, incomplete
           assert incomplete["candidate_operator_intake_plan_model_authority"] == "candidate_operator_intake_plan_not_authority", incomplete
           assert incomplete["candidate_operator_intake_plan_status"] == "candidate_operator_intake_inputs_incomplete", incomplete
           assert incomplete["candidate_operator_intake_decision_status"] == "vendor_or_external_intake_not_declared", incomplete
@@ -417,6 +420,8 @@ jobs:
           assert invalid_model["selected_model_status"] == "selected_model_not_supported", invalid_model
           assert invalid_model["candidate_source_lock_status"] == "candidate_source_lock_incomplete", invalid_model
           assert invalid_model["candidate_source_lock_ready_for_review"] is False, invalid_model
+          assert invalid_model["candidate_source_lock_digest_row_count"] == 20, invalid_model
+          assert invalid_model["candidate_source_lock_selected_model_digest_row_count"] == 0, invalid_model
           assert invalid_model["candidate_operator_intake_plan_status"] == "candidate_operator_intake_inputs_incomplete", invalid_model
           assert invalid_model["candidate_operator_intake_decision_status"] == "vendor_or_external_intake_not_declared", invalid_model
           assert invalid_model["candidate_operator_command_plan_status"] == "candidate_operator_commands_ready_for_pinned_source_review", invalid_model
@@ -432,6 +437,8 @@ jobs:
           assert unpinned_ref["upstream_commit_status"] == "upstream_commit_not_immutable_sha", unpinned_ref
           assert unpinned_ref["candidate_source_lock_status"] == "candidate_source_lock_incomplete", unpinned_ref
           assert unpinned_ref["candidate_source_lock_ready_for_review"] is False, unpinned_ref
+          assert unpinned_ref["candidate_source_lock_digest_row_count"] == 20, unpinned_ref
+          assert unpinned_ref["candidate_source_lock_selected_model_digest_row_count"] == 1, unpinned_ref
           assert unpinned_ref["candidate_operator_intake_plan_status"] == "candidate_operator_intake_inputs_incomplete", unpinned_ref
           assert unpinned_ref["candidate_operator_intake_decision_status"] == "vendor_or_external_intake_not_declared", unpinned_ref
           assert unpinned_ref["candidate_operator_command_plan_status"] == "candidate_operator_commands_need_pinned_commit", unpinned_ref
@@ -451,6 +458,9 @@ jobs:
           assert complete["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", complete
           assert complete["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", complete
           assert complete["candidate_review_checklist_row_count"] == 8, complete
+          assert complete["candidate_source_lock_digest_model_authority"] == "candidate_source_lock_digest_not_authority", complete
+          assert complete["candidate_source_lock_digest_row_count"] == 20, complete
+          assert complete["candidate_source_lock_selected_model_digest_row_count"] == 1, complete
           assert complete["candidate_operator_intake_plan_model_authority"] == "candidate_operator_intake_plan_not_authority", complete
           assert complete["candidate_operator_intake_plan_status"] == "candidate_locked_operator_decision_required", complete
           assert complete["candidate_operator_intake_decision_status"] == "vendor_or_external_intake_not_declared", complete
@@ -511,6 +521,7 @@ jobs:
               assert case["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", case
               assert case["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", case
               assert case["candidate_review_checklist_row_count"] == 8, case
+              assert case["candidate_source_lock_digest_model_authority"] == "candidate_source_lock_digest_not_authority", case
               assert case["candidate_operator_intake_plan_model_authority"] == "candidate_operator_intake_plan_not_authority", case
               assert case["candidate_operator_command_plan_model_authority"] == "candidate_operator_command_plan_not_authority", case
               assert case["candidate_operator_intake_decision_status"] in {

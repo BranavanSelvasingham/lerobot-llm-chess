@@ -106,6 +106,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_source_lock_model_authority",
         "candidate_source_lock_status",
         "candidate_source_lock_ready_for_review",
+        "candidate_source_lock_digest_model_authority",
+        "candidate_source_lock_digest_row_count",
+        "candidate_source_lock_selected_model_digest_row_count",
         "candidate_operator_intake_plan_model_authority",
         "candidate_operator_intake_plan_status",
         "candidate_operator_intake_decision_status",
@@ -653,6 +656,7 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "files_csv",
         "candidate_manifest_draft_json",
         "candidate_source_lock_json",
+        "candidate_source_lock_digests_csv",
         "candidate_seeded_review_manifest_template_json",
         "candidate_direct_review_manifest_template_json",
         "candidate_review_checklist_json",
@@ -728,6 +732,30 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         errors.append(f"{case_id}.candidate_source_lock physical authority not false")
     if source_lock.get("ready_for_model_backed_ik") is not False:
         errors.append(f"{case_id}.candidate_source_lock.ready_for_model_backed_ik not false")
+    expected_digest_row_count = int(summary.get("present_expected_file_count") or 0)
+    expected_selected_digest_row_count = (
+        1 if expect["model_present"] and expected_selected_model_supported else 0
+    )
+    if (
+        summary.get("candidate_source_lock_digest_model_authority")
+        != "candidate_source_lock_digest_not_authority"
+    ):
+        errors.append(f"{case_id}.candidate_source_lock_digest_model_authority invalid")
+    if summary.get("candidate_source_lock_digest_row_count") != expected_digest_row_count:
+        errors.append(
+            f"{case_id}.candidate_source_lock_digest_row_count expected "
+            f"{expected_digest_row_count!r}, got "
+            f"{summary.get('candidate_source_lock_digest_row_count')!r}"
+        )
+    if (
+        summary.get("candidate_source_lock_selected_model_digest_row_count")
+        != expected_selected_digest_row_count
+    ):
+        errors.append(
+            f"{case_id}.candidate_source_lock_selected_model_digest_row_count expected "
+            f"{expected_selected_digest_row_count!r}, got "
+            f"{summary.get('candidate_source_lock_selected_model_digest_row_count')!r}"
+        )
     if expected_source_lock_ready:
         if source_lock.get("file_digest_count") != summary.get("expected_file_count"):
             errors.append(f"{case_id}.candidate_source_lock.file_digest_count invalid")
@@ -1106,6 +1134,15 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "candidate_source_lock_status": source_lock.get("status"),
         "candidate_source_lock_ready_for_review": source_lock.get(
             "source_lock_ready_for_review"
+        ),
+        "candidate_source_lock_digest_model_authority": summary.get(
+            "candidate_source_lock_digest_model_authority"
+        ),
+        "candidate_source_lock_digest_row_count": summary.get(
+            "candidate_source_lock_digest_row_count"
+        ),
+        "candidate_source_lock_selected_model_digest_row_count": summary.get(
+            "candidate_source_lock_selected_model_digest_row_count"
         ),
         "candidate_operator_intake_plan_model_authority": summary.get(
             "candidate_operator_intake_plan_model_authority"

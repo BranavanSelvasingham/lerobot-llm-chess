@@ -4077,6 +4077,21 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(case, dict)
             else None,
+            "candidate_source_lock_digest_model_authority": case.get(
+                "candidate_source_lock_digest_model_authority"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_digest_row_count": case.get(
+                "candidate_source_lock_digest_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_digest_row_count": case.get(
+                "candidate_source_lock_selected_model_digest_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
             "upstream_commit": case.get("upstream_commit")
             if isinstance(case, dict)
             else None,
@@ -4245,6 +4260,21 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(checked_case, dict)
             else None,
+            "candidate_source_lock_digest_model_authority": checked_case.get(
+                "candidate_source_lock_digest_model_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_digest_row_count": checked_case.get(
+                "candidate_source_lock_digest_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_digest_row_count": checked_case.get(
+                "candidate_source_lock_selected_model_digest_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
             "upstream_commit": checked_case.get("upstream_commit")
             if isinstance(checked_case, dict)
             else None,
@@ -4367,6 +4397,11 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(unpinned_commit_case, dict)
             else None,
+            "candidate_source_lock_selected_model_digest_row_count": unpinned_commit_case.get(
+                "candidate_source_lock_selected_model_digest_row_count"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
             "candidate_operator_intake_plan_status": unpinned_commit_case.get(
                 "candidate_operator_intake_plan_status"
             )
@@ -4422,6 +4457,11 @@ def so101_public_candidate_intake_matrix_section(
             else None,
             "candidate_source_lock_ready_for_review": invalid_model_selection_case.get(
                 "candidate_source_lock_ready_for_review"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_digest_row_count": invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_digest_row_count"
             )
             if isinstance(invalid_model_selection_case, dict)
             else None,

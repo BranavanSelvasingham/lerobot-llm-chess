@@ -100,6 +100,16 @@ OPERATOR_REQUIREMENT_FIELDNAMES = (
     "manifest_or_review_field",
     "authority_boundary",
 )
+SOURCE_LOCK_DIGEST_FIELDNAMES = (
+    "relative_path",
+    "sha256",
+    "size_bytes",
+    "suffix",
+    "expected",
+    "selected_model",
+    "digest_role",
+    "authority_boundary",
+)
 
 
 def command_string(parts: list[str]) -> str:
@@ -550,6 +560,44 @@ def candidate_operator_intake_requirement_rows(
                     ),
                 }
             )
+    return rows
+
+
+def candidate_source_lock_digest_rows(
+    source_lock: dict[str, Any],
+) -> list[dict[str, Any]]:
+    selected_model = source_lock.get("selected_model")
+    selected_model = selected_model if isinstance(selected_model, dict) else {}
+    selected_relative_path = selected_model.get("relative_path")
+    selected_model_supported = selected_model.get("supported") is True
+    file_digests = source_lock.get("file_digests")
+    file_digests = file_digests if isinstance(file_digests, list) else []
+    rows: list[dict[str, Any]] = []
+    for digest in file_digests:
+        if not isinstance(digest, dict):
+            continue
+        relative_path = digest.get("relative_path")
+        is_selected_model = bool(
+            selected_model_supported
+            and relative_path
+            and relative_path == selected_relative_path
+        )
+        rows.append(
+            {
+                "relative_path": relative_path,
+                "sha256": digest.get("sha256"),
+                "size_bytes": digest.get("size_bytes"),
+                "suffix": digest.get("suffix"),
+                "expected": True,
+                "selected_model": is_selected_model,
+                "digest_role": (
+                    "selected_model_digest"
+                    if is_selected_model
+                    else "expected_candidate_file_digest"
+                ),
+                "authority_boundary": "candidate_source_lock_digest_not_authority",
+            }
+        )
     return rows
 
 
@@ -1445,6 +1493,8 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `candidate_source_lock_model_authority`: `{summary['candidate_source_lock_model_authority']}`",
         f"- `candidate_source_lock_status`: `{summary['candidate_source_lock']['status']}`",
         f"- `candidate_source_lock_ready_for_review`: `{str(summary['candidate_source_lock']['source_lock_ready_for_review']).lower()}`",
+        f"- `candidate_source_lock_digest_model_authority`: `{summary['candidate_source_lock_digest_model_authority']}`",
+        f"- `candidate_source_lock_digest_row_count`: `{summary['candidate_source_lock_digest_row_count']}`",
         f"- `candidate_operator_intake_plan_model_authority`: `{summary['candidate_operator_intake_plan_model_authority']}`",
         f"- `candidate_operator_intake_plan_status`: `{summary['candidate_operator_intake_plan_status']}`",
         f"- `candidate_operator_intake_decision_status`: `{summary['candidate_operator_intake_decision_status']}`",
@@ -1462,6 +1512,7 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `files_csv`: `{summary['artifacts']['files_csv']}`",
         f"- `candidate_source_lock_json`: `{summary['artifacts']['candidate_source_lock_json']}`",
+        f"- `candidate_source_lock_digests_csv`: `{summary['artifacts']['candidate_source_lock_digests_csv']}`",
         f"- `candidate_manifest_draft_json`: `{summary['artifacts']['candidate_manifest_draft_json']}`",
         f"- `candidate_seeded_review_manifest_template_json`: `{summary['artifacts']['candidate_seeded_review_manifest_template_json']}`",
         f"- `candidate_direct_review_manifest_template_json`: `{summary['artifacts']['candidate_direct_review_manifest_template_json']}`",
@@ -1490,6 +1541,8 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "## Candidate Source Lock",
             "",
             "The `candidate_source_lock` JSON records the pinned upstream, selected model, and expected file digests as review handoff evidence. It is not reviewed physical SO-101 model authority.",
+            "",
+            "The `candidate_source_lock_digests` CSV flattens the expected candidate file digest set and marks the selected model digest row for review. It is not reviewed physical SO-101 model authority.",
             "",
             "## Candidate Operator Intake Plan",
             "",
@@ -1520,6 +1573,9 @@ def main() -> int:
     summary_path = output_dir / "so101_public_candidate_intake_summary.json"
     files_csv_path = output_dir / "so101_public_candidate_intake_files.csv"
     source_lock_path = output_dir / "so101_public_candidate_source_lock.json"
+    source_lock_digests_csv_path = (
+        output_dir / "so101_public_candidate_source_lock_digests.csv"
+    )
     draft_path = output_dir / "so101_public_candidate_manifest_draft.json"
     seeded_template_path = (
         output_dir / "so101_public_candidate_seeded_review_manifest_template.json"
@@ -1541,6 +1597,7 @@ def main() -> int:
         "summary_json": str(summary_path),
         "files_csv": str(files_csv_path),
         "candidate_source_lock_json": str(source_lock_path),
+        "candidate_source_lock_digests_csv": str(source_lock_digests_csv_path),
         "candidate_manifest_draft_json": str(draft_path),
         "candidate_seeded_review_manifest_template_json": str(seeded_template_path),
         "candidate_direct_review_manifest_template_json": str(direct_template_path),
@@ -1557,6 +1614,17 @@ def main() -> int:
     source_lock = candidate_source_lock(summary)
     summary["candidate_source_lock_model_authority"] = source_lock["model_authority"]
     summary["candidate_source_lock"] = source_lock
+    source_lock_digest_rows = candidate_source_lock_digest_rows(source_lock)
+    selected_source_lock_digest_rows = [
+        row for row in source_lock_digest_rows if row.get("selected_model") is True
+    ]
+    summary["candidate_source_lock_digest_model_authority"] = (
+        "candidate_source_lock_digest_not_authority"
+    )
+    summary["candidate_source_lock_digest_row_count"] = len(source_lock_digest_rows)
+    summary["candidate_source_lock_selected_model_digest_row_count"] = len(
+        selected_source_lock_digest_rows
+    )
     candidate_review_checklist = build_candidate_review_checklist(summary)
     summary["candidate_review_checklist_model_authority"] = candidate_review_checklist[
         "model_authority"
@@ -1602,6 +1670,11 @@ def main() -> int:
     ]
     write_json(summary_path, summary)
     write_json(source_lock_path, source_lock)
+    write_csv(
+        source_lock_digests_csv_path,
+        source_lock_digest_rows,
+        SOURCE_LOCK_DIGEST_FIELDNAMES,
+    )
     write_json(draft_path, summary["candidate_manifest_draft"])
     write_json(
         seeded_template_path,
@@ -1660,6 +1733,15 @@ def main() -> int:
                 "candidate_source_lock_ready_for_review": summary[
                     "candidate_source_lock"
                 ]["source_lock_ready_for_review"],
+                "candidate_source_lock_digest_model_authority": summary[
+                    "candidate_source_lock_digest_model_authority"
+                ],
+                "candidate_source_lock_digest_row_count": summary[
+                    "candidate_source_lock_digest_row_count"
+                ],
+                "candidate_source_lock_selected_model_digest_row_count": summary[
+                    "candidate_source_lock_selected_model_digest_row_count"
+                ],
                 "candidate_operator_intake_plan_model_authority": summary[
                     "candidate_operator_intake_plan_model_authority"
                 ],
