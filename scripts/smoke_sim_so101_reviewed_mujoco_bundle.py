@@ -1019,6 +1019,43 @@ def handoff_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
 
 def build_downstream_handoff(summary: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     open_work = handoff_open_work(summary)
+    summary_missing_inputs = unique_string_values(summary.get("missing_inputs"))
+    summary_pending_action_ids = pending_action_ids(summary)
+    expected_open_work_blockers = []
+    if summary_missing_inputs:
+        expected_open_work_blockers.append(
+            "resolve_ready_reviewed_mujoco_handoff_missing_inputs"
+        )
+    if summary_pending_action_ids:
+        expected_open_work_blockers.append(
+            "resolve_ready_reviewed_mujoco_handoff_pending_actions"
+        )
+    open_work_contract = {
+        "schema": "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff_open_work_contract.v1",
+        "ok": (
+            open_work["missing_inputs"] == summary_missing_inputs
+            and open_work["pending_action_ids"] == summary_pending_action_ids
+            and open_work["blockers"] == expected_open_work_blockers
+            and open_work["has_open_work"]
+            == bool(summary_missing_inputs or summary_pending_action_ids)
+        ),
+        "missing_inputs_match_summary": (
+            open_work["missing_inputs"] == summary_missing_inputs
+        ),
+        "pending_action_ids_match_summary": (
+            open_work["pending_action_ids"] == summary_pending_action_ids
+        ),
+        "blockers_match_expected_open_work": (
+            open_work["blockers"] == expected_open_work_blockers
+        ),
+        "has_open_work_matches_summary": (
+            open_work["has_open_work"]
+            == bool(summary_missing_inputs or summary_pending_action_ids)
+        ),
+        "summary_missing_inputs": summary_missing_inputs,
+        "summary_pending_action_ids": summary_pending_action_ids,
+        "expected_open_work_blockers": expected_open_work_blockers,
+    }
     motion_checked = (
         summary.get("physical_reviewed_model_motion_checked") is True
         or summary.get("hardware_free_fixture_motion_checked") is True
@@ -1062,6 +1099,8 @@ def build_downstream_handoff(summary: dict[str, Any]) -> tuple[dict[str, Any], l
         "handoff_missing_inputs": open_work["missing_inputs"],
         "handoff_pending_action_ids": open_work["pending_action_ids"],
         "handoff_blockers": open_work["blockers"],
+        "handoff_open_work_contract_ok": open_work_contract["ok"],
+        "handoff_open_work_contract": open_work_contract,
         "observed_evidence_is_authority": False,
         "physical_so101_truth_claimed": False,
         "development_fixture_evidence_not_physical_so101_truth": True,

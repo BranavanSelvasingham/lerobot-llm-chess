@@ -386,6 +386,11 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "downstream_handoff_json_schema",
         "downstream_handoff_status",
         "downstream_handoff_ready",
+        "downstream_handoff_open_work_contract_ok",
+        "downstream_handoff_open_work_contract_schema",
+        "downstream_handoff_open_work_contract_missing_inputs_match_summary",
+        "downstream_handoff_open_work_contract_pending_action_ids_match_summary",
+        "downstream_handoff_open_work_contract_blockers_match_expected",
         "fixture_handoff_ready_not_physical_so101_authority",
         "downstream_handoff_csv_exists",
         "downstream_handoff_csv_item_ids",
@@ -1814,6 +1819,60 @@ def summarize_case(
             downstream_handoff.get("handoff_pending_action_ids"),
             summary.get("ready_handoff_open_work_pending_action_ids") or [],
         )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.handoff_missing_inputs",
+            downstream_handoff.get("handoff_missing_inputs"),
+            summary.get("ready_handoff_open_work_missing_inputs") or [],
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.handoff_blockers",
+            downstream_handoff.get("handoff_blockers"),
+            summary.get("ready_handoff_open_work_blockers") or [],
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.handoff_open_work_contract_ok",
+            downstream_handoff.get("handoff_open_work_contract_ok"),
+            True,
+        )
+        open_work_contract = downstream_handoff.get("handoff_open_work_contract")
+        if not isinstance(open_work_contract, dict):
+            errors.append(
+                f"{case_id}.downstream_handoff_json.handoff_open_work_contract: expected dict"
+            )
+            open_work_contract = {}
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.handoff_open_work_contract.schema",
+            open_work_contract.get("schema"),
+            "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff_open_work_contract.v1",
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.handoff_open_work_contract.ok",
+            open_work_contract.get("ok"),
+            True,
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.handoff_open_work_contract.summary_missing_inputs",
+            open_work_contract.get("summary_missing_inputs"),
+            summary.get("ready_handoff_open_work_missing_inputs") or [],
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.handoff_open_work_contract.summary_pending_action_ids",
+            open_work_contract.get("summary_pending_action_ids"),
+            summary.get("ready_handoff_open_work_pending_action_ids") or [],
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.handoff_open_work_contract.expected_open_work_blockers",
+            open_work_contract.get("expected_open_work_blockers"),
+            summary.get("ready_handoff_open_work_blockers") or [],
+        )
         if downstream_handoff_csv_rows:
             add_error(
                 errors,
@@ -1935,6 +1994,39 @@ def summarize_case(
             else None,
             "downstream_handoff_status": summary.get("downstream_handoff_status"),
             "downstream_handoff_ready": summary.get("downstream_handoff_ready"),
+            "downstream_handoff_open_work_contract_ok": (
+                downstream_handoff.get("handoff_open_work_contract_ok")
+                if isinstance(downstream_handoff, dict)
+                else None
+            ),
+            "downstream_handoff_open_work_contract_schema": (
+                (
+                    downstream_handoff.get("handoff_open_work_contract") or {}
+                ).get("schema")
+                if isinstance(downstream_handoff, dict)
+                else None
+            ),
+            "downstream_handoff_open_work_contract_missing_inputs_match_summary": (
+                (
+                    downstream_handoff.get("handoff_open_work_contract") or {}
+                ).get("missing_inputs_match_summary")
+                if isinstance(downstream_handoff, dict)
+                else None
+            ),
+            "downstream_handoff_open_work_contract_pending_action_ids_match_summary": (
+                (
+                    downstream_handoff.get("handoff_open_work_contract") or {}
+                ).get("pending_action_ids_match_summary")
+                if isinstance(downstream_handoff, dict)
+                else None
+            ),
+            "downstream_handoff_open_work_contract_blockers_match_expected": (
+                (
+                    downstream_handoff.get("handoff_open_work_contract") or {}
+                ).get("blockers_match_expected_open_work")
+                if isinstance(downstream_handoff, dict)
+                else None
+            ),
             "fixture_handoff_ready_not_physical_so101_authority": summary.get(
                 "fixture_handoff_ready_not_physical_so101_authority"
             ),
@@ -2029,6 +2121,21 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "downstream_handoff_status": observations.get("downstream_handoff_status"),
         "downstream_handoff_ready": observations.get("downstream_handoff_ready"),
+        "downstream_handoff_open_work_contract_ok": observations.get(
+            "downstream_handoff_open_work_contract_ok"
+        ),
+        "downstream_handoff_open_work_contract_schema": observations.get(
+            "downstream_handoff_open_work_contract_schema"
+        ),
+        "downstream_handoff_open_work_contract_missing_inputs_match_summary": observations.get(
+            "downstream_handoff_open_work_contract_missing_inputs_match_summary"
+        ),
+        "downstream_handoff_open_work_contract_pending_action_ids_match_summary": observations.get(
+            "downstream_handoff_open_work_contract_pending_action_ids_match_summary"
+        ),
+        "downstream_handoff_open_work_contract_blockers_match_expected": observations.get(
+            "downstream_handoff_open_work_contract_blockers_match_expected"
+        ),
         "fixture_handoff_ready_not_physical_so101_authority": observations.get(
             "fixture_handoff_ready_not_physical_so101_authority"
         ),

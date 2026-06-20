@@ -107,6 +107,10 @@ readiness gates. The producer gate now fails that contradiction directly with
 `ready_handoff_open_work_missing_inputs`,
 `ready_handoff_open_work_pending_action_ids`, and
 `ready_handoff_open_work_blockers` populated.
+The handoff JSON also carries `handoff_open_work_contract_ok` plus a nested
+`handoff_open_work_contract` that mirrors those summary-level missing inputs,
+pending action IDs, and blockers so downstream consumers can reject drift
+between the producer summary and the handoff artifact.
 
 The joint-limit comparison converts manifest body-joint limits from degrees to
 MuJoCo radians and covers `shoulder_pan`, `shoulder_lift`, `elbow_flex`,

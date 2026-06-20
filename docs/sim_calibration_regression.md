@@ -790,7 +790,8 @@ check must remain
 asserts the reviewed-MuJoCo downstream handoff producer emits the current
 `lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1` schema in both
 the flattened summary and the handoff JSON before downstream scene/training
-gates consume it.
+gates consume it, and that the handoff open-work contract mirrors the summary's
+missing inputs, pending action IDs, and blockers.
 
 The standalone MuJoCo scene matrix writes
 `so101_mujoco_scene_matrix_summary.json`, `.csv`, and `README.md`. It reports
