@@ -173,6 +173,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `weak_mesh_manifest`: `{summary['fixtures']['weak_mesh_manifest_path']}`",
         f"- `weak_target_frame_manifest`: `{summary['fixtures']['weak_target_frame_manifest_path']}`",
         f"- `wrong_target_frame_manifest`: `{summary['fixtures']['wrong_target_frame_manifest_path']}`",
+        f"- `invalid_target_frame_manifest`: `{summary['fixtures']['invalid_target_frame_manifest_path']}`",
         f"- `model_missing_target_frame_manifest`: `{summary['fixtures']['model_missing_target_frame_manifest_path']}`",
         f"- `weak_tcp_manifest`: `{summary['fixtures']['weak_tcp_manifest_path']}`",
         f"- `invalid_tcp_manifest`: `{summary['fixtures']['invalid_tcp_manifest_path']}`",
@@ -715,6 +716,12 @@ def wrong_target_frame_manifest_payload(model_filename: str) -> dict[str, Any]:
     return payload
 
 
+def invalid_target_frame_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["target_frame"] = ["gripper_frame_link"]
+    return payload
+
+
 def weak_tcp_offset_authority_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload.pop("tcp_offset_authority", None)
@@ -858,6 +865,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         fixture_dir / "conflicting_target_frame_review_alias_bundle"
     )
     wrong_target_frame_dir = fixture_dir / "wrong_target_frame_bundle"
+    invalid_target_frame_dir = fixture_dir / "invalid_target_frame_bundle"
     model_missing_target_frame_dir = fixture_dir / "model_missing_target_frame_bundle"
     weak_tcp_dir = fixture_dir / "weak_tcp_bundle"
     invalid_tcp_dir = fixture_dir / "invalid_tcp_bundle"
@@ -918,6 +926,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_target_frame_dir,
         conflicting_target_frame_review_alias_dir,
         wrong_target_frame_dir,
+        invalid_target_frame_dir,
         model_missing_target_frame_dir,
         weak_tcp_dir,
         invalid_tcp_dir,
@@ -1045,6 +1054,8 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     )
     wrong_target_frame_model_path = wrong_target_frame_dir / "model" / "synthetic_so101_mujoco.xml"
     wrong_target_frame_model_path.write_text(mjcf_with_mesh_reference())
+    invalid_target_frame_model_path = invalid_target_frame_dir / "model" / "synthetic_so101_mujoco.xml"
+    invalid_target_frame_model_path.write_text(mjcf_with_mesh_reference())
     model_missing_target_frame_path = model_missing_target_frame_dir / "model" / "synthetic_so101_mujoco.xml"
     model_missing_target_frame_path.write_text(mjcf_missing_target_frame_with_mesh_reference())
     weak_tcp_model_path = weak_tcp_dir / "model" / "synthetic_so101_mujoco.xml"
@@ -1193,6 +1204,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         / "so101_model_bundle.conflicting_target_frame_review_alias.json"
     )
     wrong_target_frame_manifest_path = wrong_target_frame_dir / "so101_model_bundle.wrong_target_frame.json"
+    invalid_target_frame_manifest_path = (
+        invalid_target_frame_dir / "so101_model_bundle.invalid_target_frame.json"
+    )
     model_missing_target_frame_manifest_path = (
         model_missing_target_frame_dir / "so101_model_bundle.model_missing_target_frame.json"
     )
@@ -1456,6 +1470,11 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         wrong_target_frame_model_path,
     )
     write_manifest_json(
+        invalid_target_frame_manifest_path,
+        invalid_target_frame_manifest_payload(model_filename=invalid_target_frame_model_path.name),
+        invalid_target_frame_model_path,
+    )
+    write_manifest_json(
         model_missing_target_frame_manifest_path,
         manifest_payload(ready=True, model_filename=model_missing_target_frame_path.name),
         model_missing_target_frame_path,
@@ -1586,6 +1605,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
             conflicting_target_frame_review_alias_manifest_path
         ),
         "wrong_target_frame_manifest_path": wrong_target_frame_manifest_path,
+        "invalid_target_frame_manifest_path": invalid_target_frame_manifest_path,
         "model_missing_target_frame_manifest_path": model_missing_target_frame_manifest_path,
         "weak_tcp_manifest_path": weak_tcp_manifest_path,
         "invalid_tcp_manifest_path": invalid_tcp_manifest_path,
@@ -1647,6 +1667,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
             conflicting_target_frame_review_alias_model_path
         ),
         "wrong_target_frame_model_path": wrong_target_frame_model_path,
+        "invalid_target_frame_model_path": invalid_target_frame_model_path,
         "model_missing_target_frame_path": model_missing_target_frame_path,
         "weak_tcp_model_path": weak_tcp_model_path,
         "invalid_tcp_model_path": invalid_tcp_model_path,

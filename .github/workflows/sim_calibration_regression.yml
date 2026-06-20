@@ -509,6 +509,7 @@ jobs:
               "weak_target_frame_authority_not_ready",
               "conflicting_target_frame_review_alias_not_ready",
               "wrong_target_frame_not_ready",
+              "invalid_target_frame_type_not_ready",
               "weak_tcp_offset_authority_not_ready",
               "invalid_tcp_offset_shape_not_ready",
               "nonfinite_tcp_offset_not_ready",
@@ -808,6 +809,9 @@ jobs:
           wrong_frame = by_case["wrong_target_frame_not_ready"]["observations"]
           assert wrong_frame["target_frame_status"] == "invalid", wrong_frame
           assert "target_frame" in wrong_frame["missing_inputs"], wrong_frame
+          invalid_target_frame = by_case["invalid_target_frame_type_not_ready"]["observations"]
+          assert invalid_target_frame["target_frame_status"] == "invalid", invalid_target_frame
+          assert "target_frame" in invalid_target_frame["missing_inputs"], invalid_target_frame
           invalid_tcp = by_case["invalid_tcp_offset_shape_not_ready"]["observations"]
           assert invalid_tcp["tcp_offset_status"] == "invalid", invalid_tcp
           assert "tcp_offset_m" in invalid_tcp["missing_inputs"], invalid_tcp
@@ -6151,6 +6155,10 @@ jobs:
           ), model_bundle_manifest_matrix
           assert (
               "conflicting_target_frame_review_alias_not_ready"
+              in model_bundle_manifest_matrix["case_ids"]
+          ), model_bundle_manifest_matrix
+          assert (
+              "invalid_target_frame_type_not_ready"
               in model_bundle_manifest_matrix["case_ids"]
           ), model_bundle_manifest_matrix
           assert (

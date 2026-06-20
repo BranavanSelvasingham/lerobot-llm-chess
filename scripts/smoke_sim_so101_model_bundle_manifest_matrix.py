@@ -1061,6 +1061,19 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "invalid_target_frame_type_not_ready",
+            "manifest_path": fixtures["invalid_target_frame_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "target_frame_status": "invalid",
+                "target_frame_diagnostics_contains": [
+                    "target_frame_not_nonempty_string"
+                ],
+                "missing_inputs": ["target_frame"],
+            },
+        },
+        {
             "case_id": "weak_tcp_offset_authority_not_ready",
             "manifest_path": fixtures["weak_tcp_manifest_path"],
             "expect": {
@@ -1551,6 +1564,19 @@ def summarize_case(
             f"{case_id}.joint_limits.diagnostics",
             diagnostics,
             expect["joint_limits_diagnostics_contains"],
+        )
+    if "target_frame_diagnostics_contains" in expect:
+        target_frame = summary.get("target_frame")
+        diagnostics = (
+            target_frame.get("diagnostics")
+            if isinstance(target_frame, dict)
+            else []
+        )
+        expect_contains(
+            errors,
+            f"{case_id}.target_frame.diagnostics",
+            diagnostics,
+            expect["target_frame_diagnostics_contains"],
         )
     if "tcp_offset_diagnostics_contains" in expect:
         tcp_offset = summary.get("tcp_offset")
