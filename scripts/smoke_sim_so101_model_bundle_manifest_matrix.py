@@ -1091,6 +1091,20 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "oversized_tcp_offset_not_ready",
+            "manifest_path": fixtures["oversized_tcp_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "tcp_offset_status": "invalid",
+                "tcp_offset_diagnostics_contains": [
+                    "tcp_offset_norm_exceeds_limit:"
+                ],
+                "tcp_offset_diagnostics_contains_prefix": True,
+                "missing_inputs": ["tcp_offset_m"],
+            },
+        },
+        {
             "case_id": "conflicting_tcp_offset_alias_not_ready",
             "manifest_path": fixtures["conflicting_tcp_alias_manifest_path"],
             "expect": {
@@ -1538,6 +1552,25 @@ def summarize_case(
             diagnostics,
             expect["joint_limits_diagnostics_contains"],
         )
+    if "tcp_offset_diagnostics_contains" in expect:
+        tcp_offset = summary.get("tcp_offset")
+        diagnostics = (
+            tcp_offset.get("diagnostics") if isinstance(tcp_offset, dict) else []
+        )
+        if expect.get("tcp_offset_diagnostics_contains_prefix") is True:
+            expect_contains_prefix(
+                errors,
+                f"{case_id}.tcp_offset.diagnostics",
+                diagnostics,
+                expect["tcp_offset_diagnostics_contains"],
+            )
+        else:
+            expect_contains(
+                errors,
+                f"{case_id}.tcp_offset.diagnostics",
+                diagnostics,
+                expect["tcp_offset_diagnostics_contains"],
+            )
     if "alignment_diagnostics_contains" in expect:
         alignment = summary.get("base_to_board_alignment")
         diagnostics = (
