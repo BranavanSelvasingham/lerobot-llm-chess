@@ -27,6 +27,13 @@ DOWNSTREAM_HANDOFF_NAME = "so101_reviewed_mujoco_bundle_downstream_handoff.json"
 DOWNSTREAM_HANDOFF_CSV_NAME = "so101_reviewed_mujoco_bundle_downstream_handoff.csv"
 README_NAME = "README.md"
 MANIFEST_CHECKER_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_bundle_manifest.py"
+DOWNSTREAM_HANDOFF_PRIORITY_GATE_ID = "reviewed_mujoco_handoff"
+DOWNSTREAM_HANDOFF_PRIORITY_GATE_ORDER: tuple[str, ...] = (
+    "mujoco_scene_validity",
+    "gymnasium_task_wiring",
+    "reviewed_model_backed_contact_grasp_pick_place",
+)
+NEXT_DOWNSTREAM_GATE_AFTER_READY = DOWNSTREAM_HANDOFF_PRIORITY_GATE_ORDER[0]
 SO101_BODY_JOINTS: tuple[str, ...] = (
     "shoulder_pan",
     "shoulder_lift",
@@ -997,10 +1004,13 @@ def handoff_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
             "source": "reviewed_mujoco_bundle_gate",
             "observed_value": {
                 "gates_unblocked_when_physical_handoff_ready": [
-                    "mujoco_scene_validity",
-                    "gymnasium_task_wiring",
-                    "reviewed_model_backed_contact_grasp_pick_place",
+                    *DOWNSTREAM_HANDOFF_PRIORITY_GATE_ORDER,
                 ],
+                "downstream_priority_gate_id": DOWNSTREAM_HANDOFF_PRIORITY_GATE_ID,
+                "downstream_priority_gate_order": list(
+                    DOWNSTREAM_HANDOFF_PRIORITY_GATE_ORDER
+                ),
+                "next_downstream_gate_after_ready": NEXT_DOWNSTREAM_GATE_AFTER_READY,
                 "next_required_for_goal": summary.get("next_required_for_goal"),
             },
             "authority_status": "physical_handoff_ready" if physical_ready else "blocked",
@@ -1105,16 +1115,17 @@ def build_downstream_handoff(summary: dict[str, Any]) -> tuple[dict[str, Any], l
         "physical_so101_truth_claimed": False,
         "development_fixture_evidence_not_physical_so101_truth": True,
         "gates_unblocked_when_physical_handoff_ready": [
-            "mujoco_scene_validity",
-            "gymnasium_task_wiring",
-            "reviewed_model_backed_contact_grasp_pick_place",
+            *DOWNSTREAM_HANDOFF_PRIORITY_GATE_ORDER,
         ],
+        "downstream_priority_gate_id": DOWNSTREAM_HANDOFF_PRIORITY_GATE_ID,
+        "downstream_priority_gate_order": list(DOWNSTREAM_HANDOFF_PRIORITY_GATE_ORDER),
+        "next_downstream_gate_after_ready": NEXT_DOWNSTREAM_GATE_AFTER_READY,
+        "blocks_downstream_gates_until_ready": True,
+        "ready_does_not_imply_policy_training_ready": True,
         "blocked_gates_until_physical_handoff_ready": []
         if physical_ready
         else [
-            "mujoco_scene_validity",
-            "gymnasium_task_wiring",
-            "reviewed_model_backed_contact_grasp_pick_place",
+            *DOWNSTREAM_HANDOFF_PRIORITY_GATE_ORDER,
         ],
         "calibration_inputs": {
             "manifest_status": summary.get("manifest_status"),
@@ -1145,6 +1156,7 @@ def build_downstream_handoff(summary: dict[str, Any]) -> tuple[dict[str, Any], l
             "This handoff is a machine-readable snapshot for downstream gates.",
             "It is not reviewed physical SO-101 authority and never claims physical truth by itself.",
             "Only downstream_handoff_ready true should allow reviewed-model-backed scene/env/pick-place evidence to be treated as physical-model-backed evidence.",
+            "The first downstream gate after a physical handoff is mujoco_scene_validity, not Gymnasium wiring or policy training.",
             "Fixture handoffs keep development automation runnable but remain non-physical SO-101 truth.",
         ],
     }
@@ -1547,6 +1559,11 @@ def write_readme(path: Path, summary: dict[str, Any], rows: list[dict[str, Any]]
         f"- `downstream_handoff_status`: `{summary.get('downstream_handoff_status')}`",
         f"- `downstream_handoff_ready`: `{str(summary.get('downstream_handoff_ready')).lower()}`",
         f"- `ready_handoff_has_open_work`: `{str(summary.get('ready_handoff_has_open_work')).lower()}`",
+        f"- `downstream_priority_gate_id`: `{summary.get('downstream_priority_gate_id')}`",
+        f"- `downstream_priority_gate_order`: `{', '.join(summary.get('downstream_priority_gate_order') or [])}`",
+        f"- `next_downstream_gate_after_ready`: `{summary.get('next_downstream_gate_after_ready')}`",
+        f"- `blocks_downstream_gates_until_ready`: `{str(summary.get('blocks_downstream_gates_until_ready')).lower()}`",
+        f"- `ready_does_not_imply_policy_training_ready`: `{str(summary.get('ready_does_not_imply_policy_training_ready')).lower()}`",
         f"- `downstream_handoff_json`: `{summary['artifacts'].get('downstream_handoff_json')}`",
         f"- `downstream_handoff_csv`: `{summary['artifacts'].get('downstream_handoff_csv')}`",
         f"- `model_path`: `{summary.get('model_path', {}).get('path') if isinstance(summary.get('model_path'), dict) else None}`",
@@ -1664,6 +1681,21 @@ def main() -> int:
                 "handoff_item_count"
             ],
             "downstream_handoff_item_ids": downstream_handoff["handoff_item_ids"],
+            "downstream_priority_gate_id": downstream_handoff[
+                "downstream_priority_gate_id"
+            ],
+            "downstream_priority_gate_order": downstream_handoff[
+                "downstream_priority_gate_order"
+            ],
+            "next_downstream_gate_after_ready": downstream_handoff[
+                "next_downstream_gate_after_ready"
+            ],
+            "blocks_downstream_gates_until_ready": downstream_handoff[
+                "blocks_downstream_gates_until_ready"
+            ],
+            "ready_does_not_imply_policy_training_ready": downstream_handoff[
+                "ready_does_not_imply_policy_training_ready"
+            ],
             "downstream_handoff_json_path": artifacts["downstream_handoff_json"],
             "downstream_handoff_csv_path": artifacts["downstream_handoff_csv"],
             "downstream_handoff": downstream_handoff,

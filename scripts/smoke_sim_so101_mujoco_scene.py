@@ -48,6 +48,7 @@ REQUIRED_SITES: tuple[str, ...] = ("gripper_frame_link",)
 DEVELOPMENT_MODEL_AUTHORITY = "development_scaffold_not_reviewed"
 DOWNSTREAM_HANDOFF_MODEL_AUTHORITY = "downstream_handoff_not_authority"
 DOWNSTREAM_HANDOFF_SCHEMA = "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1"
+DOWNSTREAM_HANDOFF_PRIORITY_GATE_ID = "reviewed_mujoco_handoff"
 EXPECTED_DOWNSTREAM_HANDOFF_ITEM_IDS: tuple[str, ...] = (
     "model_authority",
     "model_identity",
@@ -64,6 +65,7 @@ EXPECTED_DOWNSTREAM_HANDOFF_GATES: tuple[str, ...] = (
     "gymnasium_task_wiring",
     "reviewed_model_backed_contact_grasp_pick_place",
 )
+NEXT_DOWNSTREAM_GATE_AFTER_READY = EXPECTED_DOWNSTREAM_HANDOFF_GATES[0]
 
 
 def parse_args() -> argparse.Namespace:
@@ -169,6 +171,12 @@ def handoff_intake_result(
     ready_handoff_has_open_work: bool = False,
     gates_unblocked_when_physical_ready: list[str] | None = None,
     blocked_gates_until_physical_ready: list[str] | None = None,
+    priority_gate_id: Any = None,
+    priority_gate_order: list[str] | None = None,
+    next_downstream_gate_after_ready: Any = None,
+    blocks_downstream_gates_until_ready: Any = None,
+    ready_does_not_imply_policy_training_ready: Any = None,
+    priority_contract_ok: bool = False,
 ) -> dict[str, Any]:
     return {
         "reviewed_mujoco_handoff_requested": requested,
@@ -217,6 +225,18 @@ def handoff_intake_result(
         "reviewed_mujoco_handoff_blocked_gates_until_physical_ready": (
             blocked_gates_until_physical_ready or []
         ),
+        "reviewed_mujoco_handoff_priority_gate_id": priority_gate_id,
+        "reviewed_mujoco_handoff_priority_gate_order": priority_gate_order or [],
+        "reviewed_mujoco_handoff_next_downstream_gate_after_ready": (
+            next_downstream_gate_after_ready
+        ),
+        "reviewed_mujoco_handoff_blocks_downstream_gates_until_ready": (
+            blocks_downstream_gates_until_ready
+        ),
+        "reviewed_mujoco_handoff_ready_does_not_imply_policy_training_ready": (
+            ready_does_not_imply_policy_training_ready
+        ),
+        "reviewed_mujoco_handoff_priority_contract_ok": priority_contract_ok,
         "reviewed_mujoco_handoff_item_ids": item_ids or [],
         "reviewed_mujoco_handoff_blockers": blockers or [],
     }
@@ -324,6 +344,25 @@ def reviewed_handoff_intake(
     gate_contract_ok = (
         gates_unblocked == expected_gates and blocked_gates == expected_blocked_gates
     )
+    raw_priority_gate_order = payload.get("downstream_priority_gate_order")
+    priority_gate_order = unique_strings(
+        raw_priority_gate_order if isinstance(raw_priority_gate_order, list) else []
+    )
+    priority_gate_id = payload.get("downstream_priority_gate_id")
+    next_downstream_gate_after_ready = payload.get("next_downstream_gate_after_ready")
+    blocks_downstream_gates_until_ready = payload.get(
+        "blocks_downstream_gates_until_ready"
+    )
+    ready_does_not_imply_policy_training_ready = payload.get(
+        "ready_does_not_imply_policy_training_ready"
+    )
+    priority_contract_ok = (
+        priority_gate_id == DOWNSTREAM_HANDOFF_PRIORITY_GATE_ID
+        and priority_gate_order == expected_gates
+        and next_downstream_gate_after_ready == NEXT_DOWNSTREAM_GATE_AFTER_READY
+        and blocks_downstream_gates_until_ready is True
+        and ready_does_not_imply_policy_training_ready is True
+    )
     ready_handoff_has_open_work = (raw_ready or fixture_ready) and bool(
         handoff_missing_inputs or handoff_pending_action_ids
     )
@@ -388,6 +427,7 @@ def reviewed_handoff_intake(
             physical_motion_checked or fixture_motion_checked
         )
         and gate_contract_ok
+        and priority_contract_ok
         and not ready_handoff_has_open_work
         and (not (raw_ready or fixture_ready) or joint_limit_enablement_ok)
         and physical_ready_contract_ok
@@ -421,6 +461,16 @@ def reviewed_handoff_intake(
         blockers.append("provide_reviewed_mujoco_downstream_handoff_unblocked_gate_list")
     if blocked_gates != expected_blocked_gates:
         blockers.append("provide_reviewed_mujoco_downstream_handoff_blocked_gate_list")
+    if priority_gate_id != DOWNSTREAM_HANDOFF_PRIORITY_GATE_ID:
+        blockers.append("provide_reviewed_mujoco_downstream_priority_gate_id")
+    if priority_gate_order != expected_gates:
+        blockers.append("provide_reviewed_mujoco_downstream_priority_gate_order")
+    if next_downstream_gate_after_ready != NEXT_DOWNSTREAM_GATE_AFTER_READY:
+        blockers.append("provide_reviewed_mujoco_next_downstream_gate")
+    if blocks_downstream_gates_until_ready is not True:
+        blockers.append("mark_reviewed_mujoco_handoff_blocks_downstream_gates")
+    if ready_does_not_imply_policy_training_ready is not True:
+        blockers.append("mark_reviewed_mujoco_handoff_not_policy_training_ready")
     if (raw_ready or fixture_ready) and handoff_missing_inputs:
         blockers.append("resolve_ready_reviewed_mujoco_handoff_missing_inputs")
     if (raw_ready or fixture_ready) and handoff_pending_action_ids:
@@ -464,6 +514,12 @@ def reviewed_handoff_intake(
         ready_handoff_has_open_work=ready_handoff_has_open_work,
         gates_unblocked_when_physical_ready=gates_unblocked,
         blocked_gates_until_physical_ready=blocked_gates,
+        priority_gate_id=priority_gate_id,
+        priority_gate_order=priority_gate_order,
+        next_downstream_gate_after_ready=next_downstream_gate_after_ready,
+        blocks_downstream_gates_until_ready=blocks_downstream_gates_until_ready,
+        ready_does_not_imply_policy_training_ready=ready_does_not_imply_policy_training_ready,
+        priority_contract_ok=priority_contract_ok,
     )
 
 

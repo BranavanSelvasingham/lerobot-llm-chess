@@ -2262,6 +2262,18 @@ def collect_so101_mujoco_smoke_artifacts(
         ),
         "downstream_handoff_item_count": smoke.get("downstream_handoff_item_count"),
         "downstream_handoff_item_ids": smoke.get("downstream_handoff_item_ids"),
+        "downstream_priority_gate_id": smoke.get("downstream_priority_gate_id"),
+        "downstream_priority_gate_order": smoke.get("downstream_priority_gate_order")
+        or [],
+        "next_downstream_gate_after_ready": smoke.get(
+            "next_downstream_gate_after_ready"
+        ),
+        "blocks_downstream_gates_until_ready": smoke.get(
+            "blocks_downstream_gates_until_ready"
+        ),
+        "ready_does_not_imply_policy_training_ready": smoke.get(
+            "ready_does_not_imply_policy_training_ready"
+        ),
         "reviewed_mujoco_handoff_requested": smoke.get(
             "reviewed_mujoco_handoff_requested"
         ),
@@ -2299,6 +2311,25 @@ def collect_so101_mujoco_smoke_artifacts(
             "reviewed_mujoco_handoff_missing_limited_joints"
         )
         or [],
+        "reviewed_mujoco_handoff_priority_gate_id": smoke.get(
+            "reviewed_mujoco_handoff_priority_gate_id"
+        ),
+        "reviewed_mujoco_handoff_priority_gate_order": smoke.get(
+            "reviewed_mujoco_handoff_priority_gate_order"
+        )
+        or [],
+        "reviewed_mujoco_handoff_next_downstream_gate_after_ready": smoke.get(
+            "reviewed_mujoco_handoff_next_downstream_gate_after_ready"
+        ),
+        "reviewed_mujoco_handoff_blocks_downstream_gates_until_ready": smoke.get(
+            "reviewed_mujoco_handoff_blocks_downstream_gates_until_ready"
+        ),
+        "reviewed_mujoco_handoff_ready_does_not_imply_policy_training_ready": smoke.get(
+            "reviewed_mujoco_handoff_ready_does_not_imply_policy_training_ready"
+        ),
+        "reviewed_mujoco_handoff_priority_contract_ok": smoke.get(
+            "reviewed_mujoco_handoff_priority_contract_ok"
+        ),
         "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority": smoke.get(
             "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority"
         ),
@@ -3216,6 +3247,25 @@ def collect_so101_training_readiness_gate_artifacts(
             "reviewed_mujoco_downstream_handoff_missing_limited_joints"
         )
         or [],
+        "reviewed_mujoco_downstream_handoff_priority_gate_id": gate.get(
+            "reviewed_mujoco_downstream_handoff_priority_gate_id"
+        ),
+        "reviewed_mujoco_downstream_handoff_priority_gate_order": gate.get(
+            "reviewed_mujoco_downstream_handoff_priority_gate_order"
+        )
+        or [],
+        "reviewed_mujoco_downstream_handoff_next_downstream_gate_after_ready": gate.get(
+            "reviewed_mujoco_downstream_handoff_next_downstream_gate_after_ready"
+        ),
+        "reviewed_mujoco_downstream_handoff_blocks_downstream_gates_until_ready": gate.get(
+            "reviewed_mujoco_downstream_handoff_blocks_downstream_gates_until_ready"
+        ),
+        "reviewed_mujoco_downstream_handoff_ready_does_not_imply_policy_training_ready": gate.get(
+            "reviewed_mujoco_downstream_handoff_ready_does_not_imply_policy_training_ready"
+        ),
+        "reviewed_mujoco_downstream_handoff_priority_contract_ok": gate.get(
+            "reviewed_mujoco_downstream_handoff_priority_contract_ok"
+        ),
         "reviewed_mujoco_downstream_handoff_missing_item_ids": gate.get(
             "reviewed_mujoco_downstream_handoff_missing_item_ids"
         ),

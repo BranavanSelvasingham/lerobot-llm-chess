@@ -111,6 +111,14 @@ The handoff JSON also carries `handoff_open_work_contract_ok` plus a nested
 `handoff_open_work_contract` that mirrors those summary-level missing inputs,
 pending action IDs, and blockers so downstream consumers can reject drift
 between the producer summary and the handoff artifact.
+The handoff also carries a priority contract:
+`downstream_priority_gate_id: "reviewed_mujoco_handoff"`,
+`downstream_priority_gate_order` equal to `mujoco_scene_validity`,
+`gymnasium_task_wiring`, and
+`reviewed_model_backed_contact_grasp_pick_place`,
+`next_downstream_gate_after_ready: "mujoco_scene_validity"`,
+`blocks_downstream_gates_until_ready: true`, and
+`ready_does_not_imply_policy_training_ready: true`.
 
 The joint-limit comparison converts manifest body-joint limits from degrees to
 MuJoCo radians and covers `shoulder_pan`, `shoulder_lift`, `elbow_flex`,
@@ -181,8 +189,8 @@ handoff missing inputs or pending action IDs force
 `downstream_handoff_ready` and
 `fixture_handoff_ready_not_physical_so101_authority` false.
 The matrix asserts the flattened summary schema and downstream handoff JSON
-schema match the current handoff schema before later gates can trust the
-artifact.
+schema match the current handoff schema and priority contract before later
+gates can trust the artifact.
 
 Passing this gate is still not full physical readiness. It proves reviewed-model
 handoff into MuJoCo and SimRobot joint motion. Contact-validated gripper

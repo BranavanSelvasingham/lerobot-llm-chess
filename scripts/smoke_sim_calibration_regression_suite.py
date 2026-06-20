@@ -161,6 +161,15 @@ SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_ITEM_IDS = (
     "mujoco_motion",
     "downstream_gate_handoff",
 )
+SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_GATE_ID = "reviewed_mujoco_handoff"
+SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_ORDER = (
+    "mujoco_scene_validity",
+    "gymnasium_task_wiring",
+    "reviewed_model_backed_contact_grasp_pick_place",
+)
+SO101_REVIEWED_MUJOCO_NEXT_DOWNSTREAM_GATE_AFTER_READY = (
+    SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_ORDER[0]
+)
 SO101_TRAINING_PRIORITY_STAGE_IDS = (
     "reviewed_model_authority",
     "mujoco_scene_validity",
@@ -3519,6 +3528,12 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "reviewed_mujoco_handoff_joint_limit_enablement_ok",
         "reviewed_mujoco_handoff_joint_limit_enablement_status",
         "reviewed_mujoco_handoff_missing_limited_joints",
+        "reviewed_mujoco_handoff_priority_gate_id",
+        "reviewed_mujoco_handoff_priority_gate_order",
+        "reviewed_mujoco_handoff_next_downstream_gate_after_ready",
+        "reviewed_mujoco_handoff_blocks_downstream_gates_until_ready",
+        "reviewed_mujoco_handoff_ready_does_not_imply_policy_training_ready",
+        "reviewed_mujoco_handoff_priority_contract_ok",
         "reviewed_mujoco_handoff_item_ids",
         "reviewed_mujoco_handoff_blockers",
         "scene_uses_reviewed_mujoco_handoff",
@@ -3554,6 +3569,11 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "downstream_handoff_development_fixture_evidence_not_physical_so101_truth",
         "downstream_handoff_item_count",
         "downstream_handoff_item_ids",
+        "downstream_priority_gate_id",
+        "downstream_priority_gate_order",
+        "next_downstream_gate_after_ready",
+        "blocks_downstream_gates_until_ready",
+        "ready_does_not_imply_policy_training_ready",
         "require_ready_reviewed_model",
         "missing_inputs",
     ):
@@ -6230,6 +6250,30 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
         and joint_limit_enablement_status == "so101_mujoco_joints_limited"
         and missing_limited_joints == []
     )
+    raw_priority_gate_order = reviewed_mujoco_bundle.get(
+        "downstream_priority_gate_order"
+    )
+    priority_gate_order = unique_string_values(
+        raw_priority_gate_order if isinstance(raw_priority_gate_order, list) else []
+    )
+    priority_gate_id = reviewed_mujoco_bundle.get("downstream_priority_gate_id")
+    next_downstream_gate_after_ready = reviewed_mujoco_bundle.get(
+        "next_downstream_gate_after_ready"
+    )
+    blocks_downstream_gates_until_ready = reviewed_mujoco_bundle.get(
+        "blocks_downstream_gates_until_ready"
+    )
+    ready_does_not_imply_policy_training_ready = reviewed_mujoco_bundle.get(
+        "ready_does_not_imply_policy_training_ready"
+    )
+    priority_contract_ok = (
+        priority_gate_id == SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_GATE_ID
+        and priority_gate_order == list(SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_ORDER)
+        and next_downstream_gate_after_ready
+        == SO101_REVIEWED_MUJOCO_NEXT_DOWNSTREAM_GATE_AFTER_READY
+        and blocks_downstream_gates_until_ready is True
+        and ready_does_not_imply_policy_training_ready is True
+    )
 
     physical_ready_contract_ok = (
         not raw_ready
@@ -6279,6 +6323,19 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
         blockers.append("provide_complete_reviewed_mujoco_downstream_handoff_items")
     if not item_count_ok:
         blockers.append("fix_reviewed_mujoco_downstream_handoff_item_count")
+    if priority_gate_id != SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_GATE_ID:
+        blockers.append("provide_reviewed_mujoco_downstream_priority_gate_id")
+    if priority_gate_order != list(SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_ORDER):
+        blockers.append("provide_reviewed_mujoco_downstream_priority_gate_order")
+    if (
+        next_downstream_gate_after_ready
+        != SO101_REVIEWED_MUJOCO_NEXT_DOWNSTREAM_GATE_AFTER_READY
+    ):
+        blockers.append("provide_reviewed_mujoco_next_downstream_gate")
+    if blocks_downstream_gates_until_ready is not True:
+        blockers.append("mark_reviewed_mujoco_handoff_blocks_downstream_gates")
+    if ready_does_not_imply_policy_training_ready is not True:
+        blockers.append("mark_reviewed_mujoco_handoff_not_policy_training_ready")
     if (raw_ready or fixture_ready) and handoff_missing_inputs:
         blockers.append("resolve_ready_reviewed_mujoco_handoff_missing_inputs")
     if (raw_ready or fixture_ready) and handoff_pending_action_ids:
@@ -6338,6 +6395,12 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
         "item_count": item_count,
         "item_ids": item_ids,
         "missing_item_ids": missing_item_ids,
+        "priority_gate_id": priority_gate_id,
+        "priority_gate_order": priority_gate_order,
+        "next_downstream_gate_after_ready": next_downstream_gate_after_ready,
+        "blocks_downstream_gates_until_ready": blocks_downstream_gates_until_ready,
+        "ready_does_not_imply_policy_training_ready": ready_does_not_imply_policy_training_ready,
+        "priority_contract_ok": priority_contract_ok,
         "missing_inputs": handoff_missing_inputs,
         "pending_action_ids": handoff_pending_action_ids,
         "ready_handoff_has_open_work": ready_handoff_has_open_work,
@@ -6820,6 +6883,26 @@ def so101_training_readiness_gate_section(
         ),
         "reviewed_mujoco_downstream_handoff_missing_item_ids": (
             downstream_handoff_contract.get("missing_item_ids")
+        ),
+        "reviewed_mujoco_downstream_handoff_priority_gate_id": (
+            downstream_handoff_contract.get("priority_gate_id")
+        ),
+        "reviewed_mujoco_downstream_handoff_priority_gate_order": (
+            downstream_handoff_contract.get("priority_gate_order")
+        ),
+        "reviewed_mujoco_downstream_handoff_next_downstream_gate_after_ready": (
+            downstream_handoff_contract.get("next_downstream_gate_after_ready")
+        ),
+        "reviewed_mujoco_downstream_handoff_blocks_downstream_gates_until_ready": (
+            downstream_handoff_contract.get("blocks_downstream_gates_until_ready")
+        ),
+        "reviewed_mujoco_downstream_handoff_ready_does_not_imply_policy_training_ready": (
+            downstream_handoff_contract.get(
+                "ready_does_not_imply_policy_training_ready"
+            )
+        ),
+        "reviewed_mujoco_downstream_handoff_priority_contract_ok": (
+            downstream_handoff_contract.get("priority_contract_ok")
         ),
         "reviewed_mujoco_downstream_handoff_missing_inputs": (
             downstream_handoff_contract.get("missing_inputs")

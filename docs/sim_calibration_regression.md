@@ -648,6 +648,14 @@ Ready reviewed-MuJoCo manifests must also prove that every controlled SO-101
 joint range is actually enforced by MuJoCo `jnt_limited`; matching `jnt_range`
 metadata alone is not enough to trust model-backed motion.
 
+The reviewed MuJoCo downstream handoff must also preserve a machine-readable
+priority contract: `downstream_priority_gate_id: "reviewed_mujoco_handoff"`,
+`downstream_priority_gate_order` equal to `mujoco_scene_validity`,
+`gymnasium_task_wiring`, and `reviewed_model_backed_contact_grasp_pick_place`,
+`next_downstream_gate_after_ready: "mujoco_scene_validity"`,
+`blocks_downstream_gates_until_ready: true`, and
+`ready_does_not_imply_policy_training_ready: true`.
+
 The SO-101 reviewed model authority gate contract also requires
 `source_bundle_consistency_ready`, `source_bundle_consistency_status`, and the
 nested `source_bundle_consistency` object in both the top-level summary and the
@@ -816,8 +824,11 @@ must fail closed when a reviewed handoff is required. The matrix also rejects
 ready-shaped handoffs with stale downstream-handoff schema, open missing inputs
 or actions, physical-truth claims, unlimited required joints, or a
 `gates_unblocked_when_physical_handoff_ready` list that does not explicitly
-include `mujoco_scene_validity`. The valid ready-handoff case
-records `reviewed_mujoco_handoff_contract_ok: true` and
+include `mujoco_scene_validity`. It also rejects a ready-shaped handoff whose
+`next_downstream_gate_after_ready` is not `mujoco_scene_validity`, preserving
+the reviewed-MuJoCo -> scene-validity -> Gymnasium -> pick/place order. The
+valid ready-handoff case records `reviewed_mujoco_handoff_contract_ok: true`,
+`reviewed_mujoco_handoff_priority_contract_ok: true`, and
 `reviewed_mujoco_handoff_physical_motion_checked: true`,
 `reviewed_mujoco_handoff_joint_limit_enablement_status:
 "so101_mujoco_joints_limited"`, and empty
@@ -1040,8 +1051,8 @@ A passing summary should show:
 - `ik_reachability_drill.status: "ok_model_backed"` or `"model_unavailable_fallback_complete"` with `row_count > 0`, populated `counts_by_feasibility`, and summary/CSV/heatmap artifact paths populated
 - `ik_reachability_drill.configured_model_path` populated when `--ik-model-path` is supplied, otherwise `null`
 - `ik_reachability_drill.configured_model_request` mirrored from the child diagnostic when `--ik-model-path` is supplied
-- `so101_mujoco_scene.status: "ok"` with `model_authority: "development_scaffold_not_reviewed"`, `observed_evidence_is_physical_so101_authority: false`, `ready_for_model_backed_ik: false`, `ready_for_policy_training: false`, `mujoco_scene_validity_status: "development_scene_validated_not_physical_authority"`, source/target squares and max-step budget recorded, `square_geom_count: 64`, target-frame site and target marker present, required model joints populated with the six controlled SO-101 joints plus `piece_source_freejoint`, limited-joint evidence populated with the six controlled joints, no missing/unlimited/invalid-range required joints, both gripper collision geoms present, MuJoCo load/sync checks passing, reviewed MuJoCo handoff intake fields populated from the reviewed-bundle downstream handoff, `reviewed_mujoco_handoff_contract_ok`, `reviewed_mujoco_handoff_joint_limit_enablement_status`, and `reviewed_mujoco_handoff_missing_limited_joints` recorded, `scene_uses_reviewed_mujoco_handoff: false`, and summary/model/manifest/CSV/README artifact paths populated
-- `so101_mujoco_scene_matrix` includes invalid-square, same-source/target, non-positive max-step, required not-ready handoff, required fixture-only handoff, forged-ready handoff, stale-schema ready handoff, incomplete-ready handoff, ready-handoff-with-missing-input, ready-handoff-with-pending-action, ready-handoff-with-physical-truth-claim, and ready-handoff-with-unlimited-joint-evidence cases that must fail closed, plus optional and required ready-handoff intake cases that must pass while keeping the generated scene development-only. Passing cases assert the required joint set, limited-joint evidence, reviewed-handoff joint-limit enablement evidence, and gripper collision geoms; fail-closed cases keep authority/readiness flags false, write summary/CSV/README artifacts, and leave model XML and manifest paths absent.
+- `so101_mujoco_scene.status: "ok"` with `model_authority: "development_scaffold_not_reviewed"`, `observed_evidence_is_physical_so101_authority: false`, `ready_for_model_backed_ik: false`, `ready_for_policy_training: false`, `mujoco_scene_validity_status: "development_scene_validated_not_physical_authority"`, source/target squares and max-step budget recorded, `square_geom_count: 64`, target-frame site and target marker present, required model joints populated with the six controlled SO-101 joints plus `piece_source_freejoint`, limited-joint evidence populated with the six controlled joints, no missing/unlimited/invalid-range required joints, both gripper collision geoms present, MuJoCo load/sync checks passing, reviewed MuJoCo handoff intake fields populated from the reviewed-bundle downstream handoff, `reviewed_mujoco_handoff_contract_ok`, `reviewed_mujoco_handoff_priority_contract_ok`, `reviewed_mujoco_handoff_priority_gate_id`, `reviewed_mujoco_handoff_priority_gate_order`, `reviewed_mujoco_handoff_next_downstream_gate_after_ready`, `reviewed_mujoco_handoff_joint_limit_enablement_status`, and `reviewed_mujoco_handoff_missing_limited_joints` recorded, `scene_uses_reviewed_mujoco_handoff: false`, and summary/model/manifest/CSV/README artifact paths populated
+- `so101_mujoco_scene_matrix` includes invalid-square, same-source/target, non-positive max-step, required not-ready handoff, required fixture-only handoff, forged-ready handoff, stale-schema ready handoff, incomplete-ready handoff, ready-handoff-with-missing-input, ready-handoff-with-pending-action, ready-handoff-with-physical-truth-claim, ready-handoff-missing-scene-gate, ready-handoff-wrong-next-downstream-gate, and ready-handoff-with-unlimited-joint-evidence cases that must fail closed, plus optional and required ready-handoff intake cases that must pass while keeping the generated scene development-only. Passing cases assert the required joint set, limited-joint evidence, reviewed-handoff priority contract, reviewed-handoff joint-limit enablement evidence, and gripper collision geoms; fail-closed cases keep authority/readiness flags false, write summary/CSV/README artifacts, and leave model XML and manifest paths absent.
 - `so101_chess_env.status: "ok"` with `model_authority: "development_scaffold_not_reviewed"` when the generated MuJoCo model is loaded, `ready_for_model_backed_ik: false`, `ready_for_policy_training: false`, strict Gymnasium/MuJoCo dependencies available, `mujoco_backend_required: true`, `mujoco_backend_loaded: true`, `joint_state_fallback_active: false`, `gymnasium_task_wiring_status: "development_mujoco_env_scripted"`, a valid `gymnasium_api_contract` proving six `float32` controlled-joint actions plus expected reset/final observation keys and shapes, development-scene reviewed-handoff joint-limit fields preserved as not requested/not ready, `training_authority_status: "development_mujoco_env_verified_not_policy_ready"`, serious-training blockers including `reviewed_so101_model_bundle`, symbolic contact model recorded, scripted pick/place complete, and summary/CSV/README artifact paths populated; invalid task configuration or incomplete scripted pick/place must return nonzero with false policy/model readiness
 - `so101_env_resets.status: "ok"` with `all_resets_ok: true`,
   `all_mujoco_fallback_free: true`, reset count populated, invalid reset

@@ -62,12 +62,19 @@ the current downstream schema, include the complete item set
 `downstream_handoff_ready` coherent with physical reviewed MuJoCo motion. It
 also requires the handoff gate list to keep `mujoco_scene_validity`,
 `gymnasium_task_wiring`, and reviewed-model-backed pick/place explicit. Ready
+handoffs must also preserve
+`downstream_priority_gate_id: "reviewed_mujoco_handoff"`,
+`downstream_priority_gate_order` in that same order,
+`next_downstream_gate_after_ready: "mujoco_scene_validity"`,
+`blocks_downstream_gates_until_ready: true`, and
+`ready_does_not_imply_policy_training_ready: true`. Ready
 or fixture-ready handoffs must also carry
 `mujoco_motion_inputs.mujoco_joint_limit_enablement` with
 `status: "so101_mujoco_joints_limited"` and no missing limited SO-101 joints.
 Fixture motion, incomplete ready payloads, forged ready flags, missing
 downstream gate entries, missing/enforced joint-limit evidence, or handoffs that
-claim authority/physical SO-101 truth fail closed when the handoff is required.
+point the next downstream gate away from `mujoco_scene_validity` or claim
+authority/physical SO-101 truth fail closed when the handoff is required.
 
 Invalid scene requests fail closed with artifacts instead of a traceback. For
 example, an invalid chess square or identical source/target square writes
@@ -89,8 +96,9 @@ fail-closed invalid source-square, invalid target-square, same-source/target,
 and non-positive max-step cases, fail-closed required handoff cases for
 not-ready, fixture-only, forged-ready, and incomplete-ready handoffs, ready
 handoffs with open review work, and ready
-handoffs that claim authority/physical SO-101 truth or omit enforced SO-101
-joint-limit evidence, plus valid optional and required ready-handoff intake
+handoffs that claim authority/physical SO-101 truth, omit enforced SO-101
+joint-limit evidence, or drift the next downstream gate away from
+`mujoco_scene_validity`, plus valid optional and required ready-handoff intake
 cases that still keep the generated scene development-only,
 while keeping every case labeled as non-authoritative development scaffolding.
 Passing matrix cases also assert the required model joint set, finite limited

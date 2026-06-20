@@ -1217,6 +1217,22 @@ jobs:
               assert observations["downstream_handoff_csv_exists"] is True, case
               assert Path(observations["downstream_handoff_csv_path"]).is_file(), case
               assert "downstream_gate_handoff" in observations["downstream_handoff_csv_item_ids"], case
+              assert observations["downstream_priority_gate_id"] == "reviewed_mujoco_handoff", case
+              assert observations["downstream_priority_gate_order"] == [
+                  "mujoco_scene_validity",
+                  "gymnasium_task_wiring",
+                  "reviewed_model_backed_contact_grasp_pick_place",
+              ], case
+              assert observations["next_downstream_gate_after_ready"] == "mujoco_scene_validity", case
+              assert observations["blocks_downstream_gates_until_ready"] is True, case
+              assert observations["ready_does_not_imply_policy_training_ready"] is True, case
+              assert observations["downstream_handoff_json_priority_gate_id"] == "reviewed_mujoco_handoff", case
+              assert observations["downstream_handoff_json_priority_gate_order"] == [
+                  "mujoco_scene_validity",
+                  "gymnasium_task_wiring",
+                  "reviewed_model_backed_contact_grasp_pick_place",
+              ], case
+              assert observations["downstream_handoff_json_next_downstream_gate_after_ready"] == "mujoco_scene_validity", case
               if observations["ready_for_model_backed_ik"] is False:
                   assert sorted(set(observations["motion_checks_csv_statuses"])) == [
                       "not_attempted_manifest_not_ready"
@@ -1583,6 +1599,7 @@ jobs:
               "ready_handoff_with_pending_action_rejected",
               "ready_handoff_physical_truth_claim_rejected",
               "ready_handoff_missing_scene_gate_rejected",
+              "ready_handoff_wrong_next_downstream_gate_rejected",
               "ready_handoff_unlimited_joint_rejected",
               "required_ready_handoff_intake_still_development_scene",
               "ready_handoff_intake_still_development_scene",
@@ -1625,6 +1642,7 @@ jobs:
               "ready_handoff_with_pending_action_rejected",
               "ready_handoff_physical_truth_claim_rejected",
               "ready_handoff_missing_scene_gate_rejected",
+              "ready_handoff_wrong_next_downstream_gate_rejected",
               "ready_handoff_unlimited_joint_rejected",
           }
           by_case = {case["case_id"]: case for case in summary["cases"]}
@@ -1699,6 +1717,13 @@ jobs:
           ], missing_scene_gate_handoff
           assert missing_scene_gate_handoff["reviewed_mujoco_handoff_blocked_gates_until_physical_ready"] == [], missing_scene_gate_handoff
           assert "provide_reviewed_mujoco_downstream_handoff_unblocked_gate_list" in missing_scene_gate_handoff["reviewed_mujoco_handoff_blockers"], missing_scene_gate_handoff
+          wrong_next_gate_handoff = by_case["ready_handoff_wrong_next_downstream_gate_rejected"]["observations"]
+          assert wrong_next_gate_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", wrong_next_gate_handoff
+          assert wrong_next_gate_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", wrong_next_gate_handoff
+          assert wrong_next_gate_handoff["reviewed_mujoco_handoff_contract_ok"] is False, wrong_next_gate_handoff
+          assert wrong_next_gate_handoff["reviewed_mujoco_handoff_priority_contract_ok"] is False, wrong_next_gate_handoff
+          assert wrong_next_gate_handoff["reviewed_mujoco_handoff_next_downstream_gate_after_ready"] == "gymnasium_task_wiring", wrong_next_gate_handoff
+          assert "provide_reviewed_mujoco_next_downstream_gate" in wrong_next_gate_handoff["reviewed_mujoco_handoff_blockers"], wrong_next_gate_handoff
           unlimited_joint_handoff = by_case["ready_handoff_unlimited_joint_rejected"]["observations"]
           assert unlimited_joint_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", unlimited_joint_handoff
           assert unlimited_joint_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", unlimited_joint_handoff
@@ -3050,6 +3075,15 @@ jobs:
           assert isinstance(reviewed_mujoco_bundle["downstream_handoff_item_count"], int), reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["downstream_handoff_item_count"] >= 8, reviewed_mujoco_bundle
           assert "downstream_gate_handoff" in reviewed_mujoco_bundle["downstream_handoff_item_ids"], reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["downstream_priority_gate_id"] == "reviewed_mujoco_handoff", reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["downstream_priority_gate_order"] == [
+              "mujoco_scene_validity",
+              "gymnasium_task_wiring",
+              "reviewed_model_backed_contact_grasp_pick_place",
+          ], reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["next_downstream_gate_after_ready"] == "mujoco_scene_validity", reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["blocks_downstream_gates_until_ready"] is True, reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["ready_does_not_imply_policy_training_ready"] is True, reviewed_mujoco_bundle
           if bundle_manifest["ready_for_model_backed_ik"] is True:
               assert reviewed_mujoco_bundle["reviewed_model_motion_checked"] is True, reviewed_mujoco_bundle
               assert reviewed_mujoco_bundle["status"] == "reviewed_mujoco_bundle_motion_checked", reviewed_mujoco_bundle
@@ -3100,6 +3134,11 @@ jobs:
           assert handoff["physical_so101_truth_claimed"] is False, handoff
           assert handoff["development_fixture_evidence_not_physical_so101_truth"] is True, handoff
           assert "downstream_gate_handoff" in handoff["handoff_item_ids"], handoff
+          assert handoff["downstream_priority_gate_id"] == reviewed_mujoco_bundle["downstream_priority_gate_id"], handoff
+          assert handoff["downstream_priority_gate_order"] == reviewed_mujoco_bundle["downstream_priority_gate_order"], handoff
+          assert handoff["next_downstream_gate_after_ready"] == reviewed_mujoco_bundle["next_downstream_gate_after_ready"], handoff
+          assert handoff["blocks_downstream_gates_until_ready"] is True, handoff
+          assert handoff["ready_does_not_imply_policy_training_ready"] is True, handoff
           with Path(reviewed_mujoco_artifacts["downstream_handoff_csv"]).open(newline="") as handle:
               handoff_rows = list(csv.DictReader(handle))
           assert len(handoff_rows) == handoff["handoff_item_count"], handoff_rows
@@ -3717,6 +3756,16 @@ jobs:
           assert so101_mujoco_scene["reviewed_mujoco_handoff_joint_limit_enablement_ok"] is False, so101_mujoco_scene
           assert so101_mujoco_scene["reviewed_mujoco_handoff_joint_limit_enablement_status"] is None, so101_mujoco_scene
           assert so101_mujoco_scene["reviewed_mujoco_handoff_missing_limited_joints"] == [], so101_mujoco_scene
+          assert so101_mujoco_scene["reviewed_mujoco_handoff_priority_gate_id"] == "reviewed_mujoco_handoff", so101_mujoco_scene
+          assert so101_mujoco_scene["reviewed_mujoco_handoff_priority_gate_order"] == [
+              "mujoco_scene_validity",
+              "gymnasium_task_wiring",
+              "reviewed_model_backed_contact_grasp_pick_place",
+          ], so101_mujoco_scene
+          assert so101_mujoco_scene["reviewed_mujoco_handoff_next_downstream_gate_after_ready"] == "mujoco_scene_validity", so101_mujoco_scene
+          assert so101_mujoco_scene["reviewed_mujoco_handoff_blocks_downstream_gates_until_ready"] is True, so101_mujoco_scene
+          assert so101_mujoco_scene["reviewed_mujoco_handoff_ready_does_not_imply_policy_training_ready"] is True, so101_mujoco_scene
+          assert so101_mujoco_scene["reviewed_mujoco_handoff_priority_contract_ok"] is True, so101_mujoco_scene
           assert so101_mujoco_scene["scene_uses_reviewed_mujoco_handoff"] is False, so101_mujoco_scene
           assert so101_mujoco_scene["source_square"] == "e4", so101_mujoco_scene
           assert so101_mujoco_scene["target_square"] == "e5", so101_mujoco_scene
@@ -3929,6 +3978,16 @@ jobs:
           assert training_readiness_gate["reviewed_mujoco_downstream_handoff_physical_truth_claimed"] is False, training_readiness_gate
           assert training_readiness_gate["reviewed_mujoco_downstream_handoff_observed_evidence_is_authority"] is False, training_readiness_gate
           assert "downstream_gate_handoff" in training_readiness_gate["reviewed_mujoco_downstream_handoff_item_ids"], training_readiness_gate
+          assert training_readiness_gate["reviewed_mujoco_downstream_handoff_priority_gate_id"] == "reviewed_mujoco_handoff", training_readiness_gate
+          assert training_readiness_gate["reviewed_mujoco_downstream_handoff_priority_gate_order"] == [
+              "mujoco_scene_validity",
+              "gymnasium_task_wiring",
+              "reviewed_model_backed_contact_grasp_pick_place",
+          ], training_readiness_gate
+          assert training_readiness_gate["reviewed_mujoco_downstream_handoff_next_downstream_gate_after_ready"] == "mujoco_scene_validity", training_readiness_gate
+          assert training_readiness_gate["reviewed_mujoco_downstream_handoff_blocks_downstream_gates_until_ready"] is True, training_readiness_gate
+          assert training_readiness_gate["reviewed_mujoco_downstream_handoff_ready_does_not_imply_policy_training_ready"] is True, training_readiness_gate
+          assert training_readiness_gate["reviewed_mujoco_downstream_handoff_priority_contract_ok"] is True, training_readiness_gate
           assert isinstance(training_readiness_gate["reviewed_mujoco_downstream_handoff_contract_blockers"], list), training_readiness_gate
           assert training_readiness_gate["reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority"] == (
               training_readiness_gate["reviewed_mujoco_downstream_handoff_contract_ok"] is True
@@ -4874,6 +4933,16 @@ jobs:
               assert metrics.get("downstream_handoff_observed_evidence_is_authority") in {False, None}, metrics
               assert metrics.get("downstream_handoff_physical_so101_truth_claimed") in {False, None}, metrics
               assert metrics.get("downstream_handoff_development_fixture_evidence_not_physical_so101_truth") in {True, None}, metrics
+              if metrics.get("downstream_handoff_status") is not None:
+                  assert metrics.get("downstream_priority_gate_id") == "reviewed_mujoco_handoff", metrics
+                  assert metrics.get("downstream_priority_gate_order") == [
+                      "mujoco_scene_validity",
+                      "gymnasium_task_wiring",
+                      "reviewed_model_backed_contact_grasp_pick_place",
+                  ], metrics
+                  assert metrics.get("next_downstream_gate_after_ready") == "mujoco_scene_validity", metrics
+                  assert metrics.get("blocks_downstream_gates_until_ready") is True, metrics
+                  assert metrics.get("ready_does_not_imply_policy_training_ready") is True, metrics
               if metrics.get("ready_for_model_backed_ik") is True and metrics.get("reviewed_model_motion_checked") is True:
                   assert metrics.get("physical_reviewed_model_motion_checked") == (
                       metrics.get("physical_so101_model_authority_ready") is True
@@ -5056,6 +5125,14 @@ jobs:
               and row.get("metrics", {}).get("reviewed_mujoco_handoff_contract_ok") is True
               and row.get("metrics", {}).get("reviewed_mujoco_handoff_ready") is False
               and row.get("metrics", {}).get("reviewed_mujoco_handoff_physical_truth_claimed") is False
+              and row.get("metrics", {}).get("reviewed_mujoco_handoff_priority_gate_id") == "reviewed_mujoco_handoff"
+              and row.get("metrics", {}).get("reviewed_mujoco_handoff_priority_gate_order") == [
+                  "mujoco_scene_validity",
+                  "gymnasium_task_wiring",
+                  "reviewed_model_backed_contact_grasp_pick_place",
+              ]
+              and row.get("metrics", {}).get("reviewed_mujoco_handoff_next_downstream_gate_after_ready") == "mujoco_scene_validity"
+              and row.get("metrics", {}).get("reviewed_mujoco_handoff_priority_contract_ok") is True
               and row.get("metrics", {}).get("reviewed_mujoco_handoff_joint_limit_enablement_ok") is False
               and row.get("metrics", {}).get("reviewed_mujoco_handoff_joint_limit_enablement_status") is None
               and row.get("metrics", {}).get("reviewed_mujoco_handoff_missing_limited_joints") == []

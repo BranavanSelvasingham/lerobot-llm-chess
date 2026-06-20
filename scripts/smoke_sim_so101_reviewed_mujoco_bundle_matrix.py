@@ -28,6 +28,7 @@ SCHEMA = "lerobot.sim.so101_reviewed_mujoco_bundle_matrix.v1"
 EXPECTED_DOWNSTREAM_HANDOFF_SCHEMA = (
     "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1"
 )
+DOWNSTREAM_HANDOFF_PRIORITY_GATE_ID = "reviewed_mujoco_handoff"
 REVIEWED_MUJOCO_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_reviewed_mujoco_bundle.py"
 MANIFEST_CHECKER_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_model_bundle_manifest.py"
 EXPECTED_MOTION_CHECK_JOINTS = (
@@ -43,6 +44,7 @@ EXPECTED_DOWNSTREAM_HANDOFF_GATES = (
     "gymnasium_task_wiring",
     "reviewed_model_backed_contact_grasp_pick_place",
 )
+NEXT_DOWNSTREAM_GATE_AFTER_READY = EXPECTED_DOWNSTREAM_HANDOFF_GATES[0]
 
 
 def parse_args() -> argparse.Namespace:
@@ -391,6 +393,14 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "downstream_handoff_open_work_contract_missing_inputs_match_summary",
         "downstream_handoff_open_work_contract_pending_action_ids_match_summary",
         "downstream_handoff_open_work_contract_blockers_match_expected",
+        "downstream_priority_gate_id",
+        "downstream_priority_gate_order",
+        "next_downstream_gate_after_ready",
+        "blocks_downstream_gates_until_ready",
+        "ready_does_not_imply_policy_training_ready",
+        "downstream_handoff_json_priority_gate_id",
+        "downstream_handoff_json_priority_gate_order",
+        "downstream_handoff_json_next_downstream_gate_after_ready",
         "fixture_handoff_ready_not_physical_so101_authority",
         "downstream_handoff_csv_exists",
         "downstream_handoff_csv_item_ids",
@@ -1801,6 +1811,40 @@ def summarize_case(
             if summary.get("downstream_handoff_ready") is True
             else list(EXPECTED_DOWNSTREAM_HANDOFF_GATES),
         )
+        for source_name, source in (
+            ("summary", summary),
+            ("downstream_handoff_json", downstream_handoff),
+        ):
+            add_error(
+                errors,
+                f"{case_id}.{source_name}.downstream_priority_gate_id",
+                source.get("downstream_priority_gate_id"),
+                DOWNSTREAM_HANDOFF_PRIORITY_GATE_ID,
+            )
+            add_error(
+                errors,
+                f"{case_id}.{source_name}.downstream_priority_gate_order",
+                source.get("downstream_priority_gate_order"),
+                list(EXPECTED_DOWNSTREAM_HANDOFF_GATES),
+            )
+            add_error(
+                errors,
+                f"{case_id}.{source_name}.next_downstream_gate_after_ready",
+                source.get("next_downstream_gate_after_ready"),
+                NEXT_DOWNSTREAM_GATE_AFTER_READY,
+            )
+            add_error(
+                errors,
+                f"{case_id}.{source_name}.blocks_downstream_gates_until_ready",
+                source.get("blocks_downstream_gates_until_ready"),
+                True,
+            )
+            add_error(
+                errors,
+                f"{case_id}.{source_name}.ready_does_not_imply_policy_training_ready",
+                source.get("ready_does_not_imply_policy_training_ready"),
+                True,
+            )
         if "downstream_gate_handoff" not in set(
             downstream_handoff.get("handoff_item_ids") or []
         ):
@@ -2027,6 +2071,34 @@ def summarize_case(
                 if isinstance(downstream_handoff, dict)
                 else None
             ),
+            "downstream_priority_gate_id": summary.get("downstream_priority_gate_id"),
+            "downstream_priority_gate_order": summary.get(
+                "downstream_priority_gate_order"
+            ),
+            "next_downstream_gate_after_ready": summary.get(
+                "next_downstream_gate_after_ready"
+            ),
+            "blocks_downstream_gates_until_ready": summary.get(
+                "blocks_downstream_gates_until_ready"
+            ),
+            "ready_does_not_imply_policy_training_ready": summary.get(
+                "ready_does_not_imply_policy_training_ready"
+            ),
+            "downstream_handoff_json_priority_gate_id": (
+                downstream_handoff.get("downstream_priority_gate_id")
+                if isinstance(downstream_handoff, dict)
+                else None
+            ),
+            "downstream_handoff_json_priority_gate_order": (
+                downstream_handoff.get("downstream_priority_gate_order")
+                if isinstance(downstream_handoff, dict)
+                else None
+            ),
+            "downstream_handoff_json_next_downstream_gate_after_ready": (
+                downstream_handoff.get("next_downstream_gate_after_ready")
+                if isinstance(downstream_handoff, dict)
+                else None
+            ),
             "fixture_handoff_ready_not_physical_so101_authority": summary.get(
                 "fixture_handoff_ready_not_physical_so101_authority"
             ),
@@ -2135,6 +2207,28 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "downstream_handoff_open_work_contract_blockers_match_expected": observations.get(
             "downstream_handoff_open_work_contract_blockers_match_expected"
+        ),
+        "downstream_priority_gate_id": observations.get("downstream_priority_gate_id"),
+        "downstream_priority_gate_order": observations.get(
+            "downstream_priority_gate_order"
+        ),
+        "next_downstream_gate_after_ready": observations.get(
+            "next_downstream_gate_after_ready"
+        ),
+        "blocks_downstream_gates_until_ready": observations.get(
+            "blocks_downstream_gates_until_ready"
+        ),
+        "ready_does_not_imply_policy_training_ready": observations.get(
+            "ready_does_not_imply_policy_training_ready"
+        ),
+        "downstream_handoff_json_priority_gate_id": observations.get(
+            "downstream_handoff_json_priority_gate_id"
+        ),
+        "downstream_handoff_json_priority_gate_order": observations.get(
+            "downstream_handoff_json_priority_gate_order"
+        ),
+        "downstream_handoff_json_next_downstream_gate_after_ready": observations.get(
+            "downstream_handoff_json_next_downstream_gate_after_ready"
         ),
         "fixture_handoff_ready_not_physical_so101_authority": observations.get(
             "fixture_handoff_ready_not_physical_so101_authority"

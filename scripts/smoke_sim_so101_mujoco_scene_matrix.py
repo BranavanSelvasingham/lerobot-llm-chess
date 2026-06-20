@@ -18,6 +18,7 @@ SCHEMA = "lerobot.sim.so101_mujoco_scene_matrix.v1"
 SCENE_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_mujoco_scene.py"
 SCENE_SUMMARY_NAME = "so101_mujoco_scene_summary.json"
 DOWNSTREAM_HANDOFF_SCHEMA = "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1"
+DOWNSTREAM_HANDOFF_PRIORITY_GATE_ID = "reviewed_mujoco_handoff"
 EXPECTED_REQUIRED_MODEL_JOINTS: tuple[str, ...] = (
     "shoulder_pan",
     "shoulder_lift",
@@ -55,6 +56,7 @@ EXPECTED_DOWNSTREAM_HANDOFF_GATES: tuple[str, ...] = (
     "gymnasium_task_wiring",
     "reviewed_model_backed_contact_grasp_pick_place",
 )
+NEXT_DOWNSTREAM_GATE_AFTER_READY = EXPECTED_DOWNSTREAM_HANDOFF_GATES[0]
 
 
 def parse_args() -> argparse.Namespace:
@@ -158,6 +160,12 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_handoff_ready_has_open_work",
         "reviewed_mujoco_handoff_gates_unblocked_when_physical_ready",
         "reviewed_mujoco_handoff_blocked_gates_until_physical_ready",
+        "reviewed_mujoco_handoff_priority_gate_id",
+        "reviewed_mujoco_handoff_priority_gate_order",
+        "reviewed_mujoco_handoff_next_downstream_gate_after_ready",
+        "reviewed_mujoco_handoff_blocks_downstream_gates_until_ready",
+        "reviewed_mujoco_handoff_ready_does_not_imply_policy_training_ready",
+        "reviewed_mujoco_handoff_priority_contract_ok",
         "reviewed_mujoco_handoff_blockers",
         "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority",
         "scene_uses_reviewed_mujoco_handoff",
@@ -201,6 +209,7 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
         "ready_with_pending_action",
         "ready_with_physical_truth_claim",
         "ready_missing_scene_gate",
+        "ready_wrong_next_downstream_gate",
         "ready_with_unlimited_joint",
         "schema_mismatch_ready",
     }
@@ -251,6 +260,11 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
         "gates_unblocked_when_physical_handoff_ready": list(
             EXPECTED_DOWNSTREAM_HANDOFF_GATES
         ),
+        "downstream_priority_gate_id": DOWNSTREAM_HANDOFF_PRIORITY_GATE_ID,
+        "downstream_priority_gate_order": list(EXPECTED_DOWNSTREAM_HANDOFF_GATES),
+        "next_downstream_gate_after_ready": NEXT_DOWNSTREAM_GATE_AFTER_READY,
+        "blocks_downstream_gates_until_ready": True,
+        "ready_does_not_imply_policy_training_ready": True,
         "blocked_gates_until_physical_handoff_ready": []
         if ready
         else list(EXPECTED_DOWNSTREAM_HANDOFF_GATES),
@@ -320,6 +334,8 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
             "gymnasium_task_wiring",
             "reviewed_model_backed_contact_grasp_pick_place",
         ]
+    elif state == "ready_wrong_next_downstream_gate":
+        payload["next_downstream_gate_after_ready"] = "gymnasium_task_wiring"
     elif state == "ready_with_unlimited_joint":
         enablement = payload["mujoco_motion_inputs"]["mujoco_joint_limit_enablement"]
         enablement["ok"] = False
@@ -516,6 +532,24 @@ def case_specs() -> list[dict[str, Any]]:
             "expected_handoff_blocked_gates": [],
             "expected_handoff_blockers_contain": [
                 "provide_reviewed_mujoco_downstream_handoff_unblocked_gate_list"
+            ],
+        },
+        {
+            "case_id": "ready_handoff_wrong_next_downstream_gate_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": False,
+            "handoff_state": "ready_wrong_next_downstream_gate",
+            "require_handoff": True,
+            "expected_status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "expected_handoff_intake_status": "handoff_contract_invalid",
+            "expected_handoff_ready": False,
+            "expected_handoff_contract_ok": False,
+            "expected_handoff_priority_contract_ok": False,
+            "expected_handoff_next_downstream_gate_after_ready": "gymnasium_task_wiring",
+            "expected_handoff_blockers_contain": [
+                "provide_reviewed_mujoco_next_downstream_gate"
             ],
         },
         {
@@ -736,6 +770,24 @@ def summarize_case(
         ),
         "reviewed_mujoco_handoff_blocked_gates_until_physical_ready": summary.get(
             "reviewed_mujoco_handoff_blocked_gates_until_physical_ready"
+        ),
+        "reviewed_mujoco_handoff_priority_gate_id": summary.get(
+            "reviewed_mujoco_handoff_priority_gate_id"
+        ),
+        "reviewed_mujoco_handoff_priority_gate_order": summary.get(
+            "reviewed_mujoco_handoff_priority_gate_order"
+        ),
+        "reviewed_mujoco_handoff_next_downstream_gate_after_ready": summary.get(
+            "reviewed_mujoco_handoff_next_downstream_gate_after_ready"
+        ),
+        "reviewed_mujoco_handoff_blocks_downstream_gates_until_ready": summary.get(
+            "reviewed_mujoco_handoff_blocks_downstream_gates_until_ready"
+        ),
+        "reviewed_mujoco_handoff_ready_does_not_imply_policy_training_ready": summary.get(
+            "reviewed_mujoco_handoff_ready_does_not_imply_policy_training_ready"
+        ),
+        "reviewed_mujoco_handoff_priority_contract_ok": summary.get(
+            "reviewed_mujoco_handoff_priority_contract_ok"
         ),
         "reviewed_mujoco_handoff_blockers": summary.get(
             "reviewed_mujoco_handoff_blockers"
@@ -986,6 +1038,7 @@ def summarize_case(
                 "ready_with_pending_action",
                 "ready_with_physical_truth_claim",
                 "ready_missing_scene_gate",
+                "ready_wrong_next_downstream_gate",
                 "ready_with_unlimited_joint",
                 "schema_mismatch_ready",
             }
@@ -1005,6 +1058,55 @@ def summarize_case(
             f"{case_id}.reviewed_mujoco_handoff_blocked_gates_until_physical_ready",
             observations["reviewed_mujoco_handoff_blocked_gates_until_physical_ready"],
             spec.get("expected_handoff_blocked_gates", default_blocked_gates),
+        )
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_priority_gate_id",
+            observations["reviewed_mujoco_handoff_priority_gate_id"],
+            spec.get(
+                "expected_handoff_priority_gate_id",
+                DOWNSTREAM_HANDOFF_PRIORITY_GATE_ID,
+            ),
+        )
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_priority_gate_order",
+            observations["reviewed_mujoco_handoff_priority_gate_order"],
+            spec.get(
+                "expected_handoff_priority_gate_order",
+                list(EXPECTED_DOWNSTREAM_HANDOFF_GATES),
+            ),
+        )
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_next_downstream_gate_after_ready",
+            observations["reviewed_mujoco_handoff_next_downstream_gate_after_ready"],
+            spec.get(
+                "expected_handoff_next_downstream_gate_after_ready",
+                NEXT_DOWNSTREAM_GATE_AFTER_READY,
+            ),
+        )
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_blocks_downstream_gates_until_ready",
+            observations["reviewed_mujoco_handoff_blocks_downstream_gates_until_ready"],
+            spec.get("expected_handoff_blocks_downstream_gates_until_ready", True),
+        )
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_ready_does_not_imply_policy_training_ready",
+            observations[
+                "reviewed_mujoco_handoff_ready_does_not_imply_policy_training_ready"
+            ],
+            spec.get(
+                "expected_handoff_ready_does_not_imply_policy_training_ready", True
+            ),
+        )
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_priority_contract_ok",
+            observations["reviewed_mujoco_handoff_priority_contract_ok"],
+            spec.get("expected_handoff_priority_contract_ok", True),
         )
     expect_contains(
         errors,
@@ -1232,6 +1334,24 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "reviewed_mujoco_handoff_blocked_gates_until_physical_ready": observations.get(
             "reviewed_mujoco_handoff_blocked_gates_until_physical_ready"
+        ),
+        "reviewed_mujoco_handoff_priority_gate_id": observations.get(
+            "reviewed_mujoco_handoff_priority_gate_id"
+        ),
+        "reviewed_mujoco_handoff_priority_gate_order": observations.get(
+            "reviewed_mujoco_handoff_priority_gate_order"
+        ),
+        "reviewed_mujoco_handoff_next_downstream_gate_after_ready": observations.get(
+            "reviewed_mujoco_handoff_next_downstream_gate_after_ready"
+        ),
+        "reviewed_mujoco_handoff_blocks_downstream_gates_until_ready": observations.get(
+            "reviewed_mujoco_handoff_blocks_downstream_gates_until_ready"
+        ),
+        "reviewed_mujoco_handoff_ready_does_not_imply_policy_training_ready": observations.get(
+            "reviewed_mujoco_handoff_ready_does_not_imply_policy_training_ready"
+        ),
+        "reviewed_mujoco_handoff_priority_contract_ok": observations.get(
+            "reviewed_mujoco_handoff_priority_contract_ok"
         ),
         "reviewed_mujoco_handoff_blockers": observations.get(
             "reviewed_mujoco_handoff_blockers"
