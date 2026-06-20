@@ -1724,19 +1724,20 @@ def inspect_joint_limit_review(
         if review_field in manifest:
             candidates.append((review_field, manifest.get(review_field)))
 
-    review_source = None
-    review_source_field = None
+    review_candidates: list[tuple[str, dict[str, Any]]] = []
+    seen_fields: set[str] = set()
     for candidate_field, candidate_value in candidates:
+        if candidate_field in seen_fields:
+            continue
+        seen_fields.add(candidate_field)
         if not isinstance(candidate_value, dict):
             continue
         has_status = has_any_non_empty_field(candidate_value, JOINT_LIMIT_STATUS_FIELDS)
         has_review = bool(review_evidence_summary(candidate_value)["supplied_fields"])
         if has_status or has_review:
-            review_source = candidate_value
-            review_source_field = candidate_field
-            break
+            review_candidates.append((candidate_field, candidate_value))
 
-    if not isinstance(review_source, dict):
+    if not review_candidates:
         review_evidence = review_evidence_summary(
             {},
             required_review_scope_ids=JOINT_LIMIT_REQUIRED_REVIEW_SCOPE_IDS,
@@ -1749,56 +1750,128 @@ def inspect_joint_limit_review(
             **review_evidence_report_fields(review_evidence),
             "synthetic_fixture_only": False,
             "accepted_review_statuses": sorted(REVIEWED_JOINT_LIMIT_STATUSES),
+            "review_aliases": [],
+            "review_alias_conflict": False,
+            "review_alias_not_ready_fields": [],
             "diagnostics": ["joint_limit_authority_review_missing"],
         }
 
-    status_field, raw_status = first_non_empty_field(review_source, JOINT_LIMIT_STATUS_FIELDS)
-    status_value = str(raw_status).strip().lower() if raw_status is not None else ""
-    review_evidence = review_evidence_summary(
-        review_source,
-        required_review_scope_ids=JOINT_LIMIT_REQUIRED_REVIEW_SCOPE_IDS,
+    reviews = []
+    for review_source_field, review_source in review_candidates:
+        status_field, raw_status = first_non_empty_field(
+            review_source, JOINT_LIMIT_STATUS_FIELDS
+        )
+        status_value = str(raw_status).strip().lower() if raw_status is not None else ""
+        review_evidence = review_evidence_summary(
+            review_source,
+            required_review_scope_ids=JOINT_LIMIT_REQUIRED_REVIEW_SCOPE_IDS,
+        )
+        diagnostics: list[str] = []
+        if not status_value:
+            diagnostics.append("joint_limit_authority_review_status_missing")
+        elif (
+            status_value not in REVIEWED_JOINT_LIMIT_STATUSES
+            and status_value != SYNTHETIC_FIXTURE_JOINT_LIMIT_STATUS
+        ):
+            diagnostics.append(
+                f"joint_limit_authority_review_status_not_accepted:{status_value}"
+            )
+        if not review_evidence["present"]:
+            diagnostics.append("joint_limit_authority_review_evidence_missing")
+        for group_name in review_evidence["missing_required_groups"]:
+            diagnostics.append(
+                f"joint_limit_authority_review_evidence_missing_required_group:{group_name}"
+            )
+        for evidence_field_name in review_evidence["placeholder_fields"]:
+            diagnostics.append(
+                f"joint_limit_authority_review_evidence_placeholder:{evidence_field_name}"
+            )
+        for evidence_field_name in review_evidence["invalid_fields"]:
+            diagnostics.append(
+                f"joint_limit_authority_review_evidence_invalid:{evidence_field_name}"
+            )
+        for evidence_field_name in review_evidence["open_work_fields"]:
+            diagnostics.append(
+                f"joint_limit_authority_review_evidence_open_work:{evidence_field_name}"
+            )
+        for scope_id in review_evidence["missing_review_scope_ids"]:
+            diagnostics.append(f"joint_limit_authority_review_scope_missing:{scope_id}")
+
+        is_synthetic_fixture = status_value == SYNTHETIC_FIXTURE_JOINT_LIMIT_STATUS
+        if is_synthetic_fixture and "hardware-free" not in str(
+            review_source.get("scope", "")
+        ).lower():
+            diagnostics.append("synthetic_joint_limit_scope_missing_hardware_free")
+
+        review_status_ok = status_value in REVIEWED_JOINT_LIMIT_STATUSES or (
+            is_synthetic_fixture
+            and "synthetic_joint_limit_scope_missing_hardware_free" not in diagnostics
+        )
+        reviews.append(
+            {
+                "status": (
+                    "present"
+                    if review_status_ok and review_evidence["ok"]
+                    else "needs_review"
+                ),
+                "field": review_source_field,
+                "value": review_source,
+                "review_status_field": status_field,
+                "review_status": status_value or None,
+                **review_evidence_report_fields(review_evidence),
+                "synthetic_fixture_only": is_synthetic_fixture,
+                "accepted_review_statuses": sorted(REVIEWED_JOINT_LIMIT_STATUSES),
+                "diagnostics": diagnostics,
+                "notes": (
+                    "Synthetic fixture joint-limit authority is accepted only for hardware-free forwarding regression fixtures; "
+                    "it is not physical SO-101 joint-limit truth."
+                    if is_synthetic_fixture
+                    else "Joint-limit readiness requires accepted review status, reviewer identity, a stable review artifact handle, and the joint_limits review scope."
+                ),
+            }
+        )
+
+    selected = reviews[0]
+    diagnostics = list(selected["diagnostics"])
+    alias_not_ready_fields = [
+        review["field"] for review in reviews if review["status"] != "present"
+    ]
+    diagnostics.extend(
+        f"joint_limit_authority_review_alias_not_ready:{alias_field}"
+        for alias_field in alias_not_ready_fields
     )
-    diagnostics: list[str] = []
-    if not status_value:
-        diagnostics.append("joint_limit_authority_review_status_missing")
-    elif (
-        status_value not in REVIEWED_JOINT_LIMIT_STATUSES
-        and status_value != SYNTHETIC_FIXTURE_JOINT_LIMIT_STATUS
-    ):
-        diagnostics.append(f"joint_limit_authority_review_status_not_accepted:{status_value}")
-    if not review_evidence["present"]:
-        diagnostics.append("joint_limit_authority_review_evidence_missing")
-    for group_name in review_evidence["missing_required_groups"]:
-        diagnostics.append(
-            f"joint_limit_authority_review_evidence_missing_required_group:{group_name}"
-        )
-    for field_name in review_evidence["placeholder_fields"]:
-        diagnostics.append(f"joint_limit_authority_review_evidence_placeholder:{field_name}")
-    for field_name in review_evidence["invalid_fields"]:
-        diagnostics.append(f"joint_limit_authority_review_evidence_invalid:{field_name}")
-    for field_name in review_evidence["open_work_fields"]:
-        diagnostics.append(
-            f"joint_limit_authority_review_evidence_open_work:{field_name}"
-        )
-    for scope_id in review_evidence["missing_review_scope_ids"]:
-        diagnostics.append(f"joint_limit_authority_review_scope_missing:{scope_id}")
-
-    is_synthetic_fixture = status_value == SYNTHETIC_FIXTURE_JOINT_LIMIT_STATUS
-    if is_synthetic_fixture and "hardware-free" not in str(review_source.get("scope", "")).lower():
-        diagnostics.append("synthetic_joint_limit_scope_missing_hardware_free")
-
-    review_status_ok = status_value in REVIEWED_JOINT_LIMIT_STATUSES or (
-        is_synthetic_fixture and "synthetic_joint_limit_scope_missing_hardware_free" not in diagnostics
+    ready_alias_kinds = {
+        "synthetic" if review["synthetic_fixture_only"] else "reviewed"
+        for review in reviews
+        if review["status"] == "present"
+    }
+    alias_conflict = len(ready_alias_kinds) > 1
+    if alias_conflict:
+        diagnostics.append("joint_limit_authority_review_alias_conflict")
+    is_synthetic_fixture = any(review["synthetic_fixture_only"] for review in reviews)
+    status = (
+        "present"
+        if selected["status"] == "present"
+        and not alias_not_ready_fields
+        and not alias_conflict
+        else "needs_review"
     )
     return {
-        "status": "present" if review_status_ok and review_evidence["ok"] else "needs_review",
-        "field": review_source_field,
-        "value": review_source,
-        "review_status_field": status_field,
-        "review_status": status_value or None,
-        **review_evidence_report_fields(review_evidence),
+        **selected,
+        "status": status,
         "synthetic_fixture_only": is_synthetic_fixture,
-        "accepted_review_statuses": sorted(REVIEWED_JOINT_LIMIT_STATUSES),
+        "review_aliases": [
+            {
+                "field": review["field"],
+                "status": review["status"],
+                "review_status": review["review_status"],
+                "synthetic_fixture_only": review["synthetic_fixture_only"],
+                "diagnostics": review["diagnostics"],
+            }
+            for review in reviews
+        ],
+        "review_alias_conflict": alias_conflict,
+        "review_alias_not_ready_fields": alias_not_ready_fields,
         "diagnostics": diagnostics,
         "notes": (
             "Synthetic fixture joint-limit authority is accepted only for hardware-free forwarding regression fixtures; "

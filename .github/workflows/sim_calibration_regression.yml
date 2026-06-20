@@ -498,6 +498,7 @@ jobs:
               "invalid_provenance_url_not_ready",
               "reviewed_status_with_fixture_provenance_not_physical_authority",
               "weak_joint_limit_authority_not_ready",
+              "conflicting_joint_limit_review_alias_not_ready",
               "unexpected_joint_limit_name_not_ready",
               "nonfinite_joint_limit_not_ready",
               "reversed_joint_limit_not_ready",
@@ -814,6 +815,11 @@ jobs:
           invalid_target_frame = by_case["invalid_target_frame_type_not_ready"]["observations"]
           assert invalid_target_frame["target_frame_status"] == "invalid", invalid_target_frame
           assert "target_frame" in invalid_target_frame["missing_inputs"], invalid_target_frame
+          conflicting_joint_review_alias = by_case["conflicting_joint_limit_review_alias_not_ready"]["observations"]
+          assert conflicting_joint_review_alias["joint_limits_status"] == "needs_review", conflicting_joint_review_alias
+          assert conflicting_joint_review_alias["joint_limit_review_alias_conflict"] is False, conflicting_joint_review_alias
+          assert conflicting_joint_review_alias["joint_limit_review_alias_not_ready_fields"] == ["joint_limits_review"], conflicting_joint_review_alias
+          assert "joint_limit_authority" in conflicting_joint_review_alias["missing_inputs"], conflicting_joint_review_alias
           invalid_tcp = by_case["invalid_tcp_offset_shape_not_ready"]["observations"]
           assert invalid_tcp["tcp_offset_status"] == "invalid", invalid_tcp
           assert "tcp_offset_m" in invalid_tcp["missing_inputs"], invalid_tcp
@@ -6151,6 +6157,10 @@ jobs:
           ), model_bundle_manifest_matrix
           assert (
               "conflicting_joint_limit_alias_not_ready"
+              in model_bundle_manifest_matrix["case_ids"]
+          ), model_bundle_manifest_matrix
+          assert (
+              "conflicting_joint_limit_review_alias_not_ready"
               in model_bundle_manifest_matrix["case_ids"]
           ), model_bundle_manifest_matrix
           assert (

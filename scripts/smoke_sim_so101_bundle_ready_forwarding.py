@@ -170,6 +170,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `invalid_provenance_url_manifest`: `{summary['fixtures']['invalid_provenance_url_manifest_path']}`",
         f"- `fixture_provenance_reviewed_authority_manifest`: `{summary['fixtures']['fixture_provenance_reviewed_authority_manifest_path']}`",
         f"- `weak_joint_limits_manifest`: `{summary['fixtures']['weak_joint_limits_manifest_path']}`",
+        f"- `conflicting_joint_limit_review_alias_manifest`: `{summary['fixtures']['conflicting_joint_limit_review_alias_manifest_path']}`",
         f"- `weak_mesh_manifest`: `{summary['fixtures']['weak_mesh_manifest_path']}`",
         f"- `weak_target_frame_manifest`: `{summary['fixtures']['weak_target_frame_manifest_path']}`",
         f"- `wrong_target_frame_manifest`: `{summary['fixtures']['wrong_target_frame_manifest_path']}`",
@@ -644,6 +645,20 @@ def weak_joint_limit_authority_manifest_payload(model_filename: str) -> dict[str
     return payload
 
 
+def conflicting_joint_limit_review_alias_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["joint_limits_review"] = {
+        "review_status": "needs_review",
+        "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
+        "review_id": "bundle-ready-forwarding:joint-limits-follow-up",
+        "review_scope": "joint_limits",
+        "next_required_action_ids": [
+            "resolve_conflicting_joint_limit_review_alias",
+        ],
+    }
+    return payload
+
+
 def unexpected_joint_limit_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload["joint_limits_deg"]["unknown_aux_joint"] = [-1.0, 1.0]
@@ -878,6 +893,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         fixture_dir / "fixture_provenance_reviewed_authority_bundle"
     )
     weak_joint_limits_dir = fixture_dir / "weak_joint_limits_bundle"
+    conflicting_joint_limit_review_alias_dir = (
+        fixture_dir / "conflicting_joint_limit_review_alias_bundle"
+    )
     unexpected_joint_limit_dir = fixture_dir / "unexpected_joint_limit_bundle"
     nonfinite_joint_limit_dir = fixture_dir / "nonfinite_joint_limit_bundle"
     reversed_joint_limit_dir = fixture_dir / "reversed_joint_limit_bundle"
@@ -951,6 +969,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         invalid_provenance_url_dir,
         fixture_provenance_reviewed_authority_dir,
         weak_joint_limits_dir,
+        conflicting_joint_limit_review_alias_dir,
         unexpected_joint_limit_dir,
         nonfinite_joint_limit_dir,
         reversed_joint_limit_dir,
@@ -1046,6 +1065,14 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     )
     weak_joint_limits_model_path = weak_joint_limits_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_joint_limits_model_path.write_text(mjcf_with_mesh_reference())
+    conflicting_joint_limit_review_alias_model_path = (
+        conflicting_joint_limit_review_alias_dir
+        / "model"
+        / "synthetic_so101_mujoco.xml"
+    )
+    conflicting_joint_limit_review_alias_model_path.write_text(
+        mjcf_with_mesh_reference()
+    )
     unexpected_joint_limit_model_path = (
         unexpected_joint_limit_dir / "model" / "synthetic_so101_mujoco.xml"
     )
@@ -1221,6 +1248,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         / "so101_model_bundle.fixture_provenance_reviewed_authority.json"
     )
     weak_joint_limits_manifest_path = weak_joint_limits_dir / "so101_model_bundle.weak_joint_limits.json"
+    conflicting_joint_limit_review_alias_manifest_path = (
+        conflicting_joint_limit_review_alias_dir
+        / "so101_model_bundle.conflicting_joint_limit_review_alias.json"
+    )
     unexpected_joint_limit_manifest_path = (
         unexpected_joint_limit_dir / "so101_model_bundle.unexpected_joint_limit.json"
     )
@@ -1451,6 +1482,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_joint_limits_model_path,
     )
     write_manifest_json(
+        conflicting_joint_limit_review_alias_manifest_path,
+        conflicting_joint_limit_review_alias_manifest_payload(
+            model_filename=conflicting_joint_limit_review_alias_model_path.name
+        ),
+        conflicting_joint_limit_review_alias_model_path,
+    )
+    write_manifest_json(
         unexpected_joint_limit_manifest_path,
         unexpected_joint_limit_manifest_payload(
             model_filename=unexpected_joint_limit_model_path.name
@@ -1656,6 +1694,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
             fixture_provenance_reviewed_authority_manifest_path
         ),
         "weak_joint_limits_manifest_path": weak_joint_limits_manifest_path,
+        "conflicting_joint_limit_review_alias_manifest_path": (
+            conflicting_joint_limit_review_alias_manifest_path
+        ),
         "unexpected_joint_limit_manifest_path": unexpected_joint_limit_manifest_path,
         "nonfinite_joint_limit_manifest_path": nonfinite_joint_limit_manifest_path,
         "reversed_joint_limit_manifest_path": reversed_joint_limit_manifest_path,
@@ -1724,6 +1765,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
             fixture_provenance_reviewed_authority_model_path
         ),
         "weak_joint_limits_model_path": weak_joint_limits_model_path,
+        "conflicting_joint_limit_review_alias_model_path": (
+            conflicting_joint_limit_review_alias_model_path
+        ),
         "unexpected_joint_limit_model_path": unexpected_joint_limit_model_path,
         "nonfinite_joint_limit_model_path": nonfinite_joint_limit_model_path,
         "reversed_joint_limit_model_path": reversed_joint_limit_model_path,
@@ -2955,6 +2999,50 @@ def summarize_case(
         assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
         assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
         assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
+    elif expectation == "conflicting_joint_limit_review_alias_not_forwarded":
+        assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_not_ready",
+        )
+        assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
+        assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
+        assert_equal(
+            errors,
+            f"{case_id}.diagnostic_reason",
+            forwarding.get("diagnostic_only_reason"),
+            "bundle_not_ready_for_model_backed_ik:model_bundle_manifest_needs_follow_up",
+        )
+        assert_equal(errors, f"{case_id}.authority_status", bundle.get("authority_status"), "present")
+        assert_equal(errors, f"{case_id}.provenance_status", bundle.get("provenance_status"), "present")
+        assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "needs_review")
+        assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
+        assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
+        assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
+        manifest_summary = load_json_object(bundle.get("summary_path"))
+        joint_review = get_nested(manifest_summary, ("joint_limits", "review"), {})
+        assert_equal(
+            errors,
+            f"{case_id}.joint_limit_review_alias_conflict",
+            joint_review.get("review_alias_conflict"),
+            False,
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.joint_limit_review_alias_not_ready_fields",
+            joint_review.get("review_alias_not_ready_fields"),
+            ["joint_limits_review"],
+        )
+        diagnostics = get_nested(bundle, ("joint_limits", "diagnostics"), [])
+        if "joint_limit_authority_review_alias_not_ready:joint_limits_review" not in diagnostics:
+            errors.append(f"{case_id}.joint_limits_diagnostic_missing:{diagnostics!r}")
+        missing_inputs = bundle.get("missing_inputs")
+        if not isinstance(missing_inputs, list) or "joint_limit_authority" not in missing_inputs:
+            errors.append(f"{case_id}.missing_inputs: expected joint_limit_authority, got {missing_inputs!r}")
     elif expectation == "weak_mesh_asset_authority_not_forwarded":
         assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
         assert_equal(
@@ -3527,6 +3615,14 @@ def main() -> int:
             "manifest_path": fixtures["weak_joint_limits_manifest_path"],
             "explicit_model_path": None,
             "expectation": "weak_joint_limit_authority_not_forwarded",
+        },
+        {
+            "case_id": "conflicting_joint_limit_review_alias_not_forwarded",
+            "manifest_path": fixtures[
+                "conflicting_joint_limit_review_alias_manifest_path"
+            ],
+            "explicit_model_path": None,
+            "expectation": "conflicting_joint_limit_review_alias_not_forwarded",
         },
         {
             "case_id": "weak_mesh_asset_authority_not_forwarded",
