@@ -1129,6 +1129,31 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
             errors.append(
                 f"{case_id}.candidate_source_lock missing selectable model diagnostic"
             )
+    observed_inputs = seeded_template.get("observed_inputs")
+    observed_inputs = observed_inputs if isinstance(observed_inputs, dict) else {}
+    digest_handoff = observed_inputs.get("candidate_source_lock_digest_handoff")
+    digest_handoff = digest_handoff if isinstance(digest_handoff, dict) else {}
+    if digest_handoff.get("authority_boundary") != "candidate_source_lock_digest_not_authority":
+        errors.append(
+            f"{case_id}.candidate_seeded_review_manifest_template digest handoff authority invalid"
+        )
+    if digest_handoff.get("digest_row_count") != expected_digest_row_count:
+        errors.append(
+            f"{case_id}.candidate_seeded_review_manifest_template digest_row_count expected "
+            f"{expected_digest_row_count!r}, got {digest_handoff.get('digest_row_count')!r}"
+        )
+    if digest_handoff.get("expected_file_digest_count") != expected_expected_digest_row_count:
+        errors.append(
+            f"{case_id}.candidate_seeded_review_manifest_template expected_file_digest_count invalid"
+        )
+    if digest_handoff.get("extra_lockable_file_count") != expected_extra_lockable_count:
+        errors.append(
+            f"{case_id}.candidate_seeded_review_manifest_template extra_lockable_file_count invalid"
+        )
+    if digest_handoff.get("extra_lockable_relative_paths") != expected_extra_lockable_paths:
+        errors.append(
+            f"{case_id}.candidate_seeded_review_manifest_template extra_lockable_relative_paths invalid"
+        )
     operator_plan = summary.get("candidate_operator_intake_plan")
     operator_plan = operator_plan if isinstance(operator_plan, dict) else {}
     if (

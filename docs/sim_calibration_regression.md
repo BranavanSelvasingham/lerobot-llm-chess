@@ -490,7 +490,10 @@ copy the selected model parse observation into the source-lock handoff without
 granting model authority. The matrix includes an extra-lockable-source-file
 case for upstream files such as `.part` CAD/source assets, keeping those digest
 rows visible while preserving expected-file completeness as the source-lock
-readiness check. The matrix also includes a MJCF model-selection case so
+readiness check. The candidate-seeded reviewed manifest template carries the
+same digest counts and extra lockable paths under observed inputs as review
+context only; reviewers still must replace placeholder authority fields before
+the bundle manifest can pass. The matrix also includes a MJCF model-selection case so
 the handoff can distinguish `no_mesh_references_observed` from observed mesh
 references covered by the locked candidate digest set, and it records selected
 model coverage against the expected SO-101 control joint names. Those joint

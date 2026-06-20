@@ -492,8 +492,8 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
             },
             {
                 "requirement_id": "external_file_digest_lock_reviewed",
-                "title": "Review expected file digest lock",
-                "required_evidence": "complete expected SO101 file digest set from candidate_source_lock",
+                "title": "Review complete lockable file digest handoff",
+                "required_evidence": "complete expected SO101 file digest set plus discovered lockable extra file digests from candidate_source_lock",
                 "manifest_or_review_field": "mesh_asset_authority",
             },
             {
@@ -525,7 +525,7 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
             {
                 "requirement_id": "vendor_file_digest_manifest_reviewed",
                 "title": "Review vendored file digest manifest",
-                "required_evidence": "digest manifest for every vendored SO101 file used by the bundle",
+                "required_evidence": "digest manifest for every vendored SO101 file and every lockable source/asset file retained in the reviewed bundle",
                 "manifest_or_review_field": "mesh_asset_authority",
             },
             {
@@ -1331,10 +1331,24 @@ def candidate_seeded_review_manifest_template(
     upstream_source_tree_url: str,
     upstream_commit: str | None,
     candidate_review_observations: dict[str, Any],
+    file_rows: list[dict[str, Any]],
 ) -> dict[str, Any]:
     source_reference_parts = [
         upstream_source_tree_url,
         f"commit:{upstream_commit}" if upstream_commit else "commit:<pin-required>",
+    ]
+    present_lockable_rows = [
+        row
+        for row in file_rows
+        if isinstance(row, dict) and row.get("exists") is True and row.get("sha256")
+    ]
+    expected_digest_count = sum(
+        1 for row in present_lockable_rows if row.get("expected") is True
+    )
+    extra_lockable_relative_paths = [
+        str(row.get("relative_path"))
+        for row in present_lockable_rows
+        if row.get("expected") is not True and row.get("relative_path")
     ]
     return {
         "schema": "lerobot.sim.so101_public_candidate_seeded_review_manifest_template.v1",
@@ -1355,6 +1369,13 @@ def candidate_seeded_review_manifest_template(
                 "repository_url": upstream_repository_url,
                 "source_tree_url": upstream_source_tree_url,
                 "commit": upstream_commit,
+            },
+            "candidate_source_lock_digest_handoff": {
+                "digest_row_count": len(present_lockable_rows),
+                "expected_file_digest_count": expected_digest_count,
+                "extra_lockable_file_count": len(extra_lockable_relative_paths),
+                "extra_lockable_relative_paths": extra_lockable_relative_paths[:200],
+                "authority_boundary": "candidate_source_lock_digest_not_authority",
             },
             "candidate_review_observations": candidate_review_observations,
         },
@@ -1431,6 +1452,7 @@ def candidate_seeded_review_manifest_template(
         },
         "copy_rules": [
             "Do not copy model_sha256_observed into model_sha256 until the model identity and source authority review accepts that exact file.",
+            "Do not copy candidate_source_lock_digest_handoff into mesh_asset_authority until every expected and extra lockable file digest retained for the bundle has been reviewed.",
             "Do not treat candidate README caveats or parsed XML/URDF metadata as physical SO-101 truth.",
             "Replace every placeholder authority/provenance/TCP/base-board value before running the manifest checker as a reviewed bundle.",
         ],
@@ -1720,6 +1742,7 @@ def build_summary(args: argparse.Namespace, artifacts: dict[str, str]) -> dict[s
         upstream_source_tree_url=args.upstream_source_tree_url,
         upstream_commit=args.upstream_commit,
         candidate_review_observations=candidate_review_observations,
+        file_rows=file_rows,
     )
 
     if not source_root_supplied:
