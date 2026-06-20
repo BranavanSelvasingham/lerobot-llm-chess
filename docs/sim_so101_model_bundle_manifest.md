@@ -467,7 +467,10 @@ mesh review statuses are `reviewed`, `operator_reviewed`,
 `synthetic_fixture_reviewed_for_automation_only` only for explicitly
 hardware-free regression fixtures. Review evidence must include `reviewed_by`
 plus a stable artifact handle (`review_id` or `review_url`) and the
-`mesh_assets` review scope.
+`mesh_assets` review scope. If more than one mesh/asset-root review alias is
+present, every supplied alias must be independently ready; an ignored secondary
+alias that still says follow-up is required keeps the manifest out of the
+reviewed-ready path.
 Resolved mesh files
 without this review metadata remain diagnostic evidence, not reviewed physical
 SO-101 mesh truth.

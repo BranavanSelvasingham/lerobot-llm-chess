@@ -97,6 +97,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "asset_roots_status",
         "joint_limits_status",
         "mesh_assets_status",
+        "mesh_asset_review_alias_conflict",
+        "mesh_asset_review_alias_not_ready_fields",
         "target_frame_status",
         "tcp_offset_status",
         "alignment_status",
@@ -742,6 +744,16 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "conflicting_mesh_asset_review_alias_not_ready",
+            "manifest_path": fixtures["conflicting_mesh_review_alias_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "mesh_assets_status": "needs_review",
+                "missing_inputs": ["mesh_asset_authority"],
+            },
+        },
+        {
             "case_id": "weak_target_frame_authority_not_ready",
             "manifest_path": fixtures["weak_target_frame_manifest_path"],
             "expect": {
@@ -1189,6 +1201,16 @@ def summarize_case(
                 summary.get("joint_limits") or {}
             ).get("nested_joint_limit_alias_conflict"),
             "mesh_assets_status": nested_status(summary, "mesh_assets"),
+            "mesh_asset_review_alias_conflict": (
+                ((summary.get("mesh_assets") or {}).get("review") or {}).get(
+                    "mesh_asset_review_alias_conflict"
+                )
+            ),
+            "mesh_asset_review_alias_not_ready_fields": (
+                ((summary.get("mesh_assets") or {}).get("review") or {}).get(
+                    "mesh_asset_review_alias_not_ready_fields"
+                )
+            ),
             "target_frame_status": nested_status(summary, "target_frame"),
             "tcp_offset_status": nested_status(summary, "tcp_offset"),
             "tcp_offset_alias_conflict": (
@@ -1320,6 +1342,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
             "nested_joint_limit_alias_conflict"
         ),
         "mesh_assets_status": obs.get("mesh_assets_status"),
+        "mesh_asset_review_alias_conflict": obs.get(
+            "mesh_asset_review_alias_conflict"
+        ),
+        "mesh_asset_review_alias_not_ready_fields": obs.get(
+            "mesh_asset_review_alias_not_ready_fields"
+        ),
         "target_frame_status": obs.get("target_frame_status"),
         "tcp_offset_status": obs.get("tcp_offset_status"),
         "tcp_offset_alias_conflict": obs.get("tcp_offset_alias_conflict"),

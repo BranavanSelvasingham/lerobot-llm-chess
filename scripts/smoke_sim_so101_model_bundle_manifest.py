@@ -2549,22 +2549,53 @@ def contract_non_blocking(contract: dict[str, Any]) -> tuple[bool, list[str]]:
     return not diagnostics, diagnostics
 
 
-def inspect_mesh_asset_review(manifest: dict[str, Any] | None) -> dict[str, Any]:
-    manifest = manifest if isinstance(manifest, dict) else {}
-    review_source = None
-    review_source_field = None
+def inspect_single_mesh_asset_review(
+    field_name: str,
+    value: dict[str, Any],
+) -> dict[str, Any]:
+    return inspect_review_metadata(
+        [(field_name, value)],
+        status_fields=MESH_ASSET_STATUS_FIELDS,
+        accepted_statuses=REVIEWED_MESH_ASSET_STATUSES,
+        synthetic_status=SYNTHETIC_FIXTURE_MESH_ASSET_STATUS,
+        diagnostic_prefix="mesh_asset_authority",
+        synthetic_scope_diagnostic="synthetic_mesh_asset_scope_missing_hardware_free",
+        synthetic_note=(
+            "Synthetic fixture mesh-asset authority is accepted only for hardware-free forwarding regression fixtures; "
+            "it is not physical SO-101 mesh truth."
+        ),
+        review_note="Mesh readiness requires accepted review status, reviewer identity, a stable review artifact handle, and the mesh_assets review scope.",
+        required_review_scope_ids=MESH_ASSET_REQUIRED_REVIEW_SCOPE_IDS,
+    )
+
+
+def mesh_asset_review_aliases(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    aliases = []
     for review_field in MESH_ASSET_REVIEW_FIELDS:
         candidate = manifest.get(review_field)
         if not isinstance(candidate, dict):
             continue
         has_status = has_any_non_empty_field(candidate, MESH_ASSET_STATUS_FIELDS)
         has_review = bool(review_evidence_summary(candidate)["supplied_fields"])
-        if has_status or has_review:
-            review_source = candidate
-            review_source_field = review_field
-            break
+        if not has_status and not has_review:
+            continue
+        review = inspect_single_mesh_asset_review(review_field, candidate)
+        aliases.append(
+            {
+                "field": review_field,
+                "status": review["status"],
+                "review_status": review["review_status"],
+                "synthetic_fixture_only": review["synthetic_fixture_only"],
+                "diagnostics": review["diagnostics"],
+            }
+        )
+    return aliases
 
-    if not isinstance(review_source, dict):
+
+def inspect_mesh_asset_review(manifest: dict[str, Any] | None) -> dict[str, Any]:
+    manifest = manifest if isinstance(manifest, dict) else {}
+    aliases = mesh_asset_review_aliases(manifest)
+    if not aliases:
         review_evidence = review_evidence_summary(
             {},
             required_review_scope_ids=MESH_ASSET_REQUIRED_REVIEW_SCOPE_IDS,
@@ -2577,56 +2608,48 @@ def inspect_mesh_asset_review(manifest: dict[str, Any] | None) -> dict[str, Any]
             **review_evidence_report_fields(review_evidence),
             "synthetic_fixture_only": False,
             "accepted_review_statuses": sorted(REVIEWED_MESH_ASSET_STATUSES),
+            "mesh_asset_review_aliases": [],
+            "mesh_asset_review_alias_conflict": False,
+            "mesh_asset_review_alias_not_ready_fields": [],
             "diagnostics": ["mesh_asset_authority_review_missing"],
         }
 
-    status_field, raw_status = first_non_empty_field(review_source, MESH_ASSET_STATUS_FIELDS)
-    status_value = str(raw_status).strip().lower() if raw_status is not None else ""
-    review_evidence = review_evidence_summary(
-        review_source,
-        required_review_scope_ids=MESH_ASSET_REQUIRED_REVIEW_SCOPE_IDS,
+    review_source_field = aliases[0]["field"]
+    review_source = manifest[review_source_field]
+    selected = inspect_single_mesh_asset_review(review_source_field, review_source)
+    diagnostics = list(selected["diagnostics"])
+    alias_not_ready_fields = [
+        alias["field"] for alias in aliases if alias["status"] != "present"
+    ]
+    diagnostics.extend(
+        f"mesh_asset_authority_review_alias_not_ready:{field_name}"
+        for field_name in alias_not_ready_fields
     )
-    diagnostics: list[str] = []
-    if not status_value:
-        diagnostics.append("mesh_asset_authority_review_status_missing")
-    elif (
-        status_value not in REVIEWED_MESH_ASSET_STATUSES
-        and status_value != SYNTHETIC_FIXTURE_MESH_ASSET_STATUS
-    ):
-        diagnostics.append(f"mesh_asset_authority_review_status_not_accepted:{status_value}")
-    if not review_evidence["present"]:
-        diagnostics.append("mesh_asset_authority_review_evidence_missing")
-    for group_name in review_evidence["missing_required_groups"]:
-        diagnostics.append(
-            f"mesh_asset_authority_review_evidence_missing_required_group:{group_name}"
-        )
-    for field_name in review_evidence["placeholder_fields"]:
-        diagnostics.append(f"mesh_asset_authority_review_evidence_placeholder:{field_name}")
-    for field_name in review_evidence["invalid_fields"]:
-        diagnostics.append(f"mesh_asset_authority_review_evidence_invalid:{field_name}")
-    for field_name in review_evidence["open_work_fields"]:
-        diagnostics.append(
-            f"mesh_asset_authority_review_evidence_open_work:{field_name}"
-        )
-    for scope_id in review_evidence["missing_review_scope_ids"]:
-        diagnostics.append(f"mesh_asset_authority_review_scope_missing:{scope_id}")
-
-    is_synthetic_fixture = status_value == SYNTHETIC_FIXTURE_MESH_ASSET_STATUS
-    if is_synthetic_fixture and "hardware-free" not in str(review_source.get("scope", "")).lower():
-        diagnostics.append("synthetic_mesh_asset_scope_missing_hardware_free")
-
-    review_status_ok = status_value in REVIEWED_MESH_ASSET_STATUSES or (
-        is_synthetic_fixture and "synthetic_mesh_asset_scope_missing_hardware_free" not in diagnostics
+    ready_alias_kinds = {
+        "synthetic" if alias["synthetic_fixture_only"] else "reviewed"
+        for alias in aliases
+        if alias["status"] == "present"
+    }
+    alias_conflict = len(ready_alias_kinds) > 1
+    if alias_conflict:
+        diagnostics.append("mesh_asset_authority_review_alias_conflict")
+    is_synthetic_fixture = any(alias["synthetic_fixture_only"] for alias in aliases)
+    status = (
+        "present"
+        if selected["status"] == "present"
+        and not alias_not_ready_fields
+        and not alias_conflict
+        else "needs_review"
     )
     return {
-        "status": "present" if review_status_ok and review_evidence["ok"] else "needs_review",
+        **selected,
+        "status": status,
         "field": review_source_field,
         "value": review_source,
-        "review_status_field": status_field,
-        "review_status": status_value or None,
-        **review_evidence_report_fields(review_evidence),
         "synthetic_fixture_only": is_synthetic_fixture,
-        "accepted_review_statuses": sorted(REVIEWED_MESH_ASSET_STATUSES),
+        "mesh_asset_review_aliases": aliases,
+        "mesh_asset_review_alias_conflict": alias_conflict,
+        "mesh_asset_review_alias_not_ready_fields": alias_not_ready_fields,
         "diagnostics": diagnostics,
         "notes": (
             "Synthetic fixture mesh-asset authority is accepted only for hardware-free forwarding regression fixtures; "
