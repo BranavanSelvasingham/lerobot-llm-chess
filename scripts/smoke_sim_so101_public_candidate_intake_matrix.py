@@ -13,6 +13,7 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INTAKE_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_public_candidate_intake.py"
+MANIFEST_CHECKER_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_bundle_manifest.py"
 DEFAULT_OUTPUT_DIR = (
     Path("/private/tmp") / "lerobot_sim" / "so101_public_candidate_intake_matrix"
 )
@@ -102,6 +103,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_review_observations_parsed_model_file_count",
         "candidate_readme_gripper_mapping_caveat",
         "candidate_readme_base_collision_caveat",
+        "seeded_template_manifest_checker_status",
+        "seeded_template_manifest_checker_ready_for_model_backed_ik",
+        "seeded_template_manifest_checker_physical_ready",
+        "seeded_template_manifest_checker_missing_inputs",
         "ready_for_model_backed_ik",
         "observed_evidence_is_physical_so101_authority",
         "next_required_action_ids",
@@ -278,17 +283,78 @@ def run_case(
             "status": "summary_unavailable",
             "summary_error": f"{type(exc).__name__}: {exc}",
         }
+    record = {
+        "case_id": case_id,
+        "command": command,
+        "return_code": result.returncode,
+        "stdout_path": str(stdout_path),
+        "stderr_path": str(stderr_path),
+        "summary_path": str(summary_path),
+    }
+    seeded_preview = run_seeded_template_manifest_preview(
+        case_dir=case_dir,
+        summary=summary,
+        python_path=python_path,
+    )
+    record["seeded_template_manifest_preview"] = seeded_preview
     return (
-        {
-            "case_id": case_id,
-            "command": command,
-            "return_code": result.returncode,
-            "stdout_path": str(stdout_path),
-            "stderr_path": str(stderr_path),
-            "summary_path": str(summary_path),
-        },
+        record,
         summary,
     )
+
+
+def run_seeded_template_manifest_preview(
+    *,
+    case_dir: Path,
+    summary: dict[str, Any],
+    python_path: Path,
+) -> dict[str, Any]:
+    seeded_template = summary.get("candidate_seeded_review_manifest_template")
+    seeded_template = seeded_template if isinstance(seeded_template, dict) else {}
+    manifest_template = seeded_template.get("manifest_template")
+    if not isinstance(manifest_template, dict):
+        return {
+            "attempted": False,
+            "reason": "candidate_seeded_review_manifest_template_unavailable",
+        }
+
+    direct_manifest_path = case_dir / "so101_public_candidate_seeded_review_manifest.direct.json"
+    preview_dir = case_dir / "so101_public_candidate_seeded_review_manifest_checker_preview"
+    write_json(direct_manifest_path, manifest_template)
+    command = [
+        executable_arg(python_path),
+        str(MANIFEST_CHECKER_PATH),
+        "--manifest-path",
+        str(direct_manifest_path),
+        "--output-dir",
+        str(preview_dir),
+        "--python",
+        executable_arg(python_path),
+    ]
+    result = subprocess.run(command, cwd=REPO_ROOT, text=True, capture_output=True, check=False)
+    stdout_path = case_dir / "seeded_manifest_checker_stdout.txt"
+    stderr_path = case_dir / "seeded_manifest_checker_stderr.txt"
+    stdout_path.write_text(result.stdout)
+    stderr_path.write_text(result.stderr)
+    preview_summary_path = preview_dir / "so101_model_bundle_manifest_summary.json"
+    try:
+        preview_summary = json.loads(preview_summary_path.read_text())
+    except Exception as exc:
+        preview_summary = {
+            "ok": False,
+            "status": "seeded_template_manifest_checker_summary_unavailable",
+            "summary_error": f"{type(exc).__name__}: {exc}",
+        }
+    return {
+        "attempted": True,
+        "command": command,
+        "return_code": result.returncode,
+        "direct_manifest_path": str(direct_manifest_path),
+        "summary_path": str(preview_summary_path),
+        "stdout_path": str(stdout_path),
+        "stderr_path": str(stderr_path),
+        "summary": preview_summary,
+    }
 
 
 def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict[str, Any]) -> dict[str, Any]:
@@ -392,6 +458,44 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
     if authority.get("reviewed_by") != "<reviewer-or-team>":
         errors.append(f"{case_id}.candidate_seeded_review_manifest_template authority placeholder missing")
 
+    preview_record = record.get("seeded_template_manifest_preview")
+    preview_record = preview_record if isinstance(preview_record, dict) else {}
+    preview_summary = preview_record.get("summary")
+    preview_summary = preview_summary if isinstance(preview_summary, dict) else {}
+    if preview_record.get("attempted") is not True:
+        errors.append(f"{case_id}.seeded_template_manifest_checker_preview not attempted")
+    if preview_record.get("return_code") != 0:
+        errors.append(
+            f"{case_id}.seeded_template_manifest_checker_preview return_code "
+            f"{preview_record.get('return_code')!r}"
+        )
+    if preview_summary.get("ok") is not True:
+        errors.append(f"{case_id}.seeded_template_manifest_checker_preview ok not true")
+    if preview_summary.get("model_authority") != "reviewed_bundle_required":
+        errors.append(
+            f"{case_id}.seeded_template_manifest_checker_preview model_authority invalid"
+        )
+    if preview_summary.get("ready_for_model_backed_ik") is not False:
+        errors.append(
+            f"{case_id}.seeded_template_manifest_checker_preview ready_for_model_backed_ik not false"
+        )
+    if preview_summary.get("physical_so101_model_authority_ready") is not False:
+        errors.append(
+            f"{case_id}.seeded_template_manifest_checker_preview physical authority not false"
+        )
+    preview_missing_inputs = preview_summary.get("missing_inputs")
+    preview_missing_inputs = (
+        preview_missing_inputs if isinstance(preview_missing_inputs, list) else []
+    )
+    if "model_sha256" not in preview_missing_inputs:
+        errors.append(
+            f"{case_id}.seeded_template_manifest_checker_preview missing model_sha256 not reported"
+        )
+    if "authority" not in preview_missing_inputs:
+        errors.append(
+            f"{case_id}.seeded_template_manifest_checker_preview missing authority not reported"
+        )
+
     observations = summary.get("candidate_review_observations")
     observations = observations if isinstance(observations, dict) else {}
     if observations.get("model_authority") != "candidate_review_observations_not_authority":
@@ -453,6 +557,14 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "candidate_readme_base_collision_caveat": readme_caveats.get(
             "base_collision_meshes_removed"
         ),
+        "seeded_template_manifest_checker_status": preview_summary.get("status"),
+        "seeded_template_manifest_checker_ready_for_model_backed_ik": preview_summary.get(
+            "ready_for_model_backed_ik"
+        ),
+        "seeded_template_manifest_checker_physical_ready": preview_summary.get(
+            "physical_so101_model_authority_ready"
+        ),
+        "seeded_template_manifest_checker_missing_inputs": preview_missing_inputs,
         "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
         "observed_evidence_is_physical_so101_authority": summary.get(
             "observed_evidence_is_physical_so101_authority"
@@ -475,12 +587,12 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         "",
         "## Cases",
         "",
-        "| Case | Status | OK | Model Present | Parsed Model Files | Gripper Caveat | Base Collision Caveat | Ready For Model-Backed IK |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Case | Status | OK | Model Present | Parsed Model Files | Gripper Caveat | Base Collision Caveat | Seeded Template Checker | Ready For Model-Backed IK |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for case in summary["cases"]:
         lines.append(
-            "| `{case_id}` | `{status}` | `{ok}` | `{model_present}` | `{parsed}` | `{gripper}` | `{base_collision}` | `{ready}` |".format(
+            "| `{case_id}` | `{status}` | `{ok}` | `{model_present}` | `{parsed}` | `{gripper}` | `{base_collision}` | `{checker}` | `{ready}` |".format(
                 case_id=case["case_id"],
                 status=case["status"],
                 ok=str(case["ok"]).lower(),
@@ -488,6 +600,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
                 parsed=case["candidate_review_observations_parsed_model_file_count"],
                 gripper=str(case["candidate_readme_gripper_mapping_caveat"]).lower(),
                 base_collision=str(case["candidate_readme_base_collision_caveat"]).lower(),
+                checker=case["seeded_template_manifest_checker_status"],
                 ready=str(case["ready_for_model_backed_ik"]).lower(),
             )
         )
@@ -498,6 +611,32 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         ]
     )
     path.write_text("\n".join(lines) + "\n")
+
+
+def compact_child_record(record: dict[str, Any]) -> dict[str, Any]:
+    compact = dict(record)
+    preview = compact.get("seeded_template_manifest_preview")
+    preview = preview if isinstance(preview, dict) else {}
+    preview_summary = preview.get("summary")
+    preview_summary = preview_summary if isinstance(preview_summary, dict) else {}
+    compact["seeded_template_manifest_preview"] = {
+        "attempted": preview.get("attempted"),
+        "return_code": preview.get("return_code"),
+        "direct_manifest_path": preview.get("direct_manifest_path"),
+        "summary_path": preview.get("summary_path"),
+        "stdout_path": preview.get("stdout_path"),
+        "stderr_path": preview.get("stderr_path"),
+        "summary_status": preview_summary.get("status"),
+        "summary_model_authority": preview_summary.get("model_authority"),
+        "summary_ready_for_model_backed_ik": preview_summary.get(
+            "ready_for_model_backed_ik"
+        ),
+        "summary_physical_so101_model_authority_ready": preview_summary.get(
+            "physical_so101_model_authority_ready"
+        ),
+        "summary_missing_inputs": preview_summary.get("missing_inputs"),
+    }
+    return compact
 
 
 def main() -> int:
@@ -516,7 +655,7 @@ def main() -> int:
             python_path=args.python,
             output_dir=output_dir,
         )
-        child_records.append(record)
+        child_records.append(compact_child_record(record))
         cases.append(summarize_case(record, child_summary, spec["expect"]))
 
     failed_case_ids = [case["case_id"] for case in cases if not case["ok"]]

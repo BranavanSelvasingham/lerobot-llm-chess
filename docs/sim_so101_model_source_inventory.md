@@ -222,6 +222,13 @@ all placeholders with reviewed values, then run
 `scripts/smoke_sim_so101_model_bundle_manifest.py --manifest-path <reviewed-manifest>`
 and require `physical_so101_model_authority_ready: true` before using it for
 model-backed IK or downstream simulation claims.
+The focused matrix extracts each seeded template's nested `manifest_template`,
+runs the regular bundle-manifest checker against that extracted JSON, and
+requires the checker to keep `ready_for_model_backed_ik: false`,
+`physical_so101_model_authority_ready: false`, and missing reviewed inputs such
+as `model_sha256` and `authority`. That preview proves the handoff fails closed
+until a reviewer replaces candidate observations and placeholders with reviewed
+bundle fields.
 
 Use the focused matrix when changing the public-candidate intake smoke:
 
@@ -236,7 +243,7 @@ missing-root, incomplete-candidate, and complete-candidate cases. All cases must
 keep `public_candidate_intake_not_authority`, false physical SO-101 authority,
 and `ready_for_model_backed_ik: false`; the complete fixture only proves digest
 locking, review-observation extraction, candidate-seeded template generation,
-and artifact generation for review.
+fail-closed manifest-checker preview, and artifact generation for review.
 
 If the source is later declared authoritative, rerun the inventory with
 `--authoritative-path` for exactly one reviewed URDF/MJCF file plus

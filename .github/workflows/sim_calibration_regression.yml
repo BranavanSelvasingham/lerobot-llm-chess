@@ -392,6 +392,10 @@ jobs:
           assert incomplete["candidate_review_observations_parsed_model_file_count"] == 5, incomplete
           assert incomplete["candidate_readme_gripper_mapping_caveat"] is True, incomplete
           assert incomplete["candidate_readme_base_collision_caveat"] is True, incomplete
+          assert incomplete["seeded_template_manifest_checker_ready_for_model_backed_ik"] is False, incomplete
+          assert incomplete["seeded_template_manifest_checker_physical_ready"] is False, incomplete
+          assert "model_sha256" in incomplete["seeded_template_manifest_checker_missing_inputs"], incomplete
+          assert "authority" in incomplete["seeded_template_manifest_checker_missing_inputs"], incomplete
           complete = by_case["candidate_intake_checked"]
           assert complete["status"] == "candidate_intake_checked", complete
           assert complete["missing_expected_relative_paths"] == [], complete
@@ -402,10 +406,17 @@ jobs:
           assert complete["candidate_review_observations_parsed_model_file_count"] == 5, complete
           assert complete["candidate_readme_gripper_mapping_caveat"] is True, complete
           assert complete["candidate_readme_base_collision_caveat"] is True, complete
+          assert complete["seeded_template_manifest_checker_status"] == "model_bundle_manifest_needs_follow_up", complete
+          assert complete["seeded_template_manifest_checker_ready_for_model_backed_ik"] is False, complete
+          assert complete["seeded_template_manifest_checker_physical_ready"] is False, complete
+          assert "model_sha256" in complete["seeded_template_manifest_checker_missing_inputs"], complete
+          assert "authority" in complete["seeded_template_manifest_checker_missing_inputs"], complete
           for case in summary["cases"]:
               assert case["model_authority"] == "public_candidate_intake_not_authority", case
               assert case["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", case
               assert case["candidate_seeded_review_manifest_template_model_authority"] == "candidate_seeded_review_manifest_template_not_authority", case
+              assert case["seeded_template_manifest_checker_ready_for_model_backed_ik"] is False, case
+              assert case["seeded_template_manifest_checker_physical_ready"] is False, case
               assert case["ready_for_model_backed_ik"] is False, case
               assert case["observed_evidence_is_physical_so101_authority"] is False, case
           for relative_path in (
