@@ -444,7 +444,7 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
             "source_lock_ready_for_review": True,
             "upstream_commit_sha_valid": True,
             "selected_intake_option_id": "external_pinned_source_root",
-            "selected_option_command_count": 7,
+            "selected_option_command_count": 8,
             "selected_option_review_requirement_count": len(external_requirement_ids),
             "selected_option_review_requirement_ids": external_requirement_ids,
             "selected_option_review_requirements": [
@@ -474,7 +474,7 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
             "candidate_operator_command_plan_status": (
                 "candidate_operator_commands_ready_for_pinned_source_review"
             ),
-            "candidate_operator_command_plan_selected_option_command_count": 7,
+            "candidate_operator_command_plan_selected_option_command_count": 8,
             "candidate_operator_intake_selected_requirement_count": (
                 len(external_requirement_ids)
             ),
@@ -493,7 +493,7 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
             "candidate_operator_command_plan_status": (
                 "candidate_operator_commands_ready_for_pinned_source_review"
             ),
-            "candidate_operator_command_plan_selected_option_command_count": 5,
+            "candidate_operator_command_plan_selected_option_command_count": 6,
             "candidate_operator_intake_selected_requirement_count": (
                 len(vendor_requirement_ids)
             ),
@@ -526,7 +526,7 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
             "candidate_operator_command_plan_status": (
                 "candidate_operator_commands_ready_for_pinned_source_review"
             ),
-            "candidate_operator_command_plan_selected_option_command_count": 7,
+            "candidate_operator_command_plan_selected_option_command_count": 8,
             "candidate_operator_intake_option_count": 2,
             "direct_manifest_path": str(direct_manifest_path),
         },
@@ -939,8 +939,8 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                     "vendor_locked_bundle": 5,
                 },
                 "public_candidate_recorded_operator_command_selected_command_counts_by_option": {
-                    "external_pinned_source_root": 7,
-                    "vendor_locked_bundle": 5,
+                    "external_pinned_source_root": 8,
+                    "vendor_locked_bundle": 6,
                 },
                 "public_candidate_source_lock_paths_present": True,
                 "blockers_contain": [
