@@ -670,6 +670,15 @@ def nonfinite_alignment_transform_manifest_payload(model_filename: str) -> dict[
     return payload
 
 
+def oversized_alignment_rotation_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["base_to_board_transform"] = {
+        "translation_m": {"x": 0.10, "y": -0.175, "z": 0.09},
+        "rotation_rpy_rad": {"roll": 0.0, "pitch": 0.0, "yaw": 1000.0},
+    }
+    return payload
+
+
 def conflicting_alignment_alias_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload["base_to_board_alignment"] = {
@@ -737,6 +746,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_alignment_dir = fixture_dir / "weak_alignment_bundle"
     invalid_alignment_dir = fixture_dir / "invalid_alignment_bundle"
     nonfinite_alignment_dir = fixture_dir / "nonfinite_alignment_bundle"
+    oversized_alignment_rotation_dir = (
+        fixture_dir / "oversized_alignment_rotation_bundle"
+    )
     conflicting_alignment_alias_dir = fixture_dir / "conflicting_alignment_alias_bundle"
     conflicting_alignment_nested_alias_dir = (
         fixture_dir / "conflicting_alignment_nested_alias_bundle"
@@ -777,6 +789,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_alignment_dir,
         invalid_alignment_dir,
         nonfinite_alignment_dir,
+        oversized_alignment_rotation_dir,
         conflicting_alignment_alias_dir,
         conflicting_alignment_nested_alias_dir,
     ):
@@ -887,6 +900,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         nonfinite_alignment_dir / "model" / "synthetic_so101_mujoco.xml"
     )
     nonfinite_alignment_model_path.write_text(mjcf_with_mesh_reference())
+    oversized_alignment_rotation_model_path = (
+        oversized_alignment_rotation_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    oversized_alignment_rotation_model_path.write_text(mjcf_with_mesh_reference())
     conflicting_alignment_alias_model_path = (
         conflicting_alignment_alias_dir / "model" / "synthetic_so101_mujoco.xml"
     )
@@ -980,6 +997,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     invalid_alignment_manifest_path = invalid_alignment_dir / "so101_model_bundle.invalid_alignment.json"
     nonfinite_alignment_manifest_path = (
         nonfinite_alignment_dir / "so101_model_bundle.nonfinite_alignment.json"
+    )
+    oversized_alignment_rotation_manifest_path = (
+        oversized_alignment_rotation_dir
+        / "so101_model_bundle.oversized_alignment_rotation.json"
     )
     conflicting_alignment_alias_manifest_path = (
         conflicting_alignment_alias_dir
@@ -1177,6 +1198,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         nonfinite_alignment_model_path,
     )
     write_manifest_json(
+        oversized_alignment_rotation_manifest_path,
+        oversized_alignment_rotation_manifest_payload(
+            model_filename=oversized_alignment_rotation_model_path.name
+        ),
+        oversized_alignment_rotation_model_path,
+    )
+    write_manifest_json(
         conflicting_alignment_alias_manifest_path,
         conflicting_alignment_alias_manifest_payload(
             model_filename=conflicting_alignment_alias_model_path.name
@@ -1237,6 +1265,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "weak_alignment_manifest_path": weak_alignment_manifest_path,
         "invalid_alignment_manifest_path": invalid_alignment_manifest_path,
         "nonfinite_alignment_manifest_path": nonfinite_alignment_manifest_path,
+        "oversized_alignment_rotation_manifest_path": (
+            oversized_alignment_rotation_manifest_path
+        ),
         "conflicting_alignment_alias_manifest_path": conflicting_alignment_alias_manifest_path,
         "conflicting_alignment_nested_alias_manifest_path": (
             conflicting_alignment_nested_alias_manifest_path
@@ -1284,6 +1315,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "weak_alignment_model_path": weak_alignment_model_path,
         "invalid_alignment_model_path": invalid_alignment_model_path,
         "nonfinite_alignment_model_path": nonfinite_alignment_model_path,
+        "oversized_alignment_rotation_model_path": (
+            oversized_alignment_rotation_model_path
+        ),
         "conflicting_alignment_alias_model_path": conflicting_alignment_alias_model_path,
         "conflicting_alignment_nested_alias_model_path": (
             conflicting_alignment_nested_alias_model_path

@@ -287,6 +287,7 @@ ALIGNMENT_PLACEHOLDER_FIELDS = (
 )
 MAX_TCP_OFFSET_NORM_M = 0.50
 MAX_BASE_TO_BOARD_TRANSLATION_NORM_M = 2.00
+MAX_BASE_TO_BOARD_ROTATION_ABS_RAD = math.tau
 REQUIRED_INPUTS = (
     {
         "input": "manifest_path",
@@ -2265,6 +2266,16 @@ def alignment_transform_status(value: Any) -> dict[str, Any]:
                 }
             )
         rotation = vector_status(rotation_value, ("roll", "pitch", "yaw"))
+        rotation_components = (
+            vector_components(rotation["value"], ("roll", "pitch", "yaw"))
+            if rotation["valid"]
+            else None
+        )
+        rotation_max_abs_rad = (
+            max(abs(component) for component in rotation_components)
+            if rotation_components is not None
+            else None
+        )
         invalid_rotation_alias_fields = [
             alias["field"] for alias in rotation_aliases if not alias["valid"]
         ]
@@ -2295,8 +2306,18 @@ def alignment_transform_status(value: Any) -> dict[str, Any]:
             "value": rotation["value"],
             "aliases": rotation_aliases,
             "alias_conflict": rotation_alias_conflict,
+            "max_abs_rad": rotation_max_abs_rad,
+            "max_allowed_abs_rad": MAX_BASE_TO_BOARD_ROTATION_ABS_RAD,
         }
         diagnostics.extend(f"rotation_rpy:{diagnostic}" for diagnostic in rotation["diagnostics"])
+        if (
+            rotation_max_abs_rad is not None
+            and rotation_max_abs_rad > MAX_BASE_TO_BOARD_ROTATION_ABS_RAD
+        ):
+            diagnostics.append(
+                "rotation_rpy:base_to_board_rotation_abs_exceeds_limit:"
+                f"{rotation_max_abs_rad:.6g}>{MAX_BASE_TO_BOARD_ROTATION_ABS_RAD:.6g}"
+            )
     rotation_alias_conflict = bool(
         (normalized.get("rotation_rpy") or {}).get("alias_conflict")
     )

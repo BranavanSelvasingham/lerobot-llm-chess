@@ -488,6 +488,7 @@ jobs:
               "weak_alignment_authority_not_ready",
               "invalid_alignment_transform_not_ready",
               "nonfinite_alignment_transform_not_ready",
+              "oversized_alignment_rotation_not_ready",
               "conflicting_alignment_alias_not_ready",
               "conflicting_alignment_nested_alias_not_ready",
               "mismatched_model_sha_not_ready",
@@ -684,6 +685,9 @@ jobs:
           nonfinite_alignment = by_case["nonfinite_alignment_transform_not_ready"]["observations"]
           assert nonfinite_alignment["alignment_status"] == "invalid", nonfinite_alignment
           assert "base_to_board_transform" in nonfinite_alignment["missing_inputs"], nonfinite_alignment
+          oversized_alignment = by_case["oversized_alignment_rotation_not_ready"]["observations"]
+          assert oversized_alignment["alignment_status"] == "invalid", oversized_alignment
+          assert "base_to_board_transform" in oversized_alignment["missing_inputs"], oversized_alignment
           conflicting_alignment_alias = by_case["conflicting_alignment_alias_not_ready"]["observations"]
           assert conflicting_alignment_alias["alignment_status"] == "invalid", conflicting_alignment_alias
           assert conflicting_alignment_alias["alignment_alias_conflict"] is True, conflicting_alignment_alias
@@ -5290,6 +5294,10 @@ jobs:
           ), model_bundle_manifest_matrix
           assert (
               "nonfinite_alignment_transform_not_ready"
+              in model_bundle_manifest_matrix["case_ids"]
+          ), model_bundle_manifest_matrix
+          assert (
+              "oversized_alignment_rotation_not_ready"
               in model_bundle_manifest_matrix["case_ids"]
           ), model_bundle_manifest_matrix
           assert (

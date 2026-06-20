@@ -858,6 +858,16 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "oversized_alignment_rotation_not_ready",
+            "manifest_path": fixtures["oversized_alignment_rotation_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "alignment_status": "invalid",
+                "missing_inputs": ["base_to_board_transform"],
+            },
+        },
+        {
             "case_id": "conflicting_alignment_alias_not_ready",
             "manifest_path": fixtures["conflicting_alignment_alias_manifest_path"],
             "expect": {
