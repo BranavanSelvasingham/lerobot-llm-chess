@@ -870,8 +870,9 @@ from the reset scene state. It also rejects an injected reviewed-authority-ready
 state whose reviewed MuJoCo motion flag is false; the next priority gate must
 remain `mujoco_scene_validity` so serious training cannot advance on
 source/bundle authority without reviewed motion evidence, or on fixture-only,
-malformed raw-ready, incomplete-item, or physical-truth-claiming downstream
-handoff states. The accepted handoff flag is derived from a summary-level
+malformed raw-ready, unlimited-joint, incomplete-item, or
+physical-truth-claiming downstream handoff states. The accepted handoff flag is
+derived from a summary-level
 reviewed MuJoCo downstream handoff contract, not from a raw
 `downstream_handoff_ready` boolean alone.
 
@@ -1031,6 +1032,9 @@ A passing summary should show:
   `reviewed_mujoco_downstream_handoff_observed_evidence_is_authority`,
   `reviewed_mujoco_downstream_handoff_physical_truth_claimed`,
   `reviewed_mujoco_downstream_handoff_missing_item_ids`,
+  `reviewed_mujoco_downstream_handoff_joint_limit_enablement_ok`,
+  `reviewed_mujoco_downstream_handoff_joint_limit_enablement_status`,
+  `reviewed_mujoco_downstream_handoff_missing_limited_joints`,
   `reviewed_mujoco_downstream_handoff_missing_inputs`,
   `reviewed_mujoco_downstream_handoff_pending_action_ids`,
   `reviewed_mujoco_downstream_handoff_ready_has_open_work`,
@@ -1060,7 +1064,8 @@ A passing summary should show:
   true policy-authority evidence, and no serious-policy blockers. The focused
   readiness matrix has negative cases for missing reviewed MuJoCo downstream
   handoff, fixture-only handoff, raw-ready handoff without physical reviewed
-  model motion, incomplete handoff items, physical-truth-claiming handoff,
+  model motion, a ready handoff whose MuJoCo joint-limit enablement reports an
+  unlimited SO-101 joint, incomplete handoff items, physical-truth-claiming handoff,
   missing release clearance, missing final board contact, target XY error
   outside tolerance, failed rollout status, wrong rollout authority status,
   debug rollout use, missing policy-authority evidence, and nonempty

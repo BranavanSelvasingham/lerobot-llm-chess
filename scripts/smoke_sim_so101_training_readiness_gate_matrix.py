@@ -18,6 +18,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 from smoke_sim_calibration_regression_suite import (  # noqa: E402
     SO101_BOARD_PICK_REQUIRED_PHASE_IDS,
     SO101_BOARD_PICK_REQUIRED_STAGE_SEQUENCE,
+    SO101_CONTROL_JOINT_IDS,
     REVIEWED_SO101_MODEL_AUTHORITY,
     SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_ITEM_IDS,
     SO101_TRAINING_PRIORITY_STAGE_IDS,
@@ -80,6 +81,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority",
         "reviewed_mujoco_downstream_handoff_physical_motion_checked",
         "reviewed_mujoco_downstream_handoff_hardware_free_fixture_motion_checked",
+        "reviewed_mujoco_downstream_handoff_joint_limit_enablement_ok",
+        "reviewed_mujoco_downstream_handoff_joint_limit_enablement_status",
+        "reviewed_mujoco_downstream_handoff_missing_limited_joints",
+        "reviewed_mujoco_downstream_handoff_required_limited_joints",
         "reviewed_mujoco_downstream_handoff_missing_item_ids",
         "reviewed_mujoco_downstream_handoff_missing_inputs",
         "reviewed_mujoco_downstream_handoff_pending_action_ids",
@@ -348,6 +353,33 @@ def grasp_probe_state(summary_path: Path, *, verified: bool = True) -> dict[str,
     }
 
 
+def mujoco_joint_limit_enablement_state(
+    *,
+    missing_limited_joints: list[str] | None = None,
+) -> dict[str, Any]:
+    missing_limited_joints = sorted(missing_limited_joints or [])
+    joint_limited = {
+        joint_name: joint_name not in missing_limited_joints
+        for joint_name in SO101_CONTROL_JOINT_IDS
+    }
+    return {
+        "ok": not missing_limited_joints,
+        "status": (
+            "so101_mujoco_joints_limited"
+            if not missing_limited_joints
+            else "so101_mujoco_joints_unlimited"
+        ),
+        "joint_limited": joint_limited,
+        "missing_limited_joints": missing_limited_joints,
+        "limited_joint_count": sum(1 for value in joint_limited.values() if value),
+        "required_joint_count": len(SO101_CONTROL_JOINT_IDS),
+        "diagnostics": [
+            f"mujoco_joint_not_limited:{joint_name}"
+            for joint_name in missing_limited_joints
+        ],
+    }
+
+
 def reviewed_mujoco_bundle_state(
     summary_path: Path,
     *,
@@ -368,6 +400,7 @@ def reviewed_mujoco_bundle_state(
     physical_truth_claimed: bool = False,
     observed_evidence_is_authority: bool = False,
     development_fixture_evidence_not_physical_truth: bool = True,
+    joint_limit_enablement: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     physical_motion_checked = (
         handoff_ready if physical_motion_checked is None else physical_motion_checked
@@ -411,6 +444,13 @@ def reviewed_mujoco_bundle_state(
     next_required_action_ids = (
         [] if next_required_action_ids is None else next_required_action_ids
     )
+    if joint_limit_enablement is None and (handoff_ready or fixture_handoff_ready):
+        joint_limit_enablement = mujoco_joint_limit_enablement_state()
+    mujoco_motion_inputs = (
+        {"mujoco_joint_limit_enablement": joint_limit_enablement}
+        if isinstance(joint_limit_enablement, dict)
+        else {}
+    )
     return {
         "status": (
             "reviewed_mujoco_bundle_motion_checked"
@@ -447,6 +487,8 @@ def reviewed_mujoco_bundle_state(
         "motion_authority_status": motion_authority_status,
         "physical_so101_model_authority_ready": physical_model_authority_ready,
         "motion_evidence_not_physical_so101_authority": motion_evidence_not_physical,
+        "mujoco_joint_limit_enablement": joint_limit_enablement,
+        "mujoco_motion_inputs": mujoco_motion_inputs,
         "summary_path": str(summary_path),
     }
 
@@ -588,6 +630,13 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         reviewed_motion_checked=False,
         motion_authority_status="not_checked_manifest_not_ready",
         physical_model_authority_ready=False,
+    )
+    handoff_ready_with_unlimited_joint = reviewed_mujoco_bundle_state(
+        summaries / "reviewed_mujoco_bundle_ready_unlimited_joint.json",
+        handoff_ready=True,
+        joint_limit_enablement=mujoco_joint_limit_enablement_state(
+            missing_limited_joints=["shoulder_pan"]
+        ),
     )
     handoff_incomplete_items = reviewed_mujoco_bundle_state(
         summaries / "reviewed_mujoco_bundle_incomplete_items.json",
@@ -747,6 +796,42 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 "blockers_contain": [
                     "repair_physical_reviewed_mujoco_handoff_readiness_flags",
                     "make_reviewed_mujoco_downstream_handoff_ready",
+                ],
+                "next_priority_gate": "mujoco_scene_validity",
+            },
+        },
+        {
+            "case_id": "reviewed_authority_handoff_ready_with_unlimited_joint_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready_with_unlimited_joint,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "reviewed_motion": True,
+                "reviewed_downstream_handoff": False,
+                "reviewed_downstream_handoff_contract": False,
+                "reviewed_handoff_joint_limit_enablement_ok": False,
+                "reviewed_handoff_joint_limit_enablement_status": (
+                    "so101_mujoco_joints_unlimited"
+                ),
+                "reviewed_handoff_missing_limited_joints": ["shoulder_pan"],
+                "board_pick": True,
+                "board_authority": True,
+                "board_detail": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "handoff_contract_blockers_contain": [
+                    "provide_reviewed_mujoco_joint_limit_enablement_evidence"
+                ],
+                "blockers_contain": [
+                    "provide_reviewed_mujoco_joint_limit_enablement_evidence"
                 ],
                 "next_priority_gate": "mujoco_scene_validity",
             },
@@ -1517,6 +1602,31 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             gate.get("reviewed_mujoco_downstream_handoff_physical_motion_checked"),
             expect["reviewed_handoff_physical_motion"],
         )
+    if "reviewed_handoff_joint_limit_enablement_ok" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_downstream_handoff_joint_limit_enablement_ok",
+            gate.get(
+                "reviewed_mujoco_downstream_handoff_joint_limit_enablement_ok"
+            ),
+            expect["reviewed_handoff_joint_limit_enablement_ok"],
+        )
+    if "reviewed_handoff_joint_limit_enablement_status" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_downstream_handoff_joint_limit_enablement_status",
+            gate.get(
+                "reviewed_mujoco_downstream_handoff_joint_limit_enablement_status"
+            ),
+            expect["reviewed_handoff_joint_limit_enablement_status"],
+        )
+    if "reviewed_handoff_missing_limited_joints" in expect:
+        add_error(
+            errors,
+            "reviewed_mujoco_downstream_handoff_missing_limited_joints",
+            gate.get("reviewed_mujoco_downstream_handoff_missing_limited_joints"),
+            expect["reviewed_handoff_missing_limited_joints"],
+        )
     if "reviewed_handoff_missing_items" in expect:
         add_error(
             errors,
@@ -1819,6 +1929,18 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "reviewed_mujoco_downstream_handoff_hardware_free_fixture_motion_checked": gate.get(
             "reviewed_mujoco_downstream_handoff_hardware_free_fixture_motion_checked"
+        ),
+        "reviewed_mujoco_downstream_handoff_joint_limit_enablement_ok": gate.get(
+            "reviewed_mujoco_downstream_handoff_joint_limit_enablement_ok"
+        ),
+        "reviewed_mujoco_downstream_handoff_joint_limit_enablement_status": gate.get(
+            "reviewed_mujoco_downstream_handoff_joint_limit_enablement_status"
+        ),
+        "reviewed_mujoco_downstream_handoff_missing_limited_joints": gate.get(
+            "reviewed_mujoco_downstream_handoff_missing_limited_joints"
+        ),
+        "reviewed_mujoco_downstream_handoff_required_limited_joints": gate.get(
+            "reviewed_mujoco_downstream_handoff_required_limited_joints"
         ),
         "reviewed_mujoco_downstream_handoff_missing_item_ids": gate.get(
             "reviewed_mujoco_downstream_handoff_missing_item_ids"

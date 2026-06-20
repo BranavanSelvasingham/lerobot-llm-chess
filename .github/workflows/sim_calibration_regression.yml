@@ -2229,6 +2229,7 @@ jobs:
               "reviewed_authority_but_downstream_handoff_missing",
               "reviewed_authority_fixture_handoff_not_training_ready",
               "reviewed_authority_raw_handoff_ready_without_physical_motion_rejected",
+              "reviewed_authority_handoff_ready_with_unlimited_joint_rejected",
               "reviewed_authority_incomplete_handoff_items_rejected",
               "reviewed_authority_handoff_ready_with_missing_input_rejected",
               "reviewed_authority_handoff_ready_with_pending_action_rejected",
@@ -2296,6 +2297,14 @@ jobs:
           assert raw_handoff["reviewed_mujoco_downstream_handoff_ready"] is False, raw_handoff
           assert raw_handoff["reviewed_mujoco_downstream_handoff_physical_motion_checked"] is False, raw_handoff
           assert "repair_physical_reviewed_mujoco_handoff_readiness_flags" in raw_handoff["reviewed_mujoco_downstream_handoff_contract_blockers"], raw_handoff
+          unlimited_joint_handoff = by_case["reviewed_authority_handoff_ready_with_unlimited_joint_rejected"]["gate"]
+          assert unlimited_joint_handoff["reviewed_mujoco_downstream_handoff_raw_ready"] is True, unlimited_joint_handoff
+          assert unlimited_joint_handoff["reviewed_mujoco_downstream_handoff_contract_ok"] is False, unlimited_joint_handoff
+          assert unlimited_joint_handoff["reviewed_mujoco_downstream_handoff_ready"] is False, unlimited_joint_handoff
+          assert unlimited_joint_handoff["reviewed_mujoco_downstream_handoff_joint_limit_enablement_ok"] is False, unlimited_joint_handoff
+          assert unlimited_joint_handoff["reviewed_mujoco_downstream_handoff_joint_limit_enablement_status"] == "so101_mujoco_joints_unlimited", unlimited_joint_handoff
+          assert unlimited_joint_handoff["reviewed_mujoco_downstream_handoff_missing_limited_joints"] == ["shoulder_pan"], unlimited_joint_handoff
+          assert "provide_reviewed_mujoco_joint_limit_enablement_evidence" in unlimited_joint_handoff["reviewed_mujoco_downstream_handoff_contract_blockers"], unlimited_joint_handoff
           incomplete_handoff = by_case["reviewed_authority_incomplete_handoff_items_rejected"]["gate"]
           assert incomplete_handoff["reviewed_mujoco_downstream_handoff_contract_ok"] is False, incomplete_handoff
           assert incomplete_handoff["reviewed_mujoco_downstream_handoff_ready"] is False, incomplete_handoff
@@ -2430,6 +2439,9 @@ jobs:
           assert ready["reviewed_mujoco_downstream_handoff_raw_ready"] is True, ready
           assert ready["reviewed_mujoco_downstream_handoff_ready"] is True, ready
           assert ready["reviewed_mujoco_downstream_handoff_physical_motion_checked"] is True, ready
+          assert ready["reviewed_mujoco_downstream_handoff_joint_limit_enablement_ok"] is True, ready
+          assert ready["reviewed_mujoco_downstream_handoff_joint_limit_enablement_status"] == "so101_mujoco_joints_limited", ready
+          assert ready["reviewed_mujoco_downstream_handoff_missing_limited_joints"] == [], ready
           assert ready["reviewed_mujoco_downstream_handoff_physical_truth_claimed"] is False, ready
           assert ready["board_pick_detailed_evidence_ready"] is True, ready
           assert ready["board_pick_phase_evidence_ready"] is True, ready

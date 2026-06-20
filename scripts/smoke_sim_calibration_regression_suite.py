@@ -139,6 +139,14 @@ SO101_TRAINING_READINESS_GATE_README_NAME = "README.md"
 SO101_TRAINING_ROLLOUTS_DIR_NAME = "so101_training_rollouts"
 SO101_TRAINING_ROLLOUTS_SUMMARY_NAME = "so101_training_rollouts_summary.json"
 REVIEWED_SO101_MODEL_AUTHORITY = "reviewed_so101_model_bundle_manifest"
+SO101_CONTROL_JOINT_IDS = (
+    "shoulder_pan",
+    "shoulder_lift",
+    "elbow_flex",
+    "wrist_flex",
+    "wrist_roll",
+    "gripper",
+)
 SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_ITEM_IDS = (
     "model_authority",
     "model_identity",
@@ -6002,6 +6010,31 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
     ready_handoff_has_open_work = (raw_ready or fixture_ready) and bool(
         handoff_missing_inputs or handoff_pending_action_ids
     )
+    mujoco_motion_inputs = reviewed_mujoco_bundle.get("mujoco_motion_inputs")
+    mujoco_motion_inputs = (
+        mujoco_motion_inputs if isinstance(mujoco_motion_inputs, dict) else {}
+    )
+    joint_limit_enablement = mujoco_motion_inputs.get("mujoco_joint_limit_enablement")
+    if not isinstance(joint_limit_enablement, dict):
+        joint_limit_enablement = reviewed_mujoco_bundle.get(
+            "mujoco_joint_limit_enablement"
+        )
+    joint_limit_enablement = (
+        joint_limit_enablement if isinstance(joint_limit_enablement, dict) else {}
+    )
+    joint_limit_enablement_ok = joint_limit_enablement.get("ok") is True
+    joint_limit_enablement_status = joint_limit_enablement.get("status")
+    raw_missing_limited_joints = joint_limit_enablement.get("missing_limited_joints")
+    missing_limited_joints = unique_string_values(
+        raw_missing_limited_joints
+        if isinstance(raw_missing_limited_joints, list)
+        else []
+    )
+    ready_joint_limit_enablement_contract_ok = (
+        joint_limit_enablement_ok
+        and joint_limit_enablement_status == "so101_mujoco_joints_limited"
+        and missing_limited_joints == []
+    )
 
     physical_ready_contract_ok = (
         not raw_ready
@@ -6053,6 +6086,8 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
         blockers.append("resolve_ready_reviewed_mujoco_handoff_missing_inputs")
     if (raw_ready or fixture_ready) and handoff_pending_action_ids:
         blockers.append("resolve_ready_reviewed_mujoco_handoff_pending_actions")
+    if (raw_ready or fixture_ready) and not ready_joint_limit_enablement_contract_ok:
+        blockers.append("provide_reviewed_mujoco_joint_limit_enablement_evidence")
     if raw_ready and not physical_ready_contract_ok:
         blockers.append("repair_physical_reviewed_mujoco_handoff_readiness_flags")
     if fixture_ready and not fixture_contract_ok:
@@ -6115,6 +6150,10 @@ def so101_reviewed_mujoco_downstream_handoff_contract(
         "motion_authority_status": motion_authority_status,
         "physical_so101_model_authority_ready": physical_model_authority_ready,
         "motion_evidence_not_physical_so101_authority": motion_evidence_not_physical,
+        "joint_limit_enablement_ok": joint_limit_enablement_ok,
+        "joint_limit_enablement_status": joint_limit_enablement_status,
+        "missing_limited_joints": missing_limited_joints,
+        "required_limited_joints": list(SO101_CONTROL_JOINT_IDS),
     }
 
 
@@ -6537,6 +6576,18 @@ def so101_training_readiness_gate_section(
             downstream_handoff_contract.get(
                 "motion_evidence_not_physical_so101_authority"
             )
+        ),
+        "reviewed_mujoco_downstream_handoff_joint_limit_enablement_ok": (
+            downstream_handoff_contract.get("joint_limit_enablement_ok")
+        ),
+        "reviewed_mujoco_downstream_handoff_joint_limit_enablement_status": (
+            downstream_handoff_contract.get("joint_limit_enablement_status")
+        ),
+        "reviewed_mujoco_downstream_handoff_missing_limited_joints": (
+            downstream_handoff_contract.get("missing_limited_joints")
+        ),
+        "reviewed_mujoco_downstream_handoff_required_limited_joints": (
+            downstream_handoff_contract.get("required_limited_joints")
         ),
         "reviewed_mujoco_downstream_handoff_item_count": (
             downstream_handoff_contract.get("item_count")
