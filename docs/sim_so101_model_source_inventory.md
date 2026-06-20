@@ -197,8 +197,10 @@ The non-SO-101 authoritative fixture must remain blocked with
 review metadata is supplied.
 The single-root ready fixture must resolve to the same
 `selected_authoritative_candidate_path` as the explicit authoritative-path
-fixture and expose the selected candidate SHA-256; those model identity fields
-are later compared against the reviewed bundle manifest.
+fixture, expose the selected candidate SHA-256, and carry the selected
+path/source root into the generated `run_so101_model_bundle_probe` command;
+those model identity fields are later compared against the reviewed bundle
+manifest.
 The ambiguous-root fixture must remain
 `source_authority_blocked_ambiguous_authoritative_model` and queue
 `select_single_authoritative_so101_model_source`. Every matrix case keeps

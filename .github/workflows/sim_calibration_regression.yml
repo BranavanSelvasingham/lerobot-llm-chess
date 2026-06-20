@@ -310,11 +310,27 @@ jobs:
           assert non_so101["observations"]["review_packet_status"] == "review_packet_authoritative_candidate_not_so101_relevant", non_so101
           assert "select_so101_relevant_authoritative_model_source" in non_so101["observations"]["next_required_action_ids"], non_so101
           assert "run_so101_model_bundle_probe" not in non_so101["observations"]["next_required_action_ids"], non_so101
-          assert by_case["authoritative_complete_source_review"]["observations"]["source_authority_gate_status"] == "source_authority_ready", by_case["authoritative_complete_source_review"]
-          assert by_case["authoritative_complete_source_review"]["observations"]["source_intake_status"] == "source_authority_ready_waiting_for_bundle_manifest", by_case["authoritative_complete_source_review"]
+          complete_source = by_case["authoritative_complete_source_review"]
+          complete_source_obs = complete_source["observations"]
+          assert complete_source_obs["source_authority_gate_status"] == "source_authority_ready", complete_source
+          assert complete_source_obs["source_intake_status"] == "source_authority_ready_waiting_for_bundle_manifest", complete_source
+          assert complete_source_obs["source_intake_recommended_candidate_path"] == complete_source_obs["selected_authoritative_candidate_path"], complete_source
+          assert complete_source_obs["source_intake_recommended_candidate_authoritative"] is True, complete_source
+          complete_source_inventory = json.loads(Path(complete_source["summary_path"]).read_text())
+          complete_source_intake = complete_source_inventory["source_intake_checklist"]
+          complete_probe_actions = [
+              action for action in complete_source_intake["actions"]
+              if action["action_id"] == "run_so101_model_bundle_probe"
+          ]
+          assert len(complete_probe_actions) == 1, complete_source_intake
+          complete_probe_command = complete_probe_actions[0]["command"]
+          assert complete_source_obs["selected_authoritative_candidate_path"] in complete_probe_command, complete_probe_command
+          assert complete_source_obs["source_intake_recommended_candidate_source_root"] in complete_probe_command, complete_probe_command
           assert by_case["authoritative_single_root_complete_source_review"]["observations"]["source_authority_gate_status"] == "source_authority_ready", by_case["authoritative_single_root_complete_source_review"]
           assert by_case["authoritative_single_root_complete_source_review"]["observations"]["source_intake_status"] == "source_authority_ready_waiting_for_bundle_manifest", by_case["authoritative_single_root_complete_source_review"]
           assert by_case["authoritative_single_root_complete_source_review"]["observations"]["selected_authoritative_candidate_path"] == by_case["authoritative_complete_source_review"]["observations"]["selected_authoritative_candidate_path"], by_case
+          assert by_case["authoritative_single_root_complete_source_review"]["observations"]["source_intake_recommended_candidate_path"] == by_case["authoritative_complete_source_review"]["observations"]["selected_authoritative_candidate_path"], by_case
+          assert by_case["authoritative_single_root_complete_source_review"]["observations"]["source_intake_recommended_candidate_authoritative"] is True, by_case
           assert by_case["authoritative_root_ambiguous"]["observations"]["source_authority_gate_status"] == "source_authority_blocked_ambiguous_authoritative_model", by_case["authoritative_root_ambiguous"]
           assert by_case["authoritative_root_ambiguous"]["observations"]["source_intake_status"] == "single_source_selection_required", by_case["authoritative_root_ambiguous"]
           for case in summary["cases"]:

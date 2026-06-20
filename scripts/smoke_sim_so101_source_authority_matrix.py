@@ -787,6 +787,13 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "review_packet_status": "review_packet_source_authority_ready",
                 "selected_authoritative_candidate_path": str(normalize_path(fixtures["single_model"])),
                 "selected_authoritative_candidate_sha256": single_model_sha256,
+                "source_intake_recommended_candidate_path": str(
+                    normalize_path(fixtures["single_model"])
+                ),
+                "source_intake_recommended_candidate_source_root": str(
+                    normalize_path(fixtures["single_root"])
+                ),
+                "source_intake_recommended_candidate_authoritative": True,
                 "blockers_exact": [],
                 "actions_contain": [
                     "run_so101_model_bundle_probe",
@@ -815,6 +822,13 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "review_packet_status": "review_packet_source_authority_ready",
                 "selected_authoritative_candidate_path": str(normalize_path(fixtures["single_model"])),
                 "selected_authoritative_candidate_sha256": single_model_sha256,
+                "source_intake_recommended_candidate_path": str(
+                    normalize_path(fixtures["single_model"])
+                ),
+                "source_intake_recommended_candidate_source_root": str(
+                    normalize_path(fixtures["single_root"])
+                ),
+                "source_intake_recommended_candidate_authoritative": True,
                 "blockers_exact": [],
                 "actions_contain": [
                     "run_so101_model_bundle_probe",
@@ -1367,6 +1381,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "- Generic authoritative URDFs with complete review metadata still fail closed unless the selected candidate is SO-101-relevant.",
             "- Malformed or future-dated `authority_reviewed_at` values remain invalid review evidence.",
             "- Source-authority-ready fixture cases still report source-intake and review-packet artifacts as not authority.",
+            "- Source-authority-ready fixture cases must forward the selected model path and source root into the bundle-probe command.",
             "- Physical SO-101 model authority remains false in every case.",
             "- A reviewed bundle manifest with mesh roots, joint limits, target frame, TCP offset, and base-to-board alignment is still required before model-backed work is trusted.",
         ]

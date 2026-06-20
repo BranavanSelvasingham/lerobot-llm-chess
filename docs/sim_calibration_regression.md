@@ -432,7 +432,9 @@ single-authoritative-root review, and ambiguous-authoritative-root cases, and wr
 `so101_source_authority_matrix_cases.csv`, and `README.md`. The
 source-authority-ready fixture case proves only the inventory state transition
 to `source_authority_ready`, including that a narrowed authoritative root
-selects the same authoritative model path as an explicit authoritative path;
+selects the same authoritative model path as an explicit authoritative path and
+that the source-intake handoff forwards that selected path/source root into the
+bundle-probe command;
 malformed or future-dated `authority_reviewed_at` metadata must stay blocked as
 invalid review evidence;
 the non-SO-101 authoritative fixture must stay blocked and must not queue bundle
