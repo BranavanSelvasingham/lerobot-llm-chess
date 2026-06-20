@@ -557,6 +557,7 @@ def candidate_operator_command_plan(summary: dict[str, Any]) -> dict[str, Any]:
         "authority_blockers_until_reviewed": [
             "selected source-lock digest rows must be reviewed and copied only into reviewed authority fields",
             "license and provenance review evidence must be recorded for the selected intake option",
+            "SO-ARM100 README caveats for gripper linear-joint mapping and removed base collision meshes must be resolved in reviewed fields",
             "reviewed bundle manifest checker must report physical_so101_model_authority_ready",
             "reviewed MuJoCo bundle gate must prove physical reviewed model motion",
         ],
@@ -629,6 +630,12 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
                 "manifest_or_review_field": "mesh_asset_authority",
             },
             {
+                "requirement_id": "external_simulation_caveats_reviewed",
+                "title": "Review SO-ARM100 simulation caveats",
+                "required_evidence": "review record resolving the README gripper linear-joint mapping caveat and removed base collision mesh policy",
+                "manifest_or_review_field": "joint_limits_authority,collision_policy_review",
+            },
+            {
                 "requirement_id": "external_reviewed_bundle_manifest_supplied",
                 "title": "Supply reviewed bundle manifest for external source",
                 "required_evidence": "reviewed model bundle manifest with authority fields replaced",
@@ -659,6 +666,12 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
                 "title": "Review vendored file digest manifest",
                 "required_evidence": "digest manifest for every vendored SO101 file and every lockable source/asset file retained in the reviewed bundle",
                 "manifest_or_review_field": "mesh_asset_authority",
+            },
+            {
+                "requirement_id": "vendor_simulation_caveats_reviewed",
+                "title": "Review vendored simulation caveats",
+                "required_evidence": "review record resolving the README gripper linear-joint mapping caveat and removed base collision mesh policy for the vendored subset",
+                "manifest_or_review_field": "joint_limits_authority,collision_policy_review",
             },
             {
                 "requirement_id": "vendor_reviewed_bundle_manifest_supplied",
@@ -768,6 +781,7 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
             "Choose external pinned source root or vendored locked bundle.",
             "Keep the selected upstream commit immutable in review evidence.",
             "Review source lock digests, license/provenance, model variant, mesh roots, joint limits, target frame, gripper/TCP offset, and base-to-board alignment.",
+            "Resolve the SO-ARM100 README gripper linear-joint mapping caveat and removed base collision mesh policy in reviewed fields.",
             "Edit the direct review manifest template with reviewed values only.",
             "Run scripts/smoke_sim_so101_model_bundle_manifest.py against the reviewed manifest.",
             "Use the reviewed bundle downstream only when physical_so101_model_authority_ready and ready_for_model_backed_ik are true.",

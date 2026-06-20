@@ -350,7 +350,10 @@ plan, the operator command-plan JSON, the recorded external/vendor intake
 options, their selected requirement IDs, the handoff artifact IDs, the direct
 manifest template, and the post-review integrated suite rerun command, but it
 does not satisfy source authority, bundle authority, or model-backed IK
-readiness by itself. The gate
+readiness by itself. The selected external/vendor requirement rows explicitly
+include the SO-ARM100 README caveats for gripper linear-joint mapping and
+removed base collision meshes so those are resolved in reviewed fields before
+authority can close. The gate
 summary reports
 `model_authority: "reviewed_so101_model_authority_gate"` only when ready;
 otherwise it reports `reviewed_model_authority_gate_not_authority`. Its

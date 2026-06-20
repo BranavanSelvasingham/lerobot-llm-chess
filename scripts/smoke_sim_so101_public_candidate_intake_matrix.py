@@ -505,11 +505,12 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "operator_plan_status": "candidate_locked_operator_decision_required",
                 "operator_decision_status": "candidate_intake_decision_recorded_not_authority",
                 "selected_intake_option_id": "external_pinned_source_root",
-                "selected_requirement_count": 4,
+                "selected_requirement_count": 5,
                 "selected_requirement_ids": [
                     "external_checkout_path_declared",
                     "external_upstream_commit_pinned",
                     "external_file_digest_lock_reviewed",
+                    "external_simulation_caveats_reviewed",
                     "external_reviewed_bundle_manifest_supplied",
                 ],
             },
@@ -547,12 +548,13 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "operator_plan_status": "candidate_locked_operator_decision_required",
                 "operator_decision_status": "candidate_intake_decision_recorded_not_authority",
                 "selected_intake_option_id": "vendor_locked_bundle",
-                "selected_requirement_count": 5,
+                "selected_requirement_count": 6,
                 "selected_requirement_ids": [
                     "vendor_import_path_declared",
                     "vendor_upstream_commit_pinned",
                     "vendor_license_provenance_reviewed",
                     "vendor_file_digest_manifest_reviewed",
+                    "vendor_simulation_caveats_reviewed",
                     "vendor_reviewed_bundle_manifest_supplied",
                 ],
             },
@@ -1197,7 +1199,7 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         errors.append(
             f"{case_id}.candidate_operator_intake_requirement_model_authority invalid"
         )
-    expected_requirement_row_count = 9
+    expected_requirement_row_count = 11
     if summary.get("candidate_operator_intake_requirement_row_count") != expected_requirement_row_count:
         errors.append(
             f"{case_id}.candidate_operator_intake_requirement_row_count invalid"
@@ -1386,6 +1388,7 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         blockers_until_reviewed if isinstance(blockers_until_reviewed, list) else []
     )
     for blocker_fragment in (
+        "gripper linear-joint mapping",
         "license and provenance review evidence",
         "reviewed bundle manifest checker",
         "reviewed MuJoCo bundle gate",
