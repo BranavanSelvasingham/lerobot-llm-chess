@@ -377,6 +377,7 @@ jobs:
               "candidate_intake_invalid_model_selection",
               "candidate_intake_unpinned_commit_ref",
               "candidate_intake_checked",
+              "candidate_intake_checked_mjcf_model_selection",
               "candidate_intake_checked_external_decision",
               "candidate_intake_checked_vendor_decision",
           ], summary["case_ids"]
@@ -488,6 +489,9 @@ jobs:
           assert complete["candidate_source_lock_selected_model_observation_observed"] is True, complete
           assert complete["candidate_source_lock_selected_model_observation_parse_ok"] is True, complete
           assert complete["candidate_source_lock_selected_model_observation_root_tag"] == "robot", complete
+          assert complete["candidate_source_lock_selected_model_mesh_reference_digest_coverage_status"] == "no_mesh_references_observed", complete
+          assert complete["candidate_source_lock_selected_model_mesh_reference_digest_match_count"] == 0, complete
+          assert complete["candidate_source_lock_selected_model_mesh_reference_digest_missing_count"] == 0, complete
           assert complete["candidate_operator_intake_plan_model_authority"] == "candidate_operator_intake_plan_not_authority", complete
           assert complete["candidate_operator_intake_plan_status"] == "candidate_locked_operator_decision_required", complete
           assert complete["candidate_operator_intake_decision_status"] == "vendor_or_external_intake_not_declared", complete
@@ -504,6 +508,14 @@ jobs:
           assert complete["seeded_template_manifest_checker_physical_ready"] is False, complete
           assert "model_sha256" in complete["seeded_template_manifest_checker_missing_inputs"], complete
           assert "authority" in complete["seeded_template_manifest_checker_missing_inputs"], complete
+          mjcf_model = by_case["candidate_intake_checked_mjcf_model_selection"]
+          assert mjcf_model["status"] == "candidate_intake_checked", mjcf_model
+          assert mjcf_model["selected_model_status"] == "selectable_so101_model_selected", mjcf_model
+          assert mjcf_model["candidate_source_lock_selected_model_observation_root_tag"] == "mujoco", mjcf_model
+          assert mjcf_model["candidate_source_lock_selected_model_observation_mesh_reference_count"] == 1, mjcf_model
+          assert mjcf_model["candidate_source_lock_selected_model_mesh_reference_digest_coverage_status"] == "all_observed_mesh_references_locked", mjcf_model
+          assert mjcf_model["candidate_source_lock_selected_model_mesh_reference_digest_match_count"] == 1, mjcf_model
+          assert mjcf_model["candidate_source_lock_selected_model_mesh_reference_digest_missing_count"] == 0, mjcf_model
           external_decision = by_case["candidate_intake_checked_external_decision"]
           assert external_decision["status"] == "candidate_intake_checked", external_decision
           assert external_decision["missing_expected_relative_paths"] == [], external_decision
@@ -4999,9 +5011,10 @@ jobs:
               row.get("label") == "so101_public_candidate_intake_matrix:summary"
               and row.get("kind") == "json"
               and row.get("exists") is True
-              and row.get("metrics", {}).get("case_count") == 8
+              and row.get("metrics", {}).get("case_count") == 9
               and "candidate_intake_invalid_model_selection" in row.get("metrics", {}).get("case_ids", [])
               and "candidate_intake_unpinned_commit_ref" in row.get("metrics", {}).get("case_ids", [])
+              and "candidate_intake_checked_mjcf_model_selection" in row.get("metrics", {}).get("case_ids", [])
               and "candidate_intake_checked_external_decision" in row.get("metrics", {}).get("case_ids", [])
               and "candidate_intake_checked_vendor_decision" in row.get("metrics", {}).get("case_ids", [])
               for row in artifacts_by_category["so101_public_candidate_intake_matrix"]
@@ -5029,6 +5042,16 @@ jobs:
               assert metrics.get("candidate_intake_checked_source_lock_selected_model_observation_observed") is True, metrics
               assert metrics.get("candidate_intake_checked_source_lock_selected_model_observation_parse_ok") is True, metrics
               assert metrics.get("candidate_intake_checked_source_lock_selected_model_observation_root_tag") == "robot", metrics
+              assert metrics.get("candidate_intake_checked_source_lock_selected_model_mesh_reference_digest_coverage_status") == "no_mesh_references_observed", metrics
+              assert metrics.get("candidate_intake_checked_source_lock_selected_model_mesh_reference_digest_match_count") == 0, metrics
+              assert metrics.get("candidate_intake_checked_source_lock_selected_model_mesh_reference_digest_missing_count") == 0, metrics
+              assert metrics.get("candidate_intake_mjcf_model_selection_status") == "candidate_intake_checked", metrics
+              assert metrics.get("candidate_intake_mjcf_model_selection_selected_model_status") == "selectable_so101_model_selected", metrics
+              assert metrics.get("candidate_intake_mjcf_model_selection_source_lock_selected_model_observation_root_tag") == "mujoco", metrics
+              assert metrics.get("candidate_intake_mjcf_model_selection_source_lock_selected_model_observation_mesh_reference_count") == 1, metrics
+              assert metrics.get("candidate_intake_mjcf_model_selection_source_lock_selected_model_mesh_reference_digest_coverage_status") == "all_observed_mesh_references_locked", metrics
+              assert metrics.get("candidate_intake_mjcf_model_selection_source_lock_selected_model_mesh_reference_digest_match_count") == 1, metrics
+              assert metrics.get("candidate_intake_mjcf_model_selection_source_lock_selected_model_mesh_reference_digest_missing_count") == 0, metrics
               assert metrics.get("candidate_intake_checked_upstream_commit_sha_valid") is True, metrics
               assert metrics.get("candidate_intake_checked_upstream_commit_status") == "upstream_commit_sha_pinned", metrics
               assert metrics.get("candidate_intake_checked_operator_intake_decision_status") == "vendor_or_external_intake_not_declared", metrics

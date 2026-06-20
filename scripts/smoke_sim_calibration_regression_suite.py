@@ -3985,6 +3985,15 @@ def so101_public_candidate_intake_matrix_section(
         ),
         {},
     )
+    mjcf_model_selection_case = next(
+        (
+            case
+            for case in cases
+            if isinstance(case, dict)
+            and case.get("case_id") == "candidate_intake_checked_mjcf_model_selection"
+        ),
+        {},
+    )
     unpinned_commit_case = next(
         (
             case
@@ -4057,6 +4066,30 @@ def so101_public_candidate_intake_matrix_section(
     vendor_decision_artifacts = (
         vendor_decision_artifacts if isinstance(vendor_decision_artifacts, dict) else {}
     )
+
+    def compact_model_selection_case(case: dict[str, Any]) -> dict[str, Any]:
+        case = case if isinstance(case, dict) else {}
+        return {
+            "status": case.get("status"),
+            "model_present": case.get("model_present"),
+            "selected_model_supported": case.get("selected_model_supported"),
+            "selected_model_status": case.get("selected_model_status"),
+            "candidate_source_lock_selected_model_observation_root_tag": case.get(
+                "candidate_source_lock_selected_model_observation_root_tag"
+            ),
+            "candidate_source_lock_selected_model_observation_mesh_reference_count": case.get(
+                "candidate_source_lock_selected_model_observation_mesh_reference_count"
+            ),
+            "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status": case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status"
+            ),
+            "candidate_source_lock_selected_model_mesh_reference_digest_match_count": case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_match_count"
+            ),
+            "candidate_source_lock_selected_model_mesh_reference_digest_missing_count": case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_missing_count"
+            ),
+        }
 
     def compact_decision_case(
         case: dict[str, Any],
@@ -4134,6 +4167,21 @@ def so101_public_candidate_intake_matrix_section(
             else None,
             "candidate_source_lock_selected_model_observation_root_tag": case.get(
                 "candidate_source_lock_selected_model_observation_root_tag"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status": case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_mesh_reference_digest_match_count": case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_match_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_mesh_reference_digest_missing_count": case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_missing_count"
             )
             if isinstance(case, dict)
             else None,
@@ -4360,6 +4408,21 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(checked_case, dict)
             else None,
+            "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status": checked_case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_mesh_reference_digest_match_count": checked_case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_match_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_mesh_reference_digest_missing_count": checked_case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_missing_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
             "candidate_source_lock_digest_model_authority": checked_case.get(
                 "candidate_source_lock_digest_model_authority"
             )
@@ -4467,6 +4530,9 @@ def so101_public_candidate_intake_matrix_section(
             "direct_manifest_path": preview.get("direct_manifest_path"),
             "preview_summary_path": preview.get("summary_path"),
         },
+        "candidate_intake_checked_mjcf_model_selection": (
+            compact_model_selection_case(mjcf_model_selection_case)
+        ),
         "candidate_intake_unpinned_commit_ref": {
             "status": unpinned_commit_case.get("status")
             if isinstance(unpinned_commit_case, dict)

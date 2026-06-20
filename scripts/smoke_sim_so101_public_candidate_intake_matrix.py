@@ -121,6 +121,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_source_lock_selected_model_observation_root_tag",
         "candidate_source_lock_selected_model_observation_joint_count",
         "candidate_source_lock_selected_model_observation_mesh_reference_count",
+        "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status",
+        "candidate_source_lock_selected_model_mesh_reference_digest_match_count",
+        "candidate_source_lock_selected_model_mesh_reference_digest_missing_count",
         "candidate_operator_intake_plan_model_authority",
         "candidate_operator_intake_plan_status",
         "candidate_operator_intake_decision_status",
@@ -353,6 +356,50 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "selected_model_supported": True,
                 "selected_model_status": "selectable_so101_model_selected",
                 "parsed_model_file_count": 5,
+                "readme_caveats": {
+                    "base_collision_meshes_removed": True,
+                    "gripper_linear_joint_mapping_not_reflected": True,
+                    "onshape_to_robot_generated": True,
+                    "relative_mesh_paths_declared": True,
+                },
+                "missing_exact": [],
+                "commit_action_present": False,
+                "upstream_commit_sha_valid": True,
+                "upstream_commit_status": "upstream_commit_sha_pinned",
+                "source_lock_status": "candidate_source_lock_ready_for_review",
+                "source_lock_ready_for_review": True,
+                "operator_plan_status": "candidate_locked_operator_decision_required",
+                "operator_decision_status": "vendor_or_external_intake_not_declared",
+                "selected_intake_option_id": None,
+                "selected_requirement_count": 0,
+                "selected_requirement_ids": [],
+            },
+        },
+        {
+            "case_id": "candidate_intake_checked_mjcf_model_selection",
+            "args": [
+                "--source-root",
+                str(complete_root),
+                "--upstream-commit",
+                PINNED_FIXTURE_COMMIT,
+                "--model-relative-path",
+                "so101_new_calib.xml",
+            ],
+            "expect": {
+                "status": "candidate_intake_checked",
+                "expected_file_count": len(EXPECTED_RELATIVE_PATHS),
+                "present_expected_file_count": len(EXPECTED_RELATIVE_PATHS),
+                "model_present": True,
+                "selected_model_supported": True,
+                "selected_model_status": "selectable_so101_model_selected",
+                "parsed_model_file_count": 5,
+                "selected_model_root_tag": "mujoco",
+                "selected_model_mesh_reference_count": 1,
+                "selected_model_mesh_digest_coverage_status": (
+                    "all_observed_mesh_references_locked"
+                ),
+                "selected_model_mesh_digest_match_count": 1,
+                "selected_model_mesh_digest_missing_count": 0,
                 "readme_caveats": {
                     "base_collision_meshes_removed": True,
                     "gripper_linear_joint_mapping_not_reflected": True,
@@ -808,14 +855,74 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
             errors.append(
                 f"{case_id}.candidate_source_lock selected model observation parse failed"
             )
-        if selected_model_observation.get("root_tag") not in {"robot", "mujoco"}:
+        expected_selected_root_tag = expect.get("selected_model_root_tag")
+        if expected_selected_root_tag is None:
+            expected_selected_root_tag = "robot"
+        if selected_model_observation.get("root_tag") != expected_selected_root_tag:
             errors.append(
-                f"{case_id}.candidate_source_lock selected model observation root tag invalid"
+                f"{case_id}.candidate_source_lock selected model observation root tag "
+                f"expected {expected_selected_root_tag!r}, got "
+                f"{selected_model_observation.get('root_tag')!r}"
+            )
+        expected_mesh_reference_count = int(
+            expect.get("selected_model_mesh_reference_count", 0)
+        )
+        if (
+            selected_model_observation.get("mesh_reference_count")
+            != expected_mesh_reference_count
+        ):
+            errors.append(
+                f"{case_id}.candidate_source_lock selected model mesh reference count "
+                f"expected {expected_mesh_reference_count!r}, got "
+                f"{selected_model_observation.get('mesh_reference_count')!r}"
+            )
+        expected_mesh_coverage_status = expect.get(
+            "selected_model_mesh_digest_coverage_status",
+            "no_mesh_references_observed",
+        )
+        if (
+            selected_model_observation.get("mesh_reference_digest_coverage_status")
+            != expected_mesh_coverage_status
+        ):
+            errors.append(
+                f"{case_id}.candidate_source_lock selected model mesh digest status "
+                f"expected {expected_mesh_coverage_status!r}, got "
+                f"{selected_model_observation.get('mesh_reference_digest_coverage_status')!r}"
+            )
+        expected_mesh_digest_match_count = int(
+            expect.get("selected_model_mesh_digest_match_count", 0)
+        )
+        if (
+            selected_model_observation.get("mesh_reference_digest_match_count")
+            != expected_mesh_digest_match_count
+        ):
+            errors.append(
+                f"{case_id}.candidate_source_lock selected model mesh digest match count "
+                f"expected {expected_mesh_digest_match_count!r}, got "
+                f"{selected_model_observation.get('mesh_reference_digest_match_count')!r}"
+            )
+        expected_mesh_digest_missing_count = int(
+            expect.get("selected_model_mesh_digest_missing_count", 0)
+        )
+        if (
+            selected_model_observation.get("mesh_reference_digest_missing_count")
+            != expected_mesh_digest_missing_count
+        ):
+            errors.append(
+                f"{case_id}.candidate_source_lock selected model mesh digest missing count "
+                f"expected {expected_mesh_digest_missing_count!r}, got "
+                f"{selected_model_observation.get('mesh_reference_digest_missing_count')!r}"
             )
     elif expect["model_present"] and not expected_selected_model_supported:
         if selected_model_observation.get("observed") is not False:
             errors.append(
                 f"{case_id}.candidate_source_lock unsupported selected model should not be observed"
+            )
+        if selected_model_observation.get("mesh_reference_digest_coverage_status") != (
+            "no_mesh_references_observed"
+        ):
+            errors.append(
+                f"{case_id}.candidate_source_lock unsupported selected model mesh digest status invalid"
             )
     expected_digest_row_count = int(summary.get("present_expected_file_count") or 0)
     expected_selected_digest_row_count = (
@@ -1262,6 +1369,15 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         ),
         "candidate_source_lock_selected_model_observation_mesh_reference_count": (
             selected_model_observation.get("mesh_reference_count")
+        ),
+        "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status": (
+            selected_model_observation.get("mesh_reference_digest_coverage_status")
+        ),
+        "candidate_source_lock_selected_model_mesh_reference_digest_match_count": (
+            selected_model_observation.get("mesh_reference_digest_match_count")
+        ),
+        "candidate_source_lock_selected_model_mesh_reference_digest_missing_count": (
+            selected_model_observation.get("mesh_reference_digest_missing_count")
         ),
         "candidate_operator_intake_plan_model_authority": summary.get(
             "candidate_operator_intake_plan_model_authority"

@@ -660,6 +660,25 @@ def candidate_model_observation_rows(summary: dict[str, Any]) -> list[dict[str, 
     return rows
 
 
+def normalize_mesh_reference_for_digest(reference: Any) -> str | None:
+    if not isinstance(reference, str):
+        return None
+    value = reference.strip().replace("\\", "/")
+    if not value:
+        return None
+    if value.startswith("./"):
+        value = value[2:]
+    if value.startswith("../"):
+        return None
+    if value.startswith("/"):
+        return None
+    if value.startswith("assets/"):
+        return value
+    if "/" not in value and Path(value).suffix:
+        return f"assets/{value}"
+    return value
+
+
 def selected_model_observation(summary: dict[str, Any]) -> dict[str, Any]:
     observations = summary.get("candidate_review_observations")
     observations = observations if isinstance(observations, dict) else {}
@@ -678,6 +697,42 @@ def selected_model_observation(summary: dict[str, Any]) -> dict[str, Any]:
         {},
     )
     selected = selected if isinstance(selected, dict) else {}
+    file_rows = summary.get("file_rows")
+    file_rows = file_rows if isinstance(file_rows, list) else []
+    locked_relative_paths = {
+        str(row.get("relative_path"))
+        for row in file_rows
+        if isinstance(row, dict)
+        and row.get("expected") is True
+        and row.get("exists") is True
+        and row.get("sha256")
+    }
+    mesh_references = selected.get("mesh_references")
+    mesh_references = mesh_references if isinstance(mesh_references, list) else []
+    normalized_mesh_references = [
+        normalized
+        for normalized in (
+            normalize_mesh_reference_for_digest(reference)
+            for reference in mesh_references
+        )
+        if normalized
+    ]
+    digest_matched_mesh_references = [
+        reference
+        for reference in normalized_mesh_references
+        if reference in locked_relative_paths
+    ]
+    digest_missing_mesh_references = [
+        reference
+        for reference in normalized_mesh_references
+        if reference not in locked_relative_paths
+    ]
+    if not normalized_mesh_references:
+        mesh_reference_digest_coverage_status = "no_mesh_references_observed"
+    elif not digest_missing_mesh_references:
+        mesh_reference_digest_coverage_status = "all_observed_mesh_references_locked"
+    else:
+        mesh_reference_digest_coverage_status = "mesh_reference_digest_gaps"
     return {
         "relative_path": selected.get("relative_path") or selected_relative_path,
         "observed": bool(selected),
@@ -690,6 +745,17 @@ def selected_model_observation(summary: dict[str, Any]) -> dict[str, Any]:
             selected.get("joint_limit_or_range_count") or 0
         ),
         "mesh_reference_count": int(selected.get("mesh_reference_count") or 0),
+        "mesh_reference_digest_coverage_status": (
+            mesh_reference_digest_coverage_status
+        ),
+        "mesh_reference_digest_match_count": len(digest_matched_mesh_references),
+        "mesh_reference_digest_missing_count": len(digest_missing_mesh_references),
+        "mesh_reference_digest_matched_relative_paths": (
+            digest_matched_mesh_references[:200]
+        ),
+        "mesh_reference_digest_missing_relative_paths": (
+            digest_missing_mesh_references[:200]
+        ),
         "authority_boundary": "candidate_selected_model_observation_not_authority",
     }
 

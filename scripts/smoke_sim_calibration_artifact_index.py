@@ -3231,6 +3231,12 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
     artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
     checked_case = matrix.get("candidate_intake_checked")
     checked_case = checked_case if isinstance(checked_case, dict) else {}
+    mjcf_model_selection_case = matrix.get("candidate_intake_checked_mjcf_model_selection")
+    mjcf_model_selection_case = (
+        mjcf_model_selection_case
+        if isinstance(mjcf_model_selection_case, dict)
+        else {}
+    )
     unpinned_commit_case = matrix.get("candidate_intake_unpinned_commit_ref")
     unpinned_commit_case = (
         unpinned_commit_case if isinstance(unpinned_commit_case, dict) else {}
@@ -3333,6 +3339,52 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "candidate_intake_checked_source_lock_selected_model_observation_root_tag": (
             checked_case.get(
                 "candidate_source_lock_selected_model_observation_root_tag"
+            )
+        ),
+        "candidate_intake_checked_source_lock_selected_model_mesh_reference_digest_coverage_status": (
+            checked_case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status"
+            )
+        ),
+        "candidate_intake_checked_source_lock_selected_model_mesh_reference_digest_match_count": (
+            checked_case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_match_count"
+            )
+        ),
+        "candidate_intake_checked_source_lock_selected_model_mesh_reference_digest_missing_count": (
+            checked_case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_missing_count"
+            )
+        ),
+        "candidate_intake_mjcf_model_selection_status": (
+            mjcf_model_selection_case.get("status")
+        ),
+        "candidate_intake_mjcf_model_selection_selected_model_status": (
+            mjcf_model_selection_case.get("selected_model_status")
+        ),
+        "candidate_intake_mjcf_model_selection_source_lock_selected_model_observation_root_tag": (
+            mjcf_model_selection_case.get(
+                "candidate_source_lock_selected_model_observation_root_tag"
+            )
+        ),
+        "candidate_intake_mjcf_model_selection_source_lock_selected_model_observation_mesh_reference_count": (
+            mjcf_model_selection_case.get(
+                "candidate_source_lock_selected_model_observation_mesh_reference_count"
+            )
+        ),
+        "candidate_intake_mjcf_model_selection_source_lock_selected_model_mesh_reference_digest_coverage_status": (
+            mjcf_model_selection_case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status"
+            )
+        ),
+        "candidate_intake_mjcf_model_selection_source_lock_selected_model_mesh_reference_digest_match_count": (
+            mjcf_model_selection_case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_match_count"
+            )
+        ),
+        "candidate_intake_mjcf_model_selection_source_lock_selected_model_mesh_reference_digest_missing_count": (
+            mjcf_model_selection_case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_missing_count"
             )
         ),
         "candidate_intake_checked_source_lock_digest_row_count": checked_case.get(
