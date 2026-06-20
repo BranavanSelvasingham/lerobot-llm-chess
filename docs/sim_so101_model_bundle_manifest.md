@@ -411,10 +411,11 @@ in meters; conflicting aliases are not readiness evidence. Diagnostic output may
 use `gripper_frame_link` when `target_frame` is omitted, but readiness requires
 an explicit `target_frame` plus accepted reviewed target-frame authority.
 
-`asset_roots` must be present as a JSON list. An explicit empty list is valid
-when the model directory alone resolves mesh paths, but every supplied root must
-resolve to an existing directory. Non-list values, nonexistent roots, and file
-paths are reported as follow-up diagnostics. Readiness still requires at least
+`asset_roots` must be present as a JSON list of non-empty string paths. An
+explicit empty list is valid when the model directory alone resolves mesh paths,
+but every supplied root must resolve to an existing directory. Non-list values,
+non-string or empty entries, nonexistent roots, and file paths are reported as
+follow-up diagnostics. Readiness still requires at least
 one literal mesh reference visible to asset preflight and resolved with no
 missing or unresolved assets, plus reviewed mesh/asset-root authority.
 Explicit placeholders such as

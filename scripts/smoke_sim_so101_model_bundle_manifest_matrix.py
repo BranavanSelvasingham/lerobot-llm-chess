@@ -643,6 +643,26 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "invalid_asset_root_entries_not_ready",
+            "manifest_path": fixtures["invalid_asset_root_entries_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_authority": (
+                    "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": False,
+                "asset_roots_status": "needs_follow_up",
+                "asset_roots_diagnostics_contains": [
+                    "asset_root_0_not_string",
+                    "asset_root_1_not_string",
+                ],
+                "missing_inputs": ["asset_roots"],
+                "next_actions": ["declare_model_asset_roots"],
+            },
+        },
+        {
             "case_id": "unavailable_asset_root_not_ready",
             "manifest_path": fixtures["unavailable_asset_root_manifest_path"],
             "expect": {

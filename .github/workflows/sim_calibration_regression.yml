@@ -481,6 +481,7 @@ jobs:
               "invalid_model_path_type_not_ready",
               "model_path_directory_not_ready",
               "invalid_asset_roots_not_ready",
+              "invalid_asset_root_entries_not_ready",
               "unavailable_asset_root_not_ready",
               "file_asset_root_not_ready",
               "placeholder_alignment_manifest_not_ready",
@@ -610,6 +611,14 @@ jobs:
           assert "asset_roots_not_list" in invalid_asset_roots["asset_roots_diagnostics"], invalid_asset_roots
           assert "asset_roots" in invalid_asset_roots["missing_inputs"], invalid_asset_roots
           assert "declare_model_asset_roots" in invalid_asset_roots["next_required_action_ids"], invalid_asset_roots
+          invalid_asset_root_entries = by_case["invalid_asset_root_entries_not_ready"]["observations"]
+          assert invalid_asset_root_entries["status"] == "model_bundle_manifest_needs_follow_up", invalid_asset_root_entries
+          assert invalid_asset_root_entries["ready_for_model_backed_ik"] is False, invalid_asset_root_entries
+          assert invalid_asset_root_entries["asset_roots_status"] == "needs_follow_up", invalid_asset_root_entries
+          assert "asset_root_0_not_string" in invalid_asset_root_entries["asset_roots_diagnostics"], invalid_asset_root_entries
+          assert "asset_root_1_not_string" in invalid_asset_root_entries["asset_roots_diagnostics"], invalid_asset_root_entries
+          assert "asset_roots" in invalid_asset_root_entries["missing_inputs"], invalid_asset_root_entries
+          assert "declare_model_asset_roots" in invalid_asset_root_entries["next_required_action_ids"], invalid_asset_root_entries
           unavailable_asset_root = by_case["unavailable_asset_root_not_ready"]["observations"]
           assert unavailable_asset_root["status"] == "model_bundle_manifest_needs_follow_up", unavailable_asset_root
           assert unavailable_asset_root["ready_for_model_backed_ik"] is False, unavailable_asset_root
@@ -5669,6 +5678,10 @@ jobs:
           ), model_bundle_manifest_matrix
           assert (
               "invalid_model_path_type_not_ready"
+              in model_bundle_manifest_matrix["case_ids"]
+          ), model_bundle_manifest_matrix
+          assert (
+              "invalid_asset_root_entries_not_ready"
               in model_bundle_manifest_matrix["case_ids"]
           ), model_bundle_manifest_matrix
           assert (
