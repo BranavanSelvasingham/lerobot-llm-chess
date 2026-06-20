@@ -213,6 +213,22 @@ def inspect_board_pick_prerequisite(path: Path) -> dict[str, Any]:
         "lift_verified": summary.get("lift_verified") is True,
         "board_contact_cleared_during_lift": summary.get("board_contact_cleared_during_lift") is True,
         "transfer_verified": summary.get("transfer_verified") is True,
+        "lower_contact_retained_before_release": summary.get(
+            "lower_contact_retained_before_release"
+        )
+        is True,
+        "lower_board_contact_observed_before_release": summary.get(
+            "lower_board_contact_observed_before_release"
+        )
+        is True,
+        "lower_target_within_tolerance_before_release": summary.get(
+            "lower_target_within_tolerance_before_release"
+        )
+        is True,
+        "lower_place_z_within_tolerance_before_release": summary.get(
+            "lower_place_z_within_tolerance_before_release"
+        )
+        is True,
         "place_without_manual_piece_pose_verified": summary.get("place_without_manual_piece_pose_verified") is True,
         "release_contact_cleared_after_retreat": summary.get("release_contact_cleared_after_retreat") is True,
         "final_board_contact_observed": summary.get("final_board_contact_observed") is True,
@@ -222,6 +238,20 @@ def inspect_board_pick_prerequisite(path: Path) -> dict[str, Any]:
             and (target_xy_tolerance_m := json_number(summary.get("target_xy_tolerance_m")))
             is not None
             and final_target_xy_error_m <= target_xy_tolerance_m
+        ),
+        "lower_target_xy_within_tolerance": (
+            (lower_target_xy_error_m := json_number(summary.get("lower_target_xy_error_m")))
+            is not None
+            and (target_xy_tolerance_m := json_number(summary.get("target_xy_tolerance_m")))
+            is not None
+            and lower_target_xy_error_m <= target_xy_tolerance_m
+        ),
+        "lower_place_z_within_tolerance": (
+            (lower_place_z_error_m := json_number(summary.get("lower_place_z_error_m")))
+            is not None
+            and (place_z_tolerance_m := json_number(summary.get("place_z_tolerance_m")))
+            is not None
+            and lower_place_z_error_m <= place_z_tolerance_m
         ),
         "final_place_z_within_tolerance": (
             (final_place_z_error_m := json_number(summary.get("final_place_z_error_m"))) is not None
@@ -272,6 +302,20 @@ def inspect_board_pick_prerequisite(path: Path) -> dict[str, Any]:
             "robot_pose_seeded_for_source_fixture": summary.get("robot_pose_seeded_for_source_fixture"),
             "final_target_xy_error_m": summary.get("final_target_xy_error_m"),
             "target_xy_tolerance_m": summary.get("target_xy_tolerance_m"),
+            "lower_contact_retained_before_release": summary.get(
+                "lower_contact_retained_before_release"
+            ),
+            "lower_board_contact_observed_before_release": summary.get(
+                "lower_board_contact_observed_before_release"
+            ),
+            "lower_target_within_tolerance_before_release": summary.get(
+                "lower_target_within_tolerance_before_release"
+            ),
+            "lower_place_z_within_tolerance_before_release": summary.get(
+                "lower_place_z_within_tolerance_before_release"
+            ),
+            "lower_target_xy_error_m": summary.get("lower_target_xy_error_m"),
+            "lower_place_z_error_m": summary.get("lower_place_z_error_m"),
             "final_place_z_error_m": summary.get("final_place_z_error_m"),
             "place_z_tolerance_m": summary.get("place_z_tolerance_m"),
             "final_board_contact_observed": summary.get("final_board_contact_observed"),

@@ -111,6 +111,12 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "lift_verified",
         "board_contact_cleared_during_lift",
         "transfer_verified",
+        "lower_contact_retained_before_release",
+        "lower_board_contact_observed_before_release",
+        "lower_target_within_tolerance_before_release",
+        "lower_place_z_within_tolerance_before_release",
+        "lower_target_xy_error_m",
+        "lower_place_z_error_m",
         "place_without_manual_piece_pose_verified",
         "board_source_pick_place_verified",
         "release_contact_cleared_after_retreat",
@@ -181,6 +187,10 @@ def case_specs() -> list[dict[str, Any]]:
             "expect_lift": True,
             "expect_board_contact_cleared_during_lift": True,
             "expect_transfer": True,
+            "expect_lower_contact_retained_before_release": True,
+            "expect_lower_board_contact_before_release": True,
+            "expect_lower_target_within_tolerance_before_release": True,
+            "expect_lower_place_z_within_tolerance_before_release": True,
             "expect_place": True,
             "expect_board_pick_place": True,
             "expect_release_contact_cleared_after_retreat": True,
@@ -197,6 +207,10 @@ def case_specs() -> list[dict[str, Any]]:
             "expect_lift": True,
             "expect_board_contact_cleared_during_lift": True,
             "expect_transfer": True,
+            "expect_lower_contact_retained_before_release": True,
+            "expect_lower_board_contact_before_release": True,
+            "expect_lower_target_within_tolerance_before_release": False,
+            "expect_lower_place_z_within_tolerance_before_release": True,
             "expect_place": False,
             "expect_board_pick_place": False,
             "expect_release_contact_cleared_after_retreat": True,
@@ -213,6 +227,10 @@ def case_specs() -> list[dict[str, Any]]:
             "expect_lift": False,
             "expect_board_contact_cleared_during_lift": False,
             "expect_transfer": False,
+            "expect_lower_contact_retained_before_release": False,
+            "expect_lower_board_contact_before_release": True,
+            "expect_lower_target_within_tolerance_before_release": False,
+            "expect_lower_place_z_within_tolerance_before_release": True,
             "expect_place": False,
             "expect_board_pick_place": False,
             "expect_release_contact_cleared_after_retreat": True,
@@ -234,6 +252,10 @@ def case_specs() -> list[dict[str, Any]]:
             "expect_lift": False,
             "expect_board_contact_cleared_during_lift": False,
             "expect_transfer": False,
+            "expect_lower_contact_retained_before_release": True,
+            "expect_lower_board_contact_before_release": True,
+            "expect_lower_target_within_tolerance_before_release": False,
+            "expect_lower_place_z_within_tolerance_before_release": True,
             "expect_place": False,
             "expect_board_pick_place": False,
             "expect_release_contact_cleared_after_retreat": True,
@@ -383,6 +405,35 @@ def phase_evidence_contract_errors(
             errors.append(
                 f"{case_id}.phase_contract.{expected_phase_id}.ok: expected to match {observation_key}={expected_ok!r}, got {ok!r}"
             )
+        if expected_phase_id == "release_place":
+            criteria = row.get("criteria")
+            metrics = row.get("metrics")
+            if not isinstance(criteria, list):
+                errors.append(f"{case_id}.phase_contract.release_place.criteria: expected list")
+            else:
+                for expected_criterion in (
+                    "lower_contact_retained_before_release",
+                    "lower_board_contact_observed_before_release",
+                    "lower_target_xy_error_within_tolerance_before_release",
+                    "lower_place_z_error_within_tolerance_before_release",
+                ):
+                    if expected_criterion not in criteria:
+                        errors.append(
+                            f"{case_id}.phase_contract.release_place.criteria: missing {expected_criterion!r}"
+                        )
+            if not isinstance(metrics, dict):
+                errors.append(f"{case_id}.phase_contract.release_place.metrics: expected dict")
+            else:
+                for expected_metric in (
+                    "lower_contact_retained_before_release",
+                    "lower_board_contact_observed_before_release",
+                    "lower_target_xy_error_m",
+                    "lower_place_z_error_m",
+                ):
+                    if expected_metric not in metrics:
+                        errors.append(
+                            f"{case_id}.phase_contract.release_place.metrics: missing {expected_metric!r}"
+                        )
 
     if phase_ids != row_phase_ids:
         errors.append(
@@ -505,6 +556,20 @@ def summarize_case(
         "lift_verified": summary.get("lift_verified"),
         "board_contact_cleared_during_lift": summary.get("board_contact_cleared_during_lift"),
         "transfer_verified": summary.get("transfer_verified"),
+        "lower_contact_retained_before_release": summary.get(
+            "lower_contact_retained_before_release"
+        ),
+        "lower_board_contact_observed_before_release": summary.get(
+            "lower_board_contact_observed_before_release"
+        ),
+        "lower_target_within_tolerance_before_release": summary.get(
+            "lower_target_within_tolerance_before_release"
+        ),
+        "lower_place_z_within_tolerance_before_release": summary.get(
+            "lower_place_z_within_tolerance_before_release"
+        ),
+        "lower_target_xy_error_m": summary.get("lower_target_xy_error_m"),
+        "lower_place_z_error_m": summary.get("lower_place_z_error_m"),
         "place_without_manual_piece_pose_verified": summary.get(
             "place_without_manual_piece_pose_verified"
         ),
@@ -636,6 +701,30 @@ def summarize_case(
         )
         add_error(
             errors,
+            f"{case_id}.lower_contact_retained_before_release",
+            observations["lower_contact_retained_before_release"],
+            spec["expect_lower_contact_retained_before_release"],
+        )
+        add_error(
+            errors,
+            f"{case_id}.lower_board_contact_observed_before_release",
+            observations["lower_board_contact_observed_before_release"],
+            spec["expect_lower_board_contact_before_release"],
+        )
+        add_error(
+            errors,
+            f"{case_id}.lower_target_within_tolerance_before_release",
+            observations["lower_target_within_tolerance_before_release"],
+            spec["expect_lower_target_within_tolerance_before_release"],
+        )
+        add_error(
+            errors,
+            f"{case_id}.lower_place_z_within_tolerance_before_release",
+            observations["lower_place_z_within_tolerance_before_release"],
+            spec["expect_lower_place_z_within_tolerance_before_release"],
+        )
+        add_error(
+            errors,
             f"{case_id}.place_without_manual_piece_pose_verified",
             observations["place_without_manual_piece_pose_verified"],
             spec["expect_place"],
@@ -753,6 +842,10 @@ def summarize_case(
             ("lift_verified", False),
             ("board_contact_cleared_during_lift", False),
             ("transfer_verified", False),
+            ("lower_contact_retained_before_release", False),
+            ("lower_board_contact_observed_before_release", False),
+            ("lower_target_within_tolerance_before_release", False),
+            ("lower_place_z_within_tolerance_before_release", False),
             ("place_without_manual_piece_pose_verified", False),
             ("board_source_pick_place_verified", False),
             ("release_contact_cleared_after_retreat", False),
@@ -868,6 +961,20 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "lift_verified": observations.get("lift_verified"),
         "board_contact_cleared_during_lift": observations.get("board_contact_cleared_during_lift"),
         "transfer_verified": observations.get("transfer_verified"),
+        "lower_contact_retained_before_release": observations.get(
+            "lower_contact_retained_before_release"
+        ),
+        "lower_board_contact_observed_before_release": observations.get(
+            "lower_board_contact_observed_before_release"
+        ),
+        "lower_target_within_tolerance_before_release": observations.get(
+            "lower_target_within_tolerance_before_release"
+        ),
+        "lower_place_z_within_tolerance_before_release": observations.get(
+            "lower_place_z_within_tolerance_before_release"
+        ),
+        "lower_target_xy_error_m": observations.get("lower_target_xy_error_m"),
+        "lower_place_z_error_m": observations.get("lower_place_z_error_m"),
         "place_without_manual_piece_pose_verified": observations.get(
             "place_without_manual_piece_pose_verified"
         ),

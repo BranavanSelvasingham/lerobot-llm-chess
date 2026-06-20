@@ -41,8 +41,9 @@ must keep `observed_evidence_is_policy_training_authority: false` and
 `ready_for_policy_training: false`; a development board-pick prerequisite that
 claims physical or policy-training authority must fail closed before rollout
 evidence is trusted. A prerequisite with passing aggregate pick/place booleans
-must also expose the expected reset/lower/close/lift/transfer/lower/release/
-retreat stage sequence, empty missing/unexpected stage lists, empty
+must also expose lower-before-release gripper contact, lower board contact,
+lower target XY/Z tolerance, the expected reset/lower/close/lift/transfer/lower/
+release/retreat stage sequence, empty missing/unexpected stage lists, empty
 `stage_sequence_contract_errors`, and empty
 `manual_piece_pose_after_reset_stage_ids`.
 
@@ -74,6 +75,9 @@ The summary must report:
 - `episode_count` greater than zero
 - `transition_count` greater than zero
 - `development_prerequisites_satisfied: true`
+- `board_pick_prerequisite.required_checks.lower_contact_retained_before_release: true`
+- `board_pick_prerequisite.required_checks.lower_target_xy_within_tolerance: true`
+- `board_pick_prerequisite.required_checks.lower_place_z_within_tolerance: true`
 - `board_pick_prerequisite.required_checks.stage_sequence_contract: true`
 - `training_authority_status: "development_rollouts_prerequisites_verified_not_policy_ready"`
 - `model_authority: "development_scaffold_not_reviewed"`

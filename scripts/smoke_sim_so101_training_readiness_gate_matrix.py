@@ -132,6 +132,15 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "board_pick_unexpected_stage_ids",
         "board_pick_stage_sequence_contract_errors",
         "board_pick_manual_piece_pose_after_reset_stage_ids",
+        "board_pick_lower_contact_retained_before_release",
+        "board_pick_lower_board_contact_observed_before_release",
+        "board_pick_lower_target_within_tolerance_before_release",
+        "board_pick_lower_place_z_within_tolerance_before_release",
+        "board_pick_lower_target_xy_error_m",
+        "board_pick_target_xy_tolerance_m",
+        "board_pick_lower_target_xy_within_tolerance",
+        "board_pick_lower_place_z_error_m",
+        "board_pick_lower_place_z_within_tolerance",
         "board_pick_final_place_z_error_m",
         "board_pick_place_z_tolerance_m",
         "board_pick_final_place_z_within_tolerance",
@@ -187,16 +196,34 @@ def reviewed_authority_blocked(summary_path: Path) -> dict[str, Any]:
 
 
 def board_pick_phase_evidence(verified: bool = True) -> list[dict[str, Any]]:
-    return [
-        {
+    rows: list[dict[str, Any]] = []
+    for phase_id in SO101_BOARD_PICK_REQUIRED_PHASE_IDS:
+        row = {
             "phase_id": phase_id,
             "stage": f"{phase_id}_contract_state_fixture",
             "ok": verified,
             "criteria": [f"{phase_id}_criterion_recorded"],
             "metrics": {f"{phase_id}_metric": 1.0 if verified else 0.0},
         }
-        for phase_id in SO101_BOARD_PICK_REQUIRED_PHASE_IDS
-    ]
+        if phase_id == "release_place":
+            row["criteria"] = [
+                "lower_contact_retained_before_release",
+                "lower_board_contact_observed_before_release",
+                "lower_target_xy_error_within_tolerance_before_release",
+                "lower_place_z_error_within_tolerance_before_release",
+                "final_board_contact_observed",
+                "release_contact_cleared_after_retreat",
+                "final_target_xy_error_within_tolerance",
+                "final_place_z_error_within_tolerance",
+            ]
+            row["metrics"] = {
+                "lower_contact_retained_before_release": verified,
+                "lower_board_contact_observed_before_release": verified,
+                "lower_target_xy_error_m": 0.002 if verified else 0.05,
+                "lower_place_z_error_m": 0.001 if verified else 0.02,
+            }
+        rows.append(row)
+    return rows
 
 
 def board_pick_state(
@@ -214,6 +241,8 @@ def board_pick_state(
 ) -> dict[str, Any]:
     final_target_xy_error_m = 0.002 if verified else 0.05
     target_xy_tolerance_m = 0.01
+    lower_target_xy_error_m = 0.002 if verified else 0.05
+    lower_place_z_error_m = 0.001 if verified else 0.02
     final_place_z_error_m = 0.001 if verified else 0.02
     place_z_tolerance_m = 0.005
     observed_stage_sequence = (
@@ -256,6 +285,12 @@ def board_pick_state(
         "lift_verified": verified,
         "board_contact_cleared_during_lift": verified,
         "transfer_verified": verified,
+        "lower_contact_retained_before_release": verified,
+        "lower_board_contact_observed_before_release": verified,
+        "lower_target_within_tolerance_before_release": verified,
+        "lower_place_z_within_tolerance_before_release": verified,
+        "lower_target_xy_error_m": lower_target_xy_error_m,
+        "lower_place_z_error_m": lower_place_z_error_m,
         "place_without_manual_piece_pose_verified": verified,
         "release_contact_cleared_after_retreat": verified,
         "final_board_contact_observed": verified,
@@ -2110,6 +2145,42 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             )
             add_error(
                 errors,
+                "board_pick_lower_contact_retained_before_release",
+                gate.get("board_pick_lower_contact_retained_before_release"),
+                True,
+            )
+            add_error(
+                errors,
+                "board_pick_lower_board_contact_observed_before_release",
+                gate.get("board_pick_lower_board_contact_observed_before_release"),
+                True,
+            )
+            add_error(
+                errors,
+                "board_pick_lower_target_within_tolerance_before_release",
+                gate.get("board_pick_lower_target_within_tolerance_before_release"),
+                True,
+            )
+            add_error(
+                errors,
+                "board_pick_lower_place_z_within_tolerance_before_release",
+                gate.get("board_pick_lower_place_z_within_tolerance_before_release"),
+                True,
+            )
+            add_error(
+                errors,
+                "board_pick_lower_target_xy_within_tolerance",
+                gate.get("board_pick_lower_target_xy_within_tolerance"),
+                True,
+            )
+            add_error(
+                errors,
+                "board_pick_lower_place_z_within_tolerance",
+                gate.get("board_pick_lower_place_z_within_tolerance"),
+                True,
+            )
+            add_error(
+                errors,
                 "board_pick_observed_stage_sequence",
                 gate.get("board_pick_observed_stage_sequence"),
                 list(SO101_BOARD_PICK_REQUIRED_STAGE_SEQUENCE),
@@ -2542,6 +2613,27 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "board_pick_manual_piece_pose_after_reset_stage_ids": gate.get(
             "board_pick_manual_piece_pose_after_reset_stage_ids"
+        ),
+        "board_pick_lower_contact_retained_before_release": gate.get(
+            "board_pick_lower_contact_retained_before_release"
+        ),
+        "board_pick_lower_board_contact_observed_before_release": gate.get(
+            "board_pick_lower_board_contact_observed_before_release"
+        ),
+        "board_pick_lower_target_within_tolerance_before_release": gate.get(
+            "board_pick_lower_target_within_tolerance_before_release"
+        ),
+        "board_pick_lower_place_z_within_tolerance_before_release": gate.get(
+            "board_pick_lower_place_z_within_tolerance_before_release"
+        ),
+        "board_pick_lower_target_xy_error_m": gate.get("board_pick_lower_target_xy_error_m"),
+        "board_pick_target_xy_tolerance_m": gate.get("board_pick_target_xy_tolerance_m"),
+        "board_pick_lower_target_xy_within_tolerance": gate.get(
+            "board_pick_lower_target_xy_within_tolerance"
+        ),
+        "board_pick_lower_place_z_error_m": gate.get("board_pick_lower_place_z_error_m"),
+        "board_pick_lower_place_z_within_tolerance": gate.get(
+            "board_pick_lower_place_z_within_tolerance"
         ),
         "board_pick_final_place_z_error_m": gate.get("board_pick_final_place_z_error_m"),
         "board_pick_place_z_tolerance_m": gate.get("board_pick_place_z_tolerance_m"),

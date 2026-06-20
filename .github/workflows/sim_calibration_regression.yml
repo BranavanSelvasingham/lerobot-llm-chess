@@ -2214,6 +2214,10 @@ jobs:
           assert verified["observations"]["status"] == "development_board_source_pick_place_verified", verified
           assert verified["observations"]["board_source_pick_place_verified"] is True, verified
           assert verified["observations"]["board_contact_cleared_during_lift"] is True, verified
+          assert verified["observations"]["lower_contact_retained_before_release"] is True, verified
+          assert verified["observations"]["lower_board_contact_observed_before_release"] is True, verified
+          assert verified["observations"]["lower_target_within_tolerance_before_release"] is True, verified
+          assert verified["observations"]["lower_place_z_within_tolerance_before_release"] is True, verified
           assert verified["observations"]["release_contact_cleared_after_retreat"] is True, verified
           assert verified["observations"]["final_board_contact_observed"] is True, verified
           assert verified["observations"]["final_target_within_tolerance"] is True, verified
@@ -2221,6 +2225,10 @@ jobs:
           assert place_gap["observations"]["status"] == "development_board_source_lift_verified_place_gap_recorded", place_gap
           assert place_gap["observations"]["lift_verified"] is True, place_gap
           assert place_gap["observations"]["board_contact_cleared_during_lift"] is True, place_gap
+          assert place_gap["observations"]["lower_contact_retained_before_release"] is True, place_gap
+          assert place_gap["observations"]["lower_board_contact_observed_before_release"] is True, place_gap
+          assert place_gap["observations"]["lower_target_within_tolerance_before_release"] is False, place_gap
+          assert place_gap["observations"]["lower_place_z_within_tolerance_before_release"] is True, place_gap
           assert place_gap["observations"]["place_without_manual_piece_pose_verified"] is False, place_gap
           assert place_gap["observations"]["release_contact_cleared_after_retreat"] is True, place_gap
           assert place_gap["observations"]["final_board_contact_observed"] is True, place_gap
@@ -2242,10 +2250,15 @@ jobs:
               assert case["observations"]["lift_verified"] is False, case
               assert case["observations"]["board_contact_cleared_during_lift"] is False, case
               assert case["observations"]["board_source_pick_place_verified"] is False, case
+              assert case["observations"]["lower_board_contact_observed_before_release"] is True, case
+              assert case["observations"]["lower_target_within_tolerance_before_release"] is False, case
+              assert case["observations"]["lower_place_z_within_tolerance_before_release"] is True, case
               assert case["observations"]["release_contact_cleared_after_retreat"] is True, case
               assert case["observations"]["final_board_contact_observed"] is True, case
               assert case["observations"]["final_target_within_tolerance"] is False, case
               assert case["observations"]["pick_place_failed_phase_ids"] == expected_pick_gap_phase_ids, case
+          assert by_case["alternate_source_d4_e5_records_pick_gap"]["observations"]["lower_contact_retained_before_release"] is False, by_case["alternate_source_d4_e5_records_pick_gap"]
+          assert by_case["reversed_source_e5_e4_records_pick_gap"]["observations"]["lower_contact_retained_before_release"] is True, by_case["reversed_source_e5_e4_records_pick_gap"]
           for case in summary["cases"]:
               obs = case["observations"]
               assert obs["model_authority"] == "development_scaffold_not_reviewed", case
@@ -2792,6 +2805,12 @@ jobs:
           assert ready["board_pick_stage_sequence_contract_ok"] is True, ready
           assert ready["board_pick_missing_stage_ids"] == [], ready
           assert ready["board_pick_manual_piece_pose_after_reset_stage_ids"] == [], ready
+          assert ready["board_pick_lower_contact_retained_before_release"] is True, ready
+          assert ready["board_pick_lower_board_contact_observed_before_release"] is True, ready
+          assert ready["board_pick_lower_target_within_tolerance_before_release"] is True, ready
+          assert ready["board_pick_lower_place_z_within_tolerance_before_release"] is True, ready
+          assert ready["board_pick_lower_target_xy_within_tolerance"] is True, ready
+          assert ready["board_pick_lower_place_z_within_tolerance"] is True, ready
           assert ready["board_pick_final_place_z_within_tolerance"] is True, ready
           assert ready["rollout_status"] == "ok", ready
           assert ready["rollout_training_authority_status"] == "reviewed_policy_training_rollouts_ready", ready
@@ -4079,6 +4098,12 @@ jobs:
           assert so101_mujoco_board_pick_probe["lift_verified"] is True, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["board_contact_cleared_during_lift"] is True, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["transfer_verified"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["lower_contact_retained_before_release"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["lower_board_contact_observed_before_release"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["lower_target_within_tolerance_before_release"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["lower_place_z_within_tolerance_before_release"] is True, so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["lower_target_xy_error_m"] <= so101_mujoco_board_pick_probe["target_xy_tolerance_m"], so101_mujoco_board_pick_probe
+          assert so101_mujoco_board_pick_probe["lower_place_z_error_m"] <= so101_mujoco_board_pick_probe["place_z_tolerance_m"], so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["place_without_manual_piece_pose_verified"] is True, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["board_source_pick_place_verified"] is True, so101_mujoco_board_pick_probe
           assert so101_mujoco_board_pick_probe["release_contact_cleared_after_retreat"] is True, so101_mujoco_board_pick_probe
@@ -4145,6 +4170,12 @@ jobs:
           assert board_pick_prerequisite["ok"] is True, board_pick_prerequisite
           assert board_pick_prerequisite["status"] == "development_board_pick_prerequisite_verified", board_pick_prerequisite
           assert board_pick_prerequisite["board_source_pick_place_verified"] is True, board_pick_prerequisite
+          assert board_pick_prerequisite["lower_contact_retained_before_release"] is True, board_pick_prerequisite
+          assert board_pick_prerequisite["lower_board_contact_observed_before_release"] is True, board_pick_prerequisite
+          assert board_pick_prerequisite["lower_target_within_tolerance_before_release"] is True, board_pick_prerequisite
+          assert board_pick_prerequisite["lower_place_z_within_tolerance_before_release"] is True, board_pick_prerequisite
+          assert board_pick_prerequisite["lower_target_xy_error_m"] <= board_pick_prerequisite["target_xy_tolerance_m"], board_pick_prerequisite
+          assert board_pick_prerequisite["lower_place_z_error_m"] <= board_pick_prerequisite["place_z_tolerance_m"], board_pick_prerequisite
           assert board_pick_prerequisite["manual_piece_pose_used_after_reset"] is False, board_pick_prerequisite
           assert board_pick_prerequisite["stage_sequence_contract_ok"] is True, board_pick_prerequisite
           assert board_pick_prerequisite["stage_sequence_contract_errors"] == [], board_pick_prerequisite
@@ -4222,6 +4253,14 @@ jobs:
           assert training_readiness_gate["board_pick_missing_stage_ids"] == [], training_readiness_gate
           assert training_readiness_gate["board_pick_unexpected_stage_ids"] == [], training_readiness_gate
           assert training_readiness_gate["board_pick_manual_piece_pose_after_reset_stage_ids"] == [], training_readiness_gate
+          assert training_readiness_gate["board_pick_lower_contact_retained_before_release"] is True, training_readiness_gate
+          assert training_readiness_gate["board_pick_lower_board_contact_observed_before_release"] is True, training_readiness_gate
+          assert training_readiness_gate["board_pick_lower_target_within_tolerance_before_release"] is True, training_readiness_gate
+          assert training_readiness_gate["board_pick_lower_place_z_within_tolerance_before_release"] is True, training_readiness_gate
+          assert training_readiness_gate["board_pick_lower_target_xy_error_m"] <= training_readiness_gate["board_pick_target_xy_tolerance_m"], training_readiness_gate
+          assert training_readiness_gate["board_pick_lower_target_xy_within_tolerance"] is True, training_readiness_gate
+          assert training_readiness_gate["board_pick_lower_place_z_error_m"] <= training_readiness_gate["board_pick_place_z_tolerance_m"], training_readiness_gate
+          assert training_readiness_gate["board_pick_lower_place_z_within_tolerance"] is True, training_readiness_gate
           assert training_readiness_gate["board_pick_final_place_z_error_m"] <= training_readiness_gate["board_pick_place_z_tolerance_m"], training_readiness_gate
           assert training_readiness_gate["board_pick_final_place_z_within_tolerance"] is True, training_readiness_gate
           assert isinstance(training_readiness_gate["rollout_policy_training_authority_ready"], bool), training_readiness_gate

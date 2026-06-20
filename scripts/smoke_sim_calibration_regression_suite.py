@@ -3463,6 +3463,12 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
         "transfer_xy_threshold_m",
         "transfer_target_xy_error_m",
         "transfer_source_to_target_progress_m",
+        "lower_contact_retained_before_release",
+        "lower_board_contact_observed_before_release",
+        "lower_target_within_tolerance_before_release",
+        "lower_place_z_within_tolerance_before_release",
+        "lower_target_xy_error_m",
+        "lower_place_z_error_m",
         "place_without_manual_piece_pose_verified",
         "lift_place_physics_verified",
         "board_source_pick_place_verified",
@@ -6030,6 +6036,25 @@ def so101_board_pick_phase_evidence_ready(board_pick: dict[str, Any]) -> bool:
             return False
         if not isinstance(row.get("metrics"), dict) or not row["metrics"]:
             return False
+        if expected_phase_id == "release_place":
+            criteria = row.get("criteria")
+            metrics = row.get("metrics")
+            for expected_criterion in (
+                "lower_contact_retained_before_release",
+                "lower_board_contact_observed_before_release",
+                "lower_target_xy_error_within_tolerance_before_release",
+                "lower_place_z_error_within_tolerance_before_release",
+            ):
+                if expected_criterion not in criteria:
+                    return False
+            for expected_metric in (
+                "lower_contact_retained_before_release",
+                "lower_board_contact_observed_before_release",
+                "lower_target_xy_error_m",
+                "lower_place_z_error_m",
+            ):
+                if expected_metric not in metrics:
+                    return False
     return True
 
 
@@ -6058,14 +6083,26 @@ def so101_board_pick_stage_sequence_ready(board_pick: dict[str, Any]) -> bool:
 
 
 def so101_board_pick_detailed_evidence_ready(board_pick: dict[str, Any]) -> bool:
+    lower_target_xy_error_m = _json_number(board_pick.get("lower_target_xy_error_m"))
     final_target_xy_error_m = _json_number(board_pick.get("final_target_xy_error_m"))
     target_xy_tolerance_m = _json_number(board_pick.get("target_xy_tolerance_m"))
+    lower_place_z_error_m = _json_number(board_pick.get("lower_place_z_error_m"))
     final_place_z_error_m = _json_number(board_pick.get("final_place_z_error_m"))
     place_z_tolerance_m = _json_number(board_pick.get("place_z_tolerance_m"))
+    lower_target_within_tolerance = (
+        lower_target_xy_error_m is not None
+        and target_xy_tolerance_m is not None
+        and lower_target_xy_error_m <= target_xy_tolerance_m
+    )
     final_target_within_tolerance = (
         final_target_xy_error_m is not None
         and target_xy_tolerance_m is not None
         and final_target_xy_error_m <= target_xy_tolerance_m
+    )
+    lower_place_z_within_tolerance = (
+        lower_place_z_error_m is not None
+        and place_z_tolerance_m is not None
+        and lower_place_z_error_m <= place_z_tolerance_m
     )
     final_place_z_within_tolerance = (
         final_place_z_error_m is not None
@@ -6079,10 +6116,16 @@ def so101_board_pick_detailed_evidence_ready(board_pick: dict[str, Any]) -> bool
         and board_pick.get("lift_verified") is True
         and board_pick.get("board_contact_cleared_during_lift") is True
         and board_pick.get("transfer_verified") is True
+        and board_pick.get("lower_contact_retained_before_release") is True
+        and board_pick.get("lower_board_contact_observed_before_release") is True
+        and board_pick.get("lower_target_within_tolerance_before_release") is True
+        and board_pick.get("lower_place_z_within_tolerance_before_release") is True
         and board_pick.get("place_without_manual_piece_pose_verified") is True
         and board_pick.get("release_contact_cleared_after_retreat") is True
         and board_pick.get("final_board_contact_observed") is True
+        and lower_target_within_tolerance
         and final_target_within_tolerance
+        and lower_place_z_within_tolerance
         and final_place_z_within_tolerance
         and so101_board_pick_phase_evidence_ready(board_pick)
         and so101_board_pick_stage_sequence_ready(board_pick)
@@ -7039,6 +7082,20 @@ def so101_training_readiness_gate_section(
             "board_contact_cleared_during_lift"
         ),
         "board_pick_transfer_verified": board_pick.get("transfer_verified"),
+        "board_pick_lower_contact_retained_before_release": board_pick.get(
+            "lower_contact_retained_before_release"
+        ),
+        "board_pick_lower_board_contact_observed_before_release": board_pick.get(
+            "lower_board_contact_observed_before_release"
+        ),
+        "board_pick_lower_target_within_tolerance_before_release": board_pick.get(
+            "lower_target_within_tolerance_before_release"
+        ),
+        "board_pick_lower_place_z_within_tolerance_before_release": board_pick.get(
+            "lower_place_z_within_tolerance_before_release"
+        ),
+        "board_pick_lower_target_xy_error_m": board_pick.get("lower_target_xy_error_m"),
+        "board_pick_lower_place_z_error_m": board_pick.get("lower_place_z_error_m"),
         "board_pick_place_without_manual_piece_pose_verified": board_pick.get(
             "place_without_manual_piece_pose_verified"
         ),
@@ -7050,8 +7107,20 @@ def so101_training_readiness_gate_section(
         ),
         "board_pick_final_target_xy_error_m": board_pick.get("final_target_xy_error_m"),
         "board_pick_target_xy_tolerance_m": board_pick.get("target_xy_tolerance_m"),
+        "board_pick_lower_target_xy_within_tolerance": (
+            _json_number(board_pick.get("lower_target_xy_error_m")) is not None
+            and _json_number(board_pick.get("target_xy_tolerance_m")) is not None
+            and _json_number(board_pick.get("lower_target_xy_error_m"))
+            <= _json_number(board_pick.get("target_xy_tolerance_m"))
+        ),
         "board_pick_final_place_z_error_m": board_pick.get("final_place_z_error_m"),
         "board_pick_place_z_tolerance_m": board_pick.get("place_z_tolerance_m"),
+        "board_pick_lower_place_z_within_tolerance": (
+            _json_number(board_pick.get("lower_place_z_error_m")) is not None
+            and _json_number(board_pick.get("place_z_tolerance_m")) is not None
+            and _json_number(board_pick.get("lower_place_z_error_m"))
+            <= _json_number(board_pick.get("place_z_tolerance_m"))
+        ),
         "board_pick_final_place_z_within_tolerance": (
             _json_number(board_pick.get("final_place_z_error_m")) is not None
             and _json_number(board_pick.get("place_z_tolerance_m")) is not None

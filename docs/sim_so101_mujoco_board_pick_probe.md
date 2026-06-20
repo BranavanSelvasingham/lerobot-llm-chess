@@ -32,8 +32,10 @@ closed with summary, CSV, and README artifacts while leaving model XML and
 manifest files ungenerated.
 The matrix explicitly exports and checks the contact path booleans for
 board-contact clearance during lift, release-contact clearance after retreat,
-final board contact, and final target XY tolerance so downstream rollout gates
-do not have to infer those conditions from one aggregate pick/place flag.
+lower-before-release gripper contact, lower-before-release board contact,
+lower target XY/Z tolerance, final board contact, and final target XY tolerance
+so downstream rollout gates do not have to infer those conditions from one
+aggregate pick/place flag.
 It also checks the machine-readable phase contract:
 `pick_place_phase_evidence`, `pick_place_phase_ids`,
 `pick_place_failed_phase_ids`, `pick_place_phase_count`, and
@@ -63,11 +65,12 @@ the piece freejoint after the initial reset.
 Expected current status is
 `development_board_source_pick_place_verified`: the source pick starts at the
 source square, two-finger contact is visible after close/settle, the piece
-lifts while board contact clears, the transfer moves toward the target, the
+lifts while board contact clears, the transfer moves toward the target, gripper
+contact is still retained while lowering onto the target before release, the
 piece lands back on the board within the target XY tolerance, and gripper
-contact clears after retreat. The placement check now also records
-`final_place_z_error_m` against `place_z_tolerance_m`, so the release/place
-phase is not only an XY check.
+contact clears after retreat. The placement check also records
+`lower_place_z_error_m` and `final_place_z_error_m` against
+`place_z_tolerance_m`, so the release/place phase is not only an XY check.
 
 This is still development evidence, not physical SO-101 grasp truth. It uses
 the generated `development_scaffold_not_reviewed` MJCF, an enlarged/lightened

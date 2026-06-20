@@ -386,6 +386,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- Lift verified: `{summary.get('lift_verified')}`",
         f"- Board contact cleared during lift: `{summary.get('board_contact_cleared_during_lift')}`",
         f"- Transfer verified: `{summary.get('transfer_verified')}`",
+        f"- Lower contact retained before release: `{summary.get('lower_contact_retained_before_release')}`",
         f"- Place verified: `{summary.get('place_without_manual_piece_pose_verified')}`",
         f"- All required phases verified: `{summary.get('pick_place_all_required_phases_verified')}`",
         f"- Failed phase IDs: `{summary.get('pick_place_failed_phase_ids')}`",
@@ -431,6 +432,12 @@ def missing_dependency_summary(args: argparse.Namespace, deps: dict[str, bool], 
         "transfer_verified": False,
         "place_without_manual_piece_pose_verified": False,
         "board_source_pick_place_verified": False,
+        "lower_contact_retained_before_release": False,
+        "lower_board_contact_observed_before_release": False,
+        "lower_target_within_tolerance_before_release": False,
+        "lower_place_z_within_tolerance_before_release": False,
+        "lower_target_xy_error_m": None,
+        "lower_place_z_error_m": None,
         "release_contact_cleared_after_retreat": False,
         "final_board_contact_observed": False,
         "manual_piece_pose_used_after_reset": False,
@@ -499,6 +506,12 @@ def invalid_task_summary(
         "transfer_verified": False,
         "place_without_manual_piece_pose_verified": False,
         "board_source_pick_place_verified": False,
+        "lower_contact_retained_before_release": False,
+        "lower_board_contact_observed_before_release": False,
+        "lower_target_within_tolerance_before_release": False,
+        "lower_place_z_within_tolerance_before_release": False,
+        "lower_target_xy_error_m": None,
+        "lower_place_z_error_m": None,
         "release_contact_cleared_after_retreat": False,
         "final_board_contact_observed": False,
         "manual_piece_pose_used_after_reset": False,
@@ -804,6 +817,7 @@ def main() -> int:
     close_settle = row_by_stage(rows, "close_on_source_piece_after_settle")
     lift = row_by_stage(rows, "lift_from_source_without_manual_piece_pose")
     transfer = row_by_stage(rows, "transfer_to_target_without_manual_piece_pose")
+    lower = row_by_stage(rows, "lower_to_target_without_manual_piece_pose")
     final = row_by_stage(rows, "retreat_after_release_without_manual_piece_pose")
     source_pick_started_at_source = (
         source_reset["source_xy_error_m"] <= SOURCE_PICK_XY_TOLERANCE_M
@@ -826,12 +840,26 @@ def main() -> int:
         and transfer["target_xy_error_m"] < close_settle["target_xy_error_m"]
         and transfer["board_contact_count"] == 0
     )
+    lower_target_xy_error_m = float(lower["target_xy_error_m"])
+    lower_place_z_error_m = abs(float(lower["piece_z"]) - expected_place_z)
+    lower_contact_retained_before_release = lower["gripper_contact_count"] > 0
+    lower_board_contact_observed_before_release = lower["board_contact_count"] > 0
+    lower_target_within_tolerance_before_release = (
+        lower_target_xy_error_m <= TARGET_XY_TOLERANCE_M
+    )
+    lower_place_z_within_tolerance_before_release = (
+        lower_place_z_error_m <= PLACE_Z_TOLERANCE_M
+    )
     final_target_xy_error_m = float(final["target_xy_error_m"])
     final_place_z_error_m = abs(float(final["piece_z"]) - expected_place_z)
     release_contact_cleared_after_retreat = final["gripper_contact_count"] == 0
     final_board_contact_observed = final["board_contact_count"] > 0
     place_without_manual_piece_pose_verified = (
-        final_board_contact_observed
+        lower_contact_retained_before_release
+        and lower_board_contact_observed_before_release
+        and lower_target_within_tolerance_before_release
+        and lower_place_z_within_tolerance_before_release
+        and final_board_contact_observed
         and release_contact_cleared_after_retreat
         and final_target_xy_error_m <= TARGET_XY_TOLERANCE_M
         and final_place_z_error_m <= PLACE_Z_TOLERANCE_M
@@ -905,12 +933,20 @@ def main() -> int:
             stage="retreat_after_release_without_manual_piece_pose",
             ok=place_without_manual_piece_pose_verified,
             criteria=[
+                "lower_contact_retained_before_release",
+                "lower_board_contact_observed_before_release",
+                "lower_target_xy_error_within_tolerance_before_release",
+                "lower_place_z_error_within_tolerance_before_release",
                 "final_board_contact_observed",
                 "release_contact_cleared_after_retreat",
                 "final_target_xy_error_within_tolerance",
                 "final_place_z_error_within_tolerance",
             ],
             metrics={
+                "lower_contact_retained_before_release": lower_contact_retained_before_release,
+                "lower_board_contact_observed_before_release": lower_board_contact_observed_before_release,
+                "lower_target_xy_error_m": lower_target_xy_error_m,
+                "lower_place_z_error_m": lower_place_z_error_m,
                 "final_board_contact_observed": final_board_contact_observed,
                 "release_contact_cleared_after_retreat": release_contact_cleared_after_retreat,
                 "final_target_xy_error_m": final_target_xy_error_m,
@@ -989,6 +1025,12 @@ def main() -> int:
         "transfer_verified": transfer_verified,
         "transfer_target_xy_error_m": transfer["target_xy_error_m"],
         "transfer_source_to_target_progress_m": transfer["source_to_target_progress_m"],
+        "lower_contact_retained_before_release": lower_contact_retained_before_release,
+        "lower_board_contact_observed_before_release": lower_board_contact_observed_before_release,
+        "lower_target_within_tolerance_before_release": lower_target_within_tolerance_before_release,
+        "lower_place_z_within_tolerance_before_release": lower_place_z_within_tolerance_before_release,
+        "lower_target_xy_error_m": lower_target_xy_error_m,
+        "lower_place_z_error_m": lower_place_z_error_m,
         "place_without_manual_piece_pose_verified": place_without_manual_piece_pose_verified,
         "board_source_pick_place_verified": board_source_pick_place_verified,
         "release_contact_cleared_after_retreat": release_contact_cleared_after_retreat,

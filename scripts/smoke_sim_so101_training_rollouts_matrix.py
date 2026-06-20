@@ -100,6 +100,16 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "development_prerequisites_satisfied",
         "board_pick_prerequisite_status",
         "board_pick_failed_checks",
+        "board_pick_lower_contact_retained_before_release",
+        "board_pick_lower_board_contact_observed_before_release",
+        "board_pick_lower_target_within_tolerance_before_release",
+        "board_pick_lower_place_z_within_tolerance_before_release",
+        "board_pick_lower_target_xy_error_m",
+        "board_pick_lower_place_z_error_m",
+        "board_pick_final_target_xy_error_m",
+        "board_pick_target_xy_tolerance_m",
+        "board_pick_final_place_z_error_m",
+        "board_pick_place_z_tolerance_m",
         "ready_for_policy_training",
         "policy_authority",
         "rollout_use",
@@ -655,6 +665,20 @@ def summarize_case(
         "board_pick_prerequisite_status": board_pick.get("status"),
         "board_pick_prerequisite_ok": board_pick.get("ok"),
         "board_pick_failed_checks": board_pick.get("failed_checks"),
+        "board_pick_lower_contact_retained_before_release": board_pick.get(
+            "lower_contact_retained_before_release"
+        ),
+        "board_pick_lower_board_contact_observed_before_release": board_pick.get(
+            "lower_board_contact_observed_before_release"
+        ),
+        "board_pick_lower_target_within_tolerance_before_release": board_pick.get(
+            "lower_target_within_tolerance_before_release"
+        ),
+        "board_pick_lower_place_z_within_tolerance_before_release": board_pick.get(
+            "lower_place_z_within_tolerance_before_release"
+        ),
+        "board_pick_lower_target_xy_error_m": board_pick.get("lower_target_xy_error_m"),
+        "board_pick_lower_place_z_error_m": board_pick.get("lower_place_z_error_m"),
         "board_pick_final_target_xy_error_m": board_pick.get("final_target_xy_error_m"),
         "board_pick_target_xy_tolerance_m": board_pick.get("target_xy_tolerance_m"),
         "board_pick_final_place_z_error_m": board_pick.get("final_place_z_error_m"),
@@ -836,6 +860,20 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "development_prerequisites_satisfied": observations.get("development_prerequisites_satisfied"),
         "board_pick_prerequisite_status": observations.get("board_pick_prerequisite_status"),
         "board_pick_failed_checks": observations.get("board_pick_failed_checks"),
+        "board_pick_lower_contact_retained_before_release": observations.get(
+            "board_pick_lower_contact_retained_before_release"
+        ),
+        "board_pick_lower_board_contact_observed_before_release": observations.get(
+            "board_pick_lower_board_contact_observed_before_release"
+        ),
+        "board_pick_lower_target_within_tolerance_before_release": observations.get(
+            "board_pick_lower_target_within_tolerance_before_release"
+        ),
+        "board_pick_lower_place_z_within_tolerance_before_release": observations.get(
+            "board_pick_lower_place_z_within_tolerance_before_release"
+        ),
+        "board_pick_lower_target_xy_error_m": observations.get("board_pick_lower_target_xy_error_m"),
+        "board_pick_lower_place_z_error_m": observations.get("board_pick_lower_place_z_error_m"),
         "board_pick_final_target_xy_error_m": observations.get("board_pick_final_target_xy_error_m"),
         "board_pick_target_xy_tolerance_m": observations.get("board_pick_target_xy_tolerance_m"),
         "board_pick_final_place_z_error_m": observations.get("board_pick_final_place_z_error_m"),
