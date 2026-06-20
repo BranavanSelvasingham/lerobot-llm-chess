@@ -4011,6 +4011,25 @@ jobs:
           assert len(source_review_requirements["requirements"]) == source_inventory["source_review_requirements_requirement_count"], source_review_requirements
           assert source_inventory["candidate_count"] >= source_inventory["likely_candidate_count"], source_inventory
           assert source_inventory["likely_candidate_count"] >= source_inventory["direct_contract_candidate_count"], source_inventory
+          assert source_inventory["known_public_candidate_source_count"] >= 1, source_inventory
+          known_source = next(
+              source
+              for source in source_inventory["known_public_candidate_sources"]
+              if source["source_id"] == "therobotstudio_soarm100_simulation_so101"
+          )
+          known_operator_intake = known_source["operator_intake"]
+          for command_template_key in (
+              "resolve_pin_command_template",
+              "fetch_command_template",
+              "checkout_command_template",
+              "candidate_intake_command_template",
+              "scan_command_template",
+              "vendor_lock_command_template",
+              "probe_command_template",
+              "reviewed_source_inventory_command_template",
+          ):
+              assert isinstance(known_operator_intake.get(command_template_key), list), known_operator_intake
+              assert known_operator_intake[command_template_key], known_operator_intake
           source_configuration = source_inventory["source_configuration"]
           contract_configuration = summary["so101_model_contract_config"]
           assert source_configuration["ik_model_path_is_authority"] is False, source_configuration

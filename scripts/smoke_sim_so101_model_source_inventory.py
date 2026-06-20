@@ -175,6 +175,41 @@ KNOWN_PUBLIC_SO101_CANDIDATE_SOURCES = (
                 "Resolve and record an immutable commit SHA before scanning or vendoring "
                 "Simulation/SO101."
             ),
+            "resolve_pin_command_template": [
+                "git",
+                "ls-remote",
+                "https://github.com/TheRobotStudio/SO-ARM100.git",
+                "refs/heads/main",
+            ],
+            "fetch_command_template": [
+                "git",
+                "-C",
+                "<local-SO-ARM100-checkout>",
+                "fetch",
+                "--depth=1",
+                "origin",
+                "<immutable-upstream-commit-sha>",
+            ],
+            "checkout_command_template": [
+                "git",
+                "-C",
+                "<local-SO-ARM100-checkout>",
+                "checkout",
+                "--detach",
+                "<immutable-upstream-commit-sha>",
+            ],
+            "candidate_intake_command_template": [
+                "python",
+                "scripts/smoke_sim_so101_public_candidate_intake.py",
+                "--source-root",
+                "<local-SO-ARM100-checkout>/Simulation/SO101",
+                "--upstream-commit",
+                "<immutable-upstream-commit-sha>",
+                "--operator-intake-decision",
+                "external_pinned_source_root",
+                "--output-dir",
+                "/private/tmp/lerobot_sim/so101_public_candidate_intake_external",
+            ],
             "scan_command_template": [
                 "python",
                 "scripts/smoke_sim_so101_model_source_inventory.py",
@@ -182,6 +217,13 @@ KNOWN_PUBLIC_SO101_CANDIDATE_SOURCES = (
                 "<local-SO-ARM100-checkout>/Simulation/SO101",
                 "--output-dir",
                 "/private/tmp/lerobot_sim/soarm100_so101_source_inventory_candidate",
+            ],
+            "vendor_lock_command_template": [
+                "rsync",
+                "-a",
+                "--delete",
+                "<local-SO-ARM100-checkout>/Simulation/SO101/",
+                "<repo-vendored-SO101-asset-root>/",
             ],
             "probe_command_template": [
                 "python",
@@ -192,6 +234,30 @@ KNOWN_PUBLIC_SO101_CANDIDATE_SOURCES = (
                 "<local-SO-ARM100-checkout>/Simulation/SO101",
                 "--output-dir",
                 "/private/tmp/lerobot_sim/soarm100_so101_bundle_probe_candidate",
+            ],
+            "reviewed_source_inventory_command_template": [
+                "python",
+                "scripts/smoke_sim_so101_model_source_inventory.py",
+                "--root",
+                "<local-SO-ARM100-checkout>/Simulation/SO101",
+                "--authoritative-path",
+                "<local-SO-ARM100-checkout>/Simulation/SO101/so101_new_calib.urdf",
+                "--authority-source-reference",
+                "https://github.com/TheRobotStudio/SO-ARM100/tree/<immutable-upstream-commit-sha>/Simulation/SO101",
+                "--authority-license-basis",
+                "<reviewed-license-or-redistribution-basis>",
+                "--authority-review-scope",
+                "model_identity",
+                "--authority-review-scope",
+                "provenance",
+                "--authority-review-scope",
+                "license",
+                "--authority-reviewed-by",
+                "<reviewer-or-team>",
+                "--authority-review-id",
+                "<stable-source-authority-review-artifact>",
+                "--output-dir",
+                "/private/tmp/lerobot_sim/soarm100_so101_source_inventory_reviewed",
             ],
         },
     },
@@ -2493,6 +2559,17 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         notes = source.get("source_notes") or []
         if notes:
             lines.append(f"  - Notes: {'; '.join(str(note) for note in notes)}")
+        operator_intake = source.get("operator_intake")
+        operator_intake = operator_intake if isinstance(operator_intake, dict) else {}
+        command_template_items = [
+            (key, value)
+            for key, value in operator_intake.items()
+            if key.endswith("_command_template") and isinstance(value, list)
+        ]
+        if command_template_items:
+            lines.append("  - Operator command templates:")
+            for key, value in command_template_items:
+                lines.append(f"    - `{key}`: `{' '.join(str(part) for part in value)}`")
     lines.extend(
         [
             "",
