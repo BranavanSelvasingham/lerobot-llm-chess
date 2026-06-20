@@ -2580,6 +2580,8 @@ def collect_so101_model_bundle_manifest_artifacts(
         "review_requirements_development_fixture_evidence_not_physical_so101_truth": bundle.get(
             "review_requirements_development_fixture_evidence_not_physical_so101_truth"
         ),
+        "review_requirements_json_path": artifact_paths.get("review_requirements_json"),
+        "review_requirements_csv_path": artifact_paths.get("review_requirements_csv"),
         "bundle_intake_status": bundle.get("bundle_intake_status"),
         "bundle_intake_model_authority": bundle.get("bundle_intake_model_authority"),
         "bundle_intake_action_count": bundle.get("bundle_intake_action_count"),
@@ -2592,6 +2594,12 @@ def collect_so101_model_bundle_manifest_artifacts(
         ),
         "bundle_intake_development_fixture_evidence_not_physical_so101_truth": bundle.get(
             "bundle_intake_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "bundle_intake_checklist_json_path": artifact_paths.get(
+            "bundle_intake_checklist_json"
+        ),
+        "bundle_intake_checklist_csv_path": artifact_paths.get(
+            "bundle_intake_checklist_csv"
         ),
         "reviewed_manifest_template_status": bundle.get(
             "reviewed_manifest_template_status"
@@ -2607,6 +2615,9 @@ def collect_so101_model_bundle_manifest_artifacts(
         ),
         "reviewed_manifest_template_development_fixture_evidence_not_physical_so101_truth": bundle.get(
             "reviewed_manifest_template_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "reviewed_manifest_template_json_path": artifact_paths.get(
+            "reviewed_manifest_template_json"
         ),
         "authority_review_evidence_invalid_fields": bundle.get(
             "authority_review_evidence_invalid_fields"

@@ -5184,6 +5184,16 @@ jobs:
               assert metrics.get("review_requirements_physical_so101_truth_claimed") is False, metrics
               assert metrics.get("review_requirements_development_fixture_evidence_not_physical_so101_truth") is True, metrics
               assert metrics.get("review_requirements_requirement_count") == len(metrics.get("review_requirements_requirement_ids") or []), metrics
+              assert isinstance(metrics.get("review_requirements_json_path"), str), metrics
+              assert isinstance(metrics.get("review_requirements_csv_path"), str), metrics
+              assert Path(metrics.get("review_requirements_json_path")).is_file(), metrics
+              assert Path(metrics.get("review_requirements_csv_path")).is_file(), metrics
+              assert isinstance(metrics.get("bundle_intake_checklist_json_path"), str), metrics
+              assert isinstance(metrics.get("bundle_intake_checklist_csv_path"), str), metrics
+              assert Path(metrics.get("bundle_intake_checklist_json_path")).is_file(), metrics
+              assert Path(metrics.get("bundle_intake_checklist_csv_path")).is_file(), metrics
+              assert isinstance(metrics.get("reviewed_manifest_template_json_path"), str), metrics
+              assert Path(metrics.get("reviewed_manifest_template_json_path")).is_file(), metrics
               assert metrics.get("authority_review_evidence_invalid_fields") in (None, []) or isinstance(metrics.get("authority_review_evidence_invalid_fields"), list), metrics
               assert metrics.get("authority_required_review_scope_ids") in (None, []) or isinstance(metrics.get("authority_required_review_scope_ids"), list), metrics
               assert metrics.get("authority_supplied_review_scope_ids") in (None, []) or isinstance(metrics.get("authority_supplied_review_scope_ids"), list), metrics
