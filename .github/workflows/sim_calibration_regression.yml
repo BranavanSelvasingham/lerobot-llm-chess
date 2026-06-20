@@ -88,6 +88,7 @@ env:
   PYTHON_VERSION: "3.12"
   CALIBRATION_REGRESSION_OUTPUT_DIR: "/tmp/lerobot_sim/calibration_regression_suite"
   SO101_SOURCE_AUTHORITY_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_source_authority_matrix"
+  SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_public_candidate_intake_matrix"
   SO101_MODEL_BUNDLE_PROBE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_model_bundle_probe_matrix"
   SO101_MODEL_BUNDLE_MANIFEST_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_model_bundle_manifest_matrix"
   SO101_REVIEWED_AUTHORITY_GATE_MATRIX_OUTPUT_DIR: "/tmp/lerobot_sim/so101_reviewed_authority_gate_matrix"
@@ -342,6 +343,62 @@ jobs:
           for relative_path in (
               "so101_source_authority_matrix_summary.json",
               "so101_source_authority_matrix_cases.csv",
+              "README.md",
+          ):
+              assert (summary_path.parent / relative_path).is_file(), relative_path
+          PY
+
+      - name: Run SO-101 public candidate intake matrix
+        run: |
+          python scripts/smoke_sim_so101_public_candidate_intake_matrix.py \
+            --output-dir "${SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_OUTPUT_DIR}" \
+            --python "$(python -c 'import sys; print(sys.executable)')"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          summary_path = Path(os.environ["SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_OUTPUT_DIR"]) / "so101_public_candidate_intake_matrix_summary.json"
+          summary = json.loads(summary_path.read_text())
+          assert summary["ok"] is True, summary
+          assert summary["status"] == "ok", summary
+          assert summary["model_authority"] == "public_candidate_intake_matrix_not_authority", summary
+          assert summary["observed_evidence_is_physical_so101_authority"] is False, summary
+          assert summary["ready_for_model_backed_ik"] is False, summary
+          assert summary["ready_for_policy_training"] is False, summary
+          assert summary["hardware_skipped"] is True, summary
+          assert summary["gui_skipped"] is True, summary
+          assert summary["openai_skipped"] is True, summary
+          assert summary["network_skipped"] is True, summary
+          assert summary["case_ids"] == [
+              "source_root_not_supplied",
+              "source_root_unavailable",
+              "candidate_intake_incomplete",
+              "candidate_intake_checked",
+          ], summary["case_ids"]
+          assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
+          by_case = {case["case_id"]: case for case in summary["cases"]}
+          no_root = by_case["source_root_not_supplied"]
+          assert no_root["status"] == "source_root_not_supplied", no_root
+          assert "pin_upstream_soarm100_commit" in no_root["next_required_action_ids"], no_root
+          missing_root = by_case["source_root_unavailable"]
+          assert missing_root["status"] == "source_root_unavailable", missing_root
+          assert "pin_upstream_soarm100_commit" not in missing_root["next_required_action_ids"], missing_root
+          incomplete = by_case["candidate_intake_incomplete"]
+          assert incomplete["status"] == "candidate_intake_incomplete", incomplete
+          assert "assets/wrist_roll_pitch_so101_v2.stl" in incomplete["missing_expected_relative_paths"], incomplete
+          complete = by_case["candidate_intake_checked"]
+          assert complete["status"] == "candidate_intake_checked", complete
+          assert complete["missing_expected_relative_paths"] == [], complete
+          assert complete["model_present"] is True, complete
+          assert complete["model_sha256_observed"], complete
+          for case in summary["cases"]:
+              assert case["model_authority"] == "public_candidate_intake_not_authority", case
+              assert case["ready_for_model_backed_ik"] is False, case
+              assert case["observed_evidence_is_physical_so101_authority"] is False, case
+          for relative_path in (
+              "so101_public_candidate_intake_matrix_summary.json",
+              "so101_public_candidate_intake_matrix_cases.csv",
               "README.md",
           ):
               assert (summary_path.parent / relative_path).is_file(), relative_path
@@ -6536,6 +6593,7 @@ jobs:
           path: |
             ${{ env.CALIBRATION_REGRESSION_OUTPUT_DIR }}
             ${{ env.SO101_SOURCE_AUTHORITY_MATRIX_OUTPUT_DIR }}
+            ${{ env.SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_MODEL_BUNDLE_PROBE_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_MODEL_BUNDLE_MANIFEST_MATRIX_OUTPUT_DIR }}
             ${{ env.SO101_REVIEWED_AUTHORITY_GATE_MATRIX_OUTPUT_DIR }}

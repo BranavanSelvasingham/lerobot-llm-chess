@@ -203,6 +203,20 @@ only. Its manifest draft uses `model_sha256_observed` rather than a reviewed
 `ready_for_model_backed_ik: false`; copy those observed values into the real
 bundle manifest only after review.
 
+Use the focused matrix when changing the public-candidate intake smoke:
+
+```bash
+python scripts/smoke_sim_so101_public_candidate_intake_matrix.py \
+  --output-dir /private/tmp/lerobot_sim/so101_public_candidate_intake_matrix \
+  --python python
+```
+
+The matrix creates synthetic SO-ARM100-shaped folders and verifies no-root,
+missing-root, incomplete-candidate, and complete-candidate cases. All cases must
+keep `public_candidate_intake_not_authority`, false physical SO-101 authority,
+and `ready_for_model_backed_ik: false`; the complete fixture only proves digest
+locking and artifact generation for review.
+
 If the source is later declared authoritative, rerun the inventory with
 `--authoritative-path` for exactly one reviewed URDF/MJCF file plus
 `--authority-source-reference`, `--authority-license-basis`, all three required
