@@ -178,6 +178,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `invalid_tcp_manifest`: `{summary['fixtures']['invalid_tcp_manifest_path']}`",
         f"- `weak_alignment_manifest`: `{summary['fixtures']['weak_alignment_manifest_path']}`",
         f"- `invalid_alignment_manifest`: `{summary['fixtures']['invalid_alignment_manifest_path']}`",
+        f"- `oversized_alignment_translation_manifest`: `{summary['fixtures']['oversized_alignment_translation_manifest_path']}`",
         f"- `explicit_model_path`: `{summary['fixtures']['explicit_model_path']}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `cases_csv`: `{summary['artifacts']['cases_csv']}`",
@@ -769,6 +770,15 @@ def oversized_alignment_rotation_manifest_payload(model_filename: str) -> dict[s
     return payload
 
 
+def oversized_alignment_translation_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["base_to_board_transform"] = {
+        "translation_m": {"x": 3.0, "y": 0.0, "z": 0.0},
+        "rotation_rpy_rad": {"roll": 0.0, "pitch": 0.0, "yaw": 0.0},
+    }
+    return payload
+
+
 def conflicting_alignment_alias_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload["base_to_board_alignment"] = {
@@ -852,6 +862,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     oversized_alignment_rotation_dir = (
         fixture_dir / "oversized_alignment_rotation_bundle"
     )
+    oversized_alignment_translation_dir = (
+        fixture_dir / "oversized_alignment_translation_bundle"
+    )
     conflicting_alignment_alias_dir = fixture_dir / "conflicting_alignment_alias_bundle"
     conflicting_alignment_nested_alias_dir = (
         fixture_dir / "conflicting_alignment_nested_alias_bundle"
@@ -906,6 +919,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         invalid_alignment_dir,
         nonfinite_alignment_dir,
         oversized_alignment_rotation_dir,
+        oversized_alignment_translation_dir,
         conflicting_alignment_alias_dir,
         conflicting_alignment_nested_alias_dir,
     ):
@@ -1046,6 +1060,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         oversized_alignment_rotation_dir / "model" / "synthetic_so101_mujoco.xml"
     )
     oversized_alignment_rotation_model_path.write_text(mjcf_with_mesh_reference())
+    oversized_alignment_translation_model_path = (
+        oversized_alignment_translation_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    oversized_alignment_translation_model_path.write_text(mjcf_with_mesh_reference())
     conflicting_alignment_alias_model_path = (
         conflicting_alignment_alias_dir / "model" / "synthetic_so101_mujoco.xml"
     )
@@ -1184,6 +1202,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     oversized_alignment_rotation_manifest_path = (
         oversized_alignment_rotation_dir
         / "so101_model_bundle.oversized_alignment_rotation.json"
+    )
+    oversized_alignment_translation_manifest_path = (
+        oversized_alignment_translation_dir
+        / "so101_model_bundle.oversized_alignment_translation.json"
     )
     conflicting_alignment_alias_manifest_path = (
         conflicting_alignment_alias_dir
@@ -1471,6 +1493,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         oversized_alignment_rotation_model_path,
     )
     write_manifest_json(
+        oversized_alignment_translation_manifest_path,
+        oversized_alignment_translation_manifest_payload(
+            model_filename=oversized_alignment_translation_model_path.name
+        ),
+        oversized_alignment_translation_model_path,
+    )
+    write_manifest_json(
         conflicting_alignment_alias_manifest_path,
         conflicting_alignment_alias_manifest_payload(
             model_filename=conflicting_alignment_alias_model_path.name
@@ -1549,6 +1578,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "oversized_alignment_rotation_manifest_path": (
             oversized_alignment_rotation_manifest_path
         ),
+        "oversized_alignment_translation_manifest_path": (
+            oversized_alignment_translation_manifest_path
+        ),
         "conflicting_alignment_alias_manifest_path": conflicting_alignment_alias_manifest_path,
         "conflicting_alignment_nested_alias_manifest_path": (
             conflicting_alignment_nested_alias_manifest_path
@@ -1605,6 +1637,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "nonfinite_alignment_model_path": nonfinite_alignment_model_path,
         "oversized_alignment_rotation_model_path": (
             oversized_alignment_rotation_model_path
+        ),
+        "oversized_alignment_translation_model_path": (
+            oversized_alignment_translation_model_path
         ),
         "conflicting_alignment_alias_model_path": conflicting_alignment_alias_model_path,
         "conflicting_alignment_nested_alias_model_path": (

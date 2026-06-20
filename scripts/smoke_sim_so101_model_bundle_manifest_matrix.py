@@ -1137,6 +1137,24 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "status": "model_bundle_manifest_needs_follow_up",
                 "ready": False,
                 "alignment_status": "invalid",
+                "alignment_diagnostics_contains": [
+                    "rotation_rpy:base_to_board_rotation_abs_exceeds_limit:"
+                ],
+                "alignment_diagnostics_contains_prefix": True,
+                "missing_inputs": ["base_to_board_transform"],
+            },
+        },
+        {
+            "case_id": "oversized_alignment_translation_not_ready",
+            "manifest_path": fixtures["oversized_alignment_translation_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "alignment_status": "invalid",
+                "alignment_diagnostics_contains": [
+                    "translation:base_to_board_translation_norm_exceeds_limit:"
+                ],
+                "alignment_diagnostics_contains_prefix": True,
                 "missing_inputs": ["base_to_board_transform"],
             },
         },
@@ -1520,6 +1538,25 @@ def summarize_case(
             diagnostics,
             expect["joint_limits_diagnostics_contains"],
         )
+    if "alignment_diagnostics_contains" in expect:
+        alignment = summary.get("base_to_board_alignment")
+        diagnostics = (
+            alignment.get("diagnostics") if isinstance(alignment, dict) else []
+        )
+        if expect.get("alignment_diagnostics_contains_prefix") is True:
+            expect_contains_prefix(
+                errors,
+                f"{case_id}.base_to_board_alignment.diagnostics",
+                diagnostics,
+                expect["alignment_diagnostics_contains"],
+            )
+        else:
+            expect_contains(
+                errors,
+                f"{case_id}.base_to_board_alignment.diagnostics",
+                diagnostics,
+                expect["alignment_diagnostics_contains"],
+            )
     if "contract_checker_status" in expect:
         add_error(
             errors,
