@@ -176,6 +176,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `invalid_target_frame_manifest`: `{summary['fixtures']['invalid_target_frame_manifest_path']}`",
         f"- `model_missing_target_frame_manifest`: `{summary['fixtures']['model_missing_target_frame_manifest_path']}`",
         f"- `weak_tcp_manifest`: `{summary['fixtures']['weak_tcp_manifest_path']}`",
+        f"- `conflicting_tcp_review_alias_manifest`: `{summary['fixtures']['conflicting_tcp_review_alias_manifest_path']}`",
         f"- `invalid_tcp_manifest`: `{summary['fixtures']['invalid_tcp_manifest_path']}`",
         f"- `oversized_tcp_manifest`: `{summary['fixtures']['oversized_tcp_manifest_path']}`",
         f"- `weak_alignment_manifest`: `{summary['fixtures']['weak_alignment_manifest_path']}`",
@@ -728,6 +729,20 @@ def weak_tcp_offset_authority_manifest_payload(model_filename: str) -> dict[str,
     return payload
 
 
+def conflicting_tcp_offset_review_alias_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["tcp_offset_review"] = {
+        "review_status": "needs_review",
+        "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
+        "review_id": "bundle-ready-forwarding:tcp-offset-follow-up",
+        "review_scope": "tcp_offset",
+        "next_required_action_ids": [
+            "resolve_conflicting_tcp_offset_review_alias",
+        ],
+    }
+    return payload
+
+
 def invalid_tcp_offset_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload["tcp_offset_m"] = {"x": 0.0, "y": 0.0}
@@ -868,6 +883,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     invalid_target_frame_dir = fixture_dir / "invalid_target_frame_bundle"
     model_missing_target_frame_dir = fixture_dir / "model_missing_target_frame_bundle"
     weak_tcp_dir = fixture_dir / "weak_tcp_bundle"
+    conflicting_tcp_review_alias_dir = (
+        fixture_dir / "conflicting_tcp_review_alias_bundle"
+    )
     invalid_tcp_dir = fixture_dir / "invalid_tcp_bundle"
     nonfinite_tcp_dir = fixture_dir / "nonfinite_tcp_bundle"
     oversized_tcp_dir = fixture_dir / "oversized_tcp_bundle"
@@ -929,6 +947,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         invalid_target_frame_dir,
         model_missing_target_frame_dir,
         weak_tcp_dir,
+        conflicting_tcp_review_alias_dir,
         invalid_tcp_dir,
         nonfinite_tcp_dir,
         oversized_tcp_dir,
@@ -1060,6 +1079,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     model_missing_target_frame_path.write_text(mjcf_missing_target_frame_with_mesh_reference())
     weak_tcp_model_path = weak_tcp_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_tcp_model_path.write_text(mjcf_with_mesh_reference())
+    conflicting_tcp_review_alias_model_path = (
+        conflicting_tcp_review_alias_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    conflicting_tcp_review_alias_model_path.write_text(mjcf_with_mesh_reference())
     invalid_tcp_model_path = invalid_tcp_dir / "model" / "synthetic_so101_mujoco.xml"
     invalid_tcp_model_path.write_text(mjcf_with_mesh_reference())
     nonfinite_tcp_model_path = nonfinite_tcp_dir / "model" / "synthetic_so101_mujoco.xml"
@@ -1211,6 +1234,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         model_missing_target_frame_dir / "so101_model_bundle.model_missing_target_frame.json"
     )
     weak_tcp_manifest_path = weak_tcp_dir / "so101_model_bundle.weak_tcp_offset.json"
+    conflicting_tcp_review_alias_manifest_path = (
+        conflicting_tcp_review_alias_dir
+        / "so101_model_bundle.conflicting_tcp_review_alias.json"
+    )
     invalid_tcp_manifest_path = invalid_tcp_dir / "so101_model_bundle.invalid_tcp_offset.json"
     nonfinite_tcp_manifest_path = (
         nonfinite_tcp_dir / "so101_model_bundle.nonfinite_tcp_offset.json"
@@ -1485,6 +1512,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_tcp_model_path,
     )
     write_manifest_json(
+        conflicting_tcp_review_alias_manifest_path,
+        conflicting_tcp_offset_review_alias_manifest_payload(
+            model_filename=conflicting_tcp_review_alias_model_path.name
+        ),
+        conflicting_tcp_review_alias_model_path,
+    )
+    write_manifest_json(
         invalid_tcp_manifest_path,
         invalid_tcp_offset_manifest_payload(model_filename=invalid_tcp_model_path.name),
         invalid_tcp_model_path,
@@ -1608,6 +1642,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "invalid_target_frame_manifest_path": invalid_target_frame_manifest_path,
         "model_missing_target_frame_manifest_path": model_missing_target_frame_manifest_path,
         "weak_tcp_manifest_path": weak_tcp_manifest_path,
+        "conflicting_tcp_review_alias_manifest_path": (
+            conflicting_tcp_review_alias_manifest_path
+        ),
         "invalid_tcp_manifest_path": invalid_tcp_manifest_path,
         "nonfinite_tcp_manifest_path": nonfinite_tcp_manifest_path,
         "oversized_tcp_manifest_path": oversized_tcp_manifest_path,
@@ -1670,6 +1707,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "invalid_target_frame_model_path": invalid_target_frame_model_path,
         "model_missing_target_frame_path": model_missing_target_frame_path,
         "weak_tcp_model_path": weak_tcp_model_path,
+        "conflicting_tcp_review_alias_model_path": (
+            conflicting_tcp_review_alias_model_path
+        ),
         "invalid_tcp_model_path": invalid_tcp_model_path,
         "nonfinite_tcp_model_path": nonfinite_tcp_model_path,
         "oversized_tcp_model_path": oversized_tcp_model_path,
@@ -3030,6 +3070,48 @@ def summarize_case(
         missing_inputs = bundle.get("missing_inputs")
         if not isinstance(missing_inputs, list) or "tcp_offset_authority" not in missing_inputs:
             errors.append(f"{case_id}.missing_inputs: expected tcp_offset_authority, got {missing_inputs!r}")
+    elif expectation == "conflicting_tcp_offset_review_alias_not_forwarded":
+        assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_not_ready",
+        )
+        assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
+        assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
+        assert_equal(
+            errors,
+            f"{case_id}.diagnostic_reason",
+            forwarding.get("diagnostic_only_reason"),
+            "bundle_not_ready_for_model_backed_ik:model_bundle_manifest_needs_follow_up",
+        )
+        assert_equal(errors, f"{case_id}.authority_status", bundle.get("authority_status"), "present")
+        assert_equal(errors, f"{case_id}.provenance_status", bundle.get("provenance_status"), "present")
+        assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
+        assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
+        assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "needs_review")
+        assert_equal(errors, f"{case_id}.alignment_status", get_nested(bundle, ("base_to_board_alignment", "status")), "present")
+        assert_equal(
+            errors,
+            f"{case_id}.tcp_offset_review_alias_conflict",
+            get_nested(reviewed_mujoco, ("tcp_offset", "review", "review_alias_conflict")),
+            False,
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.tcp_offset_review_alias_not_ready_fields",
+            get_nested(reviewed_mujoco, ("tcp_offset", "review", "review_alias_not_ready_fields")),
+            ["tcp_offset_review"],
+        )
+        diagnostics = get_nested(reviewed_mujoco, ("tcp_offset", "diagnostics"), [])
+        if "tcp_offset_authority_review_alias_not_ready:tcp_offset_review" not in diagnostics:
+            errors.append(f"{case_id}.tcp_offset_diagnostic_missing:{diagnostics!r}")
+        missing_inputs = bundle.get("missing_inputs")
+        if not isinstance(missing_inputs, list) or "tcp_offset_authority" not in missing_inputs:
+            errors.append(f"{case_id}.missing_inputs: expected tcp_offset_authority, got {missing_inputs!r}")
     elif expectation == "invalid_tcp_offset_not_forwarded":
         assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
         assert_equal(
@@ -3376,6 +3458,12 @@ def main() -> int:
             "manifest_path": fixtures["weak_tcp_manifest_path"],
             "explicit_model_path": None,
             "expectation": "weak_tcp_offset_authority_not_forwarded",
+        },
+        {
+            "case_id": "conflicting_tcp_offset_review_alias_not_forwarded",
+            "manifest_path": fixtures["conflicting_tcp_review_alias_manifest_path"],
+            "explicit_model_path": None,
+            "expectation": "conflicting_tcp_offset_review_alias_not_forwarded",
         },
         {
             "case_id": "invalid_tcp_offset_not_forwarded",

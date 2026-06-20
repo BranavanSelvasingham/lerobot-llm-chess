@@ -511,6 +511,7 @@ jobs:
               "wrong_target_frame_not_ready",
               "invalid_target_frame_type_not_ready",
               "weak_tcp_offset_authority_not_ready",
+              "conflicting_tcp_offset_review_alias_not_ready",
               "invalid_tcp_offset_shape_not_ready",
               "nonfinite_tcp_offset_not_ready",
               "oversized_tcp_offset_not_ready",
@@ -821,6 +822,11 @@ jobs:
           oversized_tcp = by_case["oversized_tcp_offset_not_ready"]["observations"]
           assert oversized_tcp["tcp_offset_status"] == "invalid", oversized_tcp
           assert "tcp_offset_m" in oversized_tcp["missing_inputs"], oversized_tcp
+          conflicting_tcp_review_alias = by_case["conflicting_tcp_offset_review_alias_not_ready"]["observations"]
+          assert conflicting_tcp_review_alias["tcp_offset_status"] == "needs_review", conflicting_tcp_review_alias
+          assert conflicting_tcp_review_alias["tcp_offset_review_alias_conflict"] is False, conflicting_tcp_review_alias
+          assert conflicting_tcp_review_alias["tcp_offset_review_alias_not_ready_fields"] == ["tcp_offset_review"], conflicting_tcp_review_alias
+          assert "tcp_offset_authority" in conflicting_tcp_review_alias["missing_inputs"], conflicting_tcp_review_alias
           conflicting_tcp_alias = by_case["conflicting_tcp_offset_alias_not_ready"]["observations"]
           assert conflicting_tcp_alias["tcp_offset_status"] == "invalid", conflicting_tcp_alias
           assert conflicting_tcp_alias["tcp_offset_alias_conflict"] is True, conflicting_tcp_alias
@@ -6159,6 +6165,10 @@ jobs:
           ), model_bundle_manifest_matrix
           assert (
               "invalid_target_frame_type_not_ready"
+              in model_bundle_manifest_matrix["case_ids"]
+          ), model_bundle_manifest_matrix
+          assert (
+              "conflicting_tcp_offset_review_alias_not_ready"
               in model_bundle_manifest_matrix["case_ids"]
           ), model_bundle_manifest_matrix
           assert (
