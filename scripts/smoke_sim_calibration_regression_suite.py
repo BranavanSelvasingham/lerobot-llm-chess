@@ -4042,6 +4042,26 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(checked_case, dict)
             else None,
+            "candidate_operator_intake_plan_model_authority": checked_case.get(
+                "candidate_operator_intake_plan_model_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_intake_plan_status": checked_case.get(
+                "candidate_operator_intake_plan_status"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_intake_decision_status": checked_case.get(
+                "candidate_operator_intake_decision_status"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_intake_option_count": checked_case.get(
+                "candidate_operator_intake_option_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
             "seeded_template_manifest_checker_status": checked_case.get(
                 "seeded_template_manifest_checker_status"
             )

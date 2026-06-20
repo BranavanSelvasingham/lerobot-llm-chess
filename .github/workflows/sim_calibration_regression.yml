@@ -390,6 +390,10 @@ jobs:
           assert incomplete["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", incomplete
           assert incomplete["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", incomplete
           assert incomplete["candidate_review_checklist_row_count"] == 8, incomplete
+          assert incomplete["candidate_operator_intake_plan_model_authority"] == "candidate_operator_intake_plan_not_authority", incomplete
+          assert incomplete["candidate_operator_intake_plan_status"] == "candidate_operator_intake_inputs_incomplete", incomplete
+          assert incomplete["candidate_operator_intake_decision_status"] == "vendor_or_external_intake_not_declared", incomplete
+          assert incomplete["candidate_operator_intake_option_count"] == 2, incomplete
           assert incomplete["candidate_seeded_review_manifest_template_model_authority"] == "candidate_seeded_review_manifest_template_not_authority", incomplete
           assert incomplete["candidate_review_observations_parsed_model_file_count"] == 5, incomplete
           assert incomplete["candidate_readme_gripper_mapping_caveat"] is True, incomplete
@@ -406,6 +410,10 @@ jobs:
           assert complete["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", complete
           assert complete["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", complete
           assert complete["candidate_review_checklist_row_count"] == 8, complete
+          assert complete["candidate_operator_intake_plan_model_authority"] == "candidate_operator_intake_plan_not_authority", complete
+          assert complete["candidate_operator_intake_plan_status"] == "candidate_locked_operator_decision_required", complete
+          assert complete["candidate_operator_intake_decision_status"] == "vendor_or_external_intake_not_declared", complete
+          assert complete["candidate_operator_intake_option_count"] == 2, complete
           assert complete["candidate_seeded_review_manifest_template_model_authority"] == "candidate_seeded_review_manifest_template_not_authority", complete
           assert complete["candidate_review_observations_parsed_model_file_count"] == 5, complete
           assert complete["candidate_readme_gripper_mapping_caveat"] is True, complete
@@ -420,6 +428,9 @@ jobs:
               assert case["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", case
               assert case["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", case
               assert case["candidate_review_checklist_row_count"] == 8, case
+              assert case["candidate_operator_intake_plan_model_authority"] == "candidate_operator_intake_plan_not_authority", case
+              assert case["candidate_operator_intake_decision_status"] == "vendor_or_external_intake_not_declared", case
+              assert case["candidate_operator_intake_option_count"] == 2, case
               assert case["candidate_seeded_review_manifest_template_model_authority"] == "candidate_seeded_review_manifest_template_not_authority", case
               assert case["seeded_template_manifest_checker_ready_for_model_backed_ik"] is False, case
               assert case["seeded_template_manifest_checker_physical_ready"] is False, case

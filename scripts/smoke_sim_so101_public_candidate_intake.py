@@ -80,6 +80,117 @@ REVIEW_CHECKLIST_FIELDNAMES = (
 )
 
 
+def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
+    artifacts = summary.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    upstream = summary.get("upstream")
+    upstream = upstream if isinstance(upstream, dict) else {}
+    source_lock = summary.get("candidate_source_lock")
+    source_lock = source_lock if isinstance(source_lock, dict) else {}
+    source_lock_ready = source_lock.get("source_lock_ready_for_review") is True
+    upstream_commit = upstream.get("commit")
+    selected_model = source_lock.get("selected_model")
+    selected_model = selected_model if isinstance(selected_model, dict) else {}
+    return {
+        "schema": "lerobot.sim.so101_public_candidate_operator_intake_plan.v1",
+        "ok": True,
+        "status": (
+            "candidate_locked_operator_decision_required"
+            if source_lock_ready
+            else "candidate_operator_intake_inputs_incomplete"
+        ),
+        "model_authority": "candidate_operator_intake_plan_not_authority",
+        "decision_status": "vendor_or_external_intake_not_declared",
+        "observed_evidence_is_physical_so101_authority": False,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "source_lock_ready_for_review": source_lock_ready,
+        "source_lock_status": source_lock.get("status"),
+        "upstream": {
+            "repository_url": upstream.get("repository_url"),
+            "source_tree_url": upstream.get("source_tree_url"),
+            "commit": upstream_commit,
+        },
+        "source_root": summary.get("source_root"),
+        "selected_model": selected_model,
+        "candidate_artifacts": {
+            "summary_json": artifacts.get("summary_json"),
+            "files_csv": artifacts.get("files_csv"),
+            "source_lock_json": artifacts.get("candidate_source_lock_json"),
+            "direct_review_manifest_template_json": artifacts.get(
+                "candidate_direct_review_manifest_template_json"
+            ),
+            "review_checklist_json": artifacts.get("candidate_review_checklist_json"),
+            "review_checklist_csv": artifacts.get("candidate_review_checklist_csv"),
+        },
+        "intake_options": [
+            {
+                "option_id": "external_pinned_source_root",
+                "decision": "keep_assets_external_and_reference_local_checkout",
+                "required_inputs": [
+                    "immutable_upstream_commit",
+                    "local_source_root",
+                    "complete_expected_file_digest_lock",
+                    "reviewed_bundle_manifest",
+                ],
+                "command_template": [
+                    "python",
+                    "scripts/smoke_sim_so101_public_candidate_intake.py",
+                    "--source-root",
+                    "<local-SO-ARM100/Simulation/SO101-checkout>",
+                    "--upstream-commit",
+                    upstream_commit or "<immutable-upstream-commit>",
+                    "--output-dir",
+                    "/private/tmp/lerobot_sim/so101_public_candidate_intake",
+                ],
+                "authority_boundary": "external_source_root_not_reviewed_authority",
+            },
+            {
+                "option_id": "vendor_locked_bundle",
+                "decision": "vendor_reviewed_asset_subset_into_repo",
+                "required_inputs": [
+                    "license_provenance_review",
+                    "pinned_upstream_commit",
+                    "file_digest_manifest",
+                    "reviewed_model_bundle_manifest",
+                    "repo_import_review",
+                ],
+                "command_template": [
+                    "python",
+                    "scripts/smoke_sim_so101_public_candidate_intake.py",
+                    "--source-root",
+                    "<repo-vendored-SO101-asset-root>",
+                    "--upstream-commit",
+                    upstream_commit or "<immutable-upstream-commit>",
+                    "--output-dir",
+                    "/private/tmp/lerobot_sim/so101_public_candidate_intake_vendored",
+                ],
+                "authority_boundary": "vendored_files_still_require_reviewed_manifest",
+            },
+        ],
+        "review_flow": [
+            "Choose external pinned source root or vendored locked bundle.",
+            "Keep the selected upstream commit immutable in review evidence.",
+            "Review source lock digests, license/provenance, model variant, mesh roots, joint limits, target frame, gripper/TCP offset, and base-to-board alignment.",
+            "Edit the direct review manifest template with reviewed values only.",
+            "Run scripts/smoke_sim_so101_model_bundle_manifest.py against the reviewed manifest.",
+            "Use the reviewed bundle downstream only when physical_so101_model_authority_ready and ready_for_model_backed_ik are true.",
+        ],
+        "next_required_action_ids": [
+            "declare_vendor_or_external_intake_decision",
+            "pin_or_vendor_soarm100_so101_assets",
+            "review_candidate_source_lock",
+            "edit_direct_review_manifest_template_with_reviewed_values",
+            "run_reviewed_bundle_manifest_checker",
+        ],
+        "limitations": [
+            "This plan does not clone, vendor, copy, or verify remote Git state.",
+            "A selected intake option is not reviewed physical SO-101 authority.",
+            "Reviewed authority still requires a reviewed bundle manifest and passing reviewed MuJoCo motion evidence.",
+        ],
+    }
+
+
 def candidate_source_lock(summary: dict[str, Any]) -> dict[str, Any]:
     upstream = summary.get("upstream")
     upstream = upstream if isinstance(upstream, dict) else {}
@@ -809,6 +920,7 @@ def build_summary(args: argparse.Namespace, artifacts: dict[str, str]) -> dict[s
 
     next_required_action_ids = [
         "pin_upstream_soarm100_commit",
+        "declare_vendor_or_external_intake_decision",
         "review_soarm100_license_and_provenance",
         "declare_single_authoritative_so101_model_path",
         "run_so101_model_bundle_probe",
@@ -904,6 +1016,9 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `candidate_source_lock_model_authority`: `{summary['candidate_source_lock_model_authority']}`",
         f"- `candidate_source_lock_status`: `{summary['candidate_source_lock']['status']}`",
         f"- `candidate_source_lock_ready_for_review`: `{str(summary['candidate_source_lock']['source_lock_ready_for_review']).lower()}`",
+        f"- `candidate_operator_intake_plan_model_authority`: `{summary['candidate_operator_intake_plan_model_authority']}`",
+        f"- `candidate_operator_intake_plan_status`: `{summary['candidate_operator_intake_plan_status']}`",
+        f"- `candidate_operator_intake_decision_status`: `{summary['candidate_operator_intake_decision_status']}`",
         f"- `candidate_seeded_review_manifest_template_model_authority`: `{summary['candidate_seeded_review_manifest_template_model_authority']}`",
         f"- `parsed_model_file_count`: `{summary['candidate_review_observations']['parsed_model_file_count']}`",
         f"- `expected_file_count`: `{summary['expected_file_count']}`",
@@ -917,6 +1032,7 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `candidate_direct_review_manifest_template_json`: `{summary['artifacts']['candidate_direct_review_manifest_template_json']}`",
         f"- `candidate_review_checklist_json`: `{summary['artifacts']['candidate_review_checklist_json']}`",
         f"- `candidate_review_checklist_csv`: `{summary['artifacts']['candidate_review_checklist_csv']}`",
+        f"- `candidate_operator_intake_plan_json`: `{summary['artifacts']['candidate_operator_intake_plan_json']}`",
         "",
         "## Next Required Actions",
         "",
@@ -937,6 +1053,10 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "## Candidate Source Lock",
             "",
             "The `candidate_source_lock` JSON records the pinned upstream, selected model, and expected file digests as review handoff evidence. It is not reviewed physical SO-101 model authority.",
+            "",
+            "## Candidate Operator Intake Plan",
+            "",
+            "The `candidate_operator_intake_plan` JSON records the unresolved vendor-vs-external-source decision, required inputs, command templates, and review flow. It does not clone, vendor, copy, or promote assets to reviewed physical SO-101 authority.",
             "",
             "## Candidate-Seeded Reviewed Manifest Template",
             "",
@@ -968,6 +1088,7 @@ def main() -> int:
     )
     review_checklist_path = output_dir / "so101_public_candidate_review_checklist.json"
     review_checklist_csv_path = output_dir / "so101_public_candidate_review_checklist.csv"
+    operator_plan_path = output_dir / "so101_public_candidate_operator_intake_plan.json"
     readme_path = output_dir / "README.md"
     artifacts = {
         "summary_json": str(summary_path),
@@ -978,6 +1099,7 @@ def main() -> int:
         "candidate_direct_review_manifest_template_json": str(direct_template_path),
         "candidate_review_checklist_json": str(review_checklist_path),
         "candidate_review_checklist_csv": str(review_checklist_csv_path),
+        "candidate_operator_intake_plan_json": str(operator_plan_path),
         "readme_md": str(readme_path),
     }
     summary = build_summary(args, artifacts)
@@ -989,6 +1111,15 @@ def main() -> int:
         "model_authority"
     ]
     summary["candidate_review_checklist"] = candidate_review_checklist
+    operator_intake_plan = candidate_operator_intake_plan(summary)
+    summary["candidate_operator_intake_plan_model_authority"] = operator_intake_plan[
+        "model_authority"
+    ]
+    summary["candidate_operator_intake_plan_status"] = operator_intake_plan["status"]
+    summary["candidate_operator_intake_decision_status"] = operator_intake_plan[
+        "decision_status"
+    ]
+    summary["candidate_operator_intake_plan"] = operator_intake_plan
     write_json(summary_path, summary)
     write_json(source_lock_path, source_lock)
     write_json(draft_path, summary["candidate_manifest_draft"])
@@ -1001,6 +1132,7 @@ def main() -> int:
         summary["candidate_seeded_review_manifest_template"]["manifest_template"],
     )
     write_json(review_checklist_path, candidate_review_checklist)
+    write_json(operator_plan_path, operator_intake_plan)
     write_csv(
         review_checklist_csv_path,
         candidate_review_checklist["rows"],
@@ -1042,6 +1174,15 @@ def main() -> int:
                 "candidate_source_lock_ready_for_review": summary[
                     "candidate_source_lock"
                 ]["source_lock_ready_for_review"],
+                "candidate_operator_intake_plan_model_authority": summary[
+                    "candidate_operator_intake_plan_model_authority"
+                ],
+                "candidate_operator_intake_plan_status": summary[
+                    "candidate_operator_intake_plan_status"
+                ],
+                "candidate_operator_intake_decision_status": summary[
+                    "candidate_operator_intake_decision_status"
+                ],
                 "candidate_seeded_review_manifest_template_model_authority": summary[
                     "candidate_seeded_review_manifest_template_model_authority"
                 ],

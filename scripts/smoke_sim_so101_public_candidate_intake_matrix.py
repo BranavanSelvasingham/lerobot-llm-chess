@@ -102,6 +102,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_source_lock_model_authority",
         "candidate_source_lock_status",
         "candidate_source_lock_ready_for_review",
+        "candidate_operator_intake_plan_model_authority",
+        "candidate_operator_intake_plan_status",
+        "candidate_operator_intake_decision_status",
+        "candidate_operator_intake_option_count",
         "candidate_review_checklist_model_authority",
         "candidate_review_checklist_row_count",
         "candidate_seeded_review_manifest_template_model_authority",
@@ -433,6 +437,7 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "candidate_direct_review_manifest_template_json",
         "candidate_review_checklist_json",
         "candidate_review_checklist_csv",
+        "candidate_operator_intake_plan_json",
         "readme_md",
     ):
         artifact_path = artifacts.get(artifact_key)
@@ -495,6 +500,61 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         selected_model = selected_model if isinstance(selected_model, dict) else {}
         if selected_model.get("sha256") != summary.get("model_sha256_observed"):
             errors.append(f"{case_id}.candidate_source_lock selected model digest mismatch")
+    operator_plan = summary.get("candidate_operator_intake_plan")
+    operator_plan = operator_plan if isinstance(operator_plan, dict) else {}
+    if (
+        summary.get("candidate_operator_intake_plan_model_authority")
+        != "candidate_operator_intake_plan_not_authority"
+    ):
+        errors.append(f"{case_id}.candidate_operator_intake_plan_model_authority invalid")
+    if operator_plan.get("model_authority") != "candidate_operator_intake_plan_not_authority":
+        errors.append(f"{case_id}.candidate_operator_intake_plan.model_authority invalid")
+    if operator_plan.get("decision_status") != "vendor_or_external_intake_not_declared":
+        errors.append(f"{case_id}.candidate_operator_intake_plan.decision_status invalid")
+    if operator_plan.get("ready_for_model_backed_ik") is not False:
+        errors.append(f"{case_id}.candidate_operator_intake_plan.ready_for_model_backed_ik not false")
+    if operator_plan.get("ready_for_policy_training") is not False:
+        errors.append(f"{case_id}.candidate_operator_intake_plan.ready_for_policy_training not false")
+    if operator_plan.get("observed_evidence_is_physical_so101_authority") is not False:
+        errors.append(f"{case_id}.candidate_operator_intake_plan physical authority not false")
+    expected_operator_plan_status = (
+        "candidate_locked_operator_decision_required"
+        if expected_source_lock_ready
+        else "candidate_operator_intake_inputs_incomplete"
+    )
+    if operator_plan.get("status") != expected_operator_plan_status:
+        errors.append(
+            f"{case_id}.candidate_operator_intake_plan.status expected "
+            f"{expected_operator_plan_status!r}, got {operator_plan.get('status')!r}"
+        )
+    if operator_plan.get("source_lock_ready_for_review") is not expected_source_lock_ready:
+        errors.append(
+            f"{case_id}.candidate_operator_intake_plan.source_lock_ready_for_review invalid"
+        )
+    intake_options = operator_plan.get("intake_options")
+    intake_options = intake_options if isinstance(intake_options, list) else []
+    option_ids = [
+        str(option.get("option_id"))
+        for option in intake_options
+        if isinstance(option, dict)
+    ]
+    for required_option_id in ("external_pinned_source_root", "vendor_locked_bundle"):
+        if required_option_id not in option_ids:
+            errors.append(
+                f"{case_id}.candidate_operator_intake_plan missing option {required_option_id!r}"
+            )
+    operator_next_actions = operator_plan.get("next_required_action_ids")
+    operator_next_actions = (
+        operator_next_actions if isinstance(operator_next_actions, list) else []
+    )
+    for required_action_id in (
+        "declare_vendor_or_external_intake_decision",
+        "run_reviewed_bundle_manifest_checker",
+    ):
+        if required_action_id not in operator_next_actions:
+            errors.append(
+                f"{case_id}.candidate_operator_intake_plan missing action {required_action_id!r}"
+            )
     manifest_template = seeded_template.get("manifest_template")
     manifest_template = manifest_template if isinstance(manifest_template, dict) else {}
     if expect["model_present"] and manifest_template.get("model_path") != summary.get("model_path"):
@@ -626,6 +686,14 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "candidate_source_lock_ready_for_review": source_lock.get(
             "source_lock_ready_for_review"
         ),
+        "candidate_operator_intake_plan_model_authority": summary.get(
+            "candidate_operator_intake_plan_model_authority"
+        ),
+        "candidate_operator_intake_plan_status": operator_plan.get("status"),
+        "candidate_operator_intake_decision_status": operator_plan.get(
+            "decision_status"
+        ),
+        "candidate_operator_intake_option_count": len(intake_options),
         "candidate_review_checklist_model_authority": summary.get(
             "candidate_review_checklist_model_authority"
         ),
