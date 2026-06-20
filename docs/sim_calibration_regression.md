@@ -523,7 +523,10 @@ authority by rerunning the intake with
 `--operator-intake-decision vendor_locked_bundle`; a recorded decision remains
 `candidate_intake_decision_recorded_not_authority` until the source lock,
 reviewed manifest, digest/provenance/license review, joint/TCP/base-board
-review, and downstream reviewed MuJoCo checks pass. The integrated suite also
+review, and downstream reviewed MuJoCo checks pass. The operator intake-plan
+command templates include the matching `--operator-intake-decision` value for
+each option so archived rerun guidance records the decision explicitly. The
+integrated suite also
 copies the recorded external-checkout and vendored-bundle decision cases into
 `calibration_regression_summary.json` and `artifact_index.json` so reviewers can
 audit either selected intake path without treating it as model authority. Each

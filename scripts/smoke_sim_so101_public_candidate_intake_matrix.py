@@ -1265,6 +1265,23 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
             errors.append(
                 f"{case_id}.candidate_operator_intake_plan missing option {required_option_id!r}"
             )
+    for option in intake_options:
+        if not isinstance(option, dict):
+            continue
+        option_id = str(option.get("option_id"))
+        command_template = option.get("command_template")
+        command_template = command_template if isinstance(command_template, list) else []
+        if option_id in {"external_pinned_source_root", "vendor_locked_bundle"}:
+            if "--operator-intake-decision" not in command_template:
+                errors.append(
+                    f"{case_id}.candidate_operator_intake_plan option {option_id!r} "
+                    "command_template missing --operator-intake-decision"
+                )
+            if option_id not in [str(part) for part in command_template]:
+                errors.append(
+                    f"{case_id}.candidate_operator_intake_plan option {option_id!r} "
+                    "command_template missing selected option value"
+                )
     operator_next_actions = operator_plan.get("next_required_action_ids")
     operator_next_actions = (
         operator_next_actions if isinstance(operator_next_actions, list) else []
