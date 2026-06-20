@@ -106,6 +106,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "tcp_offset_status",
         "alignment_status",
         "contract_checker_status",
+        "contract_checker_diagnostics",
         "authority_review_open_work_fields",
         "joint_limits_review_open_work_fields",
         "mesh_assets_review_open_work_fields",
@@ -175,6 +176,14 @@ def field_check_status(summary: dict[str, Any], requirement_id: str) -> str | No
         if isinstance(check, dict) and check.get("requirement_id") == requirement_id:
             return "ok" if check.get("ok") is True else "action_required"
     return None
+
+
+def field_check_diagnostics(summary: dict[str, Any], requirement_id: str) -> list[str]:
+    for check in summary.get("field_checks") or []:
+        if isinstance(check, dict) and check.get("requirement_id") == requirement_id:
+            diagnostics = check.get("diagnostics")
+            return diagnostics if isinstance(diagnostics, list) else []
+    return []
 
 
 def review_requirement_by_id(
@@ -726,6 +735,20 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "unexpected_model_joint_not_ready",
+            "manifest_path": fixtures["unexpected_model_joint_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "contract_checker_status": "model_suffix_supported_not_directly_usable",
+                "contract_checker_diagnostics_contains": [
+                    "model_structure_unexpected_joints:['unknown_aux_joint']",
+                ],
+                "missing_inputs": ["non_blocking_contract_checker_result"],
+                "next_actions": ["clear_model_contract_and_asset_preflight"],
+            },
+        },
+        {
             "case_id": "conflicting_joint_limit_alias_not_ready",
             "manifest_path": fixtures["conflicting_joint_limit_alias_manifest_path"],
             "expect": {
@@ -1073,6 +1096,20 @@ def summarize_case(
             actual,
             expect["joint_limit_unexpected_joints"],
         )
+    if "contract_checker_status" in expect:
+        add_error(
+            errors,
+            f"{case_id}.contract_checker_status",
+            (summary.get("contract_checker") or {}).get("status"),
+            expect["contract_checker_status"],
+        )
+    if "contract_checker_diagnostics_contains" in expect:
+        expect_contains(
+            errors,
+            f"{case_id}.contract_checker_diagnostics",
+            field_check_diagnostics(summary, "contract_checker_result"),
+            expect["contract_checker_diagnostics_contains"],
+        )
 
     missing_inputs = summary.get("missing_inputs")
     if "missing_inputs_exact" in expect:
@@ -1291,6 +1328,10 @@ def summarize_case(
             "contract_checker_status": (summary.get("contract_checker") or {}).get(
                 "status"
             ),
+            "contract_checker_diagnostics": field_check_diagnostics(
+                summary,
+                "contract_checker_result",
+            ),
             "authority_review_open_work_fields": review_open_work_fields(
                 summary, "authority"
             ),
@@ -1429,6 +1470,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
             "nested_alignment_alias_conflict"
         ),
         "contract_checker_status": obs.get("contract_checker_status"),
+        "contract_checker_diagnostics": obs.get("contract_checker_diagnostics"),
         "authority_review_open_work_fields": obs.get(
             "authority_review_open_work_fields"
         ),

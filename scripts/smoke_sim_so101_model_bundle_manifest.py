@@ -2607,34 +2607,38 @@ def run_contract_checker(
     }
 
 
+def append_model_structure_diagnostics(contract: dict[str, Any], diagnostics: list[str]) -> None:
+    structure = (contract.get("child_diagnostics") or {}).get("model_structure_inspection") or {}
+    if not structure:
+        return
+    missing_joints = structure.get("expected_joint_names_missing")
+    unexpected_joints = structure.get("unexpected_joint_names")
+    target_frame_present = structure.get("target_frame_present")
+    if missing_joints:
+        diagnostics.append(f"model_structure_missing_joints:{missing_joints}")
+    if unexpected_joints:
+        diagnostics.append(f"model_structure_unexpected_joints:{unexpected_joints}")
+    if target_frame_present is not True:
+        diagnostics.append(f"model_structure_target_frame_present:{target_frame_present}")
+
+
 def contract_non_blocking(contract: dict[str, Any]) -> tuple[bool, list[str]]:
     diagnostics: list[str] = []
     if contract.get("model_request_status") != "model_supplied":
         diagnostics.append(f"model_request_status:{contract.get('model_request_status')}")
 
     contract_status = contract.get("status")
-    if contract_status == "model_contract_checked":
-        pass
-    elif contract_status == "model_suffix_supported_not_directly_usable":
-        structure = (contract.get("child_diagnostics") or {}).get("model_structure_inspection") or {}
-        missing_joints = structure.get("expected_joint_names_missing")
-        target_frame_present = structure.get("target_frame_present")
-        if missing_joints:
-            diagnostics.append(f"model_structure_missing_joints:{missing_joints}")
-        if target_frame_present is not True:
-            diagnostics.append(f"model_structure_target_frame_present:{target_frame_present}")
+    if contract_status in {
+        "model_contract_checked",
+        "model_suffix_supported_not_directly_usable",
+    }:
+        append_model_structure_diagnostics(contract, diagnostics)
     elif (
         contract_status == "model_contract_needs_follow_up"
         and contract.get("robot_kinematics_status") == "urdf_requires_placo"
         and contract.get("robot_kinematics_initialization_status") == "not_attempted"
     ):
-        structure = (contract.get("child_diagnostics") or {}).get("model_structure_inspection") or {}
-        missing_joints = structure.get("expected_joint_names_missing")
-        target_frame_present = structure.get("target_frame_present")
-        if missing_joints:
-            diagnostics.append(f"model_structure_missing_joints:{missing_joints}")
-        if target_frame_present is not True:
-            diagnostics.append(f"model_structure_target_frame_present:{target_frame_present}")
+        append_model_structure_diagnostics(contract, diagnostics)
     else:
         diagnostics.append(f"contract_status:{contract_status}")
 

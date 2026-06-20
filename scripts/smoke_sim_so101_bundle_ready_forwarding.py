@@ -248,6 +248,30 @@ def mjcf_missing_target_frame_with_mesh_reference() -> str:
     return ET.tostring(root, encoding="unicode")
 
 
+def mjcf_with_unexpected_joint_reference() -> str:
+    root = ET.fromstring(mjcf_with_mesh_reference())
+    worldbody = root.find("worldbody")
+    if worldbody is None:
+        worldbody = ET.SubElement(root, "worldbody")
+    aux_body = ET.SubElement(
+        worldbody,
+        "body",
+        {"name": "unknown_aux_link", "pos": "0 0 0"},
+    )
+    ET.SubElement(
+        aux_body,
+        "joint",
+        {
+            "name": "unknown_aux_joint",
+            "type": "hinge",
+            "axis": "0 0 1",
+            "range": "-1 1",
+            "limited": "true",
+        },
+    )
+    return ET.tostring(root, encoding="unicode")
+
+
 def synthetic_urdf(*, include_mesh: bool) -> str:
     visual = ""
     if include_mesh:
@@ -732,6 +756,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     )
     weak_joint_limits_dir = fixture_dir / "weak_joint_limits_bundle"
     unexpected_joint_limit_dir = fixture_dir / "unexpected_joint_limit_bundle"
+    unexpected_model_joint_dir = fixture_dir / "unexpected_model_joint_bundle"
     conflicting_joint_limit_alias_dir = fixture_dir / "conflicting_joint_limit_alias_bundle"
     conflicting_joint_limit_nested_alias_dir = (
         fixture_dir / "conflicting_joint_limit_nested_alias_bundle"
@@ -782,6 +807,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         fixture_provenance_reviewed_authority_dir,
         weak_joint_limits_dir,
         unexpected_joint_limit_dir,
+        unexpected_model_joint_dir,
         conflicting_joint_limit_alias_dir,
         conflicting_joint_limit_nested_alias_dir,
         weak_mesh_dir,
@@ -862,6 +888,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         unexpected_joint_limit_dir / "model" / "synthetic_so101_mujoco.xml"
     )
     unexpected_joint_limit_model_path.write_text(mjcf_with_mesh_reference())
+    unexpected_model_joint_model_path = (
+        unexpected_model_joint_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    unexpected_model_joint_model_path.write_text(mjcf_with_unexpected_joint_reference())
     conflicting_joint_limit_alias_model_path = (
         conflicting_joint_limit_alias_dir / "model" / "synthetic_so101_mujoco.xml"
     )
@@ -976,6 +1006,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_joint_limits_manifest_path = weak_joint_limits_dir / "so101_model_bundle.weak_joint_limits.json"
     unexpected_joint_limit_manifest_path = (
         unexpected_joint_limit_dir / "so101_model_bundle.unexpected_joint_limit.json"
+    )
+    unexpected_model_joint_manifest_path = (
+        unexpected_model_joint_dir / "so101_model_bundle.unexpected_model_joint.json"
     )
     conflicting_joint_limit_alias_manifest_path = (
         conflicting_joint_limit_alias_dir
@@ -1133,6 +1166,11 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         unexpected_joint_limit_model_path,
     )
     write_manifest_json(
+        unexpected_model_joint_manifest_path,
+        manifest_payload(ready=True, model_filename=unexpected_model_joint_model_path.name),
+        unexpected_model_joint_model_path,
+    )
+    write_manifest_json(
         conflicting_joint_limit_alias_manifest_path,
         conflicting_joint_limit_alias_manifest_payload(
             model_filename=conflicting_joint_limit_alias_model_path.name
@@ -1265,6 +1303,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         ),
         "weak_joint_limits_manifest_path": weak_joint_limits_manifest_path,
         "unexpected_joint_limit_manifest_path": unexpected_joint_limit_manifest_path,
+        "unexpected_model_joint_manifest_path": unexpected_model_joint_manifest_path,
         "conflicting_joint_limit_alias_manifest_path": (
             conflicting_joint_limit_alias_manifest_path
         ),
@@ -1316,6 +1355,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         ),
         "weak_joint_limits_model_path": weak_joint_limits_model_path,
         "unexpected_joint_limit_model_path": unexpected_joint_limit_model_path,
+        "unexpected_model_joint_model_path": unexpected_model_joint_model_path,
         "conflicting_joint_limit_alias_model_path": (
             conflicting_joint_limit_alias_model_path
         ),

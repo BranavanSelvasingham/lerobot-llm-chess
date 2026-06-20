@@ -120,10 +120,13 @@ contract requires `gripper_frame_link`; a reviewed-looking value such as
 must also be visible in the actual URDF/MJCF/XML model structure; a manifest can
 name `gripper_frame_link` and provide target-frame authority while still
 remaining not ready if the model does not expose that link, joint, body, site,
-or geom. Numeric TCP offsets and base-to-board transforms must be finite and
-also need review evidence through `tcp_offset_authority` and
-`base_to_board_alignment_authority`; otherwise they remain diagnostic inputs
-only.
+or geom. The static model contract also rejects unexpected model joints: the
+candidate model may expose the expected SO-101 body joints plus the simulator
+gripper joint, but unrelated extra joint names keep the contract checker
+blocking until the model structure is reviewed. Numeric TCP offsets and
+base-to-board transforms must be finite and also need review evidence through
+`tcp_offset_authority` and `base_to_board_alignment_authority`; otherwise they
+remain diagnostic inputs only.
 
 To re-check a generated draft directly:
 

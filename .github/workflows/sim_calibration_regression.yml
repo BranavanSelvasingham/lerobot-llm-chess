@@ -475,6 +475,7 @@ jobs:
               "reviewed_status_with_fixture_provenance_not_physical_authority",
               "weak_joint_limit_authority_not_ready",
               "unexpected_joint_limit_name_not_ready",
+              "unexpected_model_joint_not_ready",
               "conflicting_joint_limit_alias_not_ready",
               "conflicting_joint_limit_nested_alias_not_ready",
               "weak_mesh_asset_authority_not_ready",
@@ -543,6 +544,11 @@ jobs:
           assert unexpected_joint["joint_limits_status"] == "invalid", unexpected_joint
           assert unexpected_joint["joint_limit_unexpected_joints"] == ["unknown_aux_joint"], unexpected_joint
           assert "joint_limits_deg" in unexpected_joint["missing_inputs"], unexpected_joint
+          unexpected_model_joint = by_case["unexpected_model_joint_not_ready"]["observations"]
+          assert unexpected_model_joint["ready_for_model_backed_ik"] is False, unexpected_model_joint
+          assert "non_blocking_contract_checker_result" in unexpected_model_joint["missing_inputs"], unexpected_model_joint
+          assert "clear_model_contract_and_asset_preflight" in unexpected_model_joint["next_required_action_ids"], unexpected_model_joint
+          assert "model_structure_unexpected_joints:['unknown_aux_joint']" in unexpected_model_joint["contract_checker_diagnostics"], unexpected_model_joint
           conflicting_joint_alias = by_case["conflicting_joint_limit_alias_not_ready"]["observations"]
           assert conflicting_joint_alias["joint_limits_status"] == "invalid", conflicting_joint_alias
           assert conflicting_joint_alias["joint_limit_alias_conflict"] is True, conflicting_joint_alias
