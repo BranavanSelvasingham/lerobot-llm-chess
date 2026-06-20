@@ -747,6 +747,16 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "nonfinite_tcp_offset_not_ready",
+            "manifest_path": fixtures["nonfinite_tcp_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "tcp_offset_status": "invalid",
+                "missing_inputs": ["tcp_offset_m"],
+            },
+        },
+        {
             "case_id": "weak_alignment_authority_not_ready",
             "manifest_path": fixtures["weak_alignment_manifest_path"],
             "expect": {
@@ -759,6 +769,16 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
         {
             "case_id": "invalid_alignment_transform_not_ready",
             "manifest_path": fixtures["invalid_alignment_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "alignment_status": "invalid",
+                "missing_inputs": ["base_to_board_transform"],
+            },
+        },
+        {
+            "case_id": "nonfinite_alignment_transform_not_ready",
+            "manifest_path": fixtures["nonfinite_alignment_manifest_path"],
             "expect": {
                 "status": "model_bundle_manifest_needs_follow_up",
                 "ready": False,

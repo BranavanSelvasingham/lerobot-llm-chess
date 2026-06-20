@@ -578,6 +578,12 @@ def invalid_tcp_offset_manifest_payload(model_filename: str) -> dict[str, Any]:
     return payload
 
 
+def nonfinite_tcp_offset_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["tcp_offset_m"] = {"x": 0.0, "y": "NaN", "z": 0.075}
+    return payload
+
+
 def weak_alignment_authority_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload.pop("base_to_board_alignment_authority", None)
@@ -588,6 +594,15 @@ def invalid_alignment_transform_manifest_payload(model_filename: str) -> dict[st
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload["base_to_board_transform"] = {
         "translation_m": {"x": 0.10, "y": -0.175, "z": 0.09},
+    }
+    return payload
+
+
+def nonfinite_alignment_transform_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["base_to_board_transform"] = {
+        "translation_m": {"x": 0.10, "y": "inf", "z": 0.09},
+        "rotation_rpy_rad": {"roll": 0.0, "pitch": 0.0, "yaw": "NaN"},
     }
     return payload
 
@@ -618,8 +633,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     model_missing_target_frame_dir = fixture_dir / "model_missing_target_frame_bundle"
     weak_tcp_dir = fixture_dir / "weak_tcp_bundle"
     invalid_tcp_dir = fixture_dir / "invalid_tcp_bundle"
+    nonfinite_tcp_dir = fixture_dir / "nonfinite_tcp_bundle"
     weak_alignment_dir = fixture_dir / "weak_alignment_bundle"
     invalid_alignment_dir = fixture_dir / "invalid_alignment_bundle"
+    nonfinite_alignment_dir = fixture_dir / "nonfinite_alignment_bundle"
     explicit_dir = fixture_dir / "explicit_cli"
 
     for root in (
@@ -645,8 +662,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         model_missing_target_frame_dir,
         weak_tcp_dir,
         invalid_tcp_dir,
+        nonfinite_tcp_dir,
         weak_alignment_dir,
         invalid_alignment_dir,
+        nonfinite_alignment_dir,
     ):
         (root / "model").mkdir(parents=True, exist_ok=True)
         (root / "model" / "meshes").mkdir(parents=True, exist_ok=True)
@@ -713,10 +732,16 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     weak_tcp_model_path.write_text(mjcf_with_mesh_reference())
     invalid_tcp_model_path = invalid_tcp_dir / "model" / "synthetic_so101_mujoco.xml"
     invalid_tcp_model_path.write_text(mjcf_with_mesh_reference())
+    nonfinite_tcp_model_path = nonfinite_tcp_dir / "model" / "synthetic_so101_mujoco.xml"
+    nonfinite_tcp_model_path.write_text(mjcf_with_mesh_reference())
     weak_alignment_model_path = weak_alignment_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_alignment_model_path.write_text(mjcf_with_mesh_reference())
     invalid_alignment_model_path = invalid_alignment_dir / "model" / "synthetic_so101_mujoco.xml"
     invalid_alignment_model_path.write_text(mjcf_with_mesh_reference())
+    nonfinite_alignment_model_path = (
+        nonfinite_alignment_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    nonfinite_alignment_model_path.write_text(mjcf_with_mesh_reference())
 
     explicit_dir.mkdir(parents=True, exist_ok=True)
     explicit_model_path = explicit_dir / "explicit_cli_so101.urdf"
@@ -764,8 +789,14 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     )
     weak_tcp_manifest_path = weak_tcp_dir / "so101_model_bundle.weak_tcp_offset.json"
     invalid_tcp_manifest_path = invalid_tcp_dir / "so101_model_bundle.invalid_tcp_offset.json"
+    nonfinite_tcp_manifest_path = (
+        nonfinite_tcp_dir / "so101_model_bundle.nonfinite_tcp_offset.json"
+    )
     weak_alignment_manifest_path = weak_alignment_dir / "so101_model_bundle.weak_alignment.json"
     invalid_alignment_manifest_path = invalid_alignment_dir / "so101_model_bundle.invalid_alignment.json"
+    nonfinite_alignment_manifest_path = (
+        nonfinite_alignment_dir / "so101_model_bundle.nonfinite_alignment.json"
+    )
     write_manifest_json(
         ready_manifest_path,
         manifest_payload(ready=True, model_filename=ready_model_path.name),
@@ -887,6 +918,11 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         invalid_tcp_model_path,
     )
     write_manifest_json(
+        nonfinite_tcp_manifest_path,
+        nonfinite_tcp_offset_manifest_payload(model_filename=nonfinite_tcp_model_path.name),
+        nonfinite_tcp_model_path,
+    )
+    write_manifest_json(
         weak_alignment_manifest_path,
         weak_alignment_authority_manifest_payload(model_filename=weak_alignment_model_path.name),
         weak_alignment_model_path,
@@ -895,6 +931,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         invalid_alignment_manifest_path,
         invalid_alignment_transform_manifest_payload(model_filename=invalid_alignment_model_path.name),
         invalid_alignment_model_path,
+    )
+    write_manifest_json(
+        nonfinite_alignment_manifest_path,
+        nonfinite_alignment_transform_manifest_payload(
+            model_filename=nonfinite_alignment_model_path.name
+        ),
+        nonfinite_alignment_model_path,
     )
 
     return {
@@ -922,8 +965,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "model_missing_target_frame_manifest_path": model_missing_target_frame_manifest_path,
         "weak_tcp_manifest_path": weak_tcp_manifest_path,
         "invalid_tcp_manifest_path": invalid_tcp_manifest_path,
+        "nonfinite_tcp_manifest_path": nonfinite_tcp_manifest_path,
         "weak_alignment_manifest_path": weak_alignment_manifest_path,
         "invalid_alignment_manifest_path": invalid_alignment_manifest_path,
+        "nonfinite_alignment_manifest_path": nonfinite_alignment_manifest_path,
         "ready_model_path": ready_model_path,
         "mismatched_model_sha_model_path": mismatched_model_sha_model_path,
         "ready_asset_root": bundle_dir / "assets",
@@ -947,8 +992,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "model_missing_target_frame_path": model_missing_target_frame_path,
         "weak_tcp_model_path": weak_tcp_model_path,
         "invalid_tcp_model_path": invalid_tcp_model_path,
+        "nonfinite_tcp_model_path": nonfinite_tcp_model_path,
         "weak_alignment_model_path": weak_alignment_model_path,
         "invalid_alignment_model_path": invalid_alignment_model_path,
+        "nonfinite_alignment_model_path": nonfinite_alignment_model_path,
         "explicit_model_path": explicit_model_path,
     }
 

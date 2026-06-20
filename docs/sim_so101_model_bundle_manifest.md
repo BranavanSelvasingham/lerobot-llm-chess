@@ -117,10 +117,10 @@ contract requires `gripper_frame_link`; a reviewed-looking value such as
 must also be visible in the actual URDF/MJCF/XML model structure; a manifest can
 name `gripper_frame_link` and provide target-frame authority while still
 remaining not ready if the model does not expose that link, joint, body, site,
-or geom. Numeric TCP offsets and base-to-board transforms also need review
-evidence through
-`tcp_offset_authority` and `base_to_board_alignment_authority`; otherwise they
-remain diagnostic inputs only.
+or geom. Numeric TCP offsets and base-to-board transforms must be finite and
+also need review evidence through `tcp_offset_authority` and
+`base_to_board_alignment_authority`; otherwise they remain diagnostic inputs
+only.
 
 To re-check a generated draft directly:
 

@@ -478,8 +478,10 @@ jobs:
               "wrong_target_frame_not_ready",
               "weak_tcp_offset_authority_not_ready",
               "invalid_tcp_offset_shape_not_ready",
+              "nonfinite_tcp_offset_not_ready",
               "weak_alignment_authority_not_ready",
               "invalid_alignment_transform_not_ready",
+              "nonfinite_alignment_transform_not_ready",
               "mismatched_model_sha_not_ready",
           ], summary["case_ids"]
           assert summary["failed_case_ids"] == [], summary["failed_case_ids"]
@@ -636,9 +638,15 @@ jobs:
           invalid_tcp = by_case["invalid_tcp_offset_shape_not_ready"]["observations"]
           assert invalid_tcp["tcp_offset_status"] == "invalid", invalid_tcp
           assert "tcp_offset_m" in invalid_tcp["missing_inputs"], invalid_tcp
+          nonfinite_tcp = by_case["nonfinite_tcp_offset_not_ready"]["observations"]
+          assert nonfinite_tcp["tcp_offset_status"] == "invalid", nonfinite_tcp
+          assert "tcp_offset_m" in nonfinite_tcp["missing_inputs"], nonfinite_tcp
           invalid_alignment = by_case["invalid_alignment_transform_not_ready"]["observations"]
           assert invalid_alignment["alignment_status"] == "invalid", invalid_alignment
           assert "base_to_board_transform" in invalid_alignment["missing_inputs"], invalid_alignment
+          nonfinite_alignment = by_case["nonfinite_alignment_transform_not_ready"]["observations"]
+          assert nonfinite_alignment["alignment_status"] == "invalid", nonfinite_alignment
+          assert "base_to_board_transform" in nonfinite_alignment["missing_inputs"], nonfinite_alignment
           mismatch_sha = by_case["mismatched_model_sha_not_ready"]["observations"]
           assert mismatch_sha["model_identity_status"] == "invalid", mismatch_sha
           assert "model_sha256" in mismatch_sha["missing_inputs"], mismatch_sha
@@ -5119,6 +5127,14 @@ jobs:
           ), model_bundle_manifest_matrix
           assert (
               "future_reviewed_at_not_ready"
+              in model_bundle_manifest_matrix["case_ids"]
+          ), model_bundle_manifest_matrix
+          assert (
+              "nonfinite_tcp_offset_not_ready"
+              in model_bundle_manifest_matrix["case_ids"]
+          ), model_bundle_manifest_matrix
+          assert (
+              "nonfinite_alignment_transform_not_ready"
               in model_bundle_manifest_matrix["case_ids"]
           ), model_bundle_manifest_matrix
           assert model_bundle_manifest_matrix["failed_case_ids"] == [], model_bundle_manifest_matrix
