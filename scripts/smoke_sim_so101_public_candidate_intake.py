@@ -66,6 +66,18 @@ MODEL_RELATIVE_PATHS = (
     "so101_old_calib.urdf",
     "so101_old_calib.xml",
 )
+REVIEW_CHECKLIST_FIELDNAMES = (
+    "priority",
+    "action_id",
+    "gate",
+    "status",
+    "title",
+    "detail",
+    "candidate_observation",
+    "required_review_scope",
+    "manifest_fields",
+    "authority_boundary",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -469,6 +481,177 @@ def candidate_seeded_review_manifest_template(
     }
 
 
+def checklist_status(ready: bool, blocked: bool = False) -> str:
+    if blocked:
+        return "blocked"
+    return "candidate_observed_needs_review" if ready else "missing_candidate_input"
+
+
+def build_candidate_review_checklist(summary: dict[str, Any]) -> dict[str, Any]:
+    observations = summary.get("candidate_review_observations")
+    observations = observations if isinstance(observations, dict) else {}
+    caveats = observations.get("readme_caveats")
+    caveats = caveats if isinstance(caveats, dict) else {}
+    parsed_model_file_count = int(observations.get("parsed_model_file_count") or 0)
+    model_present = summary.get("model_present") is True
+    commit_supplied = bool((summary.get("upstream") or {}).get("commit_supplied"))
+    model_sha = summary.get("model_sha256_observed")
+    missing_expected = summary.get("missing_expected_relative_paths")
+    missing_expected = missing_expected if isinstance(missing_expected, list) else []
+    present_expected = int(summary.get("present_expected_file_count") or 0)
+    expected_count = int(summary.get("expected_file_count") or 0)
+    complete_expected = expected_count > 0 and present_expected == expected_count
+
+    rows = [
+        {
+            "priority": 1,
+            "action_id": "pin_upstream_soarm100_commit",
+            "gate": "reviewed_model_authority",
+            "status": checklist_status(commit_supplied),
+            "title": "Pin the SO-ARM100 upstream commit",
+            "detail": "Record the immutable upstream commit used for candidate review.",
+            "candidate_observation": (summary.get("upstream") or {}).get("commit"),
+            "required_review_scope": "provenance",
+            "manifest_fields": ["provenance.source_reference"],
+            "authority_boundary": "candidate_review_checklist_not_authority",
+        },
+        {
+            "priority": 2,
+            "action_id": "lock_candidate_file_digests",
+            "gate": "reviewed_model_authority",
+            "status": checklist_status(complete_expected),
+            "title": "Lock expected candidate file digests",
+            "detail": "Review all expected SO101 files and missing-path diagnostics before selecting the bundle.",
+            "candidate_observation": {
+                "present_expected_file_count": present_expected,
+                "expected_file_count": expected_count,
+                "missing_expected_relative_paths": missing_expected,
+            },
+            "required_review_scope": "mesh_assets",
+            "manifest_fields": ["asset_roots", "mesh_asset_authority"],
+            "authority_boundary": "candidate_review_checklist_not_authority",
+        },
+        {
+            "priority": 3,
+            "action_id": "select_single_authoritative_model_variant",
+            "gate": "reviewed_model_authority",
+            "status": checklist_status(model_present and bool(model_sha)),
+            "title": "Select one SO-101 model variant",
+            "detail": "Choose the reviewed new/old calibration URDF or MJCF file and reject other variants for this manifest.",
+            "candidate_observation": {
+                "model_path": summary.get("model_path"),
+                "model_sha256_observed": model_sha,
+                "parsed_model_file_count": parsed_model_file_count,
+            },
+            "required_review_scope": "model_identity",
+            "manifest_fields": ["model_path", "model_sha256"],
+            "authority_boundary": "candidate_review_checklist_not_authority",
+        },
+        {
+            "priority": 4,
+            "action_id": "review_source_license_and_export_provenance",
+            "gate": "reviewed_model_authority",
+            "status": checklist_status(caveats.get("onshape_to_robot_generated") is True),
+            "title": "Review source, license, and export provenance",
+            "detail": "Review upstream source, license basis, onshape-to-robot generation, and any manual edits.",
+            "candidate_observation": {
+                "repository_url": (summary.get("upstream") or {}).get("repository_url"),
+                "source_tree_url": (summary.get("upstream") or {}).get("source_tree_url"),
+                "onshape_to_robot_generated": caveats.get("onshape_to_robot_generated"),
+            },
+            "required_review_scope": "provenance,license",
+            "manifest_fields": ["authority", "provenance"],
+            "authority_boundary": "candidate_review_checklist_not_authority",
+        },
+        {
+            "priority": 5,
+            "action_id": "review_mesh_paths_and_collision_policy",
+            "gate": "reviewed_model_authority",
+            "status": checklist_status(
+                caveats.get("relative_mesh_paths_declared") is True
+                or caveats.get("base_collision_meshes_removed") is True
+            ),
+            "title": "Review mesh paths and collision policy",
+            "detail": "Confirm relative mesh paths, digest coverage, removed base collision meshes, and MuJoCo collision implications.",
+            "candidate_observation": {
+                "relative_mesh_paths_declared": caveats.get("relative_mesh_paths_declared"),
+                "base_collision_meshes_removed": caveats.get("base_collision_meshes_removed"),
+            },
+            "required_review_scope": "mesh_assets",
+            "manifest_fields": ["asset_roots", "mesh_asset_authority"],
+            "authority_boundary": "candidate_review_checklist_not_authority",
+        },
+        {
+            "priority": 6,
+            "action_id": "review_joint_limits_and_gripper_mapping",
+            "gate": "reviewed_model_authority",
+            "status": checklist_status(parsed_model_file_count > 0),
+            "title": "Review joint limits and gripper mapping",
+            "detail": "Compare parsed joint/range metadata with physical SO-101 limits and resolve the LeRobot gripper linear-joint mapping caveat.",
+            "candidate_observation": {
+                "parsed_model_file_count": parsed_model_file_count,
+                "gripper_linear_joint_mapping_not_reflected": caveats.get(
+                    "gripper_linear_joint_mapping_not_reflected"
+                ),
+            },
+            "required_review_scope": "joint_limits",
+            "manifest_fields": ["joint_limits_deg", "joint_limit_authority"],
+            "authority_boundary": "candidate_review_checklist_not_authority",
+        },
+        {
+            "priority": 7,
+            "action_id": "review_target_frame_tcp_and_base_board_alignment",
+            "gate": "reviewed_model_authority",
+            "status": "missing_review_input",
+            "title": "Review target frame, TCP, and base-to-board alignment",
+            "detail": "Record reviewed target frame, calibrated TCP/gripper offset, and base-to-board transform; do not infer them from the public candidate.",
+            "candidate_observation": {
+                "expected_target_frame": EXPECTED_TARGET_FRAME,
+                "candidate_does_not_calibrate_tcp_or_board_alignment": True,
+            },
+            "required_review_scope": "target_frame,tcp_offset,base_to_board_alignment",
+            "manifest_fields": [
+                "target_frame",
+                "target_frame_authority",
+                "tcp_offset_m",
+                "tcp_offset_authority",
+                "base_to_board_transform",
+                "base_to_board_alignment_authority",
+            ],
+            "authority_boundary": "candidate_review_checklist_not_authority",
+        },
+        {
+            "priority": 8,
+            "action_id": "rerun_reviewed_bundle_manifest_checker",
+            "gate": "reviewed_model_authority",
+            "status": "blocked",
+            "title": "Rerun the reviewed bundle manifest checker",
+            "detail": "After replacing placeholders with reviewed fields, run the manifest checker and require physical SO-101 authority readiness.",
+            "candidate_observation": {
+                "seeded_template_model_authority": summary.get(
+                    "candidate_seeded_review_manifest_template_model_authority"
+                ),
+                "ready_for_model_backed_ik": False,
+            },
+            "required_review_scope": ",".join(REQUIRED_REVIEW_SCOPES),
+            "manifest_fields": ["<reviewed-manifest>"],
+            "authority_boundary": "candidate_review_checklist_not_authority",
+        },
+    ]
+    return {
+        "schema": "lerobot.sim.so101_public_candidate_review_checklist.v1",
+        "ok": True,
+        "status": "candidate_review_required",
+        "model_authority": "candidate_review_checklist_not_authority",
+        "observed_evidence_is_physical_so101_authority": False,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "row_count": len(rows),
+        "action_ids": [str(row["action_id"]) for row in rows],
+        "rows": rows,
+    }
+
+
 def build_summary(args: argparse.Namespace, artifacts: dict[str, str]) -> dict[str, Any]:
     source_root = normalize_path(args.source_root) if args.source_root else None
     source_root_supplied = source_root is not None
@@ -623,6 +806,8 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `files_csv`: `{summary['artifacts']['files_csv']}`",
         f"- `candidate_manifest_draft_json`: `{summary['artifacts']['candidate_manifest_draft_json']}`",
         f"- `candidate_seeded_review_manifest_template_json`: `{summary['artifacts']['candidate_seeded_review_manifest_template_json']}`",
+        f"- `candidate_review_checklist_json`: `{summary['artifacts']['candidate_review_checklist_json']}`",
+        f"- `candidate_review_checklist_csv`: `{summary['artifacts']['candidate_review_checklist_csv']}`",
         "",
         "## Next Required Actions",
         "",
@@ -643,6 +828,10 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "## Candidate-Seeded Reviewed Manifest Template",
             "",
             "The `candidate_seeded_review_manifest_template` artifact follows the reviewed bundle manifest shape but keeps placeholder authority fields and remains non-authoritative until a reviewer replaces observations with reviewed values and the manifest checker reports physical authority ready.",
+            "",
+            "## Candidate Review Checklist",
+            "",
+            "The `candidate_review_checklist` JSON/CSV is the operator queue for replacing public-candidate observations with reviewed bundle-manifest fields. It is not model authority.",
         ]
     )
     path.write_text("\n".join(lines) + "\n")
@@ -658,20 +847,35 @@ def main() -> int:
     seeded_template_path = (
         output_dir / "so101_public_candidate_seeded_review_manifest_template.json"
     )
+    review_checklist_path = output_dir / "so101_public_candidate_review_checklist.json"
+    review_checklist_csv_path = output_dir / "so101_public_candidate_review_checklist.csv"
     readme_path = output_dir / "README.md"
     artifacts = {
         "summary_json": str(summary_path),
         "files_csv": str(files_csv_path),
         "candidate_manifest_draft_json": str(draft_path),
         "candidate_seeded_review_manifest_template_json": str(seeded_template_path),
+        "candidate_review_checklist_json": str(review_checklist_path),
+        "candidate_review_checklist_csv": str(review_checklist_csv_path),
         "readme_md": str(readme_path),
     }
     summary = build_summary(args, artifacts)
+    candidate_review_checklist = build_candidate_review_checklist(summary)
+    summary["candidate_review_checklist_model_authority"] = candidate_review_checklist[
+        "model_authority"
+    ]
+    summary["candidate_review_checklist"] = candidate_review_checklist
     write_json(summary_path, summary)
     write_json(draft_path, summary["candidate_manifest_draft"])
     write_json(
         seeded_template_path,
         summary["candidate_seeded_review_manifest_template"],
+    )
+    write_json(review_checklist_path, candidate_review_checklist)
+    write_csv(
+        review_checklist_csv_path,
+        candidate_review_checklist["rows"],
+        REVIEW_CHECKLIST_FIELDNAMES,
     )
     write_csv(
         files_csv_path,
@@ -705,12 +909,21 @@ def main() -> int:
                 "candidate_seeded_review_manifest_template_model_authority": summary[
                     "candidate_seeded_review_manifest_template_model_authority"
                 ],
+                "candidate_review_checklist_model_authority": summary[
+                    "candidate_review_checklist_model_authority"
+                ],
                 "candidate_review_observations_ready_for_model_backed_ik": summary[
                     "candidate_review_observations"
+                ]["ready_for_model_backed_ik"],
+                "candidate_review_checklist_ready_for_model_backed_ik": summary[
+                    "candidate_review_checklist"
                 ]["ready_for_model_backed_ik"],
                 "candidate_seeded_review_manifest_template_ready_for_model_backed_ik": summary[
                     "candidate_seeded_review_manifest_template"
                 ]["ready_for_model_backed_ik"],
+                "candidate_review_checklist_row_count": summary[
+                    "candidate_review_checklist"
+                ]["row_count"],
                 "candidate_review_observations_parsed_model_file_count": summary[
                     "candidate_review_observations"
                 ]["parsed_model_file_count"],

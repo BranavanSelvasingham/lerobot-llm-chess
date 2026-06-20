@@ -388,6 +388,8 @@ jobs:
           assert incomplete["status"] == "candidate_intake_incomplete", incomplete
           assert "assets/wrist_roll_pitch_so101_v2.stl" in incomplete["missing_expected_relative_paths"], incomplete
           assert incomplete["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", incomplete
+          assert incomplete["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", incomplete
+          assert incomplete["candidate_review_checklist_row_count"] == 8, incomplete
           assert incomplete["candidate_seeded_review_manifest_template_model_authority"] == "candidate_seeded_review_manifest_template_not_authority", incomplete
           assert incomplete["candidate_review_observations_parsed_model_file_count"] == 5, incomplete
           assert incomplete["candidate_readme_gripper_mapping_caveat"] is True, incomplete
@@ -402,6 +404,8 @@ jobs:
           assert complete["model_present"] is True, complete
           assert complete["model_sha256_observed"], complete
           assert complete["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", complete
+          assert complete["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", complete
+          assert complete["candidate_review_checklist_row_count"] == 8, complete
           assert complete["candidate_seeded_review_manifest_template_model_authority"] == "candidate_seeded_review_manifest_template_not_authority", complete
           assert complete["candidate_review_observations_parsed_model_file_count"] == 5, complete
           assert complete["candidate_readme_gripper_mapping_caveat"] is True, complete
@@ -414,6 +418,8 @@ jobs:
           for case in summary["cases"]:
               assert case["model_authority"] == "public_candidate_intake_not_authority", case
               assert case["candidate_review_observations_model_authority"] == "candidate_review_observations_not_authority", case
+              assert case["candidate_review_checklist_model_authority"] == "candidate_review_checklist_not_authority", case
+              assert case["candidate_review_checklist_row_count"] == 8, case
               assert case["candidate_seeded_review_manifest_template_model_authority"] == "candidate_seeded_review_manifest_template_not_authority", case
               assert case["seeded_template_manifest_checker_ready_for_model_backed_ik"] is False, case
               assert case["seeded_template_manifest_checker_physical_ready"] is False, case

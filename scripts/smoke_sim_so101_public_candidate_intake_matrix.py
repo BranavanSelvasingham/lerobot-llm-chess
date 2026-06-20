@@ -99,6 +99,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "model_sha256_observed",
         "model_authority",
         "candidate_review_observations_model_authority",
+        "candidate_review_checklist_model_authority",
+        "candidate_review_checklist_row_count",
         "candidate_seeded_review_manifest_template_model_authority",
         "candidate_review_observations_parsed_model_file_count",
         "candidate_readme_gripper_mapping_caveat",
@@ -415,6 +417,8 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "files_csv",
         "candidate_manifest_draft_json",
         "candidate_seeded_review_manifest_template_json",
+        "candidate_review_checklist_json",
+        "candidate_review_checklist_csv",
         "readme_md",
     ):
         artifact_path = artifacts.get(artifact_key)
@@ -457,6 +461,32 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
     authority = authority if isinstance(authority, dict) else {}
     if authority.get("reviewed_by") != "<reviewer-or-team>":
         errors.append(f"{case_id}.candidate_seeded_review_manifest_template authority placeholder missing")
+
+    review_checklist = summary.get("candidate_review_checklist")
+    review_checklist = review_checklist if isinstance(review_checklist, dict) else {}
+    if summary.get("candidate_review_checklist_model_authority") != "candidate_review_checklist_not_authority":
+        errors.append(f"{case_id}.candidate_review_checklist_model_authority invalid")
+    if review_checklist.get("model_authority") != "candidate_review_checklist_not_authority":
+        errors.append(f"{case_id}.candidate_review_checklist.model_authority invalid")
+    if review_checklist.get("ready_for_model_backed_ik") is not False:
+        errors.append(f"{case_id}.candidate_review_checklist.ready_for_model_backed_ik not false")
+    if review_checklist.get("observed_evidence_is_physical_so101_authority") is not False:
+        errors.append(f"{case_id}.candidate_review_checklist physical authority not false")
+    if review_checklist.get("row_count") != 8:
+        errors.append(f"{case_id}.candidate_review_checklist.row_count invalid")
+    checklist_action_ids = review_checklist.get("action_ids")
+    checklist_action_ids = checklist_action_ids if isinstance(checklist_action_ids, list) else []
+    for required_action_id in (
+        "pin_upstream_soarm100_commit",
+        "select_single_authoritative_model_variant",
+        "review_joint_limits_and_gripper_mapping",
+        "review_target_frame_tcp_and_base_board_alignment",
+        "rerun_reviewed_bundle_manifest_checker",
+    ):
+        if required_action_id not in checklist_action_ids:
+            errors.append(
+                f"{case_id}.candidate_review_checklist missing action {required_action_id!r}"
+            )
 
     preview_record = record.get("seeded_template_manifest_preview")
     preview_record = preview_record if isinstance(preview_record, dict) else {}
@@ -545,6 +575,10 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "candidate_review_observations_model_authority": summary.get(
             "candidate_review_observations_model_authority"
         ),
+        "candidate_review_checklist_model_authority": summary.get(
+            "candidate_review_checklist_model_authority"
+        ),
+        "candidate_review_checklist_row_count": review_checklist.get("row_count"),
         "candidate_seeded_review_manifest_template_model_authority": summary.get(
             "candidate_seeded_review_manifest_template_model_authority"
         ),

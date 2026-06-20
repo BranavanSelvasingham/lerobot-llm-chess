@@ -197,7 +197,9 @@ The public-candidate intake smoke writes
 `so101_public_candidate_intake_summary.json`,
 `so101_public_candidate_intake_files.csv`,
 `so101_public_candidate_manifest_draft.json`,
-`so101_public_candidate_seeded_review_manifest_template.json`, and `README.md`.
+`so101_public_candidate_seeded_review_manifest_template.json`,
+`so101_public_candidate_review_checklist.json`,
+`so101_public_candidate_review_checklist.csv`, and `README.md`.
 It hashes the local candidate files and records the pinned upstream commit as
 intake evidence only. The summary also includes `candidate_review_observations`: README caveat
 detection for `onshape-to-robot`, relative mesh paths, removed base collision
@@ -230,6 +232,15 @@ as `model_sha256` and `authority`. That preview proves the handoff fails closed
 until a reviewer replaces candidate observations and placeholders with reviewed
 bundle fields.
 
+The review checklist is the operator queue for that replacement work. It covers
+pinning the upstream commit, locking file digests, selecting one model variant,
+reviewing source/license/export provenance, reviewing mesh/collision policy,
+reviewing joint limits and gripper mapping, reviewing target-frame/TCP/base
+alignment, and rerunning the reviewed bundle manifest checker. It reports
+`candidate_review_checklist_not_authority`, false physical SO-101 authority,
+and `ready_for_model_backed_ik: false`; it is an intake checklist, not a model
+approval.
+
 Use the focused matrix when changing the public-candidate intake smoke:
 
 ```bash
@@ -243,7 +254,8 @@ missing-root, incomplete-candidate, and complete-candidate cases. All cases must
 keep `public_candidate_intake_not_authority`, false physical SO-101 authority,
 and `ready_for_model_backed_ik: false`; the complete fixture only proves digest
 locking, review-observation extraction, candidate-seeded template generation,
-fail-closed manifest-checker preview, and artifact generation for review.
+candidate review-checklist generation, fail-closed manifest-checker preview,
+and artifact generation for review.
 
 If the source is later declared authoritative, rerun the inventory with
 `--authoritative-path` for exactly one reviewed URDF/MJCF file plus
