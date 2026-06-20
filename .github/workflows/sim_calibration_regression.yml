@@ -474,6 +474,7 @@ jobs:
               "invalid_provenance_url_not_ready",
               "reviewed_status_with_fixture_provenance_not_physical_authority",
               "weak_joint_limit_authority_not_ready",
+              "unexpected_joint_limit_name_not_ready",
               "conflicting_joint_limit_alias_not_ready",
               "conflicting_joint_limit_nested_alias_not_ready",
               "weak_mesh_asset_authority_not_ready",
@@ -538,6 +539,10 @@ jobs:
           assert reviewed_fixture["physical_so101_model_authority_ready"] is False, reviewed_fixture
           assert reviewed_fixture["hardware_free_regression_fixture_ready"] is True, reviewed_fixture
           assert "provenance" in reviewed_fixture["synthetic_fixture_authority_fields"], reviewed_fixture
+          unexpected_joint = by_case["unexpected_joint_limit_name_not_ready"]["observations"]
+          assert unexpected_joint["joint_limits_status"] == "invalid", unexpected_joint
+          assert unexpected_joint["joint_limit_unexpected_joints"] == ["unknown_aux_joint"], unexpected_joint
+          assert "joint_limits_deg" in unexpected_joint["missing_inputs"], unexpected_joint
           conflicting_joint_alias = by_case["conflicting_joint_limit_alias_not_ready"]["observations"]
           assert conflicting_joint_alias["joint_limits_status"] == "invalid", conflicting_joint_alias
           assert conflicting_joint_alias["joint_limit_alias_conflict"] is True, conflicting_joint_alias
@@ -5274,6 +5279,10 @@ jobs:
           ), model_bundle_manifest_matrix
           assert (
               "conflicting_joint_limit_alias_not_ready"
+              in model_bundle_manifest_matrix["case_ids"]
+          ), model_bundle_manifest_matrix
+          assert (
+              "unexpected_joint_limit_name_not_ready"
               in model_bundle_manifest_matrix["case_ids"]
           ), model_bundle_manifest_matrix
           assert (

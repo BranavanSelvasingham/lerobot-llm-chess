@@ -96,6 +96,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "provenance_status",
         "asset_roots_status",
         "joint_limits_status",
+        "joint_limit_unexpected_joints",
         "mesh_assets_status",
         "mesh_asset_review_alias_conflict",
         "mesh_asset_review_alias_not_ready_fields",
@@ -714,6 +715,17 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "unexpected_joint_limit_name_not_ready",
+            "manifest_path": fixtures["unexpected_joint_limit_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "joint_limits_status": "invalid",
+                "joint_limit_unexpected_joints": ["unknown_aux_joint"],
+                "missing_inputs": ["joint_limits_deg"],
+            },
+        },
+        {
             "case_id": "conflicting_joint_limit_alias_not_ready",
             "manifest_path": fixtures["conflicting_joint_limit_alias_manifest_path"],
             "expect": {
@@ -1048,6 +1060,19 @@ def summarize_case(
             nested = summary.get(summary_key[0])
             actual = nested.get("status") if isinstance(nested, dict) else None
             add_error(errors, f"{case_id}.{key}", actual, expect[key])
+    if "joint_limit_unexpected_joints" in expect:
+        joint_limits = summary.get("joint_limits")
+        actual = (
+            joint_limits.get("unexpected_joints")
+            if isinstance(joint_limits, dict)
+            else None
+        )
+        add_error(
+            errors,
+            f"{case_id}.joint_limit_unexpected_joints",
+            actual,
+            expect["joint_limit_unexpected_joints"],
+        )
 
     missing_inputs = summary.get("missing_inputs")
     if "missing_inputs_exact" in expect:
@@ -1215,6 +1240,9 @@ def summarize_case(
             "provenance_status": nested_status(summary, "provenance"),
             "asset_roots_status": nested_status(summary, "asset_roots"),
             "joint_limits_status": nested_status(summary, "joint_limits"),
+            "joint_limit_unexpected_joints": (
+                summary.get("joint_limits") or {}
+            ).get("unexpected_joints"),
             "joint_limit_alias_conflict": (
                 summary.get("joint_limits") or {}
             ).get("joint_limit_alias_conflict"),
@@ -1368,6 +1396,7 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "provenance_status": obs.get("provenance_status"),
         "asset_roots_status": obs.get("asset_roots_status"),
         "joint_limits_status": obs.get("joint_limits_status"),
+        "joint_limit_unexpected_joints": obs.get("joint_limit_unexpected_joints"),
         "joint_limit_alias_conflict": obs.get("joint_limit_alias_conflict"),
         "top_level_joint_limit_alias_conflict": obs.get(
             "top_level_joint_limit_alias_conflict"

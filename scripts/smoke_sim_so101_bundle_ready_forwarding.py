@@ -555,6 +555,12 @@ def weak_joint_limit_authority_manifest_payload(model_filename: str) -> dict[str
     return payload
 
 
+def unexpected_joint_limit_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["joint_limits_deg"]["unknown_aux_joint"] = [-1.0, 1.0]
+    return payload
+
+
 def conflicting_joint_limit_alias_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload["joint_limits"] = copy.deepcopy(payload["joint_limits_deg"])
@@ -725,6 +731,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         fixture_dir / "fixture_provenance_reviewed_authority_bundle"
     )
     weak_joint_limits_dir = fixture_dir / "weak_joint_limits_bundle"
+    unexpected_joint_limit_dir = fixture_dir / "unexpected_joint_limit_bundle"
     conflicting_joint_limit_alias_dir = fixture_dir / "conflicting_joint_limit_alias_bundle"
     conflicting_joint_limit_nested_alias_dir = (
         fixture_dir / "conflicting_joint_limit_nested_alias_bundle"
@@ -774,6 +781,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         invalid_provenance_url_dir,
         fixture_provenance_reviewed_authority_dir,
         weak_joint_limits_dir,
+        unexpected_joint_limit_dir,
         conflicting_joint_limit_alias_dir,
         conflicting_joint_limit_nested_alias_dir,
         weak_mesh_dir,
@@ -850,6 +858,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     )
     weak_joint_limits_model_path = weak_joint_limits_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_joint_limits_model_path.write_text(mjcf_with_mesh_reference())
+    unexpected_joint_limit_model_path = (
+        unexpected_joint_limit_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    unexpected_joint_limit_model_path.write_text(mjcf_with_mesh_reference())
     conflicting_joint_limit_alias_model_path = (
         conflicting_joint_limit_alias_dir / "model" / "synthetic_so101_mujoco.xml"
     )
@@ -962,6 +974,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         / "so101_model_bundle.fixture_provenance_reviewed_authority.json"
     )
     weak_joint_limits_manifest_path = weak_joint_limits_dir / "so101_model_bundle.weak_joint_limits.json"
+    unexpected_joint_limit_manifest_path = (
+        unexpected_joint_limit_dir / "so101_model_bundle.unexpected_joint_limit.json"
+    )
     conflicting_joint_limit_alias_manifest_path = (
         conflicting_joint_limit_alias_dir
         / "so101_model_bundle.conflicting_joint_limit_alias.json"
@@ -1111,6 +1126,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_joint_limits_model_path,
     )
     write_manifest_json(
+        unexpected_joint_limit_manifest_path,
+        unexpected_joint_limit_manifest_payload(
+            model_filename=unexpected_joint_limit_model_path.name
+        ),
+        unexpected_joint_limit_model_path,
+    )
+    write_manifest_json(
         conflicting_joint_limit_alias_manifest_path,
         conflicting_joint_limit_alias_manifest_payload(
             model_filename=conflicting_joint_limit_alias_model_path.name
@@ -1242,6 +1264,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
             fixture_provenance_reviewed_authority_manifest_path
         ),
         "weak_joint_limits_manifest_path": weak_joint_limits_manifest_path,
+        "unexpected_joint_limit_manifest_path": unexpected_joint_limit_manifest_path,
         "conflicting_joint_limit_alias_manifest_path": (
             conflicting_joint_limit_alias_manifest_path
         ),
@@ -1292,6 +1315,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
             fixture_provenance_reviewed_authority_model_path
         ),
         "weak_joint_limits_model_path": weak_joint_limits_model_path,
+        "unexpected_joint_limit_model_path": unexpected_joint_limit_model_path,
         "conflicting_joint_limit_alias_model_path": (
             conflicting_joint_limit_alias_model_path
         ),

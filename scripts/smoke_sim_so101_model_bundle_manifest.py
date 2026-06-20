@@ -1493,12 +1493,18 @@ def inspect_joint_limit_payload(value_payload: Any) -> dict[str, Any]:
             "value": value_payload,
             "expected_joints": list(EXPECTED_SO101_JOINTS),
             "missing_joints": list(EXPECTED_SO101_JOINTS),
+            "unexpected_joints": [],
             "invalid_joints": [],
             "diagnostics": ["joint_limits_not_object"],
         }
 
     normalized: dict[str, Any] = {}
     invalid_joints: list[dict[str, Any]] = []
+    unexpected_joints = [
+        str(joint)
+        for joint in value_payload
+        if str(joint) not in EXPECTED_SO101_JOINTS
+    ]
     for joint in EXPECTED_SO101_JOINTS:
         if joint not in value_payload:
             continue
@@ -1514,16 +1520,21 @@ def inspect_joint_limit_payload(value_payload: Any) -> dict[str, Any]:
     diagnostics = []
     if missing_joints:
         diagnostics.extend(f"joint_limit_missing:{joint}" for joint in missing_joints)
+    if unexpected_joints:
+        diagnostics.extend(
+            f"joint_limit_unexpected:{joint}" for joint in unexpected_joints
+        )
     for invalid in invalid_joints:
         diagnostics.extend(
             f"joint_limit_invalid:{invalid['joint']}:{diagnostic}"
             for diagnostic in invalid["diagnostics"]
         )
     return {
-        "valid": not missing_joints and not invalid_joints,
+        "valid": not missing_joints and not unexpected_joints and not invalid_joints,
         "value": normalized,
         "expected_joints": list(EXPECTED_SO101_JOINTS),
         "missing_joints": missing_joints,
+        "unexpected_joints": unexpected_joints,
         "invalid_joints": invalid_joints,
         "diagnostics": diagnostics,
     }
@@ -1574,6 +1585,7 @@ def joint_limit_value_aliases(manifest: dict[str, Any]) -> list[dict[str, Any]]:
                         "value": nested["value"],
                         "valid": nested["valid"],
                         "missing_joints": nested["missing_joints"],
+                        "unexpected_joints": nested["unexpected_joints"],
                         "invalid_joints": nested["invalid_joints"],
                         "diagnostics": nested["diagnostics"],
                     }
@@ -1616,6 +1628,7 @@ def joint_limit_value_aliases(manifest: dict[str, Any]) -> list[dict[str, Any]]:
                         and not nested_alias_conflict
                     ),
                     "missing_joints": selected["missing_joints"],
+                    "unexpected_joints": selected["unexpected_joints"],
                     "invalid_joints": selected["invalid_joints"],
                     "nested_aliases": nested_aliases,
                     "nested_alias_conflict": nested_alias_conflict,
@@ -1632,6 +1645,7 @@ def joint_limit_value_aliases(manifest: dict[str, Any]) -> list[dict[str, Any]]:
                 "value": inspected["value"],
                 "valid": inspected["valid"],
                 "missing_joints": inspected["missing_joints"],
+                "unexpected_joints": inspected["unexpected_joints"],
                 "invalid_joints": inspected["invalid_joints"],
                 "nested_aliases": [],
                 "nested_alias_conflict": False,
@@ -1750,6 +1764,7 @@ def inspect_joint_limits(manifest: dict[str, Any] | None) -> dict[str, Any]:
             "joint_limit_alias_conflict": False,
             "expected_joints": list(EXPECTED_SO101_JOINTS),
             "missing_joints": list(EXPECTED_SO101_JOINTS),
+            "unexpected_joints": [],
             "invalid_joints": [],
             "diagnostics": ["joint_limits_missing"],
         }
@@ -1764,6 +1779,7 @@ def inspect_joint_limits(manifest: dict[str, Any] | None) -> dict[str, Any]:
             "joint_limit_alias_conflict": False,
             "expected_joints": list(EXPECTED_SO101_JOINTS),
             "missing_joints": list(EXPECTED_SO101_JOINTS),
+            "unexpected_joints": [],
             "invalid_joints": [],
             "diagnostics": ["joint_limits_missing"],
         }
@@ -1774,6 +1790,7 @@ def inspect_joint_limits(manifest: dict[str, Any] | None) -> dict[str, Any]:
     value_field_name = selected["value_field"]
     normalized = selected["value"]
     missing_joints = list(selected["missing_joints"])
+    unexpected_joints = list(selected["unexpected_joints"])
     invalid_joints = list(selected["invalid_joints"])
     diagnostics = list(selected["diagnostics"])
     invalid_alias_fields = [alias["field"] for alias in aliases if not alias["valid"]]
@@ -1825,6 +1842,7 @@ def inspect_joint_limits(manifest: dict[str, Any] | None) -> dict[str, Any]:
         "review_diagnostics": review.get("diagnostics", []),
         "expected_joints": list(EXPECTED_SO101_JOINTS),
         "missing_joints": missing_joints,
+        "unexpected_joints": unexpected_joints,
         "invalid_joints": invalid_joints,
         "diagnostics": diagnostics,
     }

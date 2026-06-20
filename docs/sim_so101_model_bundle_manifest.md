@@ -444,6 +444,9 @@ inputs only until copied into these reviewed manifest fields.
 as an object covering every expected SO-101 joint with finite numeric bounds:
 `shoulder_pan`,
 `shoulder_lift`, `elbow_flex`, `wrist_flex`, `wrist_roll`, and `gripper`.
+Unexpected joint-limit entries are rejected; the reviewed limit map must match
+the expected SO-101 joint set instead of carrying extra stale or non-SO-101
+joint names.
 Each entry may be a two-item `[lower, upper]` list or an object with
 `lower`/`upper` or `min`/`max` numeric values. If more than one joint-limit
 alias is present, every non-empty alias must normalize to the same finite
