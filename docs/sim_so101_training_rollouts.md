@@ -94,14 +94,17 @@ The suite-level training-readiness gate therefore distinguishes the rollout's
 raw `ready_for_policy_training` flag from the computed
 `rollout_policy_training_authority_ready` flag. Both policy-ready rollouts and
 the board-source pick/place prerequisite must carry reviewed SO-101 model
-authority before the serious-training gate can close. Reviewed rollout
+authority without physical SO-101 truth or policy-training authority overclaims
+inside the board-pick evidence before the serious-training gate can close.
+Reviewed rollout
 authority also requires status `ok`,
 `training_authority_status: "reviewed_policy_training_rollouts_ready"`,
 `rollout_use: "policy_training"`, true policy-authority evidence, and an empty
 serious-policy blocker list. The contract matrix also keeps the gate blocked
 when board-pick evidence required manual piece-pose correction after reset, even
 if the board-pick state otherwise claims reviewed model authority and
-model-backed IK readiness.
+model-backed IK readiness, and when board-pick evidence itself claims physical
+SO-101 truth or policy-training authority.
 
 For reset-specific validation before collecting rollouts, run
 [docs/sim_so101_env_resets.md](sim_so101_env_resets.md). That smoke checks

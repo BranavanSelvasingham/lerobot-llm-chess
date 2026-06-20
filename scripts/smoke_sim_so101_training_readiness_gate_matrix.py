@@ -95,6 +95,12 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "board_pick_authority_status",
         "board_pick_authority_blockers",
         "board_pick_detailed_evidence_ready",
+        "board_pick_observed_evidence_is_physical_so101_authority",
+        "board_pick_observed_evidence_is_policy_training_authority",
+        "board_pick_ready_for_policy_training",
+        "board_pick_physical_truth_claimed",
+        "board_pick_policy_training_claimed",
+        "board_pick_policy_authority_claimed",
         "board_pick_phase_evidence_ready",
         "board_pick_stage_sequence_ready",
         "board_pick_phase_ids",
@@ -182,6 +188,9 @@ def board_pick_state(
     manual_piece_pose_after_reset: bool = False,
     verified: bool = True,
     stage_sequence_verified: bool = True,
+    observed_physical_authority: bool = False,
+    ready_for_policy_training: bool = False,
+    observed_policy_authority: bool = False,
 ) -> dict[str, Any]:
     final_target_xy_error_m = 0.002 if verified else 0.05
     target_xy_tolerance_m = 0.01
@@ -248,6 +257,9 @@ def board_pick_state(
         "stage_sequence_contract_errors": stage_sequence_contract_errors,
         "manual_piece_pose_after_reset_stage_ids": manual_stage_ids,
         "ready_for_model_backed_ik": ready_for_model_backed_ik,
+        "ready_for_policy_training": ready_for_policy_training,
+        "observed_evidence_is_physical_so101_authority": observed_physical_authority,
+        "observed_evidence_is_policy_training_authority": observed_policy_authority,
         "model_authority": model_authority,
         "robot_pose_seeded_for_source_fixture": seeded_source_pose,
         "manual_piece_pose_used_after_reset": manual_piece_pose_after_reset,
@@ -579,6 +591,21 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
         ),
         "final_place_z_error_m": 0.025,
     }
+    board_reviewed_physical_truth_claimed = board_pick_state(
+        summaries / "board_reviewed_physical_truth_claimed.json",
+        model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+        ready_for_model_backed_ik=True,
+        seeded_source_pose=False,
+        observed_physical_authority=True,
+    )
+    board_reviewed_policy_training_claimed = board_pick_state(
+        summaries / "board_reviewed_policy_training_claimed.json",
+        model_authority=REVIEWED_SO101_MODEL_AUTHORITY,
+        ready_for_model_backed_ik=True,
+        seeded_source_pose=False,
+        ready_for_policy_training=True,
+        observed_policy_authority=True,
+    )
     rollout_dev_blocked = rollout_state(
         summaries / "rollout_dev_blocked.json",
         ready_for_policy_training=False,
@@ -1355,6 +1382,63 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "board_physical_truth_claim_reviewed_authority_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed_physical_truth_claimed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": False,
+                "board_authority": True,
+                "board_authority_status": "board_pick_physical_truth_claimed",
+                "board_authority_blockers_contain": [
+                    "remove_physical_so101_truth_claim_from_board_pick",
+                ],
+                "board_detail": True,
+                "board_physical_truth_claimed": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "blockers_contain": ["reviewed_model_backed_board_source_pick_place"],
+                "next_priority_gate": "scripted_contact_grasp_pick_place",
+            },
+        },
+        {
+            "case_id": "board_policy_training_claim_reviewed_authority_rejected",
+            "authority": authority_ready,
+            "reviewed_mujoco_bundle": handoff_ready,
+            "mujoco_scene": scene_reviewed,
+            "chess_env": env_reviewed,
+            "contact": contact_ready,
+            "grasp": grasp_ready,
+            "board": board_reviewed_policy_training_claimed,
+            "rollouts": rollout_reviewed_ready,
+            "expect": {
+                "ready": False,
+                "reviewed_authority": True,
+                "board_pick": False,
+                "board_authority": True,
+                "board_authority_status": "board_pick_policy_training_authority_claimed",
+                "board_authority_blockers_contain": [
+                    "remove_policy_training_authority_claim_from_board_pick",
+                ],
+                "board_detail": True,
+                "board_ready_for_policy_training": True,
+                "board_policy_authority_claimed": True,
+                "rollout_raw": True,
+                "rollout_authority": True,
+                "development_caveat": True,
+                "blockers_contain": ["reviewed_model_backed_board_source_pick_place"],
+                "next_priority_gate": "scripted_contact_grasp_pick_place",
+            },
+        },
+        {
             "case_id": "rollout_raw_ready_development_authority_rejected",
             "authority": authority_ready,
             "reviewed_mujoco_bundle": handoff_ready,
@@ -1837,6 +1921,45 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             gate.get("board_pick_final_place_z_within_tolerance"),
             expect["board_place_z_within_tolerance"],
         )
+    if "board_physical_truth_claimed" in expect:
+        add_error(
+            errors,
+            "board_pick_physical_truth_claimed",
+            gate.get("board_pick_physical_truth_claimed"),
+            expect["board_physical_truth_claimed"],
+        )
+        add_error(
+            errors,
+            "board_pick_observed_evidence_is_physical_so101_authority",
+            gate.get("board_pick_observed_evidence_is_physical_so101_authority"),
+            expect["board_physical_truth_claimed"],
+        )
+    if "board_ready_for_policy_training" in expect:
+        add_error(
+            errors,
+            "board_pick_ready_for_policy_training",
+            gate.get("board_pick_ready_for_policy_training"),
+            expect["board_ready_for_policy_training"],
+        )
+        add_error(
+            errors,
+            "board_pick_policy_training_claimed",
+            gate.get("board_pick_policy_training_claimed"),
+            expect["board_ready_for_policy_training"],
+        )
+    if "board_policy_authority_claimed" in expect:
+        add_error(
+            errors,
+            "board_pick_policy_authority_claimed",
+            gate.get("board_pick_policy_authority_claimed"),
+            expect["board_policy_authority_claimed"],
+        )
+        add_error(
+            errors,
+            "board_pick_observed_evidence_is_policy_training_authority",
+            gate.get("board_pick_observed_evidence_is_policy_training_authority"),
+            expect["board_policy_authority_claimed"],
+        )
     if "rollout_raw" in expect:
         add_error(
             errors,
@@ -2041,6 +2164,24 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "board_pick_authority_status": gate.get("board_pick_authority_status"),
         "board_pick_authority_blockers": gate.get("board_pick_authority_blockers"),
         "board_pick_detailed_evidence_ready": gate.get("board_pick_detailed_evidence_ready"),
+        "board_pick_observed_evidence_is_physical_so101_authority": gate.get(
+            "board_pick_observed_evidence_is_physical_so101_authority"
+        ),
+        "board_pick_observed_evidence_is_policy_training_authority": gate.get(
+            "board_pick_observed_evidence_is_policy_training_authority"
+        ),
+        "board_pick_ready_for_policy_training": gate.get(
+            "board_pick_ready_for_policy_training"
+        ),
+        "board_pick_physical_truth_claimed": gate.get(
+            "board_pick_physical_truth_claimed"
+        ),
+        "board_pick_policy_training_claimed": gate.get(
+            "board_pick_policy_training_claimed"
+        ),
+        "board_pick_policy_authority_claimed": gate.get(
+            "board_pick_policy_authority_claimed"
+        ),
         "board_pick_phase_evidence_ready": gate.get("board_pick_phase_evidence_ready"),
         "board_pick_stage_sequence_ready": gate.get("board_pick_stage_sequence_ready"),
         "board_pick_phase_ids": gate.get("board_pick_phase_ids"),
@@ -2140,7 +2281,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "- Each case writes `so101_training_readiness_gate_priority_queue.csv` so the prioritized missing-gate order is reviewable without parsing nested JSON.",
             "- Draft, development, and fixture-only model-authority labels are rejected even when raw readiness booleans are true.",
             "- Reviewed-MuJoCo downstream handoff readiness requires a complete summary-level handoff contract; raw-ready, fixture-only, incomplete, or physical-truth-claiming handoffs cannot unblock training.",
-            "- Board-pick readiness requires detailed source-start, contact, lift, transfer, place, release, final-board-contact, and target-tolerance evidence.",
+            "- Board-pick readiness requires detailed source-start, contact, lift, transfer, place, release, final-board-contact, and target-tolerance evidence without physical SO-101 truth or policy-training authority overclaims.",
             "- Reviewed rollout readiness requires status `ok`, reviewed-policy-ready authority status, `policy_training` use, policy-authority evidence, and no serious-policy blockers.",
             "- Use this smoke to protect training-readiness gate logic. Use reviewed SO-101 model-backed pick/place and rollout evidence before serious training.",
         ]

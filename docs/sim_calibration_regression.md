@@ -871,11 +871,14 @@ is a state-machine guard only; it is not evidence that serious policy training i
 ready. The matrix also rejects a board-pick state that carries reviewed model
 authority and raw model-backed IK readiness but used manual piece-pose correction
 after reset, because serious training needs repeatable board-source pick/place
-from the reset scene state. It also rejects an injected reviewed-authority-ready
-state whose reviewed MuJoCo motion flag is false; the next priority gate must
-remain `mujoco_scene_validity` so serious training cannot advance on
-source/bundle authority without reviewed motion evidence, or on fixture-only,
-malformed raw-ready, unlimited-joint, incomplete-item, or
+from the reset scene state. It also rejects board-pick states that otherwise
+look reviewed-model-backed but claim physical SO-101 truth or policy-training
+authority, because scripted pick/place evidence is not itself physical robot
+safety or policy-training authority. It also rejects an injected
+reviewed-authority-ready state whose reviewed MuJoCo motion flag is false; the
+next priority gate must remain `mujoco_scene_validity` so serious training
+cannot advance on source/bundle authority without reviewed motion evidence, or
+on fixture-only, malformed raw-ready, unlimited-joint, incomplete-item, or
 physical-truth-claiming downstream handoff states. The accepted handoff flag is
 derived from a summary-level
 reviewed MuJoCo downstream handoff contract, not from a raw
@@ -1049,6 +1052,12 @@ A passing summary should show:
   `board_pick_reviewed_model_authority_ready`,
   `board_pick_authority_status`, `board_pick_authority_blockers`,
   `board_pick_detailed_evidence_ready`,
+  `board_pick_observed_evidence_is_physical_so101_authority`,
+  `board_pick_observed_evidence_is_policy_training_authority`,
+  `board_pick_ready_for_policy_training`,
+  `board_pick_physical_truth_claimed`,
+  `board_pick_policy_training_claimed`,
+  `board_pick_policy_authority_claimed`,
   `board_pick_phase_evidence_ready`, `board_pick_stage_sequence_ready`,
   `board_pick_stage_sequence_contract_ok`,
   `board_pick_observed_stage_sequence`, raw
@@ -1067,7 +1076,8 @@ A passing summary should show:
   `board_pick_authority_status` must explain why detailed board-source
   pick/place remains blocked from reviewed authority, including draft or
   development model authority, missing model-backed IK, seeded source poses,
-  manual piece poses after reset, or incomplete detailed phase/stage evidence.
+  manual piece poses after reset, incomplete detailed phase/stage evidence,
+  physical SO-101 truth claims, or policy-training authority claims.
   `rollout_policy_training_authority_ready`
   must require rollout `status: "ok"`, `training_authority_status:
   "reviewed_policy_training_rollouts_ready"`, `rollout_use: "policy_training"`,
@@ -1077,9 +1087,10 @@ A passing summary should show:
   model motion, a ready handoff whose MuJoCo joint-limit enablement reports an
   unlimited SO-101 joint, incomplete handoff items, physical-truth-claiming handoff,
   missing release clearance, missing final board contact, target XY error
-  outside tolerance, failed rollout status, wrong rollout authority status,
-  debug rollout use, missing policy-authority evidence, and nonempty
-  serious-policy blockers.
+  outside tolerance, board-pick physical truth claims, board-pick
+  policy-training authority claims, failed rollout status, wrong rollout
+  authority status, debug rollout use, missing policy-authority evidence, and
+  nonempty serious-policy blockers.
 - `so101_training_rollouts.status: "ok"` with `model_authority: "development_scaffold_not_reviewed"`, `observed_evidence_is_physical_so101_authority: false`, `observed_evidence_is_policy_training_authority: false`, `ready_for_model_backed_ik: false`, scripted episodes/transitions populated, `all_mujoco_fallback_free: true`, `all_mujoco_piece_release_synced: true`, `development_prerequisites_satisfied: true`, `training_authority_status: "development_rollouts_prerequisites_verified_not_policy_ready"`, `ready_for_policy_training: false`, `board_pick_prerequisite.status: "development_board_pick_prerequisite_verified"`, serious-policy blockers including `reviewed_model_backed_board_source_pick_place`, and summary/JSONL/CSV/model/manifest/README artifact paths populated
 - `gripper_camera_pov_review.status: "ok"` with open/approach/grasp/release state IDs, frame paths, annotated-frame paths, metadata paths, metadata contract checks, target center geometry, gripper state, and piece visibility rows populated
 - `visual_review.status: "ok"` with gripper POV, pose fixture, and pick/place sequence contact-sheet PNG paths populated, distance-annotated pick/place sequence frames populated under `frame_sequences`, `depth_distance_scorecard.paths.png`/`.json` populated with the at-a-glance simulator-vs-baseline residual scorecard and missing-real-depth labels, `distance_metrics.paths.json`/`.csv` populated with simulator-ground-truth depth/distance fields, `perceived_depth_comparison.paths.json`/`.csv` populated with estimate-vs-ground-truth residual fields, `pnp_residual_diagnostics.paths.json`/`.csv` populated with source-comparability residual fields, `metadata_native_depth_view.paths.png`/`.json`/`.csv` populated with camera-model-aligned simulator projection/depth fields, and `recordings.*` populated with either a best-effort MP4 path or a skipped reason

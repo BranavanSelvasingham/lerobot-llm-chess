@@ -2284,6 +2284,8 @@ jobs:
               "board_missing_stage_sequence_reviewed_authority_rejected",
               "board_z_tolerance_missing_reviewed_authority_rejected",
               "board_z_tolerance_reviewed_authority_rejected",
+              "board_physical_truth_claim_reviewed_authority_rejected",
+              "board_policy_training_claim_reviewed_authority_rejected",
               "rollout_raw_ready_development_authority_rejected",
               "rollout_reviewed_authority_not_ready",
               "rollout_reviewed_ready_failed_status_rejected",
@@ -2478,6 +2480,26 @@ jobs:
           assert z_outside_tolerance["board_pick_final_place_z_within_tolerance"] is False, z_outside_tolerance
           assert z_outside_tolerance["reviewed_model_backed_board_source_pick_place"] is False, z_outside_tolerance
           assert z_outside_tolerance["ready"] is False, z_outside_tolerance
+          board_physical_truth_claim = by_case["board_physical_truth_claim_reviewed_authority_rejected"]["gate"]
+          assert board_physical_truth_claim["board_pick_reviewed_model_authority_ready"] is True, board_physical_truth_claim
+          assert board_physical_truth_claim["board_pick_detailed_evidence_ready"] is True, board_physical_truth_claim
+          assert board_physical_truth_claim["board_pick_observed_evidence_is_physical_so101_authority"] is True, board_physical_truth_claim
+          assert board_physical_truth_claim["board_pick_physical_truth_claimed"] is True, board_physical_truth_claim
+          assert board_physical_truth_claim["board_pick_authority_status"] == "board_pick_physical_truth_claimed", board_physical_truth_claim
+          assert "remove_physical_so101_truth_claim_from_board_pick" in board_physical_truth_claim["board_pick_authority_blockers"], board_physical_truth_claim
+          assert board_physical_truth_claim["reviewed_model_backed_board_source_pick_place"] is False, board_physical_truth_claim
+          assert board_physical_truth_claim["ready"] is False, board_physical_truth_claim
+          board_policy_claim = by_case["board_policy_training_claim_reviewed_authority_rejected"]["gate"]
+          assert board_policy_claim["board_pick_reviewed_model_authority_ready"] is True, board_policy_claim
+          assert board_policy_claim["board_pick_detailed_evidence_ready"] is True, board_policy_claim
+          assert board_policy_claim["board_pick_ready_for_policy_training"] is True, board_policy_claim
+          assert board_policy_claim["board_pick_observed_evidence_is_policy_training_authority"] is True, board_policy_claim
+          assert board_policy_claim["board_pick_policy_training_claimed"] is True, board_policy_claim
+          assert board_policy_claim["board_pick_policy_authority_claimed"] is True, board_policy_claim
+          assert board_policy_claim["board_pick_authority_status"] == "board_pick_policy_training_authority_claimed", board_policy_claim
+          assert "remove_policy_training_authority_claim_from_board_pick" in board_policy_claim["board_pick_authority_blockers"], board_policy_claim
+          assert board_policy_claim["reviewed_model_backed_board_source_pick_place"] is False, board_policy_claim
+          assert board_policy_claim["ready"] is False, board_policy_claim
           ready = by_case["all_ready_reviewed_contract_state"]["gate"]
           assert ready["ready"] is True, ready
           assert ready["reviewed_mujoco_downstream_handoff_contract_ok"] is True, ready
@@ -2490,6 +2512,9 @@ jobs:
           assert ready["reviewed_mujoco_downstream_handoff_joint_limit_enablement_status"] == "so101_mujoco_joints_limited", ready
           assert ready["reviewed_mujoco_downstream_handoff_missing_limited_joints"] == [], ready
           assert ready["reviewed_mujoco_downstream_handoff_physical_truth_claimed"] is False, ready
+          assert ready["board_pick_physical_truth_claimed"] is False, ready
+          assert ready["board_pick_policy_training_claimed"] is False, ready
+          assert ready["board_pick_policy_authority_claimed"] is False, ready
           assert ready["board_pick_detailed_evidence_ready"] is True, ready
           assert ready["board_pick_phase_evidence_ready"] is True, ready
           assert ready["board_pick_stage_sequence_ready"] is True, ready
@@ -3831,6 +3856,12 @@ jobs:
           assert isinstance(training_readiness_gate["board_pick_detailed_evidence_ready"], bool), training_readiness_gate
           assert isinstance(training_readiness_gate["board_pick_phase_evidence_ready"], bool), training_readiness_gate
           assert isinstance(training_readiness_gate["board_pick_stage_sequence_ready"], bool), training_readiness_gate
+          assert training_readiness_gate["board_pick_observed_evidence_is_physical_so101_authority"] is False, training_readiness_gate
+          assert training_readiness_gate["board_pick_observed_evidence_is_policy_training_authority"] is False, training_readiness_gate
+          assert training_readiness_gate["board_pick_ready_for_policy_training"] is False, training_readiness_gate
+          assert training_readiness_gate["board_pick_physical_truth_claimed"] is False, training_readiness_gate
+          assert training_readiness_gate["board_pick_policy_training_claimed"] is False, training_readiness_gate
+          assert training_readiness_gate["board_pick_policy_authority_claimed"] is False, training_readiness_gate
           assert training_readiness_gate["board_pick_phase_ids"] == [
               "source_reset",
               "two_finger_grasp",

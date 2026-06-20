@@ -5947,6 +5947,13 @@ def so101_board_pick_authority_contract(
     ready_for_model_backed_ik = board_pick.get("ready_for_model_backed_ik") is True
     seeded_source_pose = board_pick.get("robot_pose_seeded_for_source_fixture") is True
     manual_pose_after_reset = board_pick.get("manual_piece_pose_used_after_reset") is True
+    physical_truth_claimed = (
+        board_pick.get("observed_evidence_is_physical_so101_authority") is True
+    )
+    policy_training_claimed = board_pick.get("ready_for_policy_training") is True
+    policy_authority_claimed = (
+        board_pick.get("observed_evidence_is_policy_training_authority") is True
+    )
 
     blockers: list[str] = []
     if not detailed_evidence_ready:
@@ -5959,6 +5966,10 @@ def so101_board_pick_authority_contract(
         blockers.append("remove_seeded_source_pose_from_board_pick")
     if manual_pose_after_reset:
         blockers.append("remove_manual_piece_pose_after_reset_from_board_pick")
+    if physical_truth_claimed:
+        blockers.append("remove_physical_so101_truth_claim_from_board_pick")
+    if policy_training_claimed or policy_authority_claimed:
+        blockers.append("remove_policy_training_authority_claim_from_board_pick")
 
     ready = not blockers
     if ready:
@@ -5971,6 +5982,10 @@ def so101_board_pick_authority_contract(
         status = "board_pick_seeded_source_pose_not_reviewed_ik"
     elif manual_pose_after_reset:
         status = "board_pick_manual_piece_pose_after_reset"
+    elif physical_truth_claimed:
+        status = "board_pick_physical_truth_claimed"
+    elif policy_training_claimed or policy_authority_claimed:
+        status = "board_pick_policy_training_authority_claimed"
     elif not detailed_evidence_ready:
         status = "board_pick_detailed_evidence_incomplete"
     else:
@@ -5984,6 +5999,9 @@ def so101_board_pick_authority_contract(
         "ready_for_model_backed_ik": ready_for_model_backed_ik,
         "seeded_source_pose": seeded_source_pose,
         "manual_piece_pose_after_reset": manual_pose_after_reset,
+        "physical_truth_claimed": physical_truth_claimed,
+        "policy_training_claimed": policy_training_claimed,
+        "policy_authority_claimed": policy_authority_claimed,
         "detailed_evidence_ready": detailed_evidence_ready,
     }
 
@@ -6674,6 +6692,24 @@ def so101_training_readiness_gate_section(
         "board_pick_authority_status": board_pick_authority_contract.get("status"),
         "board_pick_authority_blockers": board_pick_authority_contract.get("blockers"),
         "board_pick_detailed_evidence_ready": board_pick_detailed_evidence_ready,
+        "board_pick_observed_evidence_is_physical_so101_authority": board_pick.get(
+            "observed_evidence_is_physical_so101_authority"
+        ),
+        "board_pick_observed_evidence_is_policy_training_authority": board_pick.get(
+            "observed_evidence_is_policy_training_authority"
+        ),
+        "board_pick_ready_for_policy_training": board_pick.get(
+            "ready_for_policy_training"
+        ),
+        "board_pick_physical_truth_claimed": board_pick_authority_contract.get(
+            "physical_truth_claimed"
+        ),
+        "board_pick_policy_training_claimed": board_pick_authority_contract.get(
+            "policy_training_claimed"
+        ),
+        "board_pick_policy_authority_claimed": board_pick_authority_contract.get(
+            "policy_authority_claimed"
+        ),
         "board_pick_ready_for_model_backed_ik": board_pick.get("ready_for_model_backed_ik"),
         "board_pick_source_pick_started_at_source": board_pick.get(
             "source_pick_started_at_source"
@@ -6852,6 +6888,32 @@ def write_so101_training_readiness_gate_artifacts(
             "expected_value": "reviewed_model_backed_board_source_pick_place_verified",
             "blockers": "; ".join(gate.get("board_pick_authority_blockers") or []),
             "notes": "This explains why detailed board-pick evidence is still not reviewed-model-backed pick/place authority.",
+        },
+        {
+            "requirement_id": "board_pick_authority_overclaim_boundary",
+            "category": "authority_boundary",
+            "status": "ok"
+            if gate.get("board_pick_physical_truth_claimed") is False
+            and gate.get("board_pick_policy_training_claimed") is False
+            and gate.get("board_pick_policy_authority_claimed") is False
+            else "action_required",
+            "observed_value": json.dumps(
+                {
+                    "physical_truth_claimed": gate.get(
+                        "board_pick_physical_truth_claimed"
+                    ),
+                    "policy_training_claimed": gate.get(
+                        "board_pick_policy_training_claimed"
+                    ),
+                    "policy_authority_claimed": gate.get(
+                        "board_pick_policy_authority_claimed"
+                    ),
+                },
+                sort_keys=True,
+            ),
+            "expected_value": "all false",
+            "blockers": "; ".join(gate.get("board_pick_authority_blockers") or []),
+            "notes": "Board-source pick/place evidence cannot independently claim physical SO-101 truth or policy-training authority.",
         },
         {
             "requirement_id": "policy_training_rollouts_ready",
