@@ -1485,12 +1485,159 @@ def parse_joint_limit_pair(value: Any) -> tuple[bool, Any, list[str]]:
     return False, value, ["joint_limit_expected_lower_upper_or_len2_list"]
 
 
-def joint_limit_values_from_field(field_name: str, value: Any) -> tuple[str, Any]:
-    if field_name == "joint_limit_authority" and isinstance(value, dict):
-        nested_field, nested_value = find_first_field(value, JOINT_LIMIT_NESTED_VALUE_FIELDS)
-        if nested_field is not None:
-            return f"{field_name}.{nested_field}", nested_value
-    return field_name, value
+def inspect_joint_limit_payload(value_payload: Any) -> dict[str, Any]:
+    if not isinstance(value_payload, dict):
+        return {
+            "valid": False,
+            "value": value_payload,
+            "expected_joints": list(EXPECTED_SO101_JOINTS),
+            "missing_joints": list(EXPECTED_SO101_JOINTS),
+            "invalid_joints": [],
+            "diagnostics": ["joint_limits_not_object"],
+        }
+
+    normalized: dict[str, Any] = {}
+    invalid_joints: list[dict[str, Any]] = []
+    for joint in EXPECTED_SO101_JOINTS:
+        if joint not in value_payload:
+            continue
+        valid, normalized_value, diagnostics = parse_joint_limit_pair(value_payload[joint])
+        if valid:
+            normalized[joint] = normalized_value
+        else:
+            invalid_joints.append(
+                {"joint": joint, "value": normalized_value, "diagnostics": diagnostics}
+            )
+
+    missing_joints = [joint for joint in EXPECTED_SO101_JOINTS if joint not in normalized]
+    diagnostics = []
+    if missing_joints:
+        diagnostics.extend(f"joint_limit_missing:{joint}" for joint in missing_joints)
+    for invalid in invalid_joints:
+        diagnostics.extend(
+            f"joint_limit_invalid:{invalid['joint']}:{diagnostic}"
+            for diagnostic in invalid["diagnostics"]
+        )
+    return {
+        "valid": not missing_joints and not invalid_joints,
+        "value": normalized,
+        "expected_joints": list(EXPECTED_SO101_JOINTS),
+        "missing_joints": missing_joints,
+        "invalid_joints": invalid_joints,
+        "diagnostics": diagnostics,
+    }
+
+
+def joint_limit_pair_components(value: Any) -> list[float] | None:
+    if isinstance(value, dict):
+        try:
+            return [float(value["lower"]), float(value["upper"])]
+        except (KeyError, TypeError, ValueError):
+            return None
+    if isinstance(value, list) and len(value) == 2:
+        try:
+            return [float(value[0]), float(value[1])]
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def joint_limit_components(value: dict[str, Any]) -> list[float] | None:
+    components: list[float] = []
+    for joint in EXPECTED_SO101_JOINTS:
+        pair = joint_limit_pair_components(value.get(joint))
+        if pair is None:
+            return None
+        components.extend(pair)
+    return components
+
+
+def joint_limit_value_aliases(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    aliases = []
+    for field_name in JOINT_LIMIT_FIELDS:
+        raw_value = manifest.get(field_name)
+        if not non_empty(raw_value):
+            continue
+        if field_name == "joint_limit_authority":
+            if not isinstance(raw_value, dict):
+                continue
+            nested_aliases = []
+            for nested_field in JOINT_LIMIT_NESTED_VALUE_FIELDS:
+                nested_value = raw_value.get(nested_field)
+                if not non_empty(nested_value):
+                    continue
+                nested = inspect_joint_limit_payload(nested_value)
+                nested_aliases.append(
+                    {
+                        "field": f"{field_name}.{nested_field}",
+                        "value": nested["value"],
+                        "valid": nested["valid"],
+                        "missing_joints": nested["missing_joints"],
+                        "invalid_joints": nested["invalid_joints"],
+                        "diagnostics": nested["diagnostics"],
+                    }
+                )
+            if not nested_aliases:
+                continue
+            invalid_nested_alias_fields = [
+                alias["field"] for alias in nested_aliases if not alias["valid"]
+            ]
+            normalized_nested_aliases = []
+            for alias in nested_aliases:
+                components = joint_limit_components(alias["value"])
+                if alias["valid"] and components is not None:
+                    normalized_nested_aliases.append(components)
+            unique_nested_aliases: list[list[float]] = []
+            for components in normalized_nested_aliases:
+                if not any(
+                    vectors_equivalent(components, existing)
+                    for existing in unique_nested_aliases
+                ):
+                    unique_nested_aliases.append(components)
+            nested_alias_conflict = len(unique_nested_aliases) > 1
+            selected = nested_aliases[0]
+            diagnostics = list(selected["diagnostics"])
+            if invalid_nested_alias_fields:
+                diagnostics.extend(
+                    f"joint_limit_nested_alias_invalid:{alias_field}"
+                    for alias_field in invalid_nested_alias_fields
+                )
+            if nested_alias_conflict:
+                diagnostics.append("joint_limit_nested_alias_conflict")
+            aliases.append(
+                {
+                    "field": field_name,
+                    "value_field": selected["field"],
+                    "value": selected["value"],
+                    "valid": bool(
+                        selected["valid"]
+                        and not invalid_nested_alias_fields
+                        and not nested_alias_conflict
+                    ),
+                    "missing_joints": selected["missing_joints"],
+                    "invalid_joints": selected["invalid_joints"],
+                    "nested_aliases": nested_aliases,
+                    "nested_alias_conflict": nested_alias_conflict,
+                    "diagnostics": diagnostics,
+                }
+            )
+            continue
+
+        inspected = inspect_joint_limit_payload(raw_value)
+        aliases.append(
+            {
+                "field": field_name,
+                "value_field": field_name,
+                "value": inspected["value"],
+                "valid": inspected["valid"],
+                "missing_joints": inspected["missing_joints"],
+                "invalid_joints": inspected["invalid_joints"],
+                "nested_aliases": [],
+                "nested_alias_conflict": False,
+                "diagnostics": inspected["diagnostics"],
+            }
+        )
+    return aliases
 
 
 def inspect_joint_limit_review(
@@ -1598,65 +1745,80 @@ def inspect_joint_limits(manifest: dict[str, Any] | None) -> dict[str, Any]:
             "status": "missing",
             "field": None,
             "value": None,
+            "joint_limit_aliases": [],
+            "joint_limit_alias_conflict": False,
             "expected_joints": list(EXPECTED_SO101_JOINTS),
             "missing_joints": list(EXPECTED_SO101_JOINTS),
             "invalid_joints": [],
             "diagnostics": ["joint_limits_missing"],
         }
 
-    field_name, value = find_first_field(manifest, JOINT_LIMIT_FIELDS)
-    if field_name is None:
+    aliases = joint_limit_value_aliases(manifest)
+    if not aliases:
         return {
             "status": "missing",
             "field": None,
             "value": None,
+            "joint_limit_aliases": [],
+            "joint_limit_alias_conflict": False,
             "expected_joints": list(EXPECTED_SO101_JOINTS),
             "missing_joints": list(EXPECTED_SO101_JOINTS),
             "invalid_joints": [],
             "diagnostics": ["joint_limits_missing"],
         }
-    value_field_name, value_payload = joint_limit_values_from_field(field_name, value)
-    if not isinstance(value_payload, dict):
-        return {
-            "status": "invalid",
-            "field": field_name,
-            "value_field": value_field_name,
-            "value": value_payload,
-            "expected_joints": list(EXPECTED_SO101_JOINTS),
-            "missing_joints": list(EXPECTED_SO101_JOINTS),
-            "invalid_joints": [],
-            "diagnostics": ["joint_limits_not_object"],
-        }
 
-    normalized: dict[str, Any] = {}
-    invalid_joints: list[dict[str, Any]] = []
-    for joint in EXPECTED_SO101_JOINTS:
-        if joint not in value_payload:
-            continue
-        valid, normalized_value, diagnostics = parse_joint_limit_pair(value_payload[joint])
-        if valid:
-            normalized[joint] = normalized_value
-        else:
-            invalid_joints.append(
-                {"joint": joint, "value": normalized_value, "diagnostics": diagnostics}
-            )
-    missing_joints = [joint for joint in EXPECTED_SO101_JOINTS if joint not in normalized]
-    diagnostics = []
-    if missing_joints:
-        diagnostics.extend(f"joint_limit_missing:{joint}" for joint in missing_joints)
-    for invalid in invalid_joints:
+    selected = aliases[0]
+    field_name = selected["field"]
+    value = manifest.get(field_name)
+    value_field_name = selected["value_field"]
+    normalized = selected["value"]
+    missing_joints = list(selected["missing_joints"])
+    invalid_joints = list(selected["invalid_joints"])
+    diagnostics = list(selected["diagnostics"])
+    invalid_alias_fields = [alias["field"] for alias in aliases if not alias["valid"]]
+    if invalid_alias_fields:
         diagnostics.extend(
-            f"joint_limit_invalid:{invalid['joint']}:{diagnostic}"
-            for diagnostic in invalid["diagnostics"]
+            f"joint_limits_alias_invalid:{alias_field}"
+            for alias_field in invalid_alias_fields
         )
+    normalized_aliases = []
+    for alias in aliases:
+        components = joint_limit_components(alias["value"])
+        if alias["valid"] and components is not None:
+            normalized_aliases.append(components)
+    unique_aliases: list[list[float]] = []
+    for components in normalized_aliases:
+        if not any(
+            vectors_equivalent(components, existing)
+            for existing in unique_aliases
+        ):
+            unique_aliases.append(components)
+    top_level_alias_conflict = len(unique_aliases) > 1
+    nested_alias_conflict = any(
+        bool(alias.get("nested_alias_conflict")) for alias in aliases
+    )
+    alias_conflict = top_level_alias_conflict or nested_alias_conflict
+    if top_level_alias_conflict:
+        diagnostics.append("joint_limits_alias_conflict")
+    if nested_alias_conflict:
+        diagnostics.append("joint_limit_nested_alias_conflict")
     review = inspect_joint_limit_review(manifest, field_name, value)
-    if not diagnostics and review["status"] != "present":
+    value_valid = bool(
+        selected["valid"]
+        and not invalid_alias_fields
+        and not alias_conflict
+    )
+    if value_valid and review["status"] != "present":
         diagnostics.extend(review.get("diagnostics", []))
     return {
-        "status": "present" if not diagnostics else "needs_review" if not missing_joints and not invalid_joints else "invalid",
+        "status": "present" if not diagnostics else "needs_review" if value_valid else "invalid",
         "field": field_name,
         "value_field": value_field_name,
         "value": normalized,
+        "joint_limit_aliases": aliases,
+        "joint_limit_alias_conflict": alias_conflict,
+        "top_level_joint_limit_alias_conflict": top_level_alias_conflict,
+        "nested_joint_limit_alias_conflict": nested_alias_conflict,
         "review": review,
         "review_status": review.get("status"),
         "review_diagnostics": review.get("diagnostics", []),

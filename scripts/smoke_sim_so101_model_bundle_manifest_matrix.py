@@ -710,6 +710,28 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "conflicting_joint_limit_alias_not_ready",
+            "manifest_path": fixtures["conflicting_joint_limit_alias_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "joint_limits_status": "invalid",
+                "missing_inputs": ["joint_limits_deg"],
+            },
+        },
+        {
+            "case_id": "conflicting_joint_limit_nested_alias_not_ready",
+            "manifest_path": fixtures[
+                "conflicting_joint_limit_nested_alias_manifest_path"
+            ],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "joint_limits_status": "invalid",
+                "missing_inputs": ["joint_limits_deg"],
+            },
+        },
+        {
             "case_id": "weak_mesh_asset_authority_not_ready",
             "manifest_path": fixtures["weak_mesh_manifest_path"],
             "expect": {
@@ -1157,6 +1179,15 @@ def summarize_case(
             "provenance_status": nested_status(summary, "provenance"),
             "asset_roots_status": nested_status(summary, "asset_roots"),
             "joint_limits_status": nested_status(summary, "joint_limits"),
+            "joint_limit_alias_conflict": (
+                summary.get("joint_limits") or {}
+            ).get("joint_limit_alias_conflict"),
+            "top_level_joint_limit_alias_conflict": (
+                summary.get("joint_limits") or {}
+            ).get("top_level_joint_limit_alias_conflict"),
+            "nested_joint_limit_alias_conflict": (
+                summary.get("joint_limits") or {}
+            ).get("nested_joint_limit_alias_conflict"),
             "mesh_assets_status": nested_status(summary, "mesh_assets"),
             "target_frame_status": nested_status(summary, "target_frame"),
             "tcp_offset_status": nested_status(summary, "tcp_offset"),
@@ -1281,6 +1312,13 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "provenance_status": obs.get("provenance_status"),
         "asset_roots_status": obs.get("asset_roots_status"),
         "joint_limits_status": obs.get("joint_limits_status"),
+        "joint_limit_alias_conflict": obs.get("joint_limit_alias_conflict"),
+        "top_level_joint_limit_alias_conflict": obs.get(
+            "top_level_joint_limit_alias_conflict"
+        ),
+        "nested_joint_limit_alias_conflict": obs.get(
+            "nested_joint_limit_alias_conflict"
+        ),
         "mesh_assets_status": obs.get("mesh_assets_status"),
         "target_frame_status": obs.get("target_frame_status"),
         "tcp_offset_status": obs.get("tcp_offset_status"),

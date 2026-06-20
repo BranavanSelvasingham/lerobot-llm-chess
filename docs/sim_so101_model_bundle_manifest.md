@@ -444,7 +444,12 @@ as an object covering every expected SO-101 joint with finite numeric bounds:
 `shoulder_pan`,
 `shoulder_lift`, `elbow_flex`, `wrist_flex`, `wrist_roll`, and `gripper`.
 Each entry may be a two-item `[lower, upper]` list or an object with
-`lower`/`upper` or `min`/`max` numeric values. The checker also requires
+`lower`/`upper` or `min`/`max` numeric values. If more than one joint-limit
+alias is present, every non-empty alias must normalize to the same finite
+per-joint bounds. If `joint_limit_authority` embeds nested limit values,
+accepted nested aliases are `joint_limits_deg`, `joint_limits`, `limits_deg`,
+and `limits`; those nested aliases must also agree. Conflicting joint-limit
+aliases are not readiness evidence. The checker also requires
 accepted joint-limit review metadata in `joint_limit_authority`,
 `joint_limits_review`, `joint_limit_review`, `joint_limits_metadata`, or inside
 the joint-limit field itself. Accepted review statuses are `reviewed`,

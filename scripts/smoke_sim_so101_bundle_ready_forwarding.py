@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import hashlib
 import json
@@ -554,6 +555,28 @@ def weak_joint_limit_authority_manifest_payload(model_filename: str) -> dict[str
     return payload
 
 
+def conflicting_joint_limit_alias_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["joint_limits"] = copy.deepcopy(payload["joint_limits_deg"])
+    payload["joint_limits"]["shoulder_pan"] = [-90.0, 90.0]
+    return payload
+
+
+def conflicting_joint_limit_nested_alias_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["joint_limit_authority"]["joint_limits_deg"] = copy.deepcopy(
+        payload["joint_limits_deg"]
+    )
+    payload["joint_limit_authority"]["limits_deg"] = copy.deepcopy(
+        payload["joint_limits_deg"]
+    )
+    payload["joint_limit_authority"]["limits_deg"]["shoulder_lift"] = [
+        -95.0,
+        105.0,
+    ]
+    return payload
+
+
 def weak_mesh_asset_authority_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload.pop("mesh_asset_authority", None)
@@ -665,6 +688,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         fixture_dir / "fixture_provenance_reviewed_authority_bundle"
     )
     weak_joint_limits_dir = fixture_dir / "weak_joint_limits_bundle"
+    conflicting_joint_limit_alias_dir = fixture_dir / "conflicting_joint_limit_alias_bundle"
+    conflicting_joint_limit_nested_alias_dir = (
+        fixture_dir / "conflicting_joint_limit_nested_alias_bundle"
+    )
     weak_mesh_dir = fixture_dir / "weak_mesh_bundle"
     weak_target_frame_dir = fixture_dir / "weak_target_frame_bundle"
     wrong_target_frame_dir = fixture_dir / "wrong_target_frame_bundle"
@@ -701,6 +728,8 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         invalid_provenance_url_dir,
         fixture_provenance_reviewed_authority_dir,
         weak_joint_limits_dir,
+        conflicting_joint_limit_alias_dir,
+        conflicting_joint_limit_nested_alias_dir,
         weak_mesh_dir,
         weak_target_frame_dir,
         wrong_target_frame_dir,
@@ -772,6 +801,18 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     )
     weak_joint_limits_model_path = weak_joint_limits_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_joint_limits_model_path.write_text(mjcf_with_mesh_reference())
+    conflicting_joint_limit_alias_model_path = (
+        conflicting_joint_limit_alias_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    conflicting_joint_limit_alias_model_path.write_text(mjcf_with_mesh_reference())
+    conflicting_joint_limit_nested_alias_model_path = (
+        conflicting_joint_limit_nested_alias_dir
+        / "model"
+        / "synthetic_so101_mujoco.xml"
+    )
+    conflicting_joint_limit_nested_alias_model_path.write_text(
+        mjcf_with_mesh_reference()
+    )
     weak_mesh_model_path = weak_mesh_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_mesh_model_path.write_text(mjcf_with_mesh_reference())
     weak_target_frame_model_path = weak_target_frame_dir / "model" / "synthetic_so101_mujoco.xml"
@@ -856,6 +897,14 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         / "so101_model_bundle.fixture_provenance_reviewed_authority.json"
     )
     weak_joint_limits_manifest_path = weak_joint_limits_dir / "so101_model_bundle.weak_joint_limits.json"
+    conflicting_joint_limit_alias_manifest_path = (
+        conflicting_joint_limit_alias_dir
+        / "so101_model_bundle.conflicting_joint_limit_alias.json"
+    )
+    conflicting_joint_limit_nested_alias_manifest_path = (
+        conflicting_joint_limit_nested_alias_dir
+        / "so101_model_bundle.conflicting_joint_limit_nested_alias.json"
+    )
     weak_mesh_manifest_path = weak_mesh_dir / "so101_model_bundle.weak_mesh_assets.json"
     weak_target_frame_manifest_path = weak_target_frame_dir / "so101_model_bundle.weak_target_frame.json"
     wrong_target_frame_manifest_path = wrong_target_frame_dir / "so101_model_bundle.wrong_target_frame.json"
@@ -985,6 +1034,20 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_joint_limits_model_path,
     )
     write_manifest_json(
+        conflicting_joint_limit_alias_manifest_path,
+        conflicting_joint_limit_alias_manifest_payload(
+            model_filename=conflicting_joint_limit_alias_model_path.name
+        ),
+        conflicting_joint_limit_alias_model_path,
+    )
+    write_manifest_json(
+        conflicting_joint_limit_nested_alias_manifest_path,
+        conflicting_joint_limit_nested_alias_manifest_payload(
+            model_filename=conflicting_joint_limit_nested_alias_model_path.name
+        ),
+        conflicting_joint_limit_nested_alias_model_path,
+    )
+    write_manifest_json(
         weak_mesh_manifest_path,
         weak_mesh_asset_authority_manifest_payload(model_filename=weak_mesh_model_path.name),
         weak_mesh_model_path,
@@ -1081,6 +1144,12 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
             fixture_provenance_reviewed_authority_manifest_path
         ),
         "weak_joint_limits_manifest_path": weak_joint_limits_manifest_path,
+        "conflicting_joint_limit_alias_manifest_path": (
+            conflicting_joint_limit_alias_manifest_path
+        ),
+        "conflicting_joint_limit_nested_alias_manifest_path": (
+            conflicting_joint_limit_nested_alias_manifest_path
+        ),
         "weak_mesh_manifest_path": weak_mesh_manifest_path,
         "weak_target_frame_manifest_path": weak_target_frame_manifest_path,
         "wrong_target_frame_manifest_path": wrong_target_frame_manifest_path,
@@ -1116,6 +1185,12 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
             fixture_provenance_reviewed_authority_model_path
         ),
         "weak_joint_limits_model_path": weak_joint_limits_model_path,
+        "conflicting_joint_limit_alias_model_path": (
+            conflicting_joint_limit_alias_model_path
+        ),
+        "conflicting_joint_limit_nested_alias_model_path": (
+            conflicting_joint_limit_nested_alias_model_path
+        ),
         "weak_mesh_model_path": weak_mesh_model_path,
         "weak_target_frame_model_path": weak_target_frame_model_path,
         "wrong_target_frame_model_path": wrong_target_frame_model_path,
