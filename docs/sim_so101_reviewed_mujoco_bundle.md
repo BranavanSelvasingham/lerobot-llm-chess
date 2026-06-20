@@ -89,6 +89,7 @@ and `.csv`. The handoff snapshots the exact model identity, target frame, TCP
 offset, base-to-board transform, joint limits, mesh evidence, and MuJoCo motion
 authority that later scene, Gymnasium, and reviewed-model-backed pick/place
 gates must consume. It always reports
+`schema: "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1"`,
 `model_authority: "downstream_handoff_not_authority"`,
 `observed_evidence_is_authority: false`, and
 `physical_so101_truth_claimed: false`. Its `downstream_handoff_ready` flag is
@@ -175,6 +176,9 @@ handoff missing inputs or pending action IDs force
 `reviewed_mujoco_bundle_handoff_blocked_open_work` and keep
 `downstream_handoff_ready` and
 `fixture_handoff_ready_not_physical_so101_authority` false.
+The matrix asserts the flattened summary schema and downstream handoff JSON
+schema match the current handoff schema before later gates can trust the
+artifact.
 
 Passing this gate is still not full physical readiness. It proves reviewed-model
 handoff into MuJoCo and SimRobot joint motion. Contact-validated gripper

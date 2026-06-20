@@ -25,6 +25,9 @@ DEFAULT_OUTPUT_DIR = (
     Path("/private/tmp") / "lerobot_sim" / "so101_reviewed_mujoco_bundle_matrix"
 )
 SCHEMA = "lerobot.sim.so101_reviewed_mujoco_bundle_matrix.v1"
+EXPECTED_DOWNSTREAM_HANDOFF_SCHEMA = (
+    "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1"
+)
 REVIEWED_MUJOCO_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_reviewed_mujoco_bundle.py"
 MANIFEST_CHECKER_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_model_bundle_manifest.py"
 EXPECTED_MOTION_CHECK_JOINTS = (
@@ -379,6 +382,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "ready_handoff_open_work_pending_action_ids",
         "ready_handoff_open_work_blockers",
         "next_required_action_ids",
+        "downstream_handoff_schema",
+        "downstream_handoff_json_schema",
         "downstream_handoff_status",
         "downstream_handoff_ready",
         "fixture_handoff_ready_not_physical_so101_authority",
@@ -1695,6 +1700,12 @@ def summarize_case(
     expected_handoff_status = expected_downstream_handoff_status(summary)
     add_error(
         errors,
+        f"{case_id}.downstream_handoff_schema",
+        summary.get("downstream_handoff_schema"),
+        EXPECTED_DOWNSTREAM_HANDOFF_SCHEMA,
+    )
+    add_error(
+        errors,
         f"{case_id}.downstream_handoff_status",
         summary.get("downstream_handoff_status"),
         expected_handoff_status,
@@ -1719,6 +1730,12 @@ def summarize_case(
         if row.get("handoff_key")
     )
     if downstream_handoff:
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.schema",
+            downstream_handoff.get("schema"),
+            EXPECTED_DOWNSTREAM_HANDOFF_SCHEMA,
+        )
         add_error(
             errors,
             f"{case_id}.downstream_handoff_json.status",
@@ -1912,6 +1929,10 @@ def summarize_case(
                 "ready_handoff_open_work_blockers"
             ),
             "next_required_action_ids": summary.get("next_required_action_ids"),
+            "downstream_handoff_schema": summary.get("downstream_handoff_schema"),
+            "downstream_handoff_json_schema": downstream_handoff.get("schema")
+            if isinstance(downstream_handoff, dict)
+            else None,
             "downstream_handoff_status": summary.get("downstream_handoff_status"),
             "downstream_handoff_ready": summary.get("downstream_handoff_ready"),
             "fixture_handoff_ready_not_physical_so101_authority": summary.get(
@@ -2002,6 +2023,10 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
             "ready_handoff_open_work_blockers"
         ),
         "next_required_action_ids": observations.get("next_required_action_ids"),
+        "downstream_handoff_schema": observations.get("downstream_handoff_schema"),
+        "downstream_handoff_json_schema": observations.get(
+            "downstream_handoff_json_schema"
+        ),
         "downstream_handoff_status": observations.get("downstream_handoff_status"),
         "downstream_handoff_ready": observations.get("downstream_handoff_ready"),
         "fixture_handoff_ready_not_physical_so101_authority": observations.get(

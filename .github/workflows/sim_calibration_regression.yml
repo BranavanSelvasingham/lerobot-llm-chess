@@ -3021,6 +3021,7 @@ jobs:
           assert reviewed_mujoco_bundle["downstream_handoff_observed_evidence_is_authority"] is False, reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["downstream_handoff_physical_so101_truth_claimed"] is False, reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["downstream_handoff_development_fixture_evidence_not_physical_so101_truth"] is True, reviewed_mujoco_bundle
+          assert reviewed_mujoco_bundle["downstream_handoff_schema"] == "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1", reviewed_mujoco_bundle
           assert isinstance(reviewed_mujoco_bundle["downstream_handoff_item_count"], int), reviewed_mujoco_bundle
           assert reviewed_mujoco_bundle["downstream_handoff_item_count"] >= 8, reviewed_mujoco_bundle
           assert "downstream_gate_handoff" in reviewed_mujoco_bundle["downstream_handoff_item_ids"], reviewed_mujoco_bundle
@@ -3066,6 +3067,7 @@ jobs:
                   reviewed_mujoco_artifacts,
               )
           handoff = json.loads(Path(reviewed_mujoco_artifacts["downstream_handoff_json"]).read_text())
+          assert handoff["schema"] == reviewed_mujoco_bundle["downstream_handoff_schema"], handoff
           assert handoff["model_authority"] == "downstream_handoff_not_authority", handoff
           assert handoff["status"] == reviewed_mujoco_bundle["downstream_handoff_status"], handoff
           assert handoff["downstream_handoff_ready"] == reviewed_mujoco_bundle["downstream_handoff_ready"], handoff
