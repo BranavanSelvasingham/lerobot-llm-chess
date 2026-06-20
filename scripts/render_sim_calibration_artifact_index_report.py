@@ -1500,6 +1500,17 @@ def so101_mujoco_smoke_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("reviewed_mujoco_handoff_physical_truth_claimed", ""),
         metrics.get("reviewed_mujoco_handoff_joint_limit_enablement_status", ""),
         compact_list(metrics.get("reviewed_mujoco_handoff_missing_limited_joints")),
+        compact_list(metrics.get("reviewed_mujoco_handoff_explicit_action_ids")),
+        compact_list(metrics.get("reviewed_mujoco_handoff_next_required_action_ids")),
+        metrics.get("reviewed_mujoco_handoff_action_ids_match_next_required", ""),
+        compact_list(
+            metrics.get("reviewed_mujoco_handoff_action_ids_missing_from_next_required")
+        ),
+        compact_list(
+            metrics.get(
+                "reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids"
+            )
+        ),
         metrics.get("reviewed_mujoco_handoff_priority_gate_id", ""),
         compact_list(metrics.get("reviewed_mujoco_handoff_priority_gate_order")),
         metrics.get("reviewed_mujoco_handoff_next_downstream_gate_after_ready", ""),
@@ -3400,6 +3411,11 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Scene Handoff Truth Claimed",
                 "Scene Handoff Joint Limits",
                 "Scene Handoff Missing Limited",
+                "Scene Handoff Explicit Actions",
+                "Scene Handoff Next Actions",
+                "Scene Handoff Action Sync",
+                "Scene Handoff Extra Actions",
+                "Scene Handoff Missing Next Actions",
                 "Scene Handoff Gate",
                 "Scene Handoff Gate Order",
                 "Scene Handoff Next Gate",

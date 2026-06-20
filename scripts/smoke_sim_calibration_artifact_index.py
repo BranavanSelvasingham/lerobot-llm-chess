@@ -2333,6 +2333,25 @@ def collect_so101_mujoco_smoke_artifacts(
             "reviewed_mujoco_handoff_missing_limited_joints"
         )
         or [],
+        "reviewed_mujoco_handoff_explicit_action_ids": smoke.get(
+            "reviewed_mujoco_handoff_explicit_action_ids"
+        )
+        or [],
+        "reviewed_mujoco_handoff_next_required_action_ids": smoke.get(
+            "reviewed_mujoco_handoff_next_required_action_ids"
+        )
+        or [],
+        "reviewed_mujoco_handoff_action_ids_match_next_required": smoke.get(
+            "reviewed_mujoco_handoff_action_ids_match_next_required"
+        ),
+        "reviewed_mujoco_handoff_action_ids_missing_from_next_required": smoke.get(
+            "reviewed_mujoco_handoff_action_ids_missing_from_next_required"
+        )
+        or [],
+        "reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids": smoke.get(
+            "reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids"
+        )
+        or [],
         "reviewed_mujoco_handoff_priority_gate_id": smoke.get(
             "reviewed_mujoco_handoff_priority_gate_id"
         ),

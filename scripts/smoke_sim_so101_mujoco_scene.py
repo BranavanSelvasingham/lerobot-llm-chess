@@ -175,6 +175,11 @@ def handoff_intake_result(
     missing_limited_joints: list[str] | None = None,
     missing_inputs: list[str] | None = None,
     pending_action_ids: list[str] | None = None,
+    explicit_action_ids: list[str] | None = None,
+    next_required_action_ids: list[str] | None = None,
+    action_ids_match_next_required: bool | None = None,
+    action_ids_missing_from_next_required: list[str] | None = None,
+    next_required_actions_missing_from_action_ids: list[str] | None = None,
     ready_handoff_has_open_work: bool = False,
     gates_unblocked_when_physical_ready: list[str] | None = None,
     blocked_gates_until_physical_ready: list[str] | None = None,
@@ -240,6 +245,19 @@ def handoff_intake_result(
         ),
         "reviewed_mujoco_handoff_missing_inputs": missing_inputs or [],
         "reviewed_mujoco_handoff_pending_action_ids": pending_action_ids or [],
+        "reviewed_mujoco_handoff_explicit_action_ids": explicit_action_ids or [],
+        "reviewed_mujoco_handoff_next_required_action_ids": (
+            next_required_action_ids or []
+        ),
+        "reviewed_mujoco_handoff_action_ids_match_next_required": (
+            action_ids_match_next_required
+        ),
+        "reviewed_mujoco_handoff_action_ids_missing_from_next_required": (
+            action_ids_missing_from_next_required or []
+        ),
+        "reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids": (
+            next_required_actions_missing_from_action_ids or []
+        ),
         "reviewed_mujoco_handoff_ready_has_open_work": ready_handoff_has_open_work,
         "reviewed_mujoco_handoff_gates_unblocked_when_physical_ready": (
             gates_unblocked_when_physical_ready or []
@@ -352,6 +370,20 @@ def reviewed_handoff_intake(
             *handoff_explicit_action_ids,
             *handoff_next_required_action_ids,
         ]
+    )
+    handoff_actions_missing_from_next_required = [
+        action_id
+        for action_id in handoff_explicit_action_ids
+        if action_id not in handoff_next_required_action_ids
+    ]
+    next_required_actions_missing_from_handoff = [
+        action_id
+        for action_id in handoff_next_required_action_ids
+        if action_id not in handoff_explicit_action_ids
+    ]
+    handoff_action_ids_match_next_required = (
+        not handoff_actions_missing_from_next_required
+        and not next_required_actions_missing_from_handoff
     )
     raw_gates_unblocked = payload.get("gates_unblocked_when_physical_handoff_ready")
     gates_unblocked = unique_strings(
@@ -502,6 +534,7 @@ def reviewed_handoff_intake(
         )
         and gate_contract_ok
         and priority_contract_ok
+        and handoff_action_ids_match_next_required
         and not ready_handoff_has_open_work
         and (not (raw_ready or fixture_ready) or joint_limit_enablement_ok)
         and (not (raw_ready or fixture_ready) or reviewed_model_identity_contract_ok)
@@ -552,6 +585,8 @@ def reviewed_handoff_intake(
         blockers.append("resolve_ready_reviewed_mujoco_handoff_missing_inputs")
     if (raw_ready or fixture_ready) and handoff_pending_action_ids:
         blockers.append("resolve_ready_reviewed_mujoco_handoff_pending_actions")
+    if not handoff_action_ids_match_next_required:
+        blockers.append("sync_reviewed_mujoco_handoff_pending_action_ids")
     if (raw_ready or fixture_ready) and not joint_limit_enablement_ok:
         blockers.append("provide_reviewed_mujoco_joint_limit_enablement_evidence")
     if (raw_ready or fixture_ready) and not reviewed_model_identity_contract_ok:
@@ -597,6 +632,15 @@ def reviewed_handoff_intake(
         missing_limited_joints=missing_limited_joints,
         missing_inputs=handoff_missing_inputs,
         pending_action_ids=handoff_pending_action_ids,
+        explicit_action_ids=handoff_explicit_action_ids,
+        next_required_action_ids=handoff_next_required_action_ids,
+        action_ids_match_next_required=handoff_action_ids_match_next_required,
+        action_ids_missing_from_next_required=(
+            handoff_actions_missing_from_next_required
+        ),
+        next_required_actions_missing_from_action_ids=(
+            next_required_actions_missing_from_handoff
+        ),
         ready_handoff_has_open_work=ready_handoff_has_open_work,
         gates_unblocked_when_physical_ready=gates_unblocked,
         blocked_gates_until_physical_ready=blocked_gates,

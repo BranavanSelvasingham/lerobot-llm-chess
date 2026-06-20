@@ -1738,6 +1738,7 @@ jobs:
               "incomplete_ready_handoff_rejected",
               "ready_handoff_with_missing_input_rejected",
               "ready_handoff_with_pending_action_rejected",
+              "ready_handoff_action_id_drift_rejected",
               "ready_handoff_physical_truth_claim_rejected",
               "ready_handoff_policy_training_claim_rejected",
               "ready_handoff_missing_scene_gate_rejected",
@@ -1783,6 +1784,7 @@ jobs:
               "incomplete_ready_handoff_rejected",
               "ready_handoff_with_missing_input_rejected",
               "ready_handoff_with_pending_action_rejected",
+              "ready_handoff_action_id_drift_rejected",
               "ready_handoff_physical_truth_claim_rejected",
               "ready_handoff_policy_training_claim_rejected",
               "ready_handoff_missing_scene_gate_rejected",
@@ -1841,7 +1843,24 @@ jobs:
           assert pending_action_handoff["reviewed_mujoco_handoff_ready_has_open_work"] is True, pending_action_handoff
           assert pending_action_handoff["reviewed_mujoco_handoff_missing_inputs"] == [], pending_action_handoff
           assert pending_action_handoff["reviewed_mujoco_handoff_pending_action_ids"] == ["rerun_reviewed_mujoco_downstream_handoff"], pending_action_handoff
+          assert pending_action_handoff["reviewed_mujoco_handoff_explicit_action_ids"] == ["rerun_reviewed_mujoco_downstream_handoff"], pending_action_handoff
+          assert pending_action_handoff["reviewed_mujoco_handoff_next_required_action_ids"] == ["rerun_reviewed_mujoco_downstream_handoff"], pending_action_handoff
+          assert pending_action_handoff["reviewed_mujoco_handoff_action_ids_match_next_required"] is True, pending_action_handoff
+          assert pending_action_handoff["reviewed_mujoco_handoff_action_ids_missing_from_next_required"] == [], pending_action_handoff
+          assert pending_action_handoff["reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids"] == [], pending_action_handoff
           assert "resolve_ready_reviewed_mujoco_handoff_pending_actions" in pending_action_handoff["reviewed_mujoco_handoff_blockers"], pending_action_handoff
+          action_drift_handoff = by_case["ready_handoff_action_id_drift_rejected"]["observations"]
+          assert action_drift_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", action_drift_handoff
+          assert action_drift_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", action_drift_handoff
+          assert action_drift_handoff["reviewed_mujoco_handoff_contract_ok"] is False, action_drift_handoff
+          assert action_drift_handoff["reviewed_mujoco_handoff_ready"] is False, action_drift_handoff
+          assert action_drift_handoff["reviewed_mujoco_handoff_ready_has_open_work"] is True, action_drift_handoff
+          assert action_drift_handoff["reviewed_mujoco_handoff_explicit_action_ids"] == ["stale_reviewed_mujoco_handoff_action"], action_drift_handoff
+          assert action_drift_handoff["reviewed_mujoco_handoff_next_required_action_ids"] == ["rerun_reviewed_mujoco_downstream_handoff"], action_drift_handoff
+          assert action_drift_handoff["reviewed_mujoco_handoff_action_ids_match_next_required"] is False, action_drift_handoff
+          assert action_drift_handoff["reviewed_mujoco_handoff_action_ids_missing_from_next_required"] == ["stale_reviewed_mujoco_handoff_action"], action_drift_handoff
+          assert action_drift_handoff["reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids"] == ["rerun_reviewed_mujoco_downstream_handoff"], action_drift_handoff
+          assert "sync_reviewed_mujoco_handoff_pending_action_ids" in action_drift_handoff["reviewed_mujoco_handoff_blockers"], action_drift_handoff
           physical_truth_handoff = by_case["ready_handoff_physical_truth_claim_rejected"]["observations"]
           assert physical_truth_handoff["status"] == "reviewed_mujoco_handoff_required_but_not_ready", physical_truth_handoff
           assert physical_truth_handoff["reviewed_mujoco_handoff_intake_status"] == "handoff_contract_invalid", physical_truth_handoff
@@ -4055,6 +4074,10 @@ jobs:
           assert so101_mujoco_scene["reviewed_mujoco_handoff_joint_limit_enablement_ok"] is False, so101_mujoco_scene
           assert so101_mujoco_scene["reviewed_mujoco_handoff_joint_limit_enablement_status"] is None, so101_mujoco_scene
           assert so101_mujoco_scene["reviewed_mujoco_handoff_missing_limited_joints"] == [], so101_mujoco_scene
+          assert so101_mujoco_scene["reviewed_mujoco_handoff_action_ids_match_next_required"] is True, so101_mujoco_scene
+          assert so101_mujoco_scene["reviewed_mujoco_handoff_explicit_action_ids"] == so101_mujoco_scene["reviewed_mujoco_handoff_next_required_action_ids"], so101_mujoco_scene
+          assert so101_mujoco_scene["reviewed_mujoco_handoff_action_ids_missing_from_next_required"] == [], so101_mujoco_scene
+          assert so101_mujoco_scene["reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids"] == [], so101_mujoco_scene
           assert so101_mujoco_scene["reviewed_mujoco_handoff_priority_gate_id"] == "reviewed_mujoco_handoff", so101_mujoco_scene
           assert so101_mujoco_scene["reviewed_mujoco_handoff_priority_gate_order"] == [
               "mujoco_scene_validity",
@@ -5583,6 +5606,10 @@ jobs:
               and row.get("metrics", {}).get("reviewed_mujoco_handoff_joint_limit_enablement_ok") is False
               and row.get("metrics", {}).get("reviewed_mujoco_handoff_joint_limit_enablement_status") is None
               and row.get("metrics", {}).get("reviewed_mujoco_handoff_missing_limited_joints") == []
+              and row.get("metrics", {}).get("reviewed_mujoco_handoff_action_ids_match_next_required") is True
+              and row.get("metrics", {}).get("reviewed_mujoco_handoff_explicit_action_ids") == row.get("metrics", {}).get("reviewed_mujoco_handoff_next_required_action_ids")
+              and row.get("metrics", {}).get("reviewed_mujoco_handoff_action_ids_missing_from_next_required") == []
+              and row.get("metrics", {}).get("reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids") == []
               for row in artifacts_by_category["so101_mujoco_scene"]
           ), artifacts_by_category["so101_mujoco_scene"]
           for category in ("so101_mujoco_scene", "so101_chess_env", "so101_env_resets", "so101_mujoco_contact_probe", "so101_mujoco_grasp_probe", "so101_mujoco_board_pick_probe"):

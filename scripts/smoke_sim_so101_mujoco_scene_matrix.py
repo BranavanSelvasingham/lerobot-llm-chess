@@ -163,6 +163,11 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "reviewed_mujoco_handoff_missing_limited_joints",
         "reviewed_mujoco_handoff_missing_inputs",
         "reviewed_mujoco_handoff_pending_action_ids",
+        "reviewed_mujoco_handoff_explicit_action_ids",
+        "reviewed_mujoco_handoff_next_required_action_ids",
+        "reviewed_mujoco_handoff_action_ids_match_next_required",
+        "reviewed_mujoco_handoff_action_ids_missing_from_next_required",
+        "reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids",
         "reviewed_mujoco_handoff_ready_has_open_work",
         "reviewed_mujoco_handoff_gates_unblocked_when_physical_ready",
         "reviewed_mujoco_handoff_blocked_gates_until_physical_ready",
@@ -217,6 +222,7 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
         "ready_with_policy_training_claim",
         "ready_missing_scene_gate",
         "ready_wrong_next_downstream_gate",
+        "ready_with_action_id_drift",
         "ready_missing_model_identity",
         "ready_with_unlimited_joint",
         "schema_mismatch_ready",
@@ -366,6 +372,17 @@ def handoff_fixture_payload(state: str) -> dict[str, Any]:
                 "detail": "Pending downstream handoff action must fail closed even with ready status.",
             }
         ]
+        payload["next_required_action_ids"] = ["rerun_reviewed_mujoco_downstream_handoff"]
+    elif state == "ready_with_action_id_drift":
+        payload["next_required_for_goal"] = [
+            {
+                "action_id": "rerun_reviewed_mujoco_downstream_handoff",
+                "gate": "mujoco_scene_validity",
+                "title": "Rerun reviewed MuJoCo downstream handoff",
+                "detail": "Pending downstream handoff action must fail closed even with ready status.",
+            }
+        ]
+        payload["next_required_action_ids"] = ["stale_reviewed_mujoco_handoff_action"]
     elif state == "ready_with_physical_truth_claim":
         payload["observed_evidence_is_authority"] = True
         payload["physical_so101_truth_claimed"] = True
@@ -548,8 +565,44 @@ def case_specs() -> list[dict[str, Any]]:
             "expected_handoff_pending_action_ids": [
                 "rerun_reviewed_mujoco_downstream_handoff"
             ],
+            "expected_handoff_explicit_action_ids": [
+                "rerun_reviewed_mujoco_downstream_handoff"
+            ],
+            "expected_handoff_next_required_action_ids": [
+                "rerun_reviewed_mujoco_downstream_handoff"
+            ],
             "expected_handoff_blockers_contain": [
                 "resolve_ready_reviewed_mujoco_handoff_pending_actions"
+            ],
+        },
+        {
+            "case_id": "ready_handoff_action_id_drift_rejected",
+            "source_square": "e4",
+            "target_square": "e5",
+            "expect_ok": False,
+            "handoff_state": "ready_with_action_id_drift",
+            "require_handoff": True,
+            "expected_status": "reviewed_mujoco_handoff_required_but_not_ready",
+            "expected_scene_validity_status": "reviewed_handoff_required_but_not_ready",
+            "expected_handoff_intake_status": "handoff_contract_invalid",
+            "expected_handoff_ready": False,
+            "expected_handoff_contract_ok": False,
+            "expected_handoff_explicit_action_ids": [
+                "stale_reviewed_mujoco_handoff_action"
+            ],
+            "expected_handoff_next_required_action_ids": [
+                "rerun_reviewed_mujoco_downstream_handoff"
+            ],
+            "expected_handoff_action_ids_match_next_required": False,
+            "expected_handoff_action_ids_missing_from_next_required": [
+                "stale_reviewed_mujoco_handoff_action"
+            ],
+            "expected_handoff_next_required_actions_missing_from_action_ids": [
+                "rerun_reviewed_mujoco_downstream_handoff"
+            ],
+            "expected_handoff_blockers_contain": [
+                "resolve_ready_reviewed_mujoco_handoff_pending_actions",
+                "sync_reviewed_mujoco_handoff_pending_action_ids",
             ],
         },
         {
@@ -869,6 +922,21 @@ def summarize_case(
         "reviewed_mujoco_handoff_pending_action_ids": summary.get(
             "reviewed_mujoco_handoff_pending_action_ids"
         ),
+        "reviewed_mujoco_handoff_explicit_action_ids": summary.get(
+            "reviewed_mujoco_handoff_explicit_action_ids"
+        ),
+        "reviewed_mujoco_handoff_next_required_action_ids": summary.get(
+            "reviewed_mujoco_handoff_next_required_action_ids"
+        ),
+        "reviewed_mujoco_handoff_action_ids_match_next_required": summary.get(
+            "reviewed_mujoco_handoff_action_ids_match_next_required"
+        ),
+        "reviewed_mujoco_handoff_action_ids_missing_from_next_required": summary.get(
+            "reviewed_mujoco_handoff_action_ids_missing_from_next_required"
+        ),
+        "reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids": summary.get(
+            "reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids"
+        ),
         "reviewed_mujoco_handoff_ready_has_open_work": summary.get(
             "reviewed_mujoco_handoff_ready_has_open_work"
         ),
@@ -1135,6 +1203,42 @@ def summarize_case(
             spec["expected_handoff_pending_action_ids"],
         )
     if expected_handoff_requested:
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_explicit_action_ids",
+            observations["reviewed_mujoco_handoff_explicit_action_ids"],
+            spec.get("expected_handoff_explicit_action_ids", []),
+        )
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_next_required_action_ids",
+            observations["reviewed_mujoco_handoff_next_required_action_ids"],
+            spec.get("expected_handoff_next_required_action_ids", []),
+        )
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_action_ids_match_next_required",
+            observations["reviewed_mujoco_handoff_action_ids_match_next_required"],
+            spec.get("expected_handoff_action_ids_match_next_required", True),
+        )
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_action_ids_missing_from_next_required",
+            observations["reviewed_mujoco_handoff_action_ids_missing_from_next_required"],
+            spec.get("expected_handoff_action_ids_missing_from_next_required", []),
+        )
+        add_error(
+            errors,
+            f"{case_id}.reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids",
+            observations[
+                "reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids"
+            ],
+            spec.get(
+                "expected_handoff_next_required_actions_missing_from_action_ids",
+                [],
+            ),
+        )
+    if expected_handoff_requested:
         handoff_state = str(spec.get("handoff_state"))
         default_blocked_gates = (
             []
@@ -1147,6 +1251,7 @@ def summarize_case(
                 "ready_with_policy_training_claim",
                 "ready_missing_scene_gate",
                 "ready_wrong_next_downstream_gate",
+                "ready_with_action_id_drift",
                 "ready_missing_model_identity",
                 "ready_with_unlimited_joint",
                 "schema_mismatch_ready",
@@ -1231,6 +1336,7 @@ def summarize_case(
                 "ready_with_policy_training_claim",
                 "ready_missing_scene_gate",
                 "ready_wrong_next_downstream_gate",
+                "ready_with_action_id_drift",
                 "ready_with_unlimited_joint",
                 "schema_mismatch_ready",
             },
@@ -1479,6 +1585,21 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "reviewed_mujoco_handoff_pending_action_ids": observations.get(
             "reviewed_mujoco_handoff_pending_action_ids"
+        ),
+        "reviewed_mujoco_handoff_explicit_action_ids": observations.get(
+            "reviewed_mujoco_handoff_explicit_action_ids"
+        ),
+        "reviewed_mujoco_handoff_next_required_action_ids": observations.get(
+            "reviewed_mujoco_handoff_next_required_action_ids"
+        ),
+        "reviewed_mujoco_handoff_action_ids_match_next_required": observations.get(
+            "reviewed_mujoco_handoff_action_ids_match_next_required"
+        ),
+        "reviewed_mujoco_handoff_action_ids_missing_from_next_required": observations.get(
+            "reviewed_mujoco_handoff_action_ids_missing_from_next_required"
+        ),
+        "reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids": observations.get(
+            "reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids"
         ),
         "reviewed_mujoco_handoff_ready_has_open_work": observations.get(
             "reviewed_mujoco_handoff_ready_has_open_work"
