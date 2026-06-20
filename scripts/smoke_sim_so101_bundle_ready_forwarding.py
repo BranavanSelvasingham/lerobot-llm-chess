@@ -180,6 +180,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `invalid_tcp_manifest`: `{summary['fixtures']['invalid_tcp_manifest_path']}`",
         f"- `oversized_tcp_manifest`: `{summary['fixtures']['oversized_tcp_manifest_path']}`",
         f"- `weak_alignment_manifest`: `{summary['fixtures']['weak_alignment_manifest_path']}`",
+        f"- `conflicting_alignment_review_alias_manifest`: `{summary['fixtures']['conflicting_alignment_review_alias_manifest_path']}`",
         f"- `invalid_alignment_manifest`: `{summary['fixtures']['invalid_alignment_manifest_path']}`",
         f"- `oversized_alignment_translation_manifest`: `{summary['fixtures']['oversized_alignment_translation_manifest_path']}`",
         f"- `explicit_model_path`: `{summary['fixtures']['explicit_model_path']}`",
@@ -773,6 +774,20 @@ def weak_alignment_authority_manifest_payload(model_filename: str) -> dict[str, 
     return payload
 
 
+def conflicting_alignment_review_alias_manifest_payload(model_filename: str) -> dict[str, Any]:
+    payload = manifest_payload(ready=True, model_filename=model_filename)
+    payload["base_to_board_alignment_review"] = {
+        "review_status": "needs_review",
+        "reviewed_by": "smoke_sim_so101_bundle_ready_forwarding",
+        "review_id": "bundle-ready-forwarding:base-to-board-follow-up",
+        "review_scope": "base_to_board_alignment",
+        "next_required_action_ids": [
+            "resolve_conflicting_base_to_board_alignment_review_alias",
+        ],
+    }
+    return payload
+
+
 def invalid_alignment_transform_manifest_payload(model_filename: str) -> dict[str, Any]:
     payload = manifest_payload(ready=True, model_filename=model_filename)
     payload["base_to_board_transform"] = {
@@ -891,6 +906,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     oversized_tcp_dir = fixture_dir / "oversized_tcp_bundle"
     conflicting_tcp_alias_dir = fixture_dir / "conflicting_tcp_alias_bundle"
     weak_alignment_dir = fixture_dir / "weak_alignment_bundle"
+    conflicting_alignment_review_alias_dir = (
+        fixture_dir / "conflicting_alignment_review_alias_bundle"
+    )
     invalid_alignment_dir = fixture_dir / "invalid_alignment_bundle"
     nonfinite_alignment_dir = fixture_dir / "nonfinite_alignment_bundle"
     oversized_alignment_rotation_dir = (
@@ -953,6 +971,7 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         oversized_tcp_dir,
         conflicting_tcp_alias_dir,
         weak_alignment_dir,
+        conflicting_alignment_review_alias_dir,
         invalid_alignment_dir,
         nonfinite_alignment_dir,
         oversized_alignment_rotation_dir,
@@ -1095,6 +1114,12 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
     conflicting_tcp_alias_model_path.write_text(mjcf_with_mesh_reference())
     weak_alignment_model_path = weak_alignment_dir / "model" / "synthetic_so101_mujoco.xml"
     weak_alignment_model_path.write_text(mjcf_with_mesh_reference())
+    conflicting_alignment_review_alias_model_path = (
+        conflicting_alignment_review_alias_dir / "model" / "synthetic_so101_mujoco.xml"
+    )
+    conflicting_alignment_review_alias_model_path.write_text(
+        mjcf_with_mesh_reference()
+    )
     invalid_alignment_model_path = invalid_alignment_dir / "model" / "synthetic_so101_mujoco.xml"
     invalid_alignment_model_path.write_text(mjcf_with_mesh_reference())
     nonfinite_alignment_model_path = (
@@ -1250,6 +1275,10 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         / "so101_model_bundle.conflicting_tcp_offset_alias.json"
     )
     weak_alignment_manifest_path = weak_alignment_dir / "so101_model_bundle.weak_alignment.json"
+    conflicting_alignment_review_alias_manifest_path = (
+        conflicting_alignment_review_alias_dir
+        / "so101_model_bundle.conflicting_alignment_review_alias.json"
+    )
     invalid_alignment_manifest_path = invalid_alignment_dir / "so101_model_bundle.invalid_alignment.json"
     nonfinite_alignment_manifest_path = (
         nonfinite_alignment_dir / "so101_model_bundle.nonfinite_alignment.json"
@@ -1546,6 +1575,13 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         weak_alignment_model_path,
     )
     write_manifest_json(
+        conflicting_alignment_review_alias_manifest_path,
+        conflicting_alignment_review_alias_manifest_payload(
+            model_filename=conflicting_alignment_review_alias_model_path.name
+        ),
+        conflicting_alignment_review_alias_model_path,
+    )
+    write_manifest_json(
         invalid_alignment_manifest_path,
         invalid_alignment_transform_manifest_payload(model_filename=invalid_alignment_model_path.name),
         invalid_alignment_model_path,
@@ -1650,6 +1686,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "oversized_tcp_manifest_path": oversized_tcp_manifest_path,
         "conflicting_tcp_alias_manifest_path": conflicting_tcp_alias_manifest_path,
         "weak_alignment_manifest_path": weak_alignment_manifest_path,
+        "conflicting_alignment_review_alias_manifest_path": (
+            conflicting_alignment_review_alias_manifest_path
+        ),
         "invalid_alignment_manifest_path": invalid_alignment_manifest_path,
         "nonfinite_alignment_manifest_path": nonfinite_alignment_manifest_path,
         "oversized_alignment_rotation_manifest_path": (
@@ -1715,6 +1754,9 @@ def create_fixtures(output_dir: Path) -> dict[str, Path]:
         "oversized_tcp_model_path": oversized_tcp_model_path,
         "conflicting_tcp_alias_model_path": conflicting_tcp_alias_model_path,
         "weak_alignment_model_path": weak_alignment_model_path,
+        "conflicting_alignment_review_alias_model_path": (
+            conflicting_alignment_review_alias_model_path
+        ),
         "invalid_alignment_model_path": invalid_alignment_model_path,
         "nonfinite_alignment_model_path": nonfinite_alignment_model_path,
         "oversized_alignment_rotation_model_path": (
@@ -3176,6 +3218,63 @@ def summarize_case(
         missing_inputs = bundle.get("missing_inputs")
         if not isinstance(missing_inputs, list) or "base_to_board_alignment_authority" not in missing_inputs:
             errors.append(f"{case_id}.missing_inputs: expected base_to_board_alignment_authority, got {missing_inputs!r}")
+    elif expectation == "conflicting_alignment_review_alias_not_forwarded":
+        assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
+        assert_equal(
+            errors,
+            f"{case_id}.reviewed_mujoco_status",
+            reviewed_mujoco.get("status"),
+            "reviewed_mujoco_bundle_not_ready",
+        )
+        assert_false(errors, f"{case_id}.reviewed_mujoco_motion_checked", reviewed_mujoco.get("reviewed_model_motion_checked"))
+        assert_not_ready_motion_authority(errors, case_id, reviewed_mujoco)
+        assert_true(errors, f"{case_id}.forwarding_diagnostic_only", forwarding.get("diagnostic_only"))
+        assert_equal(
+            errors,
+            f"{case_id}.diagnostic_reason",
+            forwarding.get("diagnostic_only_reason"),
+            "bundle_not_ready_for_model_backed_ik:model_bundle_manifest_needs_follow_up",
+        )
+        assert_equal(errors, f"{case_id}.authority_status", bundle.get("authority_status"), "present")
+        assert_equal(errors, f"{case_id}.provenance_status", bundle.get("provenance_status"), "present")
+        assert_equal(errors, f"{case_id}.joint_limits_status", get_nested(bundle, ("joint_limits", "status")), "present")
+        assert_equal(errors, f"{case_id}.mesh_assets_status", get_nested(bundle, ("mesh_assets", "status")), "present")
+        assert_equal(errors, f"{case_id}.target_frame_status", get_nested(bundle, ("target_frame", "status")), "present")
+        assert_equal(errors, f"{case_id}.tcp_offset_status", get_nested(bundle, ("tcp_offset", "status")), "present")
+        assert_equal(
+            errors,
+            f"{case_id}.alignment_status",
+            get_nested(bundle, ("base_to_board_alignment", "status")),
+            "needs_review",
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.alignment_review_alias_conflict",
+            get_nested(
+                reviewed_mujoco,
+                ("base_to_board_alignment", "review", "review_alias_conflict"),
+            ),
+            False,
+        )
+        assert_equal(
+            errors,
+            f"{case_id}.alignment_review_alias_not_ready_fields",
+            get_nested(
+                reviewed_mujoco,
+                (
+                    "base_to_board_alignment",
+                    "review",
+                    "review_alias_not_ready_fields",
+                ),
+            ),
+            ["base_to_board_alignment_review"],
+        )
+        diagnostics = get_nested(reviewed_mujoco, ("base_to_board_alignment", "diagnostics"), [])
+        if "base_to_board_alignment_authority_review_alias_not_ready:base_to_board_alignment_review" not in diagnostics:
+            errors.append(f"{case_id}.alignment_diagnostic_missing:{diagnostics!r}")
+        missing_inputs = bundle.get("missing_inputs")
+        if not isinstance(missing_inputs, list) or "base_to_board_alignment_authority" not in missing_inputs:
+            errors.append(f"{case_id}.missing_inputs: expected base_to_board_alignment_authority, got {missing_inputs!r}")
     elif expectation == "invalid_alignment_transform_not_forwarded":
         assert_false(errors, f"{case_id}.bundle_ready", bundle.get("ready_for_model_backed_ik"))
         assert_equal(
@@ -3476,6 +3575,14 @@ def main() -> int:
             "manifest_path": fixtures["weak_alignment_manifest_path"],
             "explicit_model_path": None,
             "expectation": "weak_alignment_authority_not_forwarded",
+        },
+        {
+            "case_id": "conflicting_alignment_review_alias_not_forwarded",
+            "manifest_path": fixtures[
+                "conflicting_alignment_review_alias_manifest_path"
+            ],
+            "explicit_model_path": None,
+            "expectation": "conflicting_alignment_review_alias_not_forwarded",
         },
         {
             "case_id": "invalid_alignment_transform_not_forwarded",

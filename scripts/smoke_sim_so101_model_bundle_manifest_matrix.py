@@ -117,6 +117,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "tcp_offset_review_alias_conflict",
         "tcp_offset_review_alias_not_ready_fields",
         "alignment_status",
+        "alignment_review_alias_conflict",
+        "alignment_review_alias_not_ready_fields",
         "contract_checker_status",
         "contract_checker_diagnostics",
         "authority_review_open_work_fields",
@@ -1155,6 +1157,25 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "conflicting_alignment_review_alias_not_ready",
+            "manifest_path": fixtures[
+                "conflicting_alignment_review_alias_manifest_path"
+            ],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "alignment_status": "needs_review",
+                "alignment_review_alias_conflict": False,
+                "alignment_review_alias_not_ready_fields": [
+                    "base_to_board_alignment_review"
+                ],
+                "alignment_diagnostics_contains": [
+                    "base_to_board_alignment_authority_review_alias_not_ready:base_to_board_alignment_review"
+                ],
+                "missing_inputs": ["base_to_board_alignment_authority"],
+            },
+        },
+        {
             "case_id": "invalid_alignment_transform_not_ready",
             "manifest_path": fixtures["invalid_alignment_manifest_path"],
             "expect": {
@@ -1656,6 +1677,26 @@ def summarize_case(
                 diagnostics,
                 expect["alignment_diagnostics_contains"],
             )
+    if "alignment_review_alias_conflict" in expect:
+        alignment_review = (
+            (summary.get("base_to_board_alignment") or {}).get("review") or {}
+        )
+        add_error(
+            errors,
+            f"{case_id}.base_to_board_alignment.review.review_alias_conflict",
+            alignment_review.get("review_alias_conflict"),
+            expect["alignment_review_alias_conflict"],
+        )
+    if "alignment_review_alias_not_ready_fields" in expect:
+        alignment_review = (
+            (summary.get("base_to_board_alignment") or {}).get("review") or {}
+        )
+        add_error(
+            errors,
+            f"{case_id}.base_to_board_alignment.review.review_alias_not_ready_fields",
+            alignment_review.get("review_alias_not_ready_fields"),
+            expect["alignment_review_alias_not_ready_fields"],
+        )
     if "contract_checker_status" in expect:
         add_error(
             errors,
@@ -2004,6 +2045,16 @@ def summarize_case(
                 summary.get("tcp_offset") or {}
             ).get("tcp_offset_alias_conflict"),
             "alignment_status": nested_status(summary, "base_to_board_alignment"),
+            "alignment_review_alias_conflict": (
+                ((summary.get("base_to_board_alignment") or {}).get("review") or {}).get(
+                    "review_alias_conflict"
+                )
+            ),
+            "alignment_review_alias_not_ready_fields": (
+                ((summary.get("base_to_board_alignment") or {}).get("review") or {}).get(
+                    "review_alias_not_ready_fields"
+                )
+            ),
             "alignment_alias_conflict": (
                 summary.get("base_to_board_alignment") or {}
             ).get("alignment_alias_conflict"),
@@ -2185,6 +2236,12 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "tcp_offset_alias_conflict": obs.get("tcp_offset_alias_conflict"),
         "alignment_status": obs.get("alignment_status"),
+        "alignment_review_alias_conflict": obs.get(
+            "alignment_review_alias_conflict"
+        ),
+        "alignment_review_alias_not_ready_fields": obs.get(
+            "alignment_review_alias_not_ready_fields"
+        ),
         "alignment_alias_conflict": obs.get("alignment_alias_conflict"),
         "top_level_alignment_alias_conflict": obs.get(
             "top_level_alignment_alias_conflict"

@@ -517,6 +517,7 @@ jobs:
               "oversized_tcp_offset_not_ready",
               "conflicting_tcp_offset_alias_not_ready",
               "weak_alignment_authority_not_ready",
+              "conflicting_alignment_review_alias_not_ready",
               "invalid_alignment_transform_not_ready",
               "nonfinite_alignment_transform_not_ready",
               "oversized_alignment_rotation_not_ready",
@@ -831,6 +832,11 @@ jobs:
           assert conflicting_tcp_alias["tcp_offset_status"] == "invalid", conflicting_tcp_alias
           assert conflicting_tcp_alias["tcp_offset_alias_conflict"] is True, conflicting_tcp_alias
           assert "tcp_offset_m" in conflicting_tcp_alias["missing_inputs"], conflicting_tcp_alias
+          conflicting_alignment_review_alias = by_case["conflicting_alignment_review_alias_not_ready"]["observations"]
+          assert conflicting_alignment_review_alias["alignment_status"] == "needs_review", conflicting_alignment_review_alias
+          assert conflicting_alignment_review_alias["alignment_review_alias_conflict"] is False, conflicting_alignment_review_alias
+          assert conflicting_alignment_review_alias["alignment_review_alias_not_ready_fields"] == ["base_to_board_alignment_review"], conflicting_alignment_review_alias
+          assert "base_to_board_alignment_authority" in conflicting_alignment_review_alias["missing_inputs"], conflicting_alignment_review_alias
           invalid_alignment = by_case["invalid_alignment_transform_not_ready"]["observations"]
           assert invalid_alignment["alignment_status"] == "invalid", invalid_alignment
           assert "base_to_board_transform" in invalid_alignment["missing_inputs"], invalid_alignment
@@ -6189,6 +6195,10 @@ jobs:
           ), model_bundle_manifest_matrix
           assert (
               "oversized_alignment_translation_not_ready"
+              in model_bundle_manifest_matrix["case_ids"]
+          ), model_bundle_manifest_matrix
+          assert (
+              "conflicting_alignment_review_alias_not_ready"
               in model_bundle_manifest_matrix["case_ids"]
           ), model_bundle_manifest_matrix
           assert (
