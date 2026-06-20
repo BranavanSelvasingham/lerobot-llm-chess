@@ -23,7 +23,12 @@ board/piece contact counts. The summary must report:
 - `all_piece_resets_ok: true`
 - `all_board_contacts_observed: true`
 - `model_authority: "development_scaffold_not_reviewed"`
+- `observed_evidence_is_physical_so101_authority: false`
+- `observed_evidence_is_policy_training_authority: false`
+- `development_fixture_evidence_not_physical_so101_truth: true`
+- `development_fixture_evidence_not_policy_training_truth: true`
 - `ready_for_model_backed_ik: false`
+- `ready_for_policy_training: false`
 
 This is still not grasp validation. It only proves that the generated scene now
 has resettable piece state and board-contact plumbing. Gripper/piece grasp,

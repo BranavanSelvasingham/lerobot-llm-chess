@@ -4060,6 +4060,13 @@ jobs:
           so101_mujoco_contact_probe = summary["so101_mujoco_contact_probe"]
           assert so101_mujoco_contact_probe["ok"] is True, so101_mujoco_contact_probe
           assert so101_mujoco_contact_probe["status"] == "ok", so101_mujoco_contact_probe
+          assert so101_mujoco_contact_probe["model_authority"] == "development_scaffold_not_reviewed", so101_mujoco_contact_probe
+          assert so101_mujoco_contact_probe["observed_evidence_is_physical_so101_authority"] is False, so101_mujoco_contact_probe
+          assert so101_mujoco_contact_probe["observed_evidence_is_policy_training_authority"] is False, so101_mujoco_contact_probe
+          assert so101_mujoco_contact_probe["development_fixture_evidence_not_physical_so101_truth"] is True, so101_mujoco_contact_probe
+          assert so101_mujoco_contact_probe["development_fixture_evidence_not_policy_training_truth"] is True, so101_mujoco_contact_probe
+          assert so101_mujoco_contact_probe["ready_for_model_backed_ik"] is False, so101_mujoco_contact_probe
+          assert so101_mujoco_contact_probe["ready_for_policy_training"] is False, so101_mujoco_contact_probe
           assert so101_mujoco_contact_probe["all_piece_resets_ok"] is True, so101_mujoco_contact_probe
           assert so101_mujoco_contact_probe["all_board_contacts_observed"] is True, so101_mujoco_contact_probe
           assert isinstance(so101_mujoco_contact_probe["probe_count"], int) and so101_mujoco_contact_probe["probe_count"] > 0, so101_mujoco_contact_probe
@@ -4067,6 +4074,13 @@ jobs:
           so101_mujoco_grasp_probe = summary["so101_mujoco_grasp_probe"]
           assert so101_mujoco_grasp_probe["ok"] is True, so101_mujoco_grasp_probe
           assert so101_mujoco_grasp_probe["status"] == "contact_grasp_lift_place_physics_verified", so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["model_authority"] == "development_scaffold_not_reviewed", so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["observed_evidence_is_physical_so101_authority"] is False, so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["observed_evidence_is_policy_training_authority"] is False, so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["development_fixture_evidence_not_physical_so101_truth"] is True, so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["development_fixture_evidence_not_policy_training_truth"] is True, so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["ready_for_model_backed_ik"] is False, so101_mujoco_grasp_probe
+          assert so101_mujoco_grasp_probe["ready_for_policy_training"] is False, so101_mujoco_grasp_probe
           assert so101_mujoco_grasp_probe["gripper_contact_observed"] is True, so101_mujoco_grasp_probe
           assert so101_mujoco_grasp_probe["two_finger_contact_observed"] is True, so101_mujoco_grasp_probe
           assert so101_mujoco_grasp_probe["manual_piece_pose_used_after_fixture"] is False, so101_mujoco_grasp_probe

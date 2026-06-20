@@ -25,6 +25,12 @@ Expected current status is
 `contact_grasp_lift_place_physics_verified`: contact plumbing is visible, the
 piece lifts under gripper contact, transfers toward `e5`, lands on the board
 within the target tolerance, and gripper contact clears after retreat.
+The summary must keep `model_authority: "development_scaffold_not_reviewed"`,
+`observed_evidence_is_physical_so101_authority: false`,
+`observed_evidence_is_policy_training_authority: false`,
+`development_fixture_evidence_not_physical_so101_truth: true`,
+`development_fixture_evidence_not_policy_training_truth: true`,
+`ready_for_model_backed_ik: false`, and `ready_for_policy_training: false`.
 
 This is still not physical SO-101 grasp truth. It uses the generated
 `development_scaffold_not_reviewed` MJCF, an enlarged/lightened contact-tuned
