@@ -4947,6 +4947,16 @@ jobs:
                   "external_file_digest_lock_reviewed",
                   "external_reviewed_bundle_manifest_supplied",
               ], metrics
+              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_requirement_model_authority") == "candidate_operator_intake_requirement_not_authority", metrics
+              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_requirement_row_count") == 9, metrics
+              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_requirement_row_count") == 4, metrics
+              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_unselected_requirement_row_count") == 5, metrics
+              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_requirement_row_ids") == [
+                  "external_checkout_path_declared",
+                  "external_upstream_commit_pinned",
+                  "external_file_digest_lock_reviewed",
+                  "external_reviewed_bundle_manifest_supplied",
+              ], metrics
               assert metrics.get("candidate_intake_checked_external_decision_ready_for_model_backed_ik") is False, metrics
               assert metrics.get("candidate_intake_checked_external_decision_physical_authority") is False, metrics
               assert metrics.get("recorded_operator_intake_decision_options") == [
@@ -4958,6 +4968,17 @@ jobs:
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_option") == "vendor_locked_bundle", metrics
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_count") == 5, metrics
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_ids") == [
+                  "vendor_import_path_declared",
+                  "vendor_upstream_commit_pinned",
+                  "vendor_license_provenance_reviewed",
+                  "vendor_file_digest_manifest_reviewed",
+                  "vendor_reviewed_bundle_manifest_supplied",
+              ], metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_requirement_model_authority") == "candidate_operator_intake_requirement_not_authority", metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_requirement_row_count") == 9, metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_row_count") == 5, metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_unselected_requirement_row_count") == 4, metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_row_ids") == [
                   "vendor_import_path_declared",
                   "vendor_upstream_commit_pinned",
                   "vendor_license_provenance_reviewed",

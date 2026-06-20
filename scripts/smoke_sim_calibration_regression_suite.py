@@ -4088,6 +4088,31 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(case, dict)
             else None,
+            "candidate_operator_intake_requirement_model_authority": case.get(
+                "candidate_operator_intake_requirement_model_authority"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_requirement_row_count": case.get(
+                "candidate_operator_intake_requirement_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_selected_requirement_row_count": case.get(
+                "candidate_operator_intake_selected_requirement_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_unselected_requirement_row_count": case.get(
+                "candidate_operator_intake_unselected_requirement_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_selected_requirement_row_ids": case.get(
+                "candidate_operator_intake_selected_requirement_row_ids"
+            )
+            if isinstance(case, dict)
+            else None,
             "ready_for_model_backed_ik": case.get("ready_for_model_backed_ik")
             if isinstance(case, dict)
             else None,

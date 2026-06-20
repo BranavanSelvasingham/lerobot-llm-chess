@@ -475,8 +475,8 @@ artifacts keep `candidate_operator_intake_plan_not_authority` and list the
 command templates plus flat external/vendor review requirements for either a
 local external checkout or a vendored locked bundle. The intake summary and
 artifact index expose the requirement row count, selected row count, unselected
-row count, and selected row IDs so the CSV cannot silently drift from the
-recorded operator decision.
+row count, and selected row IDs for undecided, external-source, and vendor-lock
+decisions so the CSV cannot silently drift from the recorded operator decision.
 Operators can record the chosen path without promoting the candidate to
 authority by rerunning the intake with
 `--operator-intake-decision external_pinned_source_root` or
