@@ -69,6 +69,12 @@ SO101_MODEL_SOURCE_INTAKE_CHECKLIST_JSON_NAME = (
 SO101_MODEL_SOURCE_INTAKE_CHECKLIST_CSV_NAME = (
     "so101_model_source_intake_checklist.csv"
 )
+SO101_MODEL_SOURCE_REVIEW_REQUIREMENTS_JSON_NAME = (
+    "so101_model_source_review_requirements.json"
+)
+SO101_MODEL_SOURCE_REVIEW_REQUIREMENTS_CSV_NAME = (
+    "so101_model_source_review_requirements.csv"
+)
 SO101_MODEL_BUNDLE_PROBE_DIR_NAME = "so101_model_bundle_probe"
 SO101_MODEL_BUNDLE_PROBE_SUMMARY_NAME = "so101_model_bundle_probe_summary.json"
 SO101_MODEL_BUNDLE_MANIFEST_SUMMARY_NAME = "so101_model_bundle_manifest_summary.json"
@@ -1825,6 +1831,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         f"- `so101_model_source_inventory/{SO101_MODEL_SOURCE_INVENTORY_REVIEW_PACKET_CSV_NAME}`",
         f"- `so101_model_source_inventory/{SO101_MODEL_SOURCE_INTAKE_CHECKLIST_JSON_NAME}`",
         f"- `so101_model_source_inventory/{SO101_MODEL_SOURCE_INTAKE_CHECKLIST_CSV_NAME}`",
+        f"- `so101_model_source_inventory/{SO101_MODEL_SOURCE_REVIEW_REQUIREMENTS_JSON_NAME}`",
+        f"- `so101_model_source_inventory/{SO101_MODEL_SOURCE_REVIEW_REQUIREMENTS_CSV_NAME}`",
         "- `so101_model_source_inventory/README.md`",
         f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/{SO101_MODEL_BUNDLE_PROBE_SUMMARY_NAME}`",
         f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/so101_model_bundle.candidate.json`",
@@ -3818,6 +3826,37 @@ def so101_model_source_inventory_section(
         )
         or artifacts.get("source_intake_checklist_csv"),
         "source_intake_checklist": inventory.get("source_intake_checklist"),
+        "source_review_requirements_status": inventory.get(
+            "source_review_requirements_status"
+        ),
+        "source_review_requirements_model_authority": inventory.get(
+            "source_review_requirements_model_authority"
+        ),
+        "source_review_requirements_requirement_count": inventory.get(
+            "source_review_requirements_requirement_count"
+        ),
+        "source_review_requirements_action_required_requirement_ids": inventory.get(
+            "source_review_requirements_action_required_requirement_ids"
+        )
+        or [],
+        "source_review_requirements_observed_evidence_is_authority": inventory.get(
+            "source_review_requirements_observed_evidence_is_authority"
+        ),
+        "source_review_requirements_physical_so101_model_authority_ready": inventory.get(
+            "source_review_requirements_physical_so101_model_authority_ready"
+        ),
+        "source_review_requirements_development_fixture_evidence_not_physical_so101_truth": inventory.get(
+            "source_review_requirements_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "source_review_requirements_json_path": inventory.get(
+            "source_review_requirements_json_path"
+        )
+        or artifacts.get("source_review_requirements_json"),
+        "source_review_requirements_csv_path": inventory.get(
+            "source_review_requirements_csv_path"
+        )
+        or artifacts.get("source_review_requirements_csv"),
+        "source_review_requirements": inventory.get("source_review_requirements"),
         "diagnostics": diagnostics,
         "artifacts": {
             "summary_json": artifacts.get("summary_json")
@@ -3828,6 +3867,12 @@ def so101_model_source_inventory_section(
             "review_packet_csv": artifacts.get("review_packet_csv"),
             "source_intake_checklist_json": artifacts.get("source_intake_checklist_json"),
             "source_intake_checklist_csv": artifacts.get("source_intake_checklist_csv"),
+            "source_review_requirements_json": artifacts.get(
+                "source_review_requirements_json"
+            ),
+            "source_review_requirements_csv": artifacts.get(
+                "source_review_requirements_csv"
+            ),
             "readme_md": artifacts.get("readme_md"),
         },
         "hardware_skipped": inventory.get("hardware_skipped"),

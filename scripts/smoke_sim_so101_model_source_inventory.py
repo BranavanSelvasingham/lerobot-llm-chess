@@ -19,6 +19,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = "lerobot.sim.so101_model_source_inventory.v1"
 REVIEW_PACKET_SCHEMA = "lerobot.sim.so101_model_source_inventory_review_packet.v1"
 SOURCE_INTAKE_SCHEMA = "lerobot.sim.so101_model_source_intake_checklist.v1"
+SOURCE_REVIEW_REQUIREMENTS_SCHEMA = (
+    "lerobot.sim.so101_model_source_review_requirements.v1"
+)
 DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "so101_model_source_inventory"
 SUPPORTED_SUFFIXES = {".urdf", ".xacro", ".xml", ".mjcf"}
 DIRECT_ROBOT_KINEMATICS_SUFFIXES = {".urdf"}
@@ -107,6 +110,18 @@ SOURCE_INTAKE_FIELDNAMES = (
     "recommended_candidate_authoritative",
     "command",
     "required_inputs",
+)
+SOURCE_REVIEW_REQUIREMENTS_FIELDNAMES = (
+    "priority",
+    "requirement_id",
+    "status",
+    "gate",
+    "required_input",
+    "supplied",
+    "missing",
+    "evidence_fields",
+    "next_action_id",
+    "operator_action",
 )
 SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS = (
     "model_identity",
@@ -1662,6 +1677,225 @@ def build_source_intake_checklist(summary: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def build_source_review_requirements(summary: dict[str, Any]) -> dict[str, Any]:
+    source_authority_review = summary.get("source_authority_review")
+    source_authority_review = (
+        source_authority_review if isinstance(source_authority_review, dict) else {}
+    )
+    missing_required_fields = set(source_authority_review.get("missing_required_fields") or [])
+    missing_required_groups = set(
+        source_authority_review.get("review_evidence_missing_required_groups") or []
+    )
+    satisfied_required_groups = set(
+        source_authority_review.get("review_evidence_satisfied_required_groups") or []
+    )
+    missing_review_scope_ids = set(
+        summary.get("source_authority_missing_review_scope_ids") or []
+    )
+    supplied_review_scope_ids = set(
+        summary.get("source_authority_supplied_review_scope_ids") or []
+    )
+    valid_metadata_fields = set(
+        source_authority_review.get("required_metadata_valid_fields") or []
+    )
+    placeholder_metadata_fields = set(
+        source_authority_review.get("required_metadata_placeholder_fields") or []
+    )
+
+    requirements: list[dict[str, Any]] = []
+
+    def add_requirement(
+        requirement_id: str,
+        *,
+        status: str,
+        required_input: str,
+        supplied: bool,
+        missing: bool,
+        evidence_fields: list[str],
+        operator_action: str,
+        next_action_id: str | None = "record_source_authority_review_metadata",
+        gate: str = "reviewed_model_authority",
+    ) -> None:
+        requirements.append(
+            {
+                "priority": len(requirements) + 1,
+                "requirement_id": requirement_id,
+                "status": status,
+                "gate": gate,
+                "required_input": required_input,
+                "supplied": supplied,
+                "missing": missing,
+                "evidence_fields": evidence_fields,
+                "next_action_id": None if status == "satisfied" else next_action_id,
+                "operator_action": operator_action,
+            }
+        )
+
+    authoritative_candidate_count = int(summary.get("authoritative_candidate_count") or 0)
+    add_requirement(
+        "authoritative_model_selection",
+        status=(
+            "satisfied"
+            if authoritative_candidate_count == 1
+            and summary.get("selected_authoritative_candidate_so101_relevance_ready")
+            is True
+            else "action_required"
+        ),
+        required_input="exactly_one_so101_relevant_authoritative_model_path",
+        supplied=authoritative_candidate_count == 1,
+        missing=authoritative_candidate_count != 1,
+        evidence_fields=[
+            "selected_authoritative_candidate_path",
+            "selected_authoritative_candidate_sha256",
+            "selected_authoritative_candidate_so101_relevance",
+        ],
+        next_action_id=(
+            "select_single_authoritative_so101_model_source"
+            if authoritative_candidate_count > 1
+            else "review_and_declare_authoritative_so101_model_source"
+        ),
+        operator_action=(
+            "Select one reviewed SO-101-relevant model source path before source "
+            "authority can feed the bundle manifest."
+        ),
+    )
+
+    review_group_fields = {
+        "review_actor": ["authority_reviewed_by"],
+        "review_trace": [
+            "authority_reviewed_at",
+            "authority_review_id",
+            "authority_review_url",
+        ],
+        "review_artifact": ["authority_review_id", "authority_review_url"],
+    }
+    for group_id, fields in review_group_fields.items():
+        missing = group_id in missing_required_groups
+        supplied = group_id in satisfied_required_groups
+        add_requirement(
+            f"review_evidence:{group_id}",
+            status="action_required" if missing else "satisfied",
+            required_input=f"authority_review_evidence:{group_id}",
+            supplied=supplied,
+            missing=missing,
+            evidence_fields=fields,
+            operator_action=(
+                "Record reviewer identity, review timestamp, and a stable review "
+                "artifact handle; a date-only trace without reviewer and artifact "
+                "handle is not enough."
+            ),
+        )
+
+    for scope_id in SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS:
+        missing = scope_id in missing_review_scope_ids
+        supplied = scope_id in supplied_review_scope_ids
+        add_requirement(
+            f"review_scope:{scope_id}",
+            status="action_required" if missing else "satisfied",
+            required_input=f"authority_review_scope:{scope_id}",
+            supplied=supplied,
+            missing=missing,
+            evidence_fields=["authority_review_scope"],
+            operator_action=SOURCE_AUTHORITY_REVIEW_SCOPE_DESCRIPTIONS[scope_id],
+        )
+
+    for field, label in (
+        (
+            "authority_source_reference",
+            "CAD/export source URL, commit, package release, or equivalent source handle.",
+        ),
+        (
+            "authority_license_basis",
+            "Reviewed license or redistribution basis for using the selected model source.",
+        ),
+    ):
+        missing = field in missing_required_fields
+        add_requirement(
+            field,
+            status="action_required" if missing else "satisfied",
+            required_input=field,
+            supplied=field in valid_metadata_fields,
+            missing=missing,
+            evidence_fields=[field],
+            operator_action=label,
+        )
+
+    ready = (
+        authoritative_candidate_count == 1
+        and summary.get("selected_authoritative_candidate_so101_relevance_ready") is True
+        and source_authority_review.get("ready") is True
+    )
+    action_required_requirement_ids = [
+        requirement["requirement_id"]
+        for requirement in requirements
+        if requirement.get("status") != "satisfied"
+    ]
+    return {
+        "schema": SOURCE_REVIEW_REQUIREMENTS_SCHEMA,
+        "ok": True,
+        "status": (
+            "source_review_requirements_satisfied"
+            if ready
+            else "source_review_requirements_action_required"
+        ),
+        "model_authority": "source_review_requirements_not_authority",
+        "source_inventory_status": summary.get("status"),
+        "source_authority_gate_status": summary.get("source_authority_gate_status"),
+        "source_authority_review_status": summary.get("source_authority_review_status"),
+        "source_authority_review_ready": summary.get("source_authority_review_ready"),
+        "source_authority_review_scope_ready": summary.get(
+            "source_authority_review_scope_ready"
+        ),
+        "authoritative_candidate_count": summary.get("authoritative_candidate_count"),
+        "selected_authoritative_candidate_path": summary.get(
+            "selected_authoritative_candidate_path"
+        ),
+        "selected_authoritative_candidate_sha256": summary.get(
+            "selected_authoritative_candidate_sha256"
+        ),
+        "required_review_scope_ids": summary.get(
+            "source_authority_required_review_scope_ids"
+        )
+        or [],
+        "supplied_review_scope_ids": summary.get(
+            "source_authority_supplied_review_scope_ids"
+        )
+        or [],
+        "missing_review_scope_ids": summary.get(
+            "source_authority_missing_review_scope_ids"
+        )
+        or [],
+        "review_evidence_required_groups": source_authority_review.get(
+            "review_evidence_required_groups"
+        )
+        or [],
+        "review_evidence_satisfied_required_groups": source_authority_review.get(
+            "review_evidence_satisfied_required_groups"
+        )
+        or [],
+        "review_evidence_missing_required_groups": source_authority_review.get(
+            "review_evidence_missing_required_groups"
+        )
+        or [],
+        "required_metadata_valid_fields": sorted(valid_metadata_fields),
+        "required_metadata_placeholder_fields": sorted(placeholder_metadata_fields),
+        "missing_required_fields": source_authority_review.get("missing_required_fields")
+        or [],
+        "requirement_count": len(requirements),
+        "action_required_requirement_ids": action_required_requirement_ids,
+        "next_required_action_ids": summary.get("next_required_action_ids") or [],
+        "requirements": requirements,
+        "observed_evidence_is_authority": False,
+        "physical_so101_model_authority_ready": False,
+        "development_fixture_evidence_not_physical_so101_truth": True,
+        "caveats": [
+            "This source-review requirements artifact is operator guidance only, not reviewed physical SO-101 authority.",
+            "A satisfied source review still only clears source authority; a reviewed bundle manifest and reviewed MuJoCo motion are separate gates.",
+            "Placeholder, malformed, future-dated, or local-only review evidence must remain action-required.",
+        ],
+    }
+
+
 def build_summary(
     roots: list[dict[str, Any]],
     candidates: list[dict[str, Any]],
@@ -1976,6 +2210,39 @@ def build_summary(
             "source_intake_checklist": source_intake_checklist,
         }
     )
+    source_review_requirements = build_source_review_requirements(summary)
+    summary.update(
+        {
+            "source_review_requirements_status": source_review_requirements["status"],
+            "source_review_requirements_model_authority": source_review_requirements[
+                "model_authority"
+            ],
+            "source_review_requirements_requirement_count": source_review_requirements[
+                "requirement_count"
+            ],
+            "source_review_requirements_action_required_requirement_ids": (
+                source_review_requirements["action_required_requirement_ids"]
+            ),
+            "source_review_requirements_observed_evidence_is_authority": (
+                source_review_requirements["observed_evidence_is_authority"]
+            ),
+            "source_review_requirements_physical_so101_model_authority_ready": (
+                source_review_requirements["physical_so101_model_authority_ready"]
+            ),
+            "source_review_requirements_development_fixture_evidence_not_physical_so101_truth": (
+                source_review_requirements[
+                    "development_fixture_evidence_not_physical_so101_truth"
+                ]
+            ),
+            "source_review_requirements_json_path": artifacts.get(
+                "source_review_requirements_json"
+            ),
+            "source_review_requirements_csv_path": artifacts.get(
+                "source_review_requirements_csv"
+            ),
+            "source_review_requirements": source_review_requirements,
+        }
+    )
     return summary
 
 
@@ -2017,6 +2284,23 @@ def write_source_intake_csv(path: Path, source_intake: dict[str, Any]) -> None:
         writer.writeheader()
         for action in source_intake.get("actions") or []:
             writer.writerow({field: csv_value(action.get(field)) for field in SOURCE_INTAKE_FIELDNAMES})
+
+
+def write_source_review_requirements_csv(
+    path: Path,
+    source_review_requirements: dict[str, Any],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=SOURCE_REVIEW_REQUIREMENTS_FIELDNAMES)
+        writer.writeheader()
+        for requirement in source_review_requirements.get("requirements") or []:
+            writer.writerow(
+                {
+                    field: csv_value(requirement.get(field))
+                    for field in SOURCE_REVIEW_REQUIREMENTS_FIELDNAMES
+                }
+            )
 
 
 def write_markdown(path: Path, summary: dict[str, Any]) -> None:
@@ -2061,12 +2345,20 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `source_intake_observed_evidence_is_authority`: `{str(summary['source_intake_observed_evidence_is_authority']).lower()}`",
         f"- `source_intake_physical_so101_model_authority_ready`: `{str(summary['source_intake_physical_so101_model_authority_ready']).lower()}`",
         f"- `source_intake_development_fixture_evidence_not_physical_so101_truth`: `{str(summary['source_intake_development_fixture_evidence_not_physical_so101_truth']).lower()}`",
+        f"- `source_review_requirements_status`: `{summary['source_review_requirements_status']}`",
+        f"- `source_review_requirements_model_authority`: `{summary['source_review_requirements_model_authority']}`",
+        f"- `source_review_requirements_requirement_count`: `{summary['source_review_requirements_requirement_count']}`",
+        f"- `source_review_requirements_action_required_requirement_ids`: `{', '.join(summary.get('source_review_requirements_action_required_requirement_ids') or []) if summary.get('source_review_requirements_action_required_requirement_ids') else 'none'}`",
+        f"- `source_review_requirements_observed_evidence_is_authority`: `{str(summary['source_review_requirements_observed_evidence_is_authority']).lower()}`",
+        f"- `source_review_requirements_physical_so101_model_authority_ready`: `{str(summary['source_review_requirements_physical_so101_model_authority_ready']).lower()}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `candidates_csv`: `{summary['artifacts']['candidates_csv']}`",
         f"- `review_packet_json`: `{summary['artifacts']['review_packet_json']}`",
         f"- `review_packet_csv`: `{summary['artifacts']['review_packet_csv']}`",
         f"- `source_intake_checklist_json`: `{summary['artifacts']['source_intake_checklist_json']}`",
         f"- `source_intake_checklist_csv`: `{summary['artifacts']['source_intake_checklist_csv']}`",
+        f"- `source_review_requirements_json`: `{summary['artifacts']['source_review_requirements_json']}`",
+        f"- `source_review_requirements_csv`: `{summary['artifacts']['source_review_requirements_csv']}`",
         "",
         "## Candidates",
         "",
@@ -2155,6 +2447,27 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
     lines.extend(
         [
             "",
+            "## Source Review Requirements",
+            "",
+            "This table records the minimum source-review evidence needed before a selected source can feed the reviewed bundle manifest. It is not physical SO-101 authority.",
+            "",
+            "| Priority | Requirement | Status | Missing | Next Action |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
+    for requirement in summary["source_review_requirements"].get("requirements") or []:
+        lines.append(
+            "| `{priority}` | `{requirement_id}` | `{status}` | `{missing}` | `{action}` |".format(
+                priority=requirement.get("priority"),
+                requirement_id=requirement.get("requirement_id"),
+                status=requirement.get("status"),
+                missing=str(requirement.get("missing")).lower(),
+                action=requirement.get("next_action_id") or "n/a",
+            )
+        )
+    lines.extend(
+        [
+            "",
             "## Missing Authoritative Source Requirements",
             "",
         ]
@@ -2214,6 +2527,12 @@ def main() -> int:
     review_packet_csv_path = output_dir / "so101_model_source_inventory_review_packet.csv"
     source_intake_path = output_dir / "so101_model_source_intake_checklist.json"
     source_intake_csv_path = output_dir / "so101_model_source_intake_checklist.csv"
+    source_review_requirements_path = (
+        output_dir / "so101_model_source_review_requirements.json"
+    )
+    source_review_requirements_csv_path = (
+        output_dir / "so101_model_source_review_requirements.csv"
+    )
     readme_path = output_dir / "README.md"
     artifacts = {
         "summary_json": str(summary_path),
@@ -2222,6 +2541,8 @@ def main() -> int:
         "review_packet_csv": str(review_packet_csv_path),
         "source_intake_checklist_json": str(source_intake_path),
         "source_intake_checklist_csv": str(source_intake_csv_path),
+        "source_review_requirements_json": str(source_review_requirements_path),
+        "source_review_requirements_csv": str(source_review_requirements_csv_path),
         "readme_md": str(readme_path),
     }
     summary = build_summary(root_records, candidates, artifacts, authority_review_input)
@@ -2229,9 +2550,17 @@ def main() -> int:
     write_json(summary_path, summary)
     write_json(review_packet_path, summary["review_packet"])
     write_json(source_intake_path, summary["source_intake_checklist"])
+    write_json(
+        source_review_requirements_path,
+        summary["source_review_requirements"],
+    )
     write_csv(csv_path, candidates)
     write_review_packet_csv(review_packet_csv_path, summary["review_packet"])
     write_source_intake_csv(source_intake_csv_path, summary["source_intake_checklist"])
+    write_source_review_requirements_csv(
+        source_review_requirements_csv_path,
+        summary["source_review_requirements"],
+    )
     write_markdown(readme_path, summary)
 
     print(
@@ -2276,6 +2605,27 @@ def main() -> int:
                 ],
                 "source_intake_development_fixture_evidence_not_physical_so101_truth": summary[
                     "source_intake_development_fixture_evidence_not_physical_so101_truth"
+                ],
+                "source_review_requirements_status": summary[
+                    "source_review_requirements_status"
+                ],
+                "source_review_requirements_model_authority": summary[
+                    "source_review_requirements_model_authority"
+                ],
+                "source_review_requirements_requirement_count": summary[
+                    "source_review_requirements_requirement_count"
+                ],
+                "source_review_requirements_action_required_requirement_ids": summary[
+                    "source_review_requirements_action_required_requirement_ids"
+                ],
+                "source_review_requirements_observed_evidence_is_authority": summary[
+                    "source_review_requirements_observed_evidence_is_authority"
+                ],
+                "source_review_requirements_physical_so101_model_authority_ready": summary[
+                    "source_review_requirements_physical_so101_model_authority_ready"
+                ],
+                "source_review_requirements_development_fixture_evidence_not_physical_so101_truth": summary[
+                    "source_review_requirements_development_fixture_evidence_not_physical_so101_truth"
                 ],
                 "artifacts": artifacts,
             },

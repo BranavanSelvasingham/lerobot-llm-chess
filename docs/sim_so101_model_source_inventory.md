@@ -14,6 +14,8 @@ The script writes:
 - `so101_model_source_inventory_review_packet.csv`
 - `so101_model_source_intake_checklist.json`
 - `so101_model_source_intake_checklist.csv`
+- `so101_model_source_review_requirements.json`
+- `so101_model_source_review_requirements.csv`
 - `README.md`
 
 It exits `0` even when no candidates exist. In that state the JSON reports `ok: true`, `status: "missing_authoritative_model"`, `candidate_count: 0`, `authoritative_candidate_count: 0`, `model_authority: "model_source_inventory_not_authority"`, false `observed_evidence_is_physical_so101_authority`, false `observed_evidence_is_policy_training_authority`, true development-fixture caveats for physical and policy truth, false physical-authority/model-backed-IK/policy-training readiness, `source_authority_gate_status: "source_authority_blocked_missing_authoritative_model"`, a `source_authority_blockers` list for the missing source-authority work, a `missing_authoritative_model` diagnostic listing the source inputs still required, and `next_required_for_goal`/`next_required_action_ids` entries that keep the operator sequence explicit.
@@ -34,6 +36,14 @@ metadata gate when the supplied values are real and non-placeholder. It reports
 `source_intake_model_authority: "source_intake_not_authority"` plus false
 observed-evidence and physical-authority flags, so it remains operator guidance
 rather than reviewed SO-101 model authority.
+The source-review requirements artifact then expands the same gate into
+individual required inputs: one selected SO-101-relevant authoritative model,
+review actor/trace/artifact evidence, `model_identity`, `provenance`, and
+`license` review scopes, source reference, and license basis. It reports
+`source_review_requirements_model_authority` as
+`source_review_requirements_not_authority` plus false observed-evidence and
+physical-authority flags. It is a deterministic requirements checklist for the
+operator review, not reviewed physical SO-101 truth.
 When the inventory finds a high/medium SO-101 candidate, the source-intake
 checklist also records a `recommended_candidate` object and mirrors
 `recommended_candidate_path`, `recommended_candidate_source_root`, and
@@ -205,9 +215,11 @@ The ambiguous-root fixture must remain
 `source_authority_blocked_ambiguous_authoritative_model` and queue
 `select_single_authoritative_so101_model_source`. Every matrix case keeps
 `source_intake_model_authority: "source_intake_not_authority"`,
-`review_packet_model_authority: "review_packet_not_authority"`, and false
-physical SO-101 authority flags; the smoke proves the inventory state machine,
-not a reviewed robot model.
+`review_packet_model_authority: "review_packet_not_authority"`,
+and `source_review_requirements_model_authority` as
+`source_review_requirements_not_authority`, with false physical SO-101 authority
+flags; the smoke proves the inventory state machine, not a reviewed robot
+model.
 The candidate recommendation fixture also proves that source-intake commands
 carry the selected top-level model path and asset/source root into the review and
 bundle-probe rerun commands without converting that recommendation into
@@ -245,6 +257,8 @@ Key fields:
 - `artifacts.review_packet_csv: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_inventory_review_packet.csv`
 - `artifacts.source_intake_checklist_json: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_intake_checklist.json`
 - `artifacts.source_intake_checklist_csv: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_intake_checklist.csv`
+- `artifacts.source_review_requirements_json: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_review_requirements.json`
+- `artifacts.source_review_requirements_csv: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_review_requirements.csv`
 
 Empty-root validation:
 

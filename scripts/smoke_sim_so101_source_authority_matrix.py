@@ -102,6 +102,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "source_intake_recommended_candidate_path",
         "source_intake_recommended_candidate_source_root",
         "source_intake_recommended_candidate_authoritative",
+        "source_review_requirements_status",
+        "source_review_requirements_model_authority",
+        "source_review_requirements_requirement_count",
+        "source_review_requirements_action_required_requirement_ids",
         "review_packet_status",
         "review_packet_model_authority",
         "physical_so101_model_authority_ready",
@@ -937,6 +941,12 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
     source_review = source_review if isinstance(source_review, dict) else {}
     source_intake = inventory.get("source_intake_checklist")
     source_intake = source_intake if isinstance(source_intake, dict) else {}
+    source_review_requirements = inventory.get("source_review_requirements")
+    source_review_requirements = (
+        source_review_requirements
+        if isinstance(source_review_requirements, dict)
+        else {}
+    )
     source_intake_recommended_candidate = source_intake.get("recommended_candidate")
     source_intake_recommended_candidate = (
         source_intake_recommended_candidate
@@ -1013,6 +1023,84 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
         source_intake.get("physical_so101_model_authority_ready"),
         False,
     )
+    add_error(
+        errors,
+        f"{case_id}.source_review_requirements_model_authority",
+        inventory.get("source_review_requirements_model_authority"),
+        "source_review_requirements_not_authority",
+    )
+    add_error(
+        errors,
+        f"{case_id}.source_review_requirements_observed_evidence_is_authority",
+        inventory.get("source_review_requirements_observed_evidence_is_authority"),
+        False,
+    )
+    add_error(
+        errors,
+        f"{case_id}.source_review_requirements_physical_so101_model_authority_ready",
+        inventory.get("source_review_requirements_physical_so101_model_authority_ready"),
+        False,
+    )
+    add_error(
+        errors,
+        f"{case_id}.source_review_requirements_development_fixture_evidence_not_physical_so101_truth",
+        inventory.get(
+            "source_review_requirements_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.source_review_requirements_nested_model_authority",
+        source_review_requirements.get("model_authority"),
+        "source_review_requirements_not_authority",
+    )
+    add_error(
+        errors,
+        f"{case_id}.source_review_requirements_nested_physical_ready",
+        source_review_requirements.get("physical_so101_model_authority_ready"),
+        False,
+    )
+    add_error(
+        errors,
+        f"{case_id}.source_review_requirements_next_actions",
+        source_review_requirements.get("next_required_action_ids"),
+        inventory.get("next_required_action_ids"),
+    )
+    add_error(
+        errors,
+        f"{case_id}.source_review_requirements_requirement_count",
+        inventory.get("source_review_requirements_requirement_count"),
+        len(source_review_requirements.get("requirements") or []),
+    )
+    if inventory.get("source_review_requirements_status") not in {
+        "source_review_requirements_action_required",
+        "source_review_requirements_satisfied",
+    }:
+        errors.append(
+            f"{case_id}.source_review_requirements_status: unexpected {inventory.get('source_review_requirements_status')!r}"
+        )
+    if not source_review_requirements.get("requirements"):
+        errors.append(f"{case_id}.source_review_requirements: expected requirements")
+    for required_requirement_id in (
+        "authoritative_model_selection",
+        "review_evidence:review_actor",
+        "review_evidence:review_trace",
+        "review_evidence:review_artifact",
+        "review_scope:model_identity",
+        "review_scope:provenance",
+        "review_scope:license",
+        "authority_source_reference",
+        "authority_license_basis",
+    ):
+        requirement_ids = [
+            requirement.get("requirement_id")
+            for requirement in source_review_requirements.get("requirements") or []
+        ]
+        if required_requirement_id not in requirement_ids:
+            errors.append(
+                f"{case_id}.source_review_requirements: missing {required_requirement_id}"
+            )
     add_error(
         errors,
         f"{case_id}.source_intake_action_ids_match_next_required",
@@ -1268,6 +1356,18 @@ def summarize_case(record: dict[str, Any], inventory: dict[str, Any], expect: di
             "source_intake_recommended_candidate_authoritative": (
                 source_intake_recommended_candidate.get("authoritative")
             ),
+            "source_review_requirements_status": inventory.get(
+                "source_review_requirements_status"
+            ),
+            "source_review_requirements_model_authority": inventory.get(
+                "source_review_requirements_model_authority"
+            ),
+            "source_review_requirements_requirement_count": inventory.get(
+                "source_review_requirements_requirement_count"
+            ),
+            "source_review_requirements_action_required_requirement_ids": inventory.get(
+                "source_review_requirements_action_required_requirement_ids"
+            ),
             "source_intake_physical_so101_model_authority_ready": inventory.get(
                 "source_intake_physical_so101_model_authority_ready"
             ),
@@ -1328,6 +1428,18 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "source_intake_recommended_candidate_authoritative": observations.get(
             "source_intake_recommended_candidate_authoritative"
+        ),
+        "source_review_requirements_status": observations.get(
+            "source_review_requirements_status"
+        ),
+        "source_review_requirements_model_authority": observations.get(
+            "source_review_requirements_model_authority"
+        ),
+        "source_review_requirements_requirement_count": observations.get(
+            "source_review_requirements_requirement_count"
+        ),
+        "source_review_requirements_action_required_requirement_ids": observations.get(
+            "source_review_requirements_action_required_requirement_ids"
         ),
         "review_packet_status": observations.get("review_packet_status"),
         "review_packet_model_authority": observations.get("review_packet_model_authority"),

@@ -2926,6 +2926,36 @@ def collect_so101_model_source_inventory_artifacts(
             "source_intake_checklist_csv_path"
         )
         or artifact_paths.get("source_intake_checklist_csv"),
+        "source_review_requirements_status": inventory.get(
+            "source_review_requirements_status"
+        ),
+        "source_review_requirements_model_authority": inventory.get(
+            "source_review_requirements_model_authority"
+        ),
+        "source_review_requirements_requirement_count": inventory.get(
+            "source_review_requirements_requirement_count"
+        ),
+        "source_review_requirements_action_required_requirement_ids": inventory.get(
+            "source_review_requirements_action_required_requirement_ids"
+        )
+        or [],
+        "source_review_requirements_observed_evidence_is_authority": inventory.get(
+            "source_review_requirements_observed_evidence_is_authority"
+        ),
+        "source_review_requirements_physical_so101_model_authority_ready": inventory.get(
+            "source_review_requirements_physical_so101_model_authority_ready"
+        ),
+        "source_review_requirements_development_fixture_evidence_not_physical_so101_truth": inventory.get(
+            "source_review_requirements_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "source_review_requirements_json_path": inventory.get(
+            "source_review_requirements_json_path"
+        )
+        or artifact_paths.get("source_review_requirements_json"),
+        "source_review_requirements_csv_path": inventory.get(
+            "source_review_requirements_csv_path"
+        )
+        or artifact_paths.get("source_review_requirements_csv"),
     }
     for key, label_suffix in (
         ("summary_json", "summary"),
@@ -2934,6 +2964,8 @@ def collect_so101_model_source_inventory_artifacts(
         ("review_packet_csv", "review_packet_rows"),
         ("source_intake_checklist_json", "source_intake_checklist"),
         ("source_intake_checklist_csv", "source_intake_checklist_rows"),
+        ("source_review_requirements_json", "source_review_requirements"),
+        ("source_review_requirements_csv", "source_review_requirement_rows"),
         ("readme_md", "readme"),
     ):
         add_path(
@@ -3028,6 +3060,33 @@ def collect_so101_model_source_inventory_artifacts(
         ],
         "source_intake_checklist_json_path": metrics["source_intake_checklist_json_path"],
         "source_intake_checklist_csv_path": metrics["source_intake_checklist_csv_path"],
+        "source_review_requirements_status": metrics[
+            "source_review_requirements_status"
+        ],
+        "source_review_requirements_model_authority": metrics[
+            "source_review_requirements_model_authority"
+        ],
+        "source_review_requirements_requirement_count": metrics[
+            "source_review_requirements_requirement_count"
+        ],
+        "source_review_requirements_action_required_requirement_ids": metrics[
+            "source_review_requirements_action_required_requirement_ids"
+        ],
+        "source_review_requirements_observed_evidence_is_authority": metrics[
+            "source_review_requirements_observed_evidence_is_authority"
+        ],
+        "source_review_requirements_physical_so101_model_authority_ready": metrics[
+            "source_review_requirements_physical_so101_model_authority_ready"
+        ],
+        "source_review_requirements_development_fixture_evidence_not_physical_so101_truth": metrics[
+            "source_review_requirements_development_fixture_evidence_not_physical_so101_truth"
+        ],
+        "source_review_requirements_json_path": metrics[
+            "source_review_requirements_json_path"
+        ],
+        "source_review_requirements_csv_path": metrics[
+            "source_review_requirements_csv_path"
+        ],
         "diagnostics": inventory.get("diagnostics"),
     }
 

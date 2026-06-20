@@ -1285,6 +1285,14 @@ def so101_model_source_inventory_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("review_packet_observed_evidence_is_authority", ""),
         metrics.get("review_packet_development_fixture_evidence_not_physical_so101_truth", ""),
         metrics.get("review_packet_physical_so101_model_authority_ready", ""),
+        metrics.get("source_review_requirements_status", ""),
+        metrics.get("source_review_requirements_model_authority", ""),
+        metrics.get("source_review_requirements_requirement_count", ""),
+        compact_list(
+            metrics.get("source_review_requirements_action_required_requirement_ids")
+        ),
+        metrics.get("source_review_requirements_observed_evidence_is_authority", ""),
+        metrics.get("source_review_requirements_physical_so101_model_authority_ready", ""),
         "ok" if artifact.get("exists") is True else "missing",
     ]
 
@@ -2960,6 +2968,12 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Observed Evidence Is Authority",
                 "Fixture Evidence Not Physical Truth",
                 "Physical Authority Ready",
+                "Source Review Requirements",
+                "Source Review Authority",
+                "Source Review Requirement Count",
+                "Source Review Action Required",
+                "Source Review Evidence Is Authority",
+                "Source Review Physical Ready",
                 "Artifact Status",
             ],
             [so101_model_source_inventory_row(row) for row in so101_model_source_inventory],
