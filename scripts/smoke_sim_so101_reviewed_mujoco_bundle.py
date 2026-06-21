@@ -999,11 +999,29 @@ def handoff_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
             ),
         },
         {
+            "handoff_key": "gripper_mapping",
+            "status": (summary.get("gripper_mapping") or {}).get("status"),
+            "source": "manifest.gripper_mapping_authority",
+            "observed_value": summary.get("gripper_mapping"),
+            "authority_status": (summary.get("gripper_mapping") or {}).get(
+                "review_status"
+            ),
+        },
+        {
             "handoff_key": "mesh_assets",
             "status": (summary.get("mesh_assets") or {}).get("status"),
             "source": "manifest.asset_roots|contract_checker.model_asset_preflight",
             "observed_value": summary.get("mesh_assets"),
             "authority_status": (summary.get("mesh_assets") or {}).get(
+                "review_status"
+            ),
+        },
+        {
+            "handoff_key": "collision_policy",
+            "status": (summary.get("collision_policy") or {}).get("status"),
+            "source": "manifest.collision_policy_authority",
+            "observed_value": summary.get("collision_policy"),
+            "authority_status": (summary.get("collision_policy") or {}).get(
                 "review_status"
             ),
         },
@@ -1180,7 +1198,9 @@ def build_downstream_handoff(summary: dict[str, Any]) -> tuple[dict[str, Any], l
             "tcp_offset": summary.get("tcp_offset"),
             "base_to_board_alignment": summary.get("base_to_board_alignment"),
             "joint_limits": summary.get("joint_limits"),
+            "gripper_mapping": summary.get("gripper_mapping"),
             "mesh_assets": summary.get("mesh_assets"),
+            "collision_policy": summary.get("collision_policy"),
         },
         "mujoco_motion_inputs": {
             "mujoco_model_load": summary.get("mujoco_model_load"),
@@ -1263,7 +1283,9 @@ def build_not_ready_summary(
         "provenance_status": manifest_value(manifest_summary, "provenance").get("status"),
         "provenance_diagnostics": manifest_value(manifest_summary, "provenance").get("diagnostics", []),
         "joint_limits": manifest_value(manifest_summary, "joint_limits"),
+        "gripper_mapping": manifest_value(manifest_summary, "gripper_mapping"),
         "mesh_assets": manifest_value(manifest_summary, "mesh_assets"),
+        "collision_policy": manifest_value(manifest_summary, "collision_policy"),
         "target_frame": manifest_value(manifest_summary, "target_frame"),
         "tcp_offset": manifest_value(manifest_summary, "tcp_offset"),
         "base_to_board_alignment": manifest_value(manifest_summary, "base_to_board_alignment"),
@@ -1460,7 +1482,9 @@ def build_ready_summary(
         "provenance_status": manifest_value(manifest_summary, "provenance").get("status"),
         "provenance_diagnostics": manifest_value(manifest_summary, "provenance").get("diagnostics", []),
         "joint_limits": manifest_value(manifest_summary, "joint_limits"),
+        "gripper_mapping": manifest_value(manifest_summary, "gripper_mapping"),
         "mesh_assets": manifest_value(manifest_summary, "mesh_assets"),
+        "collision_policy": manifest_value(manifest_summary, "collision_policy"),
         "target_frame": target_frame,
         "tcp_offset": manifest_value(manifest_summary, "tcp_offset"),
         "base_to_board_alignment": manifest_value(manifest_summary, "base_to_board_alignment"),

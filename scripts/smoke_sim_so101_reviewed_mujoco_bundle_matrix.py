@@ -370,7 +370,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "provenance_status",
         "asset_roots_status",
         "joint_limits_status",
+        "gripper_mapping_status",
         "mesh_assets_status",
+        "collision_policy_status",
         "target_frame_status",
         "ready_for_model_backed_ik",
         "ready_for_policy_training",
@@ -500,14 +502,18 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "authority_status": "needs_review",
                 "provenance_status": "present",
                 "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
                 "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
                 "target_frame_status": "needs_review",
                 "tcp_offset_status": "needs_review",
                 "alignment_status": "needs_review",
                 "missing_inputs_contains": [
                     "authority",
                     "joint_limit_authority",
+                    "gripper_mapping_authority",
                     "mesh_asset_authority",
+                    "collision_policy_authority",
                     "target_frame_authority",
                     "tcp_offset_authority",
                     "base_to_board_alignment_authority",
@@ -516,8 +522,14 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "joint_limits_diagnostics_contains": [
                     "joint_limit_authority_review_evidence_placeholder"
                 ],
+                "gripper_mapping_diagnostics_contains": [
+                    "gripper_mapping_authority_review_evidence_placeholder"
+                ],
                 "mesh_assets_diagnostics_contains": [
                     "mesh_asset_authority_review_evidence_placeholder"
+                ],
+                "collision_policy_diagnostics_contains": [
+                    "collision_policy_authority_review_evidence_placeholder"
                 ],
                 "target_frame_diagnostics_contains": [
                     "target_frame_authority_review_evidence_placeholder"
@@ -546,14 +558,18 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "motion_evidence_not_physical_so101_authority": False,
                 "authority_status": "needs_review",
                 "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
                 "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
                 "target_frame_status": "needs_review",
                 "tcp_offset_status": "needs_review",
                 "alignment_status": "needs_review",
                 "missing_inputs_contains": [
                     "authority",
                     "joint_limit_authority",
+                    "gripper_mapping_authority",
                     "mesh_asset_authority",
+                    "collision_policy_authority",
                     "target_frame_authority",
                     "tcp_offset_authority",
                     "base_to_board_alignment_authority",
@@ -566,8 +582,14 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "joint_limits_diagnostics_contains": [
                     "joint_limit_authority_review_scope_missing:joint_limits"
                 ],
+                "gripper_mapping_diagnostics_contains": [
+                    "gripper_mapping_authority_review_scope_missing:gripper_mapping"
+                ],
                 "mesh_assets_diagnostics_contains": [
                     "mesh_asset_authority_review_scope_missing:mesh_assets"
+                ],
+                "collision_policy_diagnostics_contains": [
+                    "collision_policy_authority_review_scope_missing:collision_policy"
                 ],
                 "target_frame_diagnostics_contains": [
                     "target_frame_authority_review_scope_missing:target_frame"
@@ -596,14 +618,18 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "motion_evidence_not_physical_so101_authority": False,
                 "authority_status": "needs_review",
                 "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
                 "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
                 "target_frame_status": "needs_review",
                 "tcp_offset_status": "needs_review",
                 "alignment_status": "needs_review",
                 "missing_inputs_contains": [
                     "authority",
                     "joint_limit_authority",
+                    "gripper_mapping_authority",
                     "mesh_asset_authority",
+                    "collision_policy_authority",
                     "target_frame_authority",
                     "tcp_offset_authority",
                     "base_to_board_alignment_authority",
@@ -615,8 +641,14 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "joint_limits_diagnostics_contains": [
                     "joint_limit_authority_review_evidence_open_work:next_required_action_ids"
                 ],
+                "gripper_mapping_diagnostics_contains": [
+                    "gripper_mapping_authority_review_evidence_open_work:next_required_action_ids"
+                ],
                 "mesh_assets_diagnostics_contains": [
                     "mesh_asset_authority_review_evidence_open_work:next_required_action_ids"
+                ],
+                "collision_policy_diagnostics_contains": [
+                    "collision_policy_authority_review_evidence_open_work:next_required_action_ids"
                 ],
                 "target_frame_diagnostics_contains": [
                     "target_frame_authority_review_evidence_open_work:next_required_action_ids"
@@ -681,6 +713,35 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             },
         },
         {
+            "case_id": "weak_gripper_mapping_authority_not_ready",
+            "manifest_path": fixtures["weak_gripper_mapping_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "authority_status": "present",
+                "provenance_status": "present",
+                "joint_limits_status": "present",
+                "gripper_mapping_status": "missing",
+                "mesh_assets_status": "present",
+                "collision_policy_status": "present",
+                "target_frame_status": "present",
+                "tcp_offset_status": "present",
+                "alignment_status": "present",
+                "missing_inputs_contains": ["gripper_mapping_authority"],
+                "gripper_mapping_diagnostics_contains": [
+                    "gripper_mapping_authority_review_missing"
+                ],
+            },
+        },
+        {
             "case_id": "weak_mesh_asset_authority_not_ready",
             "manifest_path": fixtures["weak_mesh_manifest_path"],
             "require_ready": False,
@@ -704,6 +765,35 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "missing_inputs_contains": ["mesh_asset_authority"],
                 "mesh_assets_diagnostics_contains": [
                     "mesh_asset_authority_review_missing"
+                ],
+            },
+        },
+        {
+            "case_id": "weak_collision_policy_authority_not_ready",
+            "manifest_path": fixtures["weak_collision_policy_manifest_path"],
+            "require_ready": False,
+            "expect": {
+                "return_code": 0,
+                "gate_ok": True,
+                "status": "reviewed_mujoco_bundle_not_ready",
+                "ready_for_model_backed_ik": False,
+                "reviewed_model_motion_checked": False,
+                "motion_authority_status": "not_checked_manifest_not_ready",
+                "physical_reviewed_model_motion_checked": False,
+                "hardware_free_fixture_motion_checked": False,
+                "motion_evidence_not_physical_so101_authority": False,
+                "authority_status": "present",
+                "provenance_status": "present",
+                "joint_limits_status": "present",
+                "gripper_mapping_status": "present",
+                "mesh_assets_status": "present",
+                "collision_policy_status": "missing",
+                "target_frame_status": "present",
+                "tcp_offset_status": "present",
+                "alignment_status": "present",
+                "missing_inputs_contains": ["collision_policy_authority"],
+                "collision_policy_diagnostics_contains": [
+                    "collision_policy_authority_review_missing"
                 ],
             },
         },
@@ -1544,7 +1634,9 @@ def summarize_case(
         ("provenance_status", "provenance"),
         ("asset_roots_status", "asset_roots"),
         ("joint_limits_status", "joint_limits"),
+        ("gripper_mapping_status", "gripper_mapping"),
         ("mesh_assets_status", "mesh_assets"),
+        ("collision_policy_status", "collision_policy"),
         ("target_frame_status", "target_frame"),
         ("mujoco_joint_limit_enablement_status", "mujoco_joint_limit_enablement"),
         ("joint_limit_model_consistency_status", "joint_limit_model_consistency"),
@@ -1577,7 +1669,9 @@ def summarize_case(
         ("provenance_diagnostics_contains", "provenance"),
         ("asset_roots_diagnostics_contains", "asset_roots"),
         ("joint_limits_diagnostics_contains", "joint_limits"),
+        ("gripper_mapping_diagnostics_contains", "gripper_mapping"),
         ("mesh_assets_diagnostics_contains", "mesh_assets"),
+        ("collision_policy_diagnostics_contains", "collision_policy"),
         ("target_frame_diagnostics_contains", "target_frame"),
         ("tcp_offset_diagnostics_contains", "tcp_offset"),
         ("alignment_diagnostics_contains", "base_to_board_alignment"),
@@ -1954,12 +2048,21 @@ def summarize_case(
                 source.get("ready_does_not_imply_policy_training_ready"),
                 True,
             )
-        if "downstream_gate_handoff" not in set(
-            downstream_handoff.get("handoff_item_ids") or []
-        ):
-            errors.append(
-                f"{case_id}.downstream_handoff_json.handoff_item_ids: missing downstream_gate_handoff"
-            )
+        required_handoff_item_ids = {
+            "downstream_gate_handoff",
+            "gripper_mapping",
+            "collision_policy",
+        }
+        missing_handoff_item_ids = sorted(
+            required_handoff_item_ids
+            - set(str(item) for item in downstream_handoff.get("handoff_item_ids") or [])
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_json.required_handoff_item_ids",
+            missing_handoff_item_ids,
+            [],
+        )
         add_error(
             errors,
             f"{case_id}.downstream_handoff_json.ready_handoff_has_open_work",
@@ -2065,11 +2168,20 @@ def summarize_case(
                 missing_caveat_rows,
                 [],
             )
-    if downstream_handoff_csv_rows and "downstream_gate_handoff" not in set(
-        downstream_handoff_csv_item_ids
-    ):
-        errors.append(
-            f"{case_id}.downstream_handoff_csv: missing downstream_gate_handoff row"
+    if downstream_handoff_csv_rows:
+        required_csv_item_ids = {
+            "downstream_gate_handoff",
+            "gripper_mapping",
+            "collision_policy",
+        }
+        missing_csv_item_ids = sorted(
+            required_csv_item_ids - set(downstream_handoff_csv_item_ids)
+        )
+        add_error(
+            errors,
+            f"{case_id}.downstream_handoff_csv.required_handoff_item_ids",
+            missing_csv_item_ids,
+            [],
         )
 
     return {
@@ -2094,8 +2206,12 @@ def summarize_case(
             "asset_roots_diagnostics": (summary.get("asset_roots") or {}).get("diagnostics"),
             "joint_limits_status": (summary.get("joint_limits") or {}).get("status"),
             "joint_limits_diagnostics": (summary.get("joint_limits") or {}).get("diagnostics"),
+            "gripper_mapping_status": (summary.get("gripper_mapping") or {}).get("status"),
+            "gripper_mapping_diagnostics": (summary.get("gripper_mapping") or {}).get("diagnostics"),
             "mesh_assets_status": (summary.get("mesh_assets") or {}).get("status"),
             "mesh_assets_diagnostics": (summary.get("mesh_assets") or {}).get("diagnostics"),
+            "collision_policy_status": (summary.get("collision_policy") or {}).get("status"),
+            "collision_policy_diagnostics": (summary.get("collision_policy") or {}).get("diagnostics"),
             "target_frame_status": (summary.get("target_frame") or {}).get("status"),
             "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
             "ready_for_policy_training": summary.get("ready_for_policy_training"),
@@ -2271,7 +2387,9 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "provenance_status": observations.get("provenance_status"),
         "asset_roots_status": observations.get("asset_roots_status"),
         "joint_limits_status": observations.get("joint_limits_status"),
+        "gripper_mapping_status": observations.get("gripper_mapping_status"),
         "mesh_assets_status": observations.get("mesh_assets_status"),
+        "collision_policy_status": observations.get("collision_policy_status"),
         "target_frame_status": observations.get("target_frame_status"),
         "ready_for_model_backed_ik": observations.get("ready_for_model_backed_ik"),
         "ready_for_policy_training": observations.get("ready_for_policy_training"),
