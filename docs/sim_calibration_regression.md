@@ -501,7 +501,10 @@ rows visible while preserving expected-file completeness as the source-lock
 readiness check. The candidate-seeded reviewed manifest template carries the
 same digest counts and extra lockable paths under observed inputs as review
 context only; reviewers still must replace placeholder authority fields before
-the bundle manifest can pass. The matrix also includes a MJCF model-selection case so
+the bundle manifest can pass. It also carries a source pin verification handoff
+in the observed inputs and direct manifest template so the selected checkout or
+vendored digest lock must be checked against the pinned upstream commit before
+reviewed authority fields are edited. The matrix also includes a MJCF model-selection case so
 the handoff can distinguish `no_mesh_references_observed` from observed mesh
 references covered by the locked candidate digest set, and it records selected
 model coverage against the expected SO-101 control joint names. Those joint

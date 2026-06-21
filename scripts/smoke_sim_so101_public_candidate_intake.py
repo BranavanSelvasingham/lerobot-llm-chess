@@ -45,6 +45,9 @@ INTAKE_DECISION_CHOICES = (
     "external_pinned_source_root",
     "vendor_locked_bundle",
 )
+SOURCE_PIN_VERIFICATION_SUCCESS_CONDITION_ID = (
+    "selected_checkout_or_vendored_digest_lock_verified_against_pinned_commit"
+)
 EXPECTED_RELATIVE_PATHS = (
     "README.md",
     "joints_properties.xml",
@@ -916,6 +919,10 @@ def candidate_operator_intake_handoff(summary: dict[str, Any]) -> dict[str, Any]
         "source_lock_ready_for_review": operator_plan.get(
             "source_lock_ready_for_review"
         ),
+        "source_pin_verification_required": True,
+        "source_pin_verification_success_condition_id": (
+            SOURCE_PIN_VERIFICATION_SUCCESS_CONDITION_ID
+        ),
         "authority_boundary": "candidate_operator_intake_handoff_not_authority",
         "review_instruction": (
             "Use this only to preserve which external-source or vendored-bundle "
@@ -1013,7 +1020,7 @@ def candidate_reviewed_manifest_rerun_plan(summary: dict[str, Any]) -> dict[str,
             "model_bundle_manifest_needs_follow_up"
         ),
         "required_success_conditions": [
-            "selected_checkout_or_vendored_digest_lock_verified_against_pinned_commit",
+            SOURCE_PIN_VERIFICATION_SUCCESS_CONDITION_ID,
             "reviewer_replaces_all_placeholders_with_reviewed_values",
             "reviewed_manifest_records_gripper_mapping_authority",
             "reviewed_manifest_records_collision_policy_authority",
@@ -1765,6 +1772,19 @@ def candidate_seeded_review_manifest_template(
             "fields after reviewer acceptance."
         ),
     }
+    candidate_source_pin_verification_handoff = {
+        "required": True,
+        "success_condition_id": SOURCE_PIN_VERIFICATION_SUCCESS_CONDITION_ID,
+        "upstream_commit": upstream_commit or "<immutable-upstream-commit-sha>",
+        "selected_source_path": str(source_root) if source_root is not None else None,
+        "authority_boundary": "candidate_source_pin_verification_not_authority",
+        "review_instruction": (
+            "Before editing reviewed authority fields, verify the selected "
+            "checkout HEAD or vendored digest lock against the pinned upstream "
+            "commit. This handoff records the required check only; it is not "
+            "reviewed physical SO-101 authority."
+        ),
+    }
     return {
         "schema": "lerobot.sim.so101_public_candidate_seeded_review_manifest_template.v1",
         "ok": True,
@@ -1788,6 +1808,9 @@ def candidate_seeded_review_manifest_template(
             "candidate_source_lock_digest_handoff": (
                 candidate_source_lock_digest_handoff
             ),
+            "candidate_source_pin_verification_handoff": (
+                candidate_source_pin_verification_handoff
+            ),
             "candidate_review_observations": candidate_review_observations,
         },
         "manifest_template": {
@@ -1796,6 +1819,9 @@ def candidate_seeded_review_manifest_template(
             "asset_roots": [str(source_root)] if source_root is not None else ["<reviewed-mesh-or-asset-root>"],
             "candidate_source_lock_digest_handoff": (
                 candidate_source_lock_digest_handoff
+            ),
+            "candidate_source_pin_verification_handoff": (
+                candidate_source_pin_verification_handoff
             ),
             "authority": {
                 "source_authority_status": "reviewed",

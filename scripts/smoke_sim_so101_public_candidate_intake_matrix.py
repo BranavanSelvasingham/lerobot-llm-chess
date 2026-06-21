@@ -19,6 +19,9 @@ DEFAULT_OUTPUT_DIR = (
 )
 SCHEMA = "lerobot.sim.so101_public_candidate_intake_matrix.v1"
 PINNED_FIXTURE_COMMIT = "fda892cba81032c46c40976a48c9ceadbf40a9ca"
+SOURCE_PIN_VERIFICATION_SUCCESS_CONDITION_ID = (
+    "selected_checkout_or_vendored_digest_lock_verified_against_pinned_commit"
+)
 EXPECTED_RELATIVE_PATHS = (
     "README.md",
     "joints_properties.xml",
@@ -1647,6 +1650,20 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
     direct_digest_handoff = (
         direct_digest_handoff if isinstance(direct_digest_handoff, dict) else {}
     )
+    source_pin_handoff = observed_inputs.get(
+        "candidate_source_pin_verification_handoff"
+    )
+    source_pin_handoff = (
+        source_pin_handoff if isinstance(source_pin_handoff, dict) else {}
+    )
+    direct_source_pin_handoff = manifest_template.get(
+        "candidate_source_pin_verification_handoff"
+    )
+    direct_source_pin_handoff = (
+        direct_source_pin_handoff
+        if isinstance(direct_source_pin_handoff, dict)
+        else {}
+    )
     for handoff_name, handoff in (
         ("observed_inputs", digest_handoff),
         ("manifest_template", direct_digest_handoff),
@@ -1680,6 +1697,38 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
                 f"{case_id}.candidate_seeded_review_manifest_template.{handoff_name} "
                 "extra_lockable_relative_paths invalid"
             )
+    upstream = summary.get("upstream")
+    upstream = upstream if isinstance(upstream, dict) else {}
+    expected_upstream_commit = (
+        upstream.get("commit") or "<immutable-upstream-commit-sha>"
+    )
+    for handoff_name, handoff in (
+        ("observed_inputs", source_pin_handoff),
+        ("manifest_template", direct_source_pin_handoff),
+    ):
+        if handoff.get("authority_boundary") != "candidate_source_pin_verification_not_authority":
+            errors.append(
+                f"{case_id}.candidate_seeded_review_manifest_template.{handoff_name} "
+                "source pin handoff authority invalid"
+            )
+        if handoff.get("required") is not True:
+            errors.append(
+                f"{case_id}.candidate_seeded_review_manifest_template.{handoff_name} "
+                "source pin handoff required flag invalid"
+            )
+        if (
+            handoff.get("success_condition_id")
+            != SOURCE_PIN_VERIFICATION_SUCCESS_CONDITION_ID
+        ):
+            errors.append(
+                f"{case_id}.candidate_seeded_review_manifest_template.{handoff_name} "
+                "source pin handoff success condition invalid"
+            )
+        if handoff.get("upstream_commit") != expected_upstream_commit:
+            errors.append(
+                f"{case_id}.candidate_seeded_review_manifest_template.{handoff_name} "
+                "source pin handoff upstream commit invalid"
+            )
     authority = manifest_template.get("authority")
     authority = authority if isinstance(authority, dict) else {}
     if authority.get("reviewed_by") != "<reviewer-or-team>":
@@ -1709,6 +1758,13 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
             errors.append(f"{case_id}.{handoff_name}.candidate_operator_intake_handoff requirement ids invalid")
         if handoff.get("ready_for_model_backed_ik") is not False:
             errors.append(f"{case_id}.{handoff_name}.candidate_operator_intake_handoff ready_for_model_backed_ik not false")
+        if handoff.get("source_pin_verification_required") is not True:
+            errors.append(f"{case_id}.{handoff_name}.candidate_operator_intake_handoff source pin required flag invalid")
+        if (
+            handoff.get("source_pin_verification_success_condition_id")
+            != SOURCE_PIN_VERIFICATION_SUCCESS_CONDITION_ID
+        ):
+            errors.append(f"{case_id}.{handoff_name}.candidate_operator_intake_handoff source pin success condition invalid")
 
     review_checklist = summary.get("candidate_review_checklist")
     review_checklist = review_checklist if isinstance(review_checklist, dict) else {}
