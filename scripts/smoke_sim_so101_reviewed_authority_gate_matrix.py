@@ -164,6 +164,12 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "public_candidate_operator_command_plan_model_authority",
         "public_candidate_operator_command_plan_review_handoff_artifact_ids",
         "public_candidate_operator_command_plan_authority_blockers_until_reviewed",
+        "public_candidate_reviewed_manifest_rerun_plan_json_path",
+        "public_candidate_reviewed_manifest_rerun_plan_status",
+        "public_candidate_reviewed_manifest_rerun_plan_model_authority",
+        "public_candidate_reviewed_manifest_rerun_plan_selected_option",
+        "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready",
+        "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions",
         "public_candidate_review_checklist_scope_coverage_ready",
         "public_candidate_review_checklist_missing_required_review_scope_ids",
         "public_candidate_review_checklist_gripper_mapping_direct_action_ids",
@@ -338,6 +344,9 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
     operator_command_plan_path = (
         artifact_dir / "so101_public_candidate_operator_command_plan.json"
     )
+    reviewed_manifest_rerun_plan_path = (
+        artifact_dir / "so101_public_candidate_reviewed_manifest_rerun_plan.json"
+    )
     direct_manifest_path = artifact_dir / "so101_public_candidate_review_manifest_template.json"
     matrix_summary_path = artifact_dir / "so101_public_candidate_intake_matrix_summary.json"
     source_lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -468,6 +477,45 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
             ],
         },
     )
+    rerun_success_conditions = [
+        "reviewer_replaces_all_placeholders_with_reviewed_values",
+        "manifest_checker_reports_ready_for_model_backed_ik_true",
+        "manifest_checker_reports_physical_so101_model_authority_ready_true",
+        "reviewed_mujoco_bundle_gate_loads_model_and_proves_joint_motion",
+    ]
+    write_json(
+        reviewed_manifest_rerun_plan_path,
+        {
+            "schema": (
+                "lerobot.sim.so101_public_candidate_reviewed_manifest_rerun_plan.v1"
+            ),
+            "status": "candidate_reviewed_manifest_rerun_plan_ready",
+            "model_authority": "candidate_reviewed_manifest_rerun_plan_not_authority",
+            "observed_evidence_is_physical_so101_authority": False,
+            "ready_for_model_backed_ik": False,
+            "ready_for_policy_training": False,
+            "source_lock_ready_for_review": True,
+            "operator_intake_decision_status": (
+                "candidate_intake_decision_recorded_not_authority"
+            ),
+            "selected_intake_option_id": "external_pinned_source_root",
+            "selected_option_review_requirement_ids": external_requirement_ids,
+            "manifest_checker_command_template": [
+                "python",
+                "scripts/smoke_sim_so101_model_bundle_manifest.py",
+                "--manifest-path",
+                "<reviewed-edited-copy-of-so101_public_candidate_review_manifest_template.direct.json>",
+                "--output-dir",
+                "/private/tmp/lerobot_sim/so101_model_bundle_manifest_reviewed_candidate",
+                "--python",
+                "<python-executable>",
+            ],
+            "required_success_conditions": rerun_success_conditions,
+            "authority_boundary": (
+                "candidate_reviewed_manifest_rerun_plan_not_authority"
+            ),
+        },
+    )
     recorded_decision_cases = {
         "external_pinned_source_root": {
             "candidate_operator_intake_decision_status": (
@@ -535,6 +583,16 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
                 "candidate_operator_commands_ready_for_pinned_source_review"
             ),
             "candidate_operator_command_plan_selected_option_command_count": 8,
+            "candidate_reviewed_manifest_rerun_plan_model_authority": (
+                "candidate_reviewed_manifest_rerun_plan_not_authority"
+            ),
+            "candidate_reviewed_manifest_rerun_plan_status": (
+                "candidate_reviewed_manifest_rerun_plan_ready"
+            ),
+            "candidate_reviewed_manifest_rerun_plan_selected_option": (
+                "external_pinned_source_root"
+            ),
+            "candidate_reviewed_manifest_rerun_plan_source_lock_ready": True,
             "candidate_review_checklist_scope_coverage_ready": True,
             "candidate_review_checklist_missing_required_review_scope_ids": [],
             "candidate_review_checklist_gripper_mapping_direct_action_ids": [
@@ -555,6 +613,9 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
                     "candidate_operator_intake_plan_json": str(operator_plan_path),
                     "candidate_operator_command_plan_json": str(
                         operator_command_plan_path
+                    ),
+                    "candidate_reviewed_manifest_rerun_plan_json": str(
+                        reviewed_manifest_rerun_plan_path
                     ),
                     "direct_manifest_template_json": str(direct_manifest_path),
                 },
@@ -930,6 +991,20 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                     "license and provenance review evidence must be recorded for the selected intake option",
                     "reviewed bundle manifest checker must report physical_so101_model_authority_ready",
                     "reviewed MuJoCo bundle gate must prove physical reviewed model motion",
+                ],
+                "public_candidate_reviewed_manifest_rerun_plan_status": (
+                    "candidate_reviewed_manifest_rerun_plan_ready"
+                ),
+                "public_candidate_reviewed_manifest_rerun_plan_model_authority": (
+                    "candidate_reviewed_manifest_rerun_plan_not_authority"
+                ),
+                "public_candidate_reviewed_manifest_rerun_plan_selected_option": (
+                    "external_pinned_source_root"
+                ),
+                "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready": True,
+                "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions_contains": [
+                    "manifest_checker_reports_physical_so101_model_authority_ready_true",
+                    "reviewed_mujoco_bundle_gate_loads_model_and_proves_joint_motion",
                 ],
                 "public_candidate_review_checklist_scope_coverage_ready": True,
                 "public_candidate_review_checklist_missing_required_review_scope_ids": [],
@@ -2174,6 +2249,81 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
                     "operator_command_plan_authority_blockers_until_reviewed "
                     f"missing {expected_blocker!r}"
                 )
+    if "public_candidate_reviewed_manifest_rerun_plan_status" in expect:
+        add_error(
+            errors,
+            "public_candidate_reviewed_manifest_rerun_plan_status",
+            gate.get("public_candidate_reviewed_manifest_rerun_plan_status"),
+            expect["public_candidate_reviewed_manifest_rerun_plan_status"],
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.reviewed_manifest_rerun_plan_status",
+            source_lock_handoff.get("reviewed_manifest_rerun_plan_status"),
+            expect["public_candidate_reviewed_manifest_rerun_plan_status"],
+        )
+    if "public_candidate_reviewed_manifest_rerun_plan_model_authority" in expect:
+        add_error(
+            errors,
+            "public_candidate_reviewed_manifest_rerun_plan_model_authority",
+            gate.get(
+                "public_candidate_reviewed_manifest_rerun_plan_model_authority"
+            ),
+            expect["public_candidate_reviewed_manifest_rerun_plan_model_authority"],
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.reviewed_manifest_rerun_plan_model_authority",
+            source_lock_handoff.get("reviewed_manifest_rerun_plan_model_authority"),
+            expect["public_candidate_reviewed_manifest_rerun_plan_model_authority"],
+        )
+    if "public_candidate_reviewed_manifest_rerun_plan_selected_option" in expect:
+        add_error(
+            errors,
+            "public_candidate_reviewed_manifest_rerun_plan_selected_option",
+            gate.get("public_candidate_reviewed_manifest_rerun_plan_selected_option"),
+            expect["public_candidate_reviewed_manifest_rerun_plan_selected_option"],
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.reviewed_manifest_rerun_plan_selected_option",
+            source_lock_handoff.get("reviewed_manifest_rerun_plan_selected_option"),
+            expect["public_candidate_reviewed_manifest_rerun_plan_selected_option"],
+        )
+    if "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready" in expect:
+        add_error(
+            errors,
+            "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready",
+            gate.get(
+                "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready"
+            ),
+            expect["public_candidate_reviewed_manifest_rerun_plan_source_lock_ready"],
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.reviewed_manifest_rerun_plan_source_lock_ready",
+            source_lock_handoff.get("reviewed_manifest_rerun_plan_source_lock_ready"),
+            expect["public_candidate_reviewed_manifest_rerun_plan_source_lock_ready"],
+        )
+    if (
+        "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions_contains"
+        in expect
+    ):
+        success_conditions = source_lock_handoff.get(
+            "reviewed_manifest_rerun_plan_required_success_conditions"
+        )
+        success_conditions = (
+            success_conditions if isinstance(success_conditions, list) else []
+        )
+        for expected_condition in expect[
+            "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions_contains"
+        ]:
+            if expected_condition not in success_conditions:
+                errors.append(
+                    "public_candidate_source_lock_handoff."
+                    "reviewed_manifest_rerun_plan_required_success_conditions "
+                    f"missing {expected_condition!r}"
+                )
     if "public_candidate_review_checklist_scope_coverage_ready" in expect:
         add_error(
             errors,
@@ -3017,6 +3167,56 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
         )
         add_error(
             errors,
+            "artifact_public_candidate_reviewed_manifest_rerun_plan_json_path",
+            gate_artifacts.get(
+                "public_candidate_reviewed_manifest_rerun_plan_json_path"
+            ),
+            source_lock_handoff.get("reviewed_manifest_rerun_plan_json_path"),
+        )
+        add_error(
+            errors,
+            "artifact_public_candidate_reviewed_manifest_rerun_plan_status",
+            gate_artifacts.get(
+                "public_candidate_reviewed_manifest_rerun_plan_status"
+            ),
+            source_lock_handoff.get("reviewed_manifest_rerun_plan_status"),
+        )
+        add_error(
+            errors,
+            "artifact_public_candidate_reviewed_manifest_rerun_plan_model_authority",
+            gate_artifacts.get(
+                "public_candidate_reviewed_manifest_rerun_plan_model_authority"
+            ),
+            source_lock_handoff.get("reviewed_manifest_rerun_plan_model_authority"),
+        )
+        add_error(
+            errors,
+            "artifact_public_candidate_reviewed_manifest_rerun_plan_selected_option",
+            gate_artifacts.get(
+                "public_candidate_reviewed_manifest_rerun_plan_selected_option"
+            ),
+            source_lock_handoff.get("reviewed_manifest_rerun_plan_selected_option"),
+        )
+        add_error(
+            errors,
+            "artifact_public_candidate_reviewed_manifest_rerun_plan_source_lock_ready",
+            gate_artifacts.get(
+                "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready"
+            ),
+            source_lock_handoff.get("reviewed_manifest_rerun_plan_source_lock_ready"),
+        )
+        add_error(
+            errors,
+            "artifact_public_candidate_reviewed_manifest_rerun_plan_required_success_conditions",
+            gate_artifacts.get(
+                "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions"
+            ),
+            source_lock_handoff.get(
+                "reviewed_manifest_rerun_plan_required_success_conditions"
+            ),
+        )
+        add_error(
+            errors,
             "artifact_public_candidate_review_checklist_scope_coverage_ready",
             gate_artifacts.get(
                 "public_candidate_review_checklist_scope_coverage_ready"
@@ -3552,6 +3752,26 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "public_candidate_operator_command_plan_authority_blockers_until_reviewed": (
             source_lock_handoff.get(
                 "operator_command_plan_authority_blockers_until_reviewed"
+            )
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_json_path": (
+            source_lock_handoff.get("reviewed_manifest_rerun_plan_json_path")
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_status": (
+            source_lock_handoff.get("reviewed_manifest_rerun_plan_status")
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_model_authority": (
+            source_lock_handoff.get("reviewed_manifest_rerun_plan_model_authority")
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_selected_option": (
+            source_lock_handoff.get("reviewed_manifest_rerun_plan_selected_option")
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready": (
+            source_lock_handoff.get("reviewed_manifest_rerun_plan_source_lock_ready")
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions": (
+            source_lock_handoff.get(
+                "reviewed_manifest_rerun_plan_required_success_conditions"
             )
         ),
         "public_candidate_review_checklist_scope_coverage_ready": (

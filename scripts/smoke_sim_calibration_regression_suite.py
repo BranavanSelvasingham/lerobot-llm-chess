@@ -5691,6 +5691,21 @@ def so101_reviewed_model_authority_gate_section(
             else {}
         )
         public_candidate_operator_command_plan_error = operator_command_plan_error
+    public_candidate_reviewed_manifest_rerun_plan = {}
+    public_candidate_reviewed_manifest_rerun_plan_error = None
+    reviewed_manifest_rerun_plan_json_path = public_candidate_checked_artifacts.get(
+        "candidate_reviewed_manifest_rerun_plan_json"
+    )
+    if isinstance(reviewed_manifest_rerun_plan_json_path, str):
+        reviewed_manifest_rerun_plan_payload, rerun_plan_error = read_json_object(
+            Path(reviewed_manifest_rerun_plan_json_path)
+        )
+        public_candidate_reviewed_manifest_rerun_plan = (
+            reviewed_manifest_rerun_plan_payload
+            if isinstance(reviewed_manifest_rerun_plan_payload, dict)
+            else {}
+        )
+        public_candidate_reviewed_manifest_rerun_plan_error = rerun_plan_error
     recorded_operator_intake_decision_cases = public_candidate_intake_matrix.get(
         "recorded_operator_intake_decision_cases"
     )
@@ -5841,6 +5856,45 @@ def so101_reviewed_model_authority_gate_section(
         ),
         "operator_command_plan_authority_blockers_until_reviewed": (
             authority_blockers_until_reviewed
+        ),
+        "reviewed_manifest_rerun_plan_json_path": (
+            reviewed_manifest_rerun_plan_json_path
+        ),
+        "reviewed_manifest_rerun_plan_parse_error": (
+            public_candidate_reviewed_manifest_rerun_plan_error
+        ),
+        "reviewed_manifest_rerun_plan_status": public_candidate_checked.get(
+            "candidate_reviewed_manifest_rerun_plan_status"
+        )
+        or public_candidate_reviewed_manifest_rerun_plan.get("status"),
+        "reviewed_manifest_rerun_plan_model_authority": public_candidate_checked.get(
+            "candidate_reviewed_manifest_rerun_plan_model_authority"
+        )
+        or public_candidate_reviewed_manifest_rerun_plan.get("model_authority")
+        or "candidate_reviewed_manifest_rerun_plan_not_authority",
+        "reviewed_manifest_rerun_plan_selected_option": public_candidate_checked.get(
+            "candidate_reviewed_manifest_rerun_plan_selected_option"
+        )
+        or public_candidate_reviewed_manifest_rerun_plan.get(
+            "selected_intake_option_id"
+        ),
+        "reviewed_manifest_rerun_plan_source_lock_ready": (
+            public_candidate_checked.get(
+                "candidate_reviewed_manifest_rerun_plan_source_lock_ready"
+            )
+            if public_candidate_checked.get(
+                "candidate_reviewed_manifest_rerun_plan_source_lock_ready"
+            )
+            is not None
+            else public_candidate_reviewed_manifest_rerun_plan.get(
+                "source_lock_ready_for_review"
+            )
+        ),
+        "reviewed_manifest_rerun_plan_required_success_conditions": (
+            public_candidate_reviewed_manifest_rerun_plan.get(
+                "required_success_conditions"
+            )
+            or []
         ),
         "review_checklist_scope_coverage_ready": public_candidate_checked.get(
             "candidate_review_checklist_scope_coverage_ready"
@@ -6480,6 +6534,36 @@ def so101_reviewed_model_authority_gate_section(
                 "operator_command_plan_authority_blockers_until_reviewed"
             ]
         ),
+        "public_candidate_reviewed_manifest_rerun_plan_json_path": (
+            public_candidate_source_lock_handoff[
+                "reviewed_manifest_rerun_plan_json_path"
+            ]
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_status": (
+            public_candidate_source_lock_handoff[
+                "reviewed_manifest_rerun_plan_status"
+            ]
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_model_authority": (
+            public_candidate_source_lock_handoff[
+                "reviewed_manifest_rerun_plan_model_authority"
+            ]
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_selected_option": (
+            public_candidate_source_lock_handoff[
+                "reviewed_manifest_rerun_plan_selected_option"
+            ]
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready": (
+            public_candidate_source_lock_handoff[
+                "reviewed_manifest_rerun_plan_source_lock_ready"
+            ]
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions": (
+            public_candidate_source_lock_handoff[
+                "reviewed_manifest_rerun_plan_required_success_conditions"
+            ]
+        ),
         "public_candidate_review_checklist_scope_coverage_ready": (
             public_candidate_source_lock_handoff[
                 "review_checklist_scope_coverage_ready"
@@ -6762,6 +6846,36 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
             "public_candidate_operator_command_plan_authority_blockers_until_reviewed": (
                 public_candidate_source_lock_handoff.get(
                     "operator_command_plan_authority_blockers_until_reviewed"
+                )
+            ),
+            "public_candidate_reviewed_manifest_rerun_plan_json_path": (
+                public_candidate_source_lock_handoff.get(
+                    "reviewed_manifest_rerun_plan_json_path"
+                )
+            ),
+            "public_candidate_reviewed_manifest_rerun_plan_status": (
+                public_candidate_source_lock_handoff.get(
+                    "reviewed_manifest_rerun_plan_status"
+                )
+            ),
+            "public_candidate_reviewed_manifest_rerun_plan_model_authority": (
+                public_candidate_source_lock_handoff.get(
+                    "reviewed_manifest_rerun_plan_model_authority"
+                )
+            ),
+            "public_candidate_reviewed_manifest_rerun_plan_selected_option": (
+                public_candidate_source_lock_handoff.get(
+                    "reviewed_manifest_rerun_plan_selected_option"
+                )
+            ),
+            "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready": (
+                public_candidate_source_lock_handoff.get(
+                    "reviewed_manifest_rerun_plan_source_lock_ready"
+                )
+            ),
+            "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions": (
+                public_candidate_source_lock_handoff.get(
+                    "reviewed_manifest_rerun_plan_required_success_conditions"
                 )
             ),
             "public_candidate_review_checklist_scope_coverage_ready": (
@@ -7374,6 +7488,24 @@ def so101_reviewed_model_authority_operator_actions(
                 "public_candidate_operator_command_plan_authority_blockers_until_reviewed": item.get(
                     "public_candidate_operator_command_plan_authority_blockers_until_reviewed"
                 ),
+                "public_candidate_reviewed_manifest_rerun_plan_json_path": item.get(
+                    "public_candidate_reviewed_manifest_rerun_plan_json_path"
+                ),
+                "public_candidate_reviewed_manifest_rerun_plan_status": item.get(
+                    "public_candidate_reviewed_manifest_rerun_plan_status"
+                ),
+                "public_candidate_reviewed_manifest_rerun_plan_model_authority": item.get(
+                    "public_candidate_reviewed_manifest_rerun_plan_model_authority"
+                ),
+                "public_candidate_reviewed_manifest_rerun_plan_selected_option": item.get(
+                    "public_candidate_reviewed_manifest_rerun_plan_selected_option"
+                ),
+                "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready": item.get(
+                    "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready"
+                ),
+                "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions": item.get(
+                    "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions"
+                ),
                 "public_candidate_review_checklist_scope_coverage_ready": item.get(
                     "public_candidate_review_checklist_scope_coverage_ready"
                 ),
@@ -7902,6 +8034,12 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "public_candidate_operator_command_plan_model_authority",
         "public_candidate_operator_command_plan_review_handoff_artifact_ids",
         "public_candidate_operator_command_plan_authority_blockers_until_reviewed",
+        "public_candidate_reviewed_manifest_rerun_plan_json_path",
+        "public_candidate_reviewed_manifest_rerun_plan_status",
+        "public_candidate_reviewed_manifest_rerun_plan_model_authority",
+        "public_candidate_reviewed_manifest_rerun_plan_selected_option",
+        "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready",
+        "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions",
         "public_candidate_review_checklist_scope_coverage_ready",
         "public_candidate_review_checklist_missing_required_review_scope_ids",
         "public_candidate_review_checklist_gripper_mapping_direct_action_ids",
@@ -7943,6 +8081,12 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "public_candidate_operator_command_plan_model_authority",
         "public_candidate_operator_command_plan_review_handoff_artifact_ids",
         "public_candidate_operator_command_plan_authority_blockers_until_reviewed",
+        "public_candidate_reviewed_manifest_rerun_plan_json_path",
+        "public_candidate_reviewed_manifest_rerun_plan_status",
+        "public_candidate_reviewed_manifest_rerun_plan_model_authority",
+        "public_candidate_reviewed_manifest_rerun_plan_selected_option",
+        "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready",
+        "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions",
         "public_candidate_review_checklist_scope_coverage_ready",
         "public_candidate_review_checklist_missing_required_review_scope_ids",
         "public_candidate_review_checklist_gripper_mapping_direct_action_ids",
