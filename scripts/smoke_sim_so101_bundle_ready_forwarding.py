@@ -563,7 +563,9 @@ def placeholder_review_metadata_manifest_payload(model_filename: str) -> dict[st
         "authority",
         "target_frame_authority",
         "joint_limit_authority",
+        "gripper_mapping_authority",
         "mesh_asset_authority",
+        "collision_policy_authority",
         "tcp_offset_authority",
         "base_to_board_alignment_authority",
     ):
@@ -579,7 +581,9 @@ def thin_review_evidence_manifest_payload(model_filename: str) -> dict[str, Any]
         "authority",
         "target_frame_authority",
         "joint_limit_authority",
+        "gripper_mapping_authority",
         "mesh_asset_authority",
+        "collision_policy_authority",
         "tcp_offset_authority",
         "base_to_board_alignment_authority",
     ):
@@ -594,7 +598,9 @@ def invalid_review_url_manifest_payload(model_filename: str) -> dict[str, Any]:
         "authority",
         "target_frame_authority",
         "joint_limit_authority",
+        "gripper_mapping_authority",
         "mesh_asset_authority",
+        "collision_policy_authority",
         "tcp_offset_authority",
         "base_to_board_alignment_authority",
     ):
@@ -609,7 +615,9 @@ def invalid_reviewed_at_manifest_payload(model_filename: str) -> dict[str, Any]:
         "authority",
         "target_frame_authority",
         "joint_limit_authority",
+        "gripper_mapping_authority",
         "mesh_asset_authority",
+        "collision_policy_authority",
         "tcp_offset_authority",
         "base_to_board_alignment_authority",
     ):
@@ -623,7 +631,9 @@ def future_reviewed_at_manifest_payload(model_filename: str) -> dict[str, Any]:
         "authority",
         "target_frame_authority",
         "joint_limit_authority",
+        "gripper_mapping_authority",
         "mesh_asset_authority",
+        "collision_policy_authority",
         "tcp_offset_authority",
         "base_to_board_alignment_authority",
     ):
@@ -637,7 +647,9 @@ def generic_review_scope_manifest_payload(model_filename: str) -> dict[str, Any]
         "authority",
         "target_frame_authority",
         "joint_limit_authority",
+        "gripper_mapping_authority",
         "mesh_asset_authority",
+        "collision_policy_authority",
         "tcp_offset_authority",
         "base_to_board_alignment_authority",
     ):
@@ -652,7 +664,9 @@ def pending_review_metadata_manifest_payload(model_filename: str) -> dict[str, A
         "authority",
         "target_frame_authority",
         "joint_limit_authority",
+        "gripper_mapping_authority",
         "mesh_asset_authority",
+        "collision_policy_authority",
         "tcp_offset_authority",
         "base_to_board_alignment_authority",
     ):

@@ -117,9 +117,15 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "joint_limits_diagnostics",
         "joint_limit_review_alias_conflict",
         "joint_limit_review_alias_not_ready_fields",
+        "gripper_mapping_status",
+        "gripper_mapping_review_open_work_fields",
+        "gripper_mapping_review_invalid_fields",
         "mesh_assets_status",
         "mesh_asset_review_alias_conflict",
         "mesh_asset_review_alias_not_ready_fields",
+        "collision_policy_status",
+        "collision_policy_review_open_work_fields",
+        "collision_policy_review_invalid_fields",
         "target_frame_status",
         "target_frame_review_alias_conflict",
         "target_frame_review_alias_not_ready_fields",
@@ -524,7 +530,9 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                     "authority",
                     "provenance",
                     "joint_limits",
+                    "gripper_mapping",
                     "mesh_assets",
+                    "collision_policy",
                     "target_frame",
                     "tcp_offset",
                     "base_to_board_alignment",
@@ -546,7 +554,9 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "authority_status": "present",
                 "provenance_status": "present",
                 "joint_limits_status": "present",
+                "gripper_mapping_status": "present",
                 "mesh_assets_status": "present",
+                "collision_policy_status": "present",
                 "target_frame_status": "present",
                 "tcp_offset_status": "present",
                 "alignment_status": "present",
@@ -768,14 +778,18 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "fixture_ready": False,
                 "authority_status": "needs_review",
                 "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
                 "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
                 "target_frame_status": "needs_review",
                 "tcp_offset_status": "needs_review",
                 "alignment_status": "needs_review",
                 "missing_inputs": [
                     "authority",
                     "joint_limit_authority",
+                    "gripper_mapping_authority",
                     "mesh_asset_authority",
+                    "collision_policy_authority",
                     "target_frame_authority",
                     "tcp_offset_authority",
                     "base_to_board_alignment_authority",
@@ -789,7 +803,23 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "status": "model_bundle_manifest_needs_follow_up",
                 "ready": False,
                 "authority_status": "needs_review",
-                "missing_inputs": ["authority", "joint_limit_authority"],
+                "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
+                "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
+                "target_frame_status": "needs_review",
+                "tcp_offset_status": "needs_review",
+                "alignment_status": "needs_review",
+                "missing_inputs": [
+                    "authority",
+                    "joint_limit_authority",
+                    "gripper_mapping_authority",
+                    "mesh_asset_authority",
+                    "collision_policy_authority",
+                    "target_frame_authority",
+                    "tcp_offset_authority",
+                    "base_to_board_alignment_authority",
+                ],
             },
         },
         {
@@ -799,7 +829,23 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "status": "model_bundle_manifest_needs_follow_up",
                 "ready": False,
                 "authority_status": "needs_review",
-                "missing_inputs": ["authority", "mesh_asset_authority"],
+                "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
+                "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
+                "target_frame_status": "needs_review",
+                "tcp_offset_status": "needs_review",
+                "alignment_status": "needs_review",
+                "missing_inputs": [
+                    "authority",
+                    "joint_limit_authority",
+                    "gripper_mapping_authority",
+                    "mesh_asset_authority",
+                    "collision_policy_authority",
+                    "target_frame_authority",
+                    "tcp_offset_authority",
+                    "base_to_board_alignment_authority",
+                ],
             },
         },
         {
@@ -810,14 +856,18 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "ready": False,
                 "authority_status": "needs_review",
                 "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
                 "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
                 "target_frame_status": "needs_review",
                 "tcp_offset_status": "needs_review",
                 "alignment_status": "needs_review",
                 "missing_inputs": [
                     "authority",
                     "joint_limit_authority",
+                    "gripper_mapping_authority",
                     "mesh_asset_authority",
+                    "collision_policy_authority",
                     "target_frame_authority",
                     "tcp_offset_authority",
                     "base_to_board_alignment_authority",
@@ -833,14 +883,18 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "ready": False,
                 "authority_status": "needs_review",
                 "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
                 "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
                 "target_frame_status": "needs_review",
                 "tcp_offset_status": "needs_review",
                 "alignment_status": "needs_review",
                 "missing_inputs": [
                     "authority",
                     "joint_limit_authority",
+                    "gripper_mapping_authority",
                     "mesh_asset_authority",
+                    "collision_policy_authority",
                     "target_frame_authority",
                     "tcp_offset_authority",
                     "base_to_board_alignment_authority",
@@ -856,14 +910,18 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "ready": False,
                 "authority_status": "needs_review",
                 "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
                 "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
                 "target_frame_status": "needs_review",
                 "tcp_offset_status": "needs_review",
                 "alignment_status": "needs_review",
                 "missing_inputs": [
                     "authority",
                     "joint_limit_authority",
+                    "gripper_mapping_authority",
                     "mesh_asset_authority",
+                    "collision_policy_authority",
                     "target_frame_authority",
                     "tcp_offset_authority",
                     "base_to_board_alignment_authority",
@@ -880,14 +938,18 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "fixture_ready": False,
                 "authority_status": "needs_review",
                 "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
                 "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
                 "target_frame_status": "needs_review",
                 "tcp_offset_status": "needs_review",
                 "alignment_status": "needs_review",
                 "missing_inputs": [
                     "authority",
                     "joint_limit_authority",
+                    "gripper_mapping_authority",
                     "mesh_asset_authority",
+                    "collision_policy_authority",
                     "target_frame_authority",
                     "tcp_offset_authority",
                     "base_to_board_alignment_authority",
@@ -1053,6 +1115,7 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             "expect": {
                 "status": "model_bundle_manifest_needs_follow_up",
                 "ready": False,
+                "gripper_mapping_status": "missing",
                 "missing_inputs": ["gripper_mapping_authority"],
                 "next_actions": ["record_gripper_mapping_authority"],
             },
@@ -1073,6 +1136,7 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
             "expect": {
                 "status": "model_bundle_manifest_needs_follow_up",
                 "ready": False,
+                "collision_policy_status": "missing",
                 "missing_inputs": ["collision_policy_authority"],
                 "next_actions": ["record_collision_policy_authority"],
             },
@@ -1670,7 +1734,9 @@ def summarize_case(
         ("provenance_status", ("provenance",)),
         ("asset_roots_status", ("asset_roots",)),
         ("joint_limits_status", ("joint_limits",)),
+        ("gripper_mapping_status", ("gripper_mapping",)),
         ("mesh_assets_status", ("mesh_assets",)),
+        ("collision_policy_status", ("collision_policy",)),
         ("target_frame_status", ("target_frame",)),
         ("tcp_offset_status", ("tcp_offset",)),
         ("alignment_status", ("base_to_board_alignment",)),
@@ -2055,7 +2121,9 @@ def summarize_case(
     if "review_open_work_fields" in expect:
         for label, summary_key in (
             ("joint_limits", "joint_limits"),
+            ("gripper_mapping", "gripper_mapping"),
             ("mesh_assets", "mesh_assets"),
+            ("collision_policy", "collision_policy"),
             ("target_frame", "target_frame"),
             ("tcp_offset", "tcp_offset"),
             ("alignment", "base_to_board_alignment"),
@@ -2070,7 +2138,9 @@ def summarize_case(
         for label, summary_key in (
             ("authority", "authority"),
             ("joint_limits", "joint_limits"),
+            ("gripper_mapping", "gripper_mapping"),
             ("mesh_assets", "mesh_assets"),
+            ("collision_policy", "collision_policy"),
             ("target_frame", "target_frame"),
             ("tcp_offset", "tcp_offset"),
             ("alignment", "base_to_board_alignment"),
@@ -2221,6 +2291,7 @@ def summarize_case(
             "nested_joint_limit_alias_conflict": (
                 summary.get("joint_limits") or {}
             ).get("nested_joint_limit_alias_conflict"),
+            "gripper_mapping_status": nested_status(summary, "gripper_mapping"),
             "mesh_assets_status": nested_status(summary, "mesh_assets"),
             "mesh_asset_review_alias_conflict": (
                 ((summary.get("mesh_assets") or {}).get("review") or {}).get(
@@ -2232,6 +2303,7 @@ def summarize_case(
                     "mesh_asset_review_alias_not_ready_fields"
                 )
             ),
+            "collision_policy_status": nested_status(summary, "collision_policy"),
             "target_frame_status": nested_status(summary, "target_frame"),
             "target_frame_review_alias_conflict": (
                 ((summary.get("target_frame") or {}).get("review") or {}).get(
@@ -2296,11 +2368,23 @@ def summarize_case(
             "joint_limits_review_invalid_fields": review_invalid_fields(
                 summary, "joint_limits"
             ),
+            "gripper_mapping_review_open_work_fields": review_open_work_fields(
+                summary, "gripper_mapping"
+            ),
+            "gripper_mapping_review_invalid_fields": review_invalid_fields(
+                summary, "gripper_mapping"
+            ),
             "mesh_assets_review_open_work_fields": review_open_work_fields(
                 summary, "mesh_assets"
             ),
             "mesh_assets_review_invalid_fields": review_invalid_fields(
                 summary, "mesh_assets"
+            ),
+            "collision_policy_review_open_work_fields": review_open_work_fields(
+                summary, "collision_policy"
+            ),
+            "collision_policy_review_invalid_fields": review_invalid_fields(
+                summary, "collision_policy"
             ),
             "target_frame_review_open_work_fields": review_open_work_fields(
                 summary, "target_frame"
@@ -2374,7 +2458,9 @@ def summarize_case(
                     "authority",
                     "provenance",
                     "joint_limits_deg",
+                    "gripper_mapping_authority",
                     "mesh_assets",
+                    "collision_policy_authority",
                     "target_frame",
                     "tcp_offset_m",
                     "base_to_board_transform",
@@ -2450,6 +2536,13 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "joint_limit_review_alias_not_ready_fields": obs.get(
             "joint_limit_review_alias_not_ready_fields"
         ),
+        "gripper_mapping_status": obs.get("gripper_mapping_status"),
+        "gripper_mapping_review_open_work_fields": obs.get(
+            "gripper_mapping_review_open_work_fields"
+        ),
+        "gripper_mapping_review_invalid_fields": obs.get(
+            "gripper_mapping_review_invalid_fields"
+        ),
         "top_level_joint_limit_alias_conflict": obs.get(
             "top_level_joint_limit_alias_conflict"
         ),
@@ -2462,6 +2555,13 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "mesh_asset_review_alias_not_ready_fields": obs.get(
             "mesh_asset_review_alias_not_ready_fields"
+        ),
+        "collision_policy_status": obs.get("collision_policy_status"),
+        "collision_policy_review_open_work_fields": obs.get(
+            "collision_policy_review_open_work_fields"
+        ),
+        "collision_policy_review_invalid_fields": obs.get(
+            "collision_policy_review_invalid_fields"
         ),
         "target_frame_status": obs.get("target_frame_status"),
         "target_frame_review_alias_conflict": obs.get(
