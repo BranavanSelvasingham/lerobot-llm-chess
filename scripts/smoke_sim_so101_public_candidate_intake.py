@@ -848,6 +848,77 @@ def candidate_operator_intake_requirement_rows(
     return rows
 
 
+def candidate_operator_intake_handoff(summary: dict[str, Any]) -> dict[str, Any]:
+    operator_plan = summary.get("candidate_operator_intake_plan")
+    operator_plan = operator_plan if isinstance(operator_plan, dict) else {}
+    operator_command_plan = summary.get("candidate_operator_command_plan")
+    operator_command_plan = (
+        operator_command_plan if isinstance(operator_command_plan, dict) else {}
+    )
+    selected_requirement_ids = operator_plan.get(
+        "selected_option_review_requirement_ids"
+    )
+    selected_requirement_ids = (
+        selected_requirement_ids if isinstance(selected_requirement_ids, list) else []
+    )
+    selected_command_requirement_ids = operator_command_plan.get(
+        "selected_option_review_requirement_ids"
+    )
+    selected_command_requirement_ids = (
+        selected_command_requirement_ids
+        if isinstance(selected_command_requirement_ids, list)
+        else []
+    )
+    return {
+        "schema": "lerobot.sim.so101_public_candidate_operator_intake_handoff.v1",
+        "model_authority": "candidate_operator_intake_handoff_not_authority",
+        "observed_evidence_is_physical_so101_authority": False,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "decision_status": operator_plan.get("decision_status"),
+        "selected_intake_option_id": operator_plan.get("selected_intake_option_id"),
+        "selected_option_review_requirement_count": operator_plan.get(
+            "selected_option_review_requirement_count"
+        ),
+        "selected_option_review_requirement_ids": selected_requirement_ids,
+        "selected_option_command_count": operator_command_plan.get(
+            "selected_option_command_count"
+        ),
+        "selected_option_command_requirement_ids": selected_command_requirement_ids,
+        "source_lock_ready_for_review": operator_plan.get(
+            "source_lock_ready_for_review"
+        ),
+        "authority_boundary": "candidate_operator_intake_handoff_not_authority",
+        "review_instruction": (
+            "Use this only to preserve which external-source or vendored-bundle "
+            "intake path was selected for review. It is not reviewed SO-101 "
+            "model authority."
+        ),
+    }
+
+
+def attach_operator_intake_handoff_to_seeded_template(
+    summary: dict[str, Any],
+) -> dict[str, Any]:
+    handoff = candidate_operator_intake_handoff(summary)
+    seeded_template = summary.get("candidate_seeded_review_manifest_template")
+    seeded_template = seeded_template if isinstance(seeded_template, dict) else {}
+    observed_inputs = seeded_template.get("observed_inputs")
+    observed_inputs = observed_inputs if isinstance(observed_inputs, dict) else {}
+    observed_inputs["candidate_operator_intake_handoff"] = handoff
+    seeded_template["observed_inputs"] = observed_inputs
+    manifest_template = seeded_template.get("manifest_template")
+    manifest_template = manifest_template if isinstance(manifest_template, dict) else {}
+    manifest_template["candidate_operator_intake_handoff"] = handoff
+    seeded_template["manifest_template"] = manifest_template
+    summary["candidate_seeded_review_manifest_template"] = seeded_template
+    summary["candidate_operator_intake_handoff"] = handoff
+    summary["candidate_operator_intake_handoff_model_authority"] = handoff[
+        "model_authority"
+    ]
+    return handoff
+
+
 def candidate_source_lock_digest_rows(
     source_lock: dict[str, Any],
 ) -> list[dict[str, Any]]:
@@ -2114,6 +2185,9 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `candidate_operator_intake_selected_option`: `{summary['candidate_operator_intake_plan'].get('selected_intake_option_id') or 'none'}`",
         f"- `candidate_operator_command_plan_model_authority`: `{summary['candidate_operator_command_plan_model_authority']}`",
         f"- `candidate_operator_command_plan_status`: `{summary['candidate_operator_command_plan_status']}`",
+        f"- `candidate_operator_intake_handoff_model_authority`: `{summary['candidate_operator_intake_handoff_model_authority']}`",
+        f"- `candidate_operator_intake_handoff_selected_option`: `{summary['candidate_operator_intake_handoff'].get('selected_intake_option_id') or 'none'}`",
+        f"- `candidate_operator_intake_handoff_selected_requirement_ids`: `{', '.join(summary['candidate_operator_intake_handoff'].get('selected_option_review_requirement_ids') or []) if summary['candidate_operator_intake_handoff'].get('selected_option_review_requirement_ids') else 'none'}`",
         f"- `candidate_operator_intake_requirement_model_authority`: `{summary['candidate_operator_intake_requirement_model_authority']}`",
         f"- `candidate_operator_intake_requirement_row_count`: `{summary['candidate_operator_intake_requirement_row_count']}`",
         f"- `candidate_operator_intake_selected_requirement_row_count`: `{summary['candidate_operator_intake_selected_requirement_row_count']}`",
@@ -2170,6 +2244,8 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "The `candidate_operator_command_plan` JSON records explicit clone/fetch/checkout/intake/checker command steps for a pinned upstream checkout or vendored subset. The commands are not executed by this smoke and remain non-authoritative.",
             "",
             "The command plan also carries selected review requirement IDs, handoff artifact paths, and authority blockers so reviewers can trace digest, license/provenance, manifest, and reviewed-MuJoCo prerequisites without treating the plan as authority.",
+            "",
+            "The `candidate_operator_intake_handoff` is copied into the seeded and direct manifest templates to preserve the selected external-source or vendored-bundle intake path for review. It remains non-authoritative and must not be copied into reviewed authority fields.",
             "",
             "The `candidate_operator_intake_requirements` CSV flattens the external and vendored requirement rows for review tracking. Selected rows only reflect the recorded operator decision and remain non-authoritative.",
             "",
@@ -2301,6 +2377,9 @@ def main() -> int:
     )
     summary["candidate_operator_command_plan_status"] = operator_command_plan["status"]
     summary["candidate_operator_command_plan"] = operator_command_plan
+    operator_intake_handoff = attach_operator_intake_handoff_to_seeded_template(
+        summary
+    )
     operator_requirement_rows = candidate_operator_intake_requirement_rows(
         operator_intake_plan
     )
@@ -2436,6 +2515,20 @@ def main() -> int:
                 "candidate_operator_command_plan_status": summary[
                     "candidate_operator_command_plan_status"
                 ],
+                "candidate_operator_intake_handoff_model_authority": summary[
+                    "candidate_operator_intake_handoff_model_authority"
+                ],
+                "candidate_operator_intake_handoff_decision_status": (
+                    operator_intake_handoff["decision_status"]
+                ),
+                "candidate_operator_intake_handoff_selected_option": (
+                    operator_intake_handoff["selected_intake_option_id"]
+                ),
+                "candidate_operator_intake_handoff_selected_requirement_ids": (
+                    operator_intake_handoff[
+                        "selected_option_review_requirement_ids"
+                    ]
+                ),
                 "candidate_operator_intake_selected_option": summary[
                     "candidate_operator_intake_plan"
                 ].get("selected_intake_option_id"),

@@ -146,6 +146,11 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_operator_intake_selected_requirement_row_count",
         "candidate_operator_intake_unselected_requirement_row_count",
         "candidate_operator_intake_selected_requirement_row_ids",
+        "candidate_operator_intake_handoff_model_authority",
+        "candidate_operator_intake_handoff_decision_status",
+        "candidate_operator_intake_handoff_selected_option",
+        "candidate_operator_intake_handoff_selected_requirement_ids",
+        "candidate_operator_intake_handoff_selected_command_count",
         "candidate_review_checklist_model_authority",
         "candidate_review_checklist_row_count",
         "candidate_review_checklist_scope_coverage_ready",
@@ -1254,6 +1259,44 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
             f"{case_id}.candidate_operator_intake_selected_requirement_row_ids "
             f"expected {expected_requirement_ids!r}, got {selected_requirement_row_ids!r}"
         )
+    operator_handoff = summary.get("candidate_operator_intake_handoff")
+    operator_handoff = operator_handoff if isinstance(operator_handoff, dict) else {}
+    if (
+        summary.get("candidate_operator_intake_handoff_model_authority")
+        != "candidate_operator_intake_handoff_not_authority"
+    ):
+        errors.append(
+            f"{case_id}.candidate_operator_intake_handoff_model_authority invalid"
+        )
+    if (
+        operator_handoff.get("model_authority")
+        != "candidate_operator_intake_handoff_not_authority"
+    ):
+        errors.append(f"{case_id}.candidate_operator_intake_handoff.model_authority invalid")
+    if operator_handoff.get("observed_evidence_is_physical_so101_authority") is not False:
+        errors.append(f"{case_id}.candidate_operator_intake_handoff physical authority not false")
+    if operator_handoff.get("ready_for_model_backed_ik") is not False:
+        errors.append(f"{case_id}.candidate_operator_intake_handoff.ready_for_model_backed_ik not false")
+    if operator_handoff.get("decision_status") != expected_operator_decision_status:
+        errors.append(f"{case_id}.candidate_operator_intake_handoff.decision_status invalid")
+    if operator_handoff.get("selected_intake_option_id") != expected_selected_option:
+        errors.append(
+            f"{case_id}.candidate_operator_intake_handoff.selected_intake_option_id invalid"
+        )
+    if (
+        operator_handoff.get("selected_option_review_requirement_count")
+        != expected_requirement_count
+    ):
+        errors.append(
+            f"{case_id}.candidate_operator_intake_handoff.selected_option_review_requirement_count invalid"
+        )
+    if (
+        operator_handoff.get("selected_option_review_requirement_ids")
+        != expected_requirement_ids
+    ):
+        errors.append(
+            f"{case_id}.candidate_operator_intake_handoff.selected_option_review_requirement_ids invalid"
+        )
     if operator_plan.get("ready_for_model_backed_ik") is not False:
         errors.append(f"{case_id}.candidate_operator_intake_plan.ready_for_model_backed_ik not false")
     if operator_plan.get("ready_for_policy_training") is not False:
@@ -1348,6 +1391,13 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
     ):
         errors.append(
             f"{case_id}.candidate_operator_command_plan.selected_option_command_count invalid"
+        )
+    if (
+        operator_handoff.get("selected_option_command_count")
+        != expected_selected_command_count
+    ):
+        errors.append(
+            f"{case_id}.candidate_operator_intake_handoff.selected_option_command_count invalid"
         )
     if (
         operator_command_plan.get("selected_option_review_requirement_count")
@@ -1531,6 +1581,31 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
     authority = authority if isinstance(authority, dict) else {}
     if authority.get("reviewed_by") != "<reviewer-or-team>":
         errors.append(f"{case_id}.candidate_seeded_review_manifest_template authority placeholder missing")
+    seeded_operator_handoff = observed_inputs.get("candidate_operator_intake_handoff")
+    seeded_operator_handoff = (
+        seeded_operator_handoff if isinstance(seeded_operator_handoff, dict) else {}
+    )
+    direct_operator_handoff = manifest_template.get("candidate_operator_intake_handoff")
+    direct_operator_handoff = (
+        direct_operator_handoff if isinstance(direct_operator_handoff, dict) else {}
+    )
+    for handoff_name, handoff in (
+        ("candidate_seeded_review_manifest_template.observed_inputs", seeded_operator_handoff),
+        ("candidate_seeded_review_manifest_template.manifest_template", direct_operator_handoff),
+    ):
+        if (
+            handoff.get("model_authority")
+            != "candidate_operator_intake_handoff_not_authority"
+        ):
+            errors.append(f"{case_id}.{handoff_name}.candidate_operator_intake_handoff model_authority invalid")
+        if handoff.get("decision_status") != expected_operator_decision_status:
+            errors.append(f"{case_id}.{handoff_name}.candidate_operator_intake_handoff decision_status invalid")
+        if handoff.get("selected_intake_option_id") != expected_selected_option:
+            errors.append(f"{case_id}.{handoff_name}.candidate_operator_intake_handoff selected option invalid")
+        if handoff.get("selected_option_review_requirement_ids") != expected_requirement_ids:
+            errors.append(f"{case_id}.{handoff_name}.candidate_operator_intake_handoff requirement ids invalid")
+        if handoff.get("ready_for_model_backed_ik") is not False:
+            errors.append(f"{case_id}.{handoff_name}.candidate_operator_intake_handoff ready_for_model_backed_ik not false")
 
     review_checklist = summary.get("candidate_review_checklist")
     review_checklist = review_checklist if isinstance(review_checklist, dict) else {}
@@ -1825,6 +1900,21 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         ),
         "candidate_operator_intake_selected_requirement_row_ids": (
             selected_requirement_row_ids
+        ),
+        "candidate_operator_intake_handoff_model_authority": summary.get(
+            "candidate_operator_intake_handoff_model_authority"
+        ),
+        "candidate_operator_intake_handoff_decision_status": (
+            operator_handoff.get("decision_status")
+        ),
+        "candidate_operator_intake_handoff_selected_option": (
+            operator_handoff.get("selected_intake_option_id")
+        ),
+        "candidate_operator_intake_handoff_selected_requirement_ids": (
+            operator_handoff.get("selected_option_review_requirement_ids")
+        ),
+        "candidate_operator_intake_handoff_selected_command_count": (
+            operator_handoff.get("selected_option_command_count")
         ),
         "candidate_review_checklist_model_authority": summary.get(
             "candidate_review_checklist_model_authority"
