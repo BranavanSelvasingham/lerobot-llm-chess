@@ -1377,9 +1377,9 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         )
     expected_selected_command_count = 0
     if expected_selected_option == "external_pinned_source_root":
-        expected_selected_command_count = 8
+        expected_selected_command_count = 9
     elif expected_selected_option == "vendor_locked_bundle":
-        expected_selected_command_count = 6
+        expected_selected_command_count = 7
     if (
         operator_command_plan.get("selected_option_command_count")
         != expected_selected_command_count
@@ -1460,6 +1460,7 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "license and provenance review evidence",
         "reviewed bundle manifest checker",
         "reviewed MuJoCo bundle gate",
+        "pinned upstream commit",
     ):
         if not any(blocker_fragment in str(blocker) for blocker in blockers_until_reviewed):
             errors.append(
@@ -1467,8 +1468,8 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
                 f"missing {blocker_fragment!r}"
             )
     for command_key, minimum_count in (
-        ("external_pinned_source_root_commands", 8),
-        ("vendor_locked_bundle_commands", 6),
+        ("external_pinned_source_root_commands", 9),
+        ("vendor_locked_bundle_commands", 7),
     ):
         commands = operator_command_plan.get(command_key)
         commands = commands if isinstance(commands, list) else []
@@ -1497,12 +1498,14 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         }
         required_step_ids = (
             {
+                "verify_checked_out_soarm100_commit_matches_pin",
                 "run_source_inventory_on_candidate_checkout",
                 "run_source_inventory_after_source_authority_review",
                 "run_integrated_reviewed_authority_gate_after_review",
             }
             if command_key == "external_pinned_source_root_commands"
             else {
+                "verify_vendored_so101_source_lock_matches_pin",
                 "run_source_inventory_on_vendored_subset",
                 "run_source_inventory_after_vendor_source_authority_review",
                 "run_integrated_reviewed_authority_gate_after_vendor_review",

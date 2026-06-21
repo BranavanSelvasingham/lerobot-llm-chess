@@ -228,6 +228,21 @@ def candidate_operator_command_plan(summary: dict[str, Any]) -> dict[str, Any]:
             "executes_in_smoke": False,
         },
         {
+            "step_id": "verify_checked_out_soarm100_commit_matches_pin",
+            "command": command_string(
+                [
+                    "test",
+                    '"$(git -C',
+                    checkout_root,
+                    'rev-parse HEAD)"',
+                    "=",
+                    str(upstream_commit or "<immutable-upstream-commit-sha>"),
+                ]
+            ),
+            "network_required": False,
+            "executes_in_smoke": False,
+        },
+        {
             "step_id": "run_candidate_intake_on_pinned_checkout",
             "command": command_string(
                 [
@@ -356,8 +371,20 @@ def candidate_operator_command_plan(summary: dict[str, Any]) -> dict[str, Any]:
         {
             "step_id": "copy_reviewed_so101_subset_into_repo",
             "command": (
-                "copy reviewed Simulation/SO101 files into "
-                "<repo-vendored-SO101-asset-root>"
+                "copy reviewed Simulation/SO101 files from pinned commit "
+                f"{upstream_commit or '<immutable-upstream-commit-sha>'} into "
+                "<repo-vendored-SO101-asset-root> and record the exact import "
+                "review reference"
+            ),
+            "network_required": False,
+            "executes_in_smoke": False,
+        },
+        {
+            "step_id": "verify_vendored_so101_source_lock_matches_pin",
+            "command": (
+                "verify vendored file digests were copied from SO-ARM100 "
+                f"commit {upstream_commit or '<immutable-upstream-commit-sha>'} "
+                "before running candidate intake"
             ),
             "network_required": False,
             "executes_in_smoke": False,
@@ -560,6 +587,7 @@ def candidate_operator_command_plan(summary: dict[str, Any]) -> dict[str, Any]:
             "selected source-lock digest rows must be reviewed and copied only into reviewed authority fields",
             "license and provenance review evidence must be recorded for the selected intake option",
             "SO-ARM100 README caveats for gripper linear-joint mapping and removed base collision meshes must be resolved in reviewed fields",
+            "the selected checkout or vendored digest lock must be verified against the pinned upstream commit before reviewed fields are edited",
             "reviewed bundle manifest checker must report physical_so101_model_authority_ready",
             "reviewed MuJoCo bundle gate must prove physical reviewed model motion",
         ],
