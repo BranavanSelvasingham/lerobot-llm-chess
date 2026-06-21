@@ -228,7 +228,8 @@ reference values for operator convenience. It intentionally keeps
 `model_sha256` and every authority/calibration field as placeholders, reports
 `candidate_seeded_review_manifest_template_not_authority`, and stays
 `ready_for_model_backed_ik: false`. Use it as a starting document only: replace
-all placeholders with reviewed values, then run
+all placeholders, including `gripper_mapping_authority` and
+`collision_policy_authority`, with reviewed values, then run
 `scripts/smoke_sim_so101_model_bundle_manifest.py --manifest-path <reviewed-manifest>`
 and require `physical_so101_model_authority_ready: true` before using it for
 model-backed IK or downstream simulation claims.
@@ -289,9 +290,9 @@ Local candidate evidence from 2026-06-20 used upstream commit
   (`asset_preflight_missing_asset_count: 0`) and observed complete unreviewed
   joint limits, but stayed `candidate_manifest_needs_review` with
   `ready_for_model_backed_ik: false` because `model_sha256`, authority,
-  provenance, mesh authority, target-frame authority, TCP offset, base-to-board
-  transform, reviewed joint limits, and a non-blocking contract result still
-  need review.
+  provenance, mesh authority, gripper mapping, collision policy, target-frame
+  authority, TCP offset, base-to-board transform, reviewed joint limits, and a
+  non-blocking contract result still need review.
 
 To inspect an external or installed model location without importing assets:
 

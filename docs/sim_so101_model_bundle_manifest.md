@@ -79,8 +79,10 @@ By default the generated candidate manifest leaves `authority` and
 `provenance` as empty objects and stores TODO details in
 `authority_placeholder` and `provenance_placeholder`. It also writes
 `target_frame_authority_placeholder`, `joint_limits_placeholder`,
-`tcp_offset_placeholder`, and `base_to_board_alignment_placeholder` instead of
-inventing reviewed target-frame authority, limits, calibrated TCP, or
+`gripper_mapping_authority_placeholder`,
+`collision_policy_authority_placeholder`, `tcp_offset_placeholder`, and
+`base_to_board_alignment_placeholder` instead of inventing reviewed target-frame
+authority, limits, gripper mapping, collision policy, calibrated TCP, or
 board-alignment values. That means the generated manifest remains
 diagnostic-only until an operator replaces those placeholders with reviewed
 fields and this checker reports `ready_for_model_backed_ik: true`.
@@ -595,8 +597,8 @@ true:
 - the nested asset preflight has no missing or unresolved mesh references
 
 Any missing input appears in `missing_inputs`, in the CSV checklist, and in the
-README. Missing authority, provenance, target-frame authority, TCP, or alignment
-data is never treated as success.
+README. Missing authority, provenance, gripper mapping, collision policy,
+target-frame authority, TCP, or alignment data is never treated as success.
 Readiness here only proves that reviewed joint limits are declared with the
 bundle. The downstream reviewed MuJoCo bundle gate must still load the model and
 compare body-joint `joint_limits_deg` against MuJoCo `jnt_range` before motion

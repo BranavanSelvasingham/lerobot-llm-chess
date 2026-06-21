@@ -985,8 +985,30 @@ def build_candidate_manifest(
             "required_review_scope_ids": ["joint_limits"],
             "reason": "The probe cannot infer reviewed joint-limit authority from model existence alone.",
         },
+        "gripper_mapping_authority_placeholder": {
+            "status": "TODO_reviewed_gripper_mapping_authority_required",
+            "accepted_manifest_fields": [
+                "gripper_mapping_authority",
+                "gripper_mapping_review",
+                "gripper_linear_joint_mapping_review",
+                "gripper_mapping_metadata",
+            ],
+            "required_review_scope_ids": ["gripper_mapping"],
+            "reason": "The probe cannot resolve the SO-ARM100 gripper linear-joint mapping caveat from model existence alone.",
+        },
         "observed_joint_limits_deg_from_model": observed_joint_limits,
         "observed_mesh_asset_references_from_model": mesh_asset_review,
+        "collision_policy_authority_placeholder": {
+            "status": "TODO_reviewed_collision_policy_authority_required",
+            "accepted_manifest_fields": [
+                "collision_policy_authority",
+                "collision_policy_review",
+                "base_collision_mesh_policy_review",
+                "collision_policy_metadata",
+            ],
+            "required_review_scope_ids": ["collision_policy"],
+            "reason": "The probe cannot resolve removed base collision meshes or collision policy from model existence alone.",
+        },
         "tcp_offset_placeholder": {
             "status": "TODO_calibrated_target_frame_to_tcp_offset_required",
             "accepted_manifest_fields": [
@@ -1011,11 +1033,13 @@ def build_candidate_manifest(
             "contract_checker": contract_result["diagnostic_excerpt"],
         },
         "notes": [
-            "This candidate manifest is a review draft. It should stay diagnostic-only until authority, provenance, target-frame authority, joint limits, TCP, and base-to-board fields are replaced with reviewed values and field-specific review scopes.",
+            "This candidate manifest is a review draft. It should stay diagnostic-only until authority, provenance, target-frame authority, joint limits, gripper mapping, collision policy, TCP, and base-to-board fields are replaced with reviewed values and field-specific review scopes.",
             "The probe does not copy, ingest, or modify model/mesh assets.",
             "Extra probe_child_diagnostics fields are for operator review; the bundle manifest checker derives readiness from the declared manifest fields.",
             "Populate target_frame_authority or an equivalent target-frame review field with review_scope target_frame before expecting ready_for_model_backed_ik.",
             "Populate joint_limits_deg or an equivalent joint-limit authority field with review_scope joint_limits before expecting ready_for_model_backed_ik.",
+            "Populate gripper_mapping_authority or an equivalent gripper mapping review field with review_scope gripper_mapping before expecting ready_for_model_backed_ik.",
+            "Populate collision_policy_authority or an equivalent collision policy review field with review_scope collision_policy before expecting ready_for_model_backed_ik.",
             "observed_source_hints_from_model is raw candidate evidence for review only; copy source URL/export/license fields into provenance only after separate authority review.",
             "observed_joint_limits_deg_from_model is raw candidate evidence for review only; copy it into joint_limits_deg only after separate authority review.",
             "observed_mesh_asset_references_from_model is raw candidate evidence for review only; supply reviewed asset roots before expecting mesh readiness.",
@@ -1193,6 +1217,28 @@ def build_rows(
             "Raw observed limits help review; they do not satisfy reviewed joint-limit authority.",
         ),
         row(
+            "gripper_mapping_authority",
+            "joint_contract",
+            "action_required",
+            "warning",
+            {"gripper_mapping_authority_placeholder": True},
+            {"reviewed_gripper_mapping_authority": True},
+            ["gripper_mapping_authority"],
+            ["gripper_mapping_placeholder_declared_without_reviewed_mapping"],
+            "The generated placeholder keeps model-backed IK disabled until the gripper linear-joint mapping caveat is reviewed.",
+        ),
+        row(
+            "collision_policy_authority",
+            "mesh_assets",
+            "action_required",
+            "warning",
+            {"collision_policy_authority_placeholder": True},
+            {"reviewed_collision_policy_authority": True},
+            ["collision_policy_authority"],
+            ["collision_policy_placeholder_declared_without_reviewed_policy"],
+            "The generated placeholder keeps model-backed IK disabled until the collision policy and removed-base-collision caveat are reviewed.",
+        ),
+        row(
             "base_to_board_transform",
             "alignment",
             "action_required",
@@ -1346,6 +1392,31 @@ def build_review_packet(
         ),
         review_packet_row(
             5,
+            "review_gripper_mapping",
+            "reviewed_model_authority",
+            "needs_gripper_mapping_review",
+            ["gripper_mapping_authority"],
+            {
+                "candidate_manifest": str(candidate_manifest_path),
+                "source_caveat": "SO-ARM100 README gripper linear-joint mapping caveat must be resolved in reviewed fields.",
+            },
+            "Review the SO-101 gripper actuator/linear-joint mapping and record authority with review_scope gripper_mapping.",
+        ),
+        review_packet_row(
+            6,
+            "review_collision_policy",
+            "reviewed_model_authority",
+            "needs_collision_policy_review",
+            ["collision_policy_authority"],
+            {
+                "candidate_manifest": str(candidate_manifest_path),
+                "source_caveat": "SO-ARM100 README removed-base-collision caveat must be resolved in reviewed fields.",
+                "asset_preflight_status": asset_preflight.get("status"),
+            },
+            "Review mesh collision policy, including removed base collision meshes, and record authority with review_scope collision_policy.",
+        ),
+        review_packet_row(
+            7,
             "review_target_frame",
             "reviewed_model_authority",
             "needs_reviewed_target_frame_authority",
@@ -1357,7 +1428,7 @@ def build_review_packet(
             "Confirm the target frame is the intended SO-101 gripper/TCP frame and record review metadata with review_scope target_frame.",
         ),
         review_packet_row(
-            6,
+            8,
             "calibrate_tcp_offset",
             "reviewed_model_authority",
             "needs_tcp_calibration",
@@ -1369,7 +1440,7 @@ def build_review_packet(
             "Measure or review target-frame-to-TCP/gripper-tip offset and record authority with review_scope tcp_offset.",
         ),
         review_packet_row(
-            7,
+            9,
             "calibrate_base_to_board_alignment",
             "reviewed_model_authority",
             "needs_base_to_board_calibration",
@@ -1381,7 +1452,7 @@ def build_review_packet(
             "Record reviewed base-to-board translation and roll/pitch/yaw alignment for the chess scene with review_scope base_to_board_alignment.",
         ),
         review_packet_row(
-            8,
+            10,
             "clear_model_contract_and_asset_preflight",
             "mujoco_scene_validity",
             "evidence_available"
@@ -1528,6 +1599,8 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
             "- Top-level `authority` requires `reviewed_by`, `review_id` or HTTP(S) `review_url`, and `review_scopes`: `model_identity`, `provenance`, `license`.",
             "- Review `observed_source_hints_from_model` before copying source URL/export/license evidence into `provenance`.",
             "- Supply reviewed mesh asset roots that resolve every `mesh_asset_review_missing_references` entry and record `review_scope: mesh_assets`.",
+            "- Replace `gripper_mapping_authority_placeholder` with a reviewed gripper mapping authority field carrying `review_scope: gripper_mapping`.",
+            "- Replace `collision_policy_authority_placeholder` with a reviewed collision policy authority field carrying `review_scope: collision_policy`.",
             "- Replace `target_frame_authority_placeholder` with accepted reviewed target-frame/TCP-frame authority carrying `review_scope: target_frame`.",
             "- Replace `tcp_offset_placeholder` with one accepted calibrated TCP/gripper-tip offset field carrying `review_scope: tcp_offset`.",
             "- Replace `base_to_board_alignment_placeholder` with a real base-to-board transform/alignment carrying `review_scope: base_to_board_alignment`.",
@@ -1718,7 +1791,7 @@ def main() -> int:
         "limitations": [
             "This probe is hardware-free and never opens robot motors, serial ports, cameras, GUI flows, OpenAI calls, or network resources.",
             "The generated candidate manifest is a draft and does not copy, ingest, or modify model/mesh assets.",
-            "Authority, provenance, TCP, and base-to-board placeholders are not treated as readiness fields by default.",
+            "Authority, provenance, gripper mapping, collision policy, TCP, and base-to-board placeholders are not treated as readiness fields by default.",
             "Future model-backed IK residuals remain diagnostic-only until the bundle manifest checker reports ready_for_model_backed_ik true.",
         ],
     }

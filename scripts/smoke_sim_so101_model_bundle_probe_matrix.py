@@ -84,6 +84,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "provenance_row_status",
         "authority_placeholder_fields",
         "provenance_placeholder_fields",
+        "gripper_mapping_placeholder_present",
+        "collision_policy_placeholder_present",
         "missing_inputs",
         "next_required_action_ids",
         "expected_status",
@@ -310,6 +312,8 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 ],
                 "missing_inputs": [
                     "base_to_board_transform",
+                    "collision_policy_authority",
+                    "gripper_mapping_authority",
                     "joint_limits_deg",
                     "mesh_assets",
                     "model_sha256",
@@ -438,6 +442,12 @@ def summarize_case(
         "authority_placeholder_fields": authority_placeholder.get("placeholder_fields") or [],
         "authority_invalid_fields": authority_placeholder.get("invalid_fields") or [],
         "provenance_placeholder_fields": provenance_placeholder.get("placeholder_fields") or [],
+        "gripper_mapping_placeholder_present": isinstance(
+            candidate.get("gripper_mapping_authority_placeholder"), dict
+        ),
+        "collision_policy_placeholder_present": isinstance(
+            candidate.get("collision_policy_authority_placeholder"), dict
+        ),
         "missing_inputs": missing_inputs,
         "next_required_action_ids": next_actions,
     }
@@ -483,6 +493,18 @@ def summarize_case(
         observations["provenance_placeholder_fields"],
         expect.get("provenance_placeholder_fields", []),
     )
+    add_error(
+        errors,
+        "gripper_mapping_placeholder_present",
+        observations["gripper_mapping_placeholder_present"],
+        True,
+    )
+    add_error(
+        errors,
+        "collision_policy_placeholder_present",
+        observations["collision_policy_placeholder_present"],
+        True,
+    )
     if authority:
         add_error(
             errors,
@@ -517,7 +539,8 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         "- Missing model input still emits a draft and keeps model path, authority, and provenance actions open.",
         "- Placeholder authority/provenance inputs stay in placeholder diagnostics and do not populate manifest fields.",
         "- Malformed or future-dated authority review timestamps keep authority open and do not populate manifest authority fields.",
-        "- Valid authority/provenance metadata can populate the draft, but the draft remains non-ready until model digest, meshes, reviewed joint limits, target-frame authority, TCP offset, and base-to-board alignment are supplied.",
+        "- Valid authority/provenance metadata can populate the draft, but the draft remains non-ready until model digest, meshes, reviewed joint limits, gripper mapping, collision policy, target-frame authority, TCP offset, and base-to-board alignment are supplied.",
+        "- Probe-generated drafts also keep gripper mapping and collision policy placeholders open until those SO-ARM100 caveats are reviewed.",
         "",
         "Summary:",
         "",

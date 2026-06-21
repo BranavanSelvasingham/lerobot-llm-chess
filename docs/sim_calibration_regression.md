@@ -270,7 +270,8 @@ follow the model-source inventory and precede a reviewed manifest: it does not
 scan for authority, does not copy external assets, and does not fill calibrated
 TCP or base-to-board values. The generated draft keeps
 `authority` and `provenance` empty by default, records TODO placeholders for
-joint limits, TCP, and base-to-board alignment, and therefore remains
+joint limits, gripper mapping, collision policy, TCP, and base-to-board
+alignment, and therefore remains
 diagnostic-only until the manifest checker reports
 `ready_for_model_backed_ik: true`.
 The integrated suite forwards ready source-authority reviewer metadata and
@@ -281,11 +282,13 @@ keeps this boundary repeatable: missing model input remains non-authority,
 placeholder authority/provenance values such as `TODO`, `TBD`, `unknown`, and
 `placeholder-*` stay in placeholder diagnostics instead of populating candidate
 manifest fields, malformed or future-dated authority review timestamps keep
-authority open, and valid authority/provenance metadata still leaves the draft blocked on model
-digest, mesh assets, reviewed joint limits, target-frame authority, TCP offset,
-and base-to-board alignment.
-The review packet groups observed candidate source, joint-limit, mesh, TCP, and
-board-alignment evidence into operator review items, but it reports
+authority open, and valid authority/provenance metadata still leaves the draft
+blocked on model digest, mesh assets, reviewed joint limits, gripper mapping,
+collision policy, target-frame authority, TCP offset, and base-to-board
+alignment.
+The review packet groups observed candidate source, joint-limit, gripper
+mapping, collision-policy, mesh, TCP, and board-alignment evidence into
+operator review items, but it reports
 `model_authority: "review_packet_not_authority"` and never fills reviewed
 manifest fields itself.
 
@@ -511,9 +514,10 @@ external checkout or a vendored locked bundle. The source-inventory command
 templates include both a candidate scan and a post-review authoritative-source
 rerun with reviewer/license/provenance placeholders; those commands are still
 operator guidance until real review metadata is supplied. The candidate review
-checklist keeps target-frame authority, TCP/gripper offset authority, and
-base-to-board alignment authority as separate prioritized rows so those missing
-review items cannot be collapsed into one broad placeholder. The intake summary and artifact index
+checklist keeps gripper mapping, collision policy, target-frame authority,
+TCP/gripper offset authority, and base-to-board alignment authority as separate
+prioritized rows so those missing review items cannot be collapsed into one
+broad placeholder. The intake summary and artifact index
 expose model-observation row counts, selected model observation row count, digest
 row counts, expected-file digest counts, extra lockable file counts and paths,
 selected model digest row count, selected model expected-joint coverage status
@@ -905,9 +909,10 @@ reports `model_authority: "model_bundle_probe_matrix_not_authority"`,
 `ready_for_policy_training: false`. Its cases prove that missing model input
 stays non-authority, placeholder authority/provenance values do not populate the
 candidate manifest, malformed or future-dated authority review timestamps keep
-authority open, and valid authority/provenance metadata still leaves the draft blocked until
-model digest, meshes, reviewed joint limits, target-frame authority, TCP offset,
-and base-to-board alignment are supplied.
+authority open, and valid authority/provenance metadata still leaves the draft
+blocked until model digest, meshes, reviewed joint limits, gripper mapping,
+collision policy, target-frame authority, TCP offset, and base-to-board
+alignment are supplied.
 
 The standalone reviewed-authority gate matrix writes
 `so101_reviewed_authority_gate_matrix_summary.json`, `.csv`, and `README.md`.

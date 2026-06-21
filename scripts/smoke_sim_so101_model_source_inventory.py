@@ -1064,7 +1064,7 @@ def source_authority_review_input(args: argparse.Namespace) -> dict[str, Any]:
             "If authority_reviewed_at is supplied, it must be an ISO YYYY-MM-DD date or ISO datetime and must not be in the future.",
             "Source-authority review evidence requires reviewer identity plus a stable review artifact handle: authority_review_id or authority_review_url.",
             "Source-authority readiness also requires explicit review scopes for model identity, provenance, and license, plus a non-placeholder source reference and license basis.",
-            "The bundle manifest still must declare reviewed provenance, mesh authority, joint limits, target frame, TCP offset, and base-to-board alignment before model-backed IK is trusted.",
+            "The bundle manifest still must declare reviewed provenance, mesh authority, joint limits, gripper mapping, collision policy, target frame, TCP offset, and base-to-board alignment before model-backed IK is trusted.",
         ],
     }
 

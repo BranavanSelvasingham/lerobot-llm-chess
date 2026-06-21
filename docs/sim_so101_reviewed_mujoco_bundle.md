@@ -23,16 +23,17 @@ The summary carries the manifest checker's `model_authority`,
 `hardware_free_regression_fixture_ready`, and
 `synthetic_fixture_authority_fields` fields. It also carries the manifest
 checker diagnostics for source authority, provenance, joint-limit authority,
-model-file identity, mesh-asset authority, target-frame authority, TCP offset,
-and base-to-board alignment so the direct MuJoCo handoff gate shows why a bundle
-is not ready
+gripper mapping, collision policy, model-file identity, mesh-asset authority,
+target-frame authority, TCP offset, and base-to-board alignment so the direct
+MuJoCo handoff gate shows why a bundle is not ready
 without attempting motion. Placeholder review metadata such as `TODO` or `TBD`
 must keep those authority fields in `needs_review`, leave
 `ready_for_model_backed_ik: false`, and keep
 `motion_authority_status: "not_checked_manifest_not_ready"`. Generic review
 scopes such as `model_bundle`, or missing per-field authority objects for joint
-limits, mesh assets, target frame, TCP offset, or base-to-board alignment, must
-also keep the manifest not ready and prevent MuJoCo motion. A hardware-free synthetic fixture
+limits, gripper mapping, collision policy, mesh assets, target frame, TCP
+offset, or base-to-board alignment, must also keep the manifest not ready and
+prevent MuJoCo motion. A hardware-free synthetic fixture
 may exercise the positive MuJoCo motion path, but it stays labeled as
 `hardware_free_regression_fixture_not_physical_so101_authority`. Motion evidence
 also carries `motion_authority_status`,
@@ -49,8 +50,9 @@ The top-level summary reports
 
 With no manifest, or with a manifest whose bundle checker does not report
 `ready_for_model_backed_ik: true` after checking reviewed joint limits, mesh
-evidence, model-file SHA-256 identity, target-frame authority, TCP offset, and
-base-to-board alignment, the smoke exits `0` with
+evidence, gripper mapping, collision policy, model-file SHA-256 identity,
+target-frame authority, TCP offset, and base-to-board alignment, the smoke exits
+`0` with
 `status: "reviewed_mujoco_bundle_not_ready"` and
 `reviewed_model_motion_checked: false`. In that not-ready state,
 `motion_authority_status` is `not_checked_manifest_not_ready`, and all motion
