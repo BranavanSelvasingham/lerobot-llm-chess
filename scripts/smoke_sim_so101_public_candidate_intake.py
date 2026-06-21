@@ -919,6 +919,66 @@ def attach_operator_intake_handoff_to_seeded_template(
     return handoff
 
 
+def candidate_review_checklist_handoff(summary: dict[str, Any]) -> dict[str, Any]:
+    checklist = summary.get("candidate_review_checklist")
+    checklist = checklist if isinstance(checklist, dict) else {}
+    direct_actions_by_scope = checklist.get(
+        "direct_action_ids_by_required_review_scope"
+    )
+    direct_actions_by_scope = (
+        direct_actions_by_scope if isinstance(direct_actions_by_scope, dict) else {}
+    )
+    return {
+        "schema": "lerobot.sim.so101_public_candidate_review_checklist_handoff.v1",
+        "model_authority": "candidate_review_checklist_handoff_not_authority",
+        "observed_evidence_is_physical_so101_authority": False,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "row_count": checklist.get("row_count"),
+        "required_review_scope_coverage_ready": checklist.get(
+            "required_review_scope_coverage_ready"
+        ),
+        "missing_required_review_scope_ids": checklist.get(
+            "missing_required_review_scope_ids"
+        ),
+        "required_review_scopes": checklist.get("required_review_scopes"),
+        "gripper_mapping_direct_action_ids": direct_actions_by_scope.get(
+            "gripper_mapping"
+        ),
+        "collision_policy_direct_action_ids": direct_actions_by_scope.get(
+            "collision_policy"
+        ),
+        "authority_boundary": "candidate_review_checklist_handoff_not_authority",
+        "review_instruction": (
+            "Use this only to preserve candidate review checklist coverage in "
+            "the manifest handoff. Reviewed authority must be recorded in the "
+            "reviewed manifest fields after review."
+        ),
+    }
+
+
+def attach_review_checklist_handoff_to_seeded_template(
+    summary: dict[str, Any],
+) -> dict[str, Any]:
+    handoff = candidate_review_checklist_handoff(summary)
+    seeded_template = summary.get("candidate_seeded_review_manifest_template")
+    seeded_template = seeded_template if isinstance(seeded_template, dict) else {}
+    observed_inputs = seeded_template.get("observed_inputs")
+    observed_inputs = observed_inputs if isinstance(observed_inputs, dict) else {}
+    observed_inputs["candidate_review_checklist_handoff"] = handoff
+    seeded_template["observed_inputs"] = observed_inputs
+    manifest_template = seeded_template.get("manifest_template")
+    manifest_template = manifest_template if isinstance(manifest_template, dict) else {}
+    manifest_template["candidate_review_checklist_handoff"] = handoff
+    seeded_template["manifest_template"] = manifest_template
+    summary["candidate_seeded_review_manifest_template"] = seeded_template
+    summary["candidate_review_checklist_handoff"] = handoff
+    summary["candidate_review_checklist_handoff_model_authority"] = handoff[
+        "model_authority"
+    ]
+    return handoff
+
+
 def candidate_source_lock_digest_rows(
     source_lock: dict[str, Any],
 ) -> list[dict[str, Any]]:
@@ -2203,6 +2263,10 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `candidate_operator_intake_requirement_row_count`: `{summary['candidate_operator_intake_requirement_row_count']}`",
         f"- `candidate_operator_intake_selected_requirement_row_count`: `{summary['candidate_operator_intake_selected_requirement_row_count']}`",
         f"- `candidate_seeded_review_manifest_template_model_authority`: `{summary['candidate_seeded_review_manifest_template_model_authority']}`",
+        f"- `candidate_review_checklist_handoff_model_authority`: `{summary['candidate_review_checklist_handoff_model_authority']}`",
+        f"- `candidate_review_checklist_handoff_scope_coverage_ready`: `{str(summary['candidate_review_checklist_handoff'].get('required_review_scope_coverage_ready')).lower()}`",
+        f"- `candidate_review_checklist_handoff_gripper_mapping_direct_action_ids`: `{', '.join(summary['candidate_review_checklist_handoff'].get('gripper_mapping_direct_action_ids') or []) if summary['candidate_review_checklist_handoff'].get('gripper_mapping_direct_action_ids') else 'none'}`",
+        f"- `candidate_review_checklist_handoff_collision_policy_direct_action_ids`: `{', '.join(summary['candidate_review_checklist_handoff'].get('collision_policy_direct_action_ids') or []) if summary['candidate_review_checklist_handoff'].get('collision_policy_direct_action_ids') else 'none'}`",
         f"- `candidate_operator_command_plan_selected_requirement_count`: `{summary['candidate_operator_command_plan'].get('selected_option_review_requirement_count')}`",
         f"- `candidate_operator_command_plan_selected_requirement_ids`: `{', '.join(summary['candidate_operator_command_plan'].get('selected_option_review_requirement_ids') or []) if summary['candidate_operator_command_plan'].get('selected_option_review_requirement_ids') else 'none'}`",
         f"- `candidate_operator_command_plan_review_handoff_artifact_count`: `{len(summary['candidate_operator_command_plan'].get('review_handoff_artifacts') or [])}`",
@@ -2265,6 +2329,8 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "The `candidate_seeded_review_manifest_template` artifact follows the reviewed bundle manifest shape but keeps placeholder authority fields and remains non-authoritative until a reviewer replaces observations with reviewed values and the manifest checker reports physical authority ready.",
             "",
             "The `candidate_direct_review_manifest_template_json` artifact contains only the nested manifest template object so a reviewer can edit that file directly and pass it to `scripts/smoke_sim_so101_model_bundle_manifest.py --manifest-path` after replacing placeholders.",
+            "",
+            "The direct manifest template also carries non-authoritative candidate digest, operator-intake, and checklist handoffs so reviewers can see the selected source path, digest coverage, and required review-scope coverage while replacing placeholders with reviewed fields.",
             "",
             "## Candidate Review Checklist",
             "",
@@ -2373,6 +2439,9 @@ def main() -> int:
         "model_authority"
     ]
     summary["candidate_review_checklist"] = candidate_review_checklist
+    review_checklist_handoff = attach_review_checklist_handoff_to_seeded_template(
+        summary
+    )
     operator_intake_plan = candidate_operator_intake_plan(summary)
     summary["candidate_operator_intake_plan_model_authority"] = operator_intake_plan[
         "model_authority"
@@ -2561,6 +2630,24 @@ def main() -> int:
                 "candidate_review_checklist_model_authority": summary[
                     "candidate_review_checklist_model_authority"
                 ],
+                "candidate_review_checklist_handoff_model_authority": summary[
+                    "candidate_review_checklist_handoff_model_authority"
+                ],
+                "candidate_review_checklist_handoff_scope_coverage_ready": (
+                    review_checklist_handoff[
+                        "required_review_scope_coverage_ready"
+                    ]
+                ),
+                "candidate_review_checklist_handoff_gripper_mapping_direct_action_ids": (
+                    review_checklist_handoff[
+                        "gripper_mapping_direct_action_ids"
+                    ]
+                ),
+                "candidate_review_checklist_handoff_collision_policy_direct_action_ids": (
+                    review_checklist_handoff[
+                        "collision_policy_direct_action_ids"
+                    ]
+                ),
                 "candidate_review_observations_ready_for_model_backed_ik": summary[
                     "candidate_review_observations"
                 ]["ready_for_model_backed_ik"],

@@ -162,6 +162,11 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_review_checklist_missing_required_review_scope_ids",
         "candidate_review_checklist_gripper_mapping_direct_action_ids",
         "candidate_review_checklist_collision_policy_direct_action_ids",
+        "candidate_direct_template_checklist_handoff_authority",
+        "candidate_direct_template_checklist_handoff_scope_coverage_ready",
+        "candidate_direct_template_checklist_handoff_missing_required_scope_ids",
+        "candidate_direct_template_checklist_handoff_gripper_mapping_direct_action_ids",
+        "candidate_direct_template_checklist_handoff_collision_policy_direct_action_ids",
         "candidate_seeded_review_manifest_template_model_authority",
         "candidate_review_observations_parsed_model_file_count",
         "candidate_readme_gripper_mapping_caveat",
@@ -1695,6 +1700,57 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
                 f"{case_id}.candidate_review_checklist.direct_action_ids_by_required_review_scope[{required_scope!r}] "
                 f"expected {expected_action_ids!r}, got {checklist_direct_actions_by_scope.get(required_scope)!r}"
             )
+    seeded_checklist_handoff = observed_inputs.get(
+        "candidate_review_checklist_handoff"
+    )
+    seeded_checklist_handoff = (
+        seeded_checklist_handoff
+        if isinstance(seeded_checklist_handoff, dict)
+        else {}
+    )
+    direct_checklist_handoff = manifest_template.get(
+        "candidate_review_checklist_handoff"
+    )
+    direct_checklist_handoff = (
+        direct_checklist_handoff
+        if isinstance(direct_checklist_handoff, dict)
+        else {}
+    )
+    for handoff_name, handoff in (
+        ("candidate_seeded_review_manifest_template.observed_inputs", seeded_checklist_handoff),
+        ("candidate_seeded_review_manifest_template.manifest_template", direct_checklist_handoff),
+    ):
+        if (
+            handoff.get("model_authority")
+            != "candidate_review_checklist_handoff_not_authority"
+        ):
+            errors.append(f"{case_id}.{handoff_name}.candidate_review_checklist_handoff model_authority invalid")
+        if handoff.get("observed_evidence_is_physical_so101_authority") is not False:
+            errors.append(f"{case_id}.{handoff_name}.candidate_review_checklist_handoff physical authority not false")
+        if handoff.get("ready_for_model_backed_ik") is not False:
+            errors.append(f"{case_id}.{handoff_name}.candidate_review_checklist_handoff ready_for_model_backed_ik not false")
+        if handoff.get("row_count") != review_checklist.get("row_count"):
+            errors.append(f"{case_id}.{handoff_name}.candidate_review_checklist_handoff row_count invalid")
+        if (
+            handoff.get("required_review_scope_coverage_ready")
+            is not review_checklist.get("required_review_scope_coverage_ready")
+        ):
+            errors.append(f"{case_id}.{handoff_name}.candidate_review_checklist_handoff scope coverage invalid")
+        if (
+            handoff.get("missing_required_review_scope_ids")
+            != review_checklist.get("missing_required_review_scope_ids")
+        ):
+            errors.append(f"{case_id}.{handoff_name}.candidate_review_checklist_handoff missing scope ids invalid")
+        if (
+            handoff.get("gripper_mapping_direct_action_ids")
+            != checklist_direct_actions_by_scope.get("gripper_mapping")
+        ):
+            errors.append(f"{case_id}.{handoff_name}.candidate_review_checklist_handoff gripper actions invalid")
+        if (
+            handoff.get("collision_policy_direct_action_ids")
+            != checklist_direct_actions_by_scope.get("collision_policy")
+        ):
+            errors.append(f"{case_id}.{handoff_name}.candidate_review_checklist_handoff collision actions invalid")
     checklist_action_ids = review_checklist.get("action_ids")
     checklist_action_ids = checklist_action_ids if isinstance(checklist_action_ids, list) else []
     for required_action_id in (
@@ -1975,6 +2031,21 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
                 review_checklist.get("direct_action_ids_by_required_review_scope")
                 or {}
             ).get("collision_policy")
+        ),
+        "candidate_direct_template_checklist_handoff_authority": (
+            direct_checklist_handoff.get("model_authority")
+        ),
+        "candidate_direct_template_checklist_handoff_scope_coverage_ready": (
+            direct_checklist_handoff.get("required_review_scope_coverage_ready")
+        ),
+        "candidate_direct_template_checklist_handoff_missing_required_scope_ids": (
+            direct_checklist_handoff.get("missing_required_review_scope_ids")
+        ),
+        "candidate_direct_template_checklist_handoff_gripper_mapping_direct_action_ids": (
+            direct_checklist_handoff.get("gripper_mapping_direct_action_ids")
+        ),
+        "candidate_direct_template_checklist_handoff_collision_policy_direct_action_ids": (
+            direct_checklist_handoff.get("collision_policy_direct_action_ids")
         ),
         "candidate_seeded_review_manifest_template_model_authority": summary.get(
             "candidate_seeded_review_manifest_template_model_authority"
