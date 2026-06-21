@@ -1568,6 +1568,8 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
     success_conditions = rerun_plan.get("required_success_conditions")
     success_conditions = success_conditions if isinstance(success_conditions, list) else []
     for required_condition in (
+        "reviewed_manifest_records_gripper_mapping_authority",
+        "reviewed_manifest_records_collision_policy_authority",
         "manifest_checker_reports_ready_for_model_backed_ik_true",
         "manifest_checker_reports_physical_so101_model_authority_ready_true",
         "reviewed_mujoco_bundle_gate_loads_model_and_proves_joint_motion",

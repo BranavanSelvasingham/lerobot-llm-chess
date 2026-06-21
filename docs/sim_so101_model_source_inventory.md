@@ -227,7 +227,10 @@ The reviewed-manifest rerun-plan JSON is the machine-readable handoff from the
 candidate source lock to `scripts/smoke_sim_so101_model_bundle_manifest.py`.
 It stays `candidate_reviewed_manifest_rerun_plan_not_authority`, keeps
 `ready_for_model_backed_ik: false`, and records the command template plus
-required success conditions. A locked source without an explicit
+required success conditions. Those conditions explicitly require reviewed
+manifest authority for the SO-ARM100/SO101 gripper linear-joint mapping caveat
+and removed base-collision policy caveat before the manifest rerun can be
+treated as a successful handoff. A locked source without an explicit
 external-source or vendor-bundle decision remains blocked; a selected intake
 decision makes only the operator rerun handoff ready.
 
