@@ -1581,6 +1581,18 @@ def candidate_seeded_review_manifest_template(
         for row in present_lockable_rows
         if row.get("expected") is not True and row.get("relative_path")
     ]
+    candidate_source_lock_digest_handoff = {
+        "digest_row_count": len(present_lockable_rows),
+        "expected_file_digest_count": expected_digest_count,
+        "extra_lockable_file_count": len(extra_lockable_relative_paths),
+        "extra_lockable_relative_paths": extra_lockable_relative_paths[:200],
+        "authority_boundary": "candidate_source_lock_digest_not_authority",
+        "review_instruction": (
+            "Use these observed candidate digests only as review handoff. "
+            "Reviewed mesh/file authority must be recorded in reviewed manifest "
+            "fields after reviewer acceptance."
+        ),
+    }
     return {
         "schema": "lerobot.sim.so101_public_candidate_seeded_review_manifest_template.v1",
         "ok": True,
@@ -1601,19 +1613,18 @@ def candidate_seeded_review_manifest_template(
                 "source_tree_url": upstream_source_tree_url,
                 "commit": upstream_commit,
             },
-            "candidate_source_lock_digest_handoff": {
-                "digest_row_count": len(present_lockable_rows),
-                "expected_file_digest_count": expected_digest_count,
-                "extra_lockable_file_count": len(extra_lockable_relative_paths),
-                "extra_lockable_relative_paths": extra_lockable_relative_paths[:200],
-                "authority_boundary": "candidate_source_lock_digest_not_authority",
-            },
+            "candidate_source_lock_digest_handoff": (
+                candidate_source_lock_digest_handoff
+            ),
             "candidate_review_observations": candidate_review_observations,
         },
         "manifest_template": {
             "model_path": str(model_path) if model_path is not None else "<reviewed-so101-model.urdf-or-mjcf>",
             "model_sha256": "<copy-reviewed-sha256-after-review>",
             "asset_roots": [str(source_root)] if source_root is not None else ["<reviewed-mesh-or-asset-root>"],
+            "candidate_source_lock_digest_handoff": (
+                candidate_source_lock_digest_handoff
+            ),
             "authority": {
                 "source_authority_status": "reviewed",
                 "reviewed_by": "<reviewer-or-team>",
