@@ -5799,6 +5799,24 @@ def so101_reviewed_model_authority_gate_section(
         "operator_command_plan_authority_blockers_until_reviewed": (
             authority_blockers_until_reviewed
         ),
+        "review_checklist_scope_coverage_ready": public_candidate_checked.get(
+            "candidate_review_checklist_scope_coverage_ready"
+        ),
+        "review_checklist_missing_required_review_scope_ids": (
+            public_candidate_checked.get(
+                "candidate_review_checklist_missing_required_review_scope_ids"
+            )
+        ),
+        "review_checklist_gripper_mapping_direct_action_ids": (
+            public_candidate_checked.get(
+                "candidate_review_checklist_gripper_mapping_direct_action_ids"
+            )
+        ),
+        "review_checklist_collision_policy_direct_action_ids": (
+            public_candidate_checked.get(
+                "candidate_review_checklist_collision_policy_direct_action_ids"
+            )
+        ),
         "selected_model_expected_joint_coverage_status": public_candidate_checked.get(
             "candidate_source_lock_selected_model_expected_joint_coverage_status"
         ),
@@ -6419,6 +6437,26 @@ def so101_reviewed_model_authority_gate_section(
                 "operator_command_plan_authority_blockers_until_reviewed"
             ]
         ),
+        "public_candidate_review_checklist_scope_coverage_ready": (
+            public_candidate_source_lock_handoff[
+                "review_checklist_scope_coverage_ready"
+            ]
+        ),
+        "public_candidate_review_checklist_missing_required_review_scope_ids": (
+            public_candidate_source_lock_handoff[
+                "review_checklist_missing_required_review_scope_ids"
+            ]
+        ),
+        "public_candidate_review_checklist_gripper_mapping_direct_action_ids": (
+            public_candidate_source_lock_handoff[
+                "review_checklist_gripper_mapping_direct_action_ids"
+            ]
+        ),
+        "public_candidate_review_checklist_collision_policy_direct_action_ids": (
+            public_candidate_source_lock_handoff[
+                "review_checklist_collision_policy_direct_action_ids"
+            ]
+        ),
         "public_candidate_recorded_operator_intake_decision_options": (
             public_candidate_source_lock_handoff[
                 "recorded_operator_intake_decision_options"
@@ -6681,6 +6719,26 @@ def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[
             "public_candidate_operator_command_plan_authority_blockers_until_reviewed": (
                 public_candidate_source_lock_handoff.get(
                     "operator_command_plan_authority_blockers_until_reviewed"
+                )
+            ),
+            "public_candidate_review_checklist_scope_coverage_ready": (
+                public_candidate_source_lock_handoff.get(
+                    "review_checklist_scope_coverage_ready"
+                )
+            ),
+            "public_candidate_review_checklist_missing_required_review_scope_ids": (
+                public_candidate_source_lock_handoff.get(
+                    "review_checklist_missing_required_review_scope_ids"
+                )
+            ),
+            "public_candidate_review_checklist_gripper_mapping_direct_action_ids": (
+                public_candidate_source_lock_handoff.get(
+                    "review_checklist_gripper_mapping_direct_action_ids"
+                )
+            ),
+            "public_candidate_review_checklist_collision_policy_direct_action_ids": (
+                public_candidate_source_lock_handoff.get(
+                    "review_checklist_collision_policy_direct_action_ids"
                 )
             ),
             "public_candidate_recorded_operator_intake_decision_options": (
@@ -7273,6 +7331,18 @@ def so101_reviewed_model_authority_operator_actions(
                 "public_candidate_operator_command_plan_authority_blockers_until_reviewed": item.get(
                     "public_candidate_operator_command_plan_authority_blockers_until_reviewed"
                 ),
+                "public_candidate_review_checklist_scope_coverage_ready": item.get(
+                    "public_candidate_review_checklist_scope_coverage_ready"
+                ),
+                "public_candidate_review_checklist_missing_required_review_scope_ids": item.get(
+                    "public_candidate_review_checklist_missing_required_review_scope_ids"
+                ),
+                "public_candidate_review_checklist_gripper_mapping_direct_action_ids": item.get(
+                    "public_candidate_review_checklist_gripper_mapping_direct_action_ids"
+                ),
+                "public_candidate_review_checklist_collision_policy_direct_action_ids": item.get(
+                    "public_candidate_review_checklist_collision_policy_direct_action_ids"
+                ),
                 "public_candidate_review_manifest_template_path": item.get(
                     "public_candidate_review_manifest_template_path"
                 ),
@@ -7789,6 +7859,10 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "public_candidate_operator_command_plan_model_authority",
         "public_candidate_operator_command_plan_review_handoff_artifact_ids",
         "public_candidate_operator_command_plan_authority_blockers_until_reviewed",
+        "public_candidate_review_checklist_scope_coverage_ready",
+        "public_candidate_review_checklist_missing_required_review_scope_ids",
+        "public_candidate_review_checklist_gripper_mapping_direct_action_ids",
+        "public_candidate_review_checklist_collision_policy_direct_action_ids",
         "public_candidate_review_manifest_template_path",
         "public_candidate_source_lock_model_authority",
         "evidence_artifact_path",
@@ -7826,6 +7900,10 @@ def write_so101_reviewed_model_authority_gate_artifacts(
         "public_candidate_operator_command_plan_model_authority",
         "public_candidate_operator_command_plan_review_handoff_artifact_ids",
         "public_candidate_operator_command_plan_authority_blockers_until_reviewed",
+        "public_candidate_review_checklist_scope_coverage_ready",
+        "public_candidate_review_checklist_missing_required_review_scope_ids",
+        "public_candidate_review_checklist_gripper_mapping_direct_action_ids",
+        "public_candidate_review_checklist_collision_policy_direct_action_ids",
         "public_candidate_review_manifest_template_path",
         "public_candidate_source_lock_model_authority",
         "development_fixture_evidence_not_physical_so101_truth",

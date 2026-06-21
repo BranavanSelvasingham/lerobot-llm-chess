@@ -164,6 +164,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "public_candidate_operator_command_plan_model_authority",
         "public_candidate_operator_command_plan_review_handoff_artifact_ids",
         "public_candidate_operator_command_plan_authority_blockers_until_reviewed",
+        "public_candidate_review_checklist_scope_coverage_ready",
+        "public_candidate_review_checklist_missing_required_review_scope_ids",
+        "public_candidate_review_checklist_gripper_mapping_direct_action_ids",
+        "public_candidate_review_checklist_collision_policy_direct_action_ids",
         "public_candidate_review_manifest_template_path",
         "public_candidate_source_lock_model_authority",
         "checklist_status_by_requirement_id",
@@ -531,6 +535,14 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
                 "candidate_operator_commands_ready_for_pinned_source_review"
             ),
             "candidate_operator_command_plan_selected_option_command_count": 8,
+            "candidate_review_checklist_scope_coverage_ready": True,
+            "candidate_review_checklist_missing_required_review_scope_ids": [],
+            "candidate_review_checklist_gripper_mapping_direct_action_ids": [
+                "review_gripper_mapping"
+            ],
+            "candidate_review_checklist_collision_policy_direct_action_ids": [
+                "review_collision_policy"
+            ],
             "candidate_operator_intake_option_count": 2,
             "direct_manifest_path": str(direct_manifest_path),
         },
@@ -918,6 +930,14 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                     "license and provenance review evidence must be recorded for the selected intake option",
                     "reviewed bundle manifest checker must report physical_so101_model_authority_ready",
                     "reviewed MuJoCo bundle gate must prove physical reviewed model motion",
+                ],
+                "public_candidate_review_checklist_scope_coverage_ready": True,
+                "public_candidate_review_checklist_missing_required_review_scope_ids": [],
+                "public_candidate_review_checklist_gripper_mapping_direct_action_ids": [
+                    "review_gripper_mapping"
+                ],
+                "public_candidate_review_checklist_collision_policy_direct_action_ids": [
+                    "review_collision_policy"
                 ],
                 "public_candidate_recorded_operator_intake_decision_options": [
                     "external_pinned_source_root",
@@ -2154,6 +2174,58 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
                     "operator_command_plan_authority_blockers_until_reviewed "
                     f"missing {expected_blocker!r}"
                 )
+    if "public_candidate_review_checklist_scope_coverage_ready" in expect:
+        add_error(
+            errors,
+            "public_candidate_review_checklist_scope_coverage_ready",
+            gate.get("public_candidate_review_checklist_scope_coverage_ready"),
+            expect["public_candidate_review_checklist_scope_coverage_ready"],
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.review_checklist_scope_coverage_ready",
+            source_lock_handoff.get("review_checklist_scope_coverage_ready"),
+            expect["public_candidate_review_checklist_scope_coverage_ready"],
+        )
+    if "public_candidate_review_checklist_missing_required_review_scope_ids" in expect:
+        add_error(
+            errors,
+            "public_candidate_review_checklist_missing_required_review_scope_ids",
+            gate.get("public_candidate_review_checklist_missing_required_review_scope_ids"),
+            expect["public_candidate_review_checklist_missing_required_review_scope_ids"],
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.review_checklist_missing_required_review_scope_ids",
+            source_lock_handoff.get("review_checklist_missing_required_review_scope_ids"),
+            expect["public_candidate_review_checklist_missing_required_review_scope_ids"],
+        )
+    if "public_candidate_review_checklist_gripper_mapping_direct_action_ids" in expect:
+        add_error(
+            errors,
+            "public_candidate_review_checklist_gripper_mapping_direct_action_ids",
+            gate.get("public_candidate_review_checklist_gripper_mapping_direct_action_ids"),
+            expect["public_candidate_review_checklist_gripper_mapping_direct_action_ids"],
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.review_checklist_gripper_mapping_direct_action_ids",
+            source_lock_handoff.get("review_checklist_gripper_mapping_direct_action_ids"),
+            expect["public_candidate_review_checklist_gripper_mapping_direct_action_ids"],
+        )
+    if "public_candidate_review_checklist_collision_policy_direct_action_ids" in expect:
+        add_error(
+            errors,
+            "public_candidate_review_checklist_collision_policy_direct_action_ids",
+            gate.get("public_candidate_review_checklist_collision_policy_direct_action_ids"),
+            expect["public_candidate_review_checklist_collision_policy_direct_action_ids"],
+        )
+        add_error(
+            errors,
+            "public_candidate_source_lock_handoff.review_checklist_collision_policy_direct_action_ids",
+            source_lock_handoff.get("review_checklist_collision_policy_direct_action_ids"),
+            expect["public_candidate_review_checklist_collision_policy_direct_action_ids"],
+        )
     if "public_candidate_recorded_operator_intake_decision_options" in expect:
         add_error(
             errors,
@@ -2943,6 +3015,42 @@ def summarize_case(spec: dict[str, Any], case_dir: Path) -> dict[str, Any]:
             ),
             source_lock_handoff.get("operator_command_plan_model_authority"),
         )
+        add_error(
+            errors,
+            "artifact_public_candidate_review_checklist_scope_coverage_ready",
+            gate_artifacts.get(
+                "public_candidate_review_checklist_scope_coverage_ready"
+            ),
+            source_lock_handoff.get("review_checklist_scope_coverage_ready"),
+        )
+        add_error(
+            errors,
+            "artifact_public_candidate_review_checklist_missing_required_review_scope_ids",
+            gate_artifacts.get(
+                "public_candidate_review_checklist_missing_required_review_scope_ids"
+            ),
+            source_lock_handoff.get("review_checklist_missing_required_review_scope_ids"),
+        )
+        add_error(
+            errors,
+            "artifact_public_candidate_review_checklist_gripper_mapping_direct_action_ids",
+            gate_artifacts.get(
+                "public_candidate_review_checklist_gripper_mapping_direct_action_ids"
+            ),
+            source_lock_handoff.get(
+                "review_checklist_gripper_mapping_direct_action_ids"
+            ),
+        )
+        add_error(
+            errors,
+            "artifact_public_candidate_review_checklist_collision_policy_direct_action_ids",
+            gate_artifacts.get(
+                "public_candidate_review_checklist_collision_policy_direct_action_ids"
+            ),
+            source_lock_handoff.get(
+                "review_checklist_collision_policy_direct_action_ids"
+            ),
+        )
     add_error(
         errors,
         "artifact_policy_training_authority_boundary",
@@ -3444,6 +3552,22 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "public_candidate_operator_command_plan_authority_blockers_until_reviewed": (
             source_lock_handoff.get(
                 "operator_command_plan_authority_blockers_until_reviewed"
+            )
+        ),
+        "public_candidate_review_checklist_scope_coverage_ready": (
+            source_lock_handoff.get("review_checklist_scope_coverage_ready")
+        ),
+        "public_candidate_review_checklist_missing_required_review_scope_ids": (
+            source_lock_handoff.get("review_checklist_missing_required_review_scope_ids")
+        ),
+        "public_candidate_review_checklist_gripper_mapping_direct_action_ids": (
+            source_lock_handoff.get(
+                "review_checklist_gripper_mapping_direct_action_ids"
+            )
+        ),
+        "public_candidate_review_checklist_collision_policy_direct_action_ids": (
+            source_lock_handoff.get(
+                "review_checklist_collision_policy_direct_action_ids"
             )
         ),
         "public_candidate_review_manifest_template_path": source_lock_handoff.get(
