@@ -34,6 +34,10 @@ CONTACT_FIXTURE_GRIPPER_MIN_CLOSURE_M = -0.012
 CONTACT_FIXTURE_GRIPPER_CLOSE_M = -0.008
 CONTACT_FIXTURE_GRIPPER_KP = 200.0
 DEVELOPMENT_MODEL_AUTHORITY = "development_scaffold_not_reviewed"
+IK_PROVENANCE_STATUS = "seeded_source_pose_not_reviewed_model_backed_ik"
+IK_SOLUTION_SOURCE = "seeded_joint_targets"
+IK_REVIEW_STATUS = "not_reviewed_model_backed_ik"
+IK_BLOCKER_ACTION_ID = "repeat_board_pick_with_reviewed_model_backed_ik"
 SOURCE_PAN_RAD = -0.1
 TARGET_PAN_RAD = 0.07
 LIFT_Z_THRESHOLD_M = 0.02
@@ -389,6 +393,32 @@ def stage_sequence_contract(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def ik_provenance_contract(*, robot_pose_seeded: bool, attempted: bool) -> dict[str, Any]:
+    ready = attempted and not robot_pose_seeded
+    if not attempted:
+        return {
+            "ik_provenance_status": "ik_not_attempted",
+            "ik_solution_source": "not_attempted",
+            "ik_review_status": "not_attempted",
+            "ik_uses_reviewed_model": False,
+            "ik_uses_reviewed_tcp_and_base_to_board_alignment": False,
+            "ik_uses_seeded_joint_targets": False,
+            "ik_authority_blocker_action_ids": [],
+            "ik_authority_blocker_count": 0,
+        }
+    blocker_ids = [] if ready else [IK_BLOCKER_ACTION_ID]
+    return {
+        "ik_provenance_status": "reviewed_model_backed_ik" if ready else IK_PROVENANCE_STATUS,
+        "ik_solution_source": "reviewed_model_backed_ik" if ready else IK_SOLUTION_SOURCE,
+        "ik_review_status": "reviewed" if ready else IK_REVIEW_STATUS,
+        "ik_uses_reviewed_model": ready,
+        "ik_uses_reviewed_tcp_and_base_to_board_alignment": ready,
+        "ik_uses_seeded_joint_targets": robot_pose_seeded,
+        "ik_authority_blocker_action_ids": blocker_ids,
+        "ik_authority_blocker_count": len(blocker_ids),
+    }
+
+
 def phase_evidence_row(
     *,
     phase_id: str,
@@ -425,6 +455,9 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- All required phases verified: `{summary.get('pick_place_all_required_phases_verified')}`",
         f"- Failed phase IDs: `{summary.get('pick_place_failed_phase_ids')}`",
         f"- Stage sequence contract OK: `{summary.get('stage_sequence_contract_ok')}`",
+        f"- IK provenance status: `{summary.get('ik_provenance_status')}`",
+        f"- IK solution source: `{summary.get('ik_solution_source')}`",
+        f"- IK authority blocker action IDs: `{summary.get('ik_authority_blocker_action_ids')}`",
         f"- Manual pose after reset stage IDs: `{summary.get('manual_piece_pose_after_reset_stage_ids')}`",
         f"- Release contact cleared after retreat: `{summary.get('release_contact_cleared_after_retreat')}`",
         f"- Final target XY error m: `{summary.get('final_target_xy_error_m')}`",
@@ -456,6 +489,7 @@ def missing_dependency_summary(args: argparse.Namespace, deps: dict[str, bool], 
         "development_fixture_evidence_not_physical_so101_truth": True,
         "development_fixture_evidence_not_policy_training_truth": True,
         "ready_for_model_backed_ik": False,
+        **ik_provenance_contract(robot_pose_seeded=False, attempted=False),
         "ready_for_policy_training": False,
         "source_square": args.source_square,
         "target_square": args.target_square,
@@ -537,6 +571,7 @@ def invalid_task_summary(
         "development_fixture_evidence_not_physical_so101_truth": True,
         "development_fixture_evidence_not_policy_training_truth": True,
         "ready_for_model_backed_ik": False,
+        **ik_provenance_contract(robot_pose_seeded=False, attempted=False),
         "ready_for_policy_training": False,
         "source_square": args.source_square,
         "target_square": args.target_square,
@@ -1001,6 +1036,7 @@ def main() -> int:
     ]
     pick_place_all_required_phases_verified = not pick_place_failed_phase_ids
     stage_sequence = stage_sequence_contract(rows)
+    ik_provenance = ik_provenance_contract(robot_pose_seeded=True, attempted=True)
     board_source_pick_place_verified = bool(
         source_pick_started_at_source
         and close_two_finger_contact_observed
@@ -1030,6 +1066,7 @@ def main() -> int:
         "development_fixture_evidence_not_physical_so101_truth": True,
         "development_fixture_evidence_not_policy_training_truth": True,
         "ready_for_model_backed_ik": False,
+        **ik_provenance,
         "ready_for_policy_training": False,
         "development_manifest": manifest,
         "probe_count": len(rows),

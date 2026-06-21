@@ -3489,6 +3489,18 @@ def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path)
             "development_fixture_evidence_not_policy_training_truth"
         ),
         "ready_for_model_backed_ik": smoke.get("ready_for_model_backed_ik"),
+        "ik_provenance_status": smoke.get("ik_provenance_status"),
+        "ik_solution_source": smoke.get("ik_solution_source"),
+        "ik_review_status": smoke.get("ik_review_status"),
+        "ik_uses_reviewed_model": smoke.get("ik_uses_reviewed_model"),
+        "ik_uses_reviewed_tcp_and_base_to_board_alignment": smoke.get(
+            "ik_uses_reviewed_tcp_and_base_to_board_alignment"
+        ),
+        "ik_uses_seeded_joint_targets": smoke.get("ik_uses_seeded_joint_targets"),
+        "ik_authority_blocker_action_ids": smoke.get(
+            "ik_authority_blocker_action_ids"
+        ),
+        "ik_authority_blocker_count": smoke.get("ik_authority_blocker_count"),
         "limitations": smoke.get("limitations"),
         "next_required_for_goal": next_required,
         "next_required_action_ids": next_required_action_ids,
@@ -8335,6 +8347,14 @@ def so101_board_pick_authority_contract(
         board_pick.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
     )
     ready_for_model_backed_ik = board_pick.get("ready_for_model_backed_ik") is True
+    ik_solution_source = board_pick.get("ik_solution_source")
+    ik_uses_reviewed_model = board_pick.get("ik_uses_reviewed_model") is True
+    ik_uses_reviewed_tcp_and_base = (
+        board_pick.get("ik_uses_reviewed_tcp_and_base_to_board_alignment") is True
+    )
+    ik_uses_seeded_joint_targets = (
+        board_pick.get("ik_uses_seeded_joint_targets") is True
+    )
     seeded_source_pose = board_pick.get("robot_pose_seeded_for_source_fixture") is True
     manual_pose_after_reset = board_pick.get("manual_piece_pose_used_after_reset") is True
     physical_truth_claimed = (
@@ -8352,6 +8372,14 @@ def so101_board_pick_authority_contract(
         blockers.append("use_reviewed_so101_model_authority_for_board_pick")
     if not ready_for_model_backed_ik:
         blockers.append("repeat_board_pick_with_reviewed_model_backed_ik")
+    if ik_solution_source != "reviewed_model_backed_ik":
+        blockers.append("replace_seeded_board_pick_ik_solution_source")
+    if not ik_uses_reviewed_model:
+        blockers.append("use_reviewed_model_for_board_pick_ik")
+    if not ik_uses_reviewed_tcp_and_base:
+        blockers.append("use_reviewed_tcp_and_base_to_board_alignment_for_board_pick_ik")
+    if ik_uses_seeded_joint_targets:
+        blockers.append("remove_seeded_joint_targets_from_board_pick_ik")
     if seeded_source_pose:
         blockers.append("remove_seeded_source_pose_from_board_pick")
     if manual_pose_after_reset:
@@ -8368,6 +8396,12 @@ def so101_board_pick_authority_contract(
         status = "board_pick_not_reviewed_model_authority"
     elif not ready_for_model_backed_ik:
         status = "board_pick_not_model_backed_ik"
+    elif ik_solution_source != "reviewed_model_backed_ik":
+        status = "board_pick_ik_solution_source_not_reviewed"
+    elif not ik_uses_reviewed_model or not ik_uses_reviewed_tcp_and_base:
+        status = "board_pick_ik_missing_reviewed_model_or_alignment"
+    elif ik_uses_seeded_joint_targets:
+        status = "board_pick_seeded_joint_targets_not_reviewed_ik"
     elif seeded_source_pose:
         status = "board_pick_seeded_source_pose_not_reviewed_ik"
     elif manual_pose_after_reset:
@@ -8387,6 +8421,10 @@ def so101_board_pick_authority_contract(
         "blockers": blockers,
         "reviewed_model_authority_ready": reviewed_model_authority_ready,
         "ready_for_model_backed_ik": ready_for_model_backed_ik,
+        "ik_solution_source": ik_solution_source,
+        "ik_uses_reviewed_model": ik_uses_reviewed_model,
+        "ik_uses_reviewed_tcp_and_base_to_board_alignment": ik_uses_reviewed_tcp_and_base,
+        "ik_uses_seeded_joint_targets": ik_uses_seeded_joint_targets,
         "seeded_source_pose": seeded_source_pose,
         "manual_piece_pose_after_reset": manual_pose_after_reset,
         "physical_truth_claimed": physical_truth_claimed,
@@ -9416,6 +9454,35 @@ def so101_training_readiness_gate_section(
             "policy_authority_claimed"
         ),
         "board_pick_ready_for_model_backed_ik": board_pick.get("ready_for_model_backed_ik"),
+        "board_pick_ik_provenance_status": board_pick.get("ik_provenance_status"),
+        "board_pick_ik_solution_source": board_pick.get("ik_solution_source"),
+        "board_pick_ik_review_status": board_pick.get("ik_review_status"),
+        "board_pick_ik_uses_reviewed_model": board_pick.get(
+            "ik_uses_reviewed_model"
+        ),
+        "board_pick_ik_uses_reviewed_tcp_and_base_to_board_alignment": board_pick.get(
+            "ik_uses_reviewed_tcp_and_base_to_board_alignment"
+        ),
+        "board_pick_ik_uses_seeded_joint_targets": board_pick.get(
+            "ik_uses_seeded_joint_targets"
+        ),
+        "board_pick_ik_authority_blocker_action_ids": board_pick.get(
+            "ik_authority_blocker_action_ids"
+        ),
+        "board_pick_authority_ik_solution_source": board_pick_authority_contract.get(
+            "ik_solution_source"
+        ),
+        "board_pick_authority_ik_uses_reviewed_model": board_pick_authority_contract.get(
+            "ik_uses_reviewed_model"
+        ),
+        "board_pick_authority_ik_uses_reviewed_tcp_and_base_to_board_alignment": (
+            board_pick_authority_contract.get(
+                "ik_uses_reviewed_tcp_and_base_to_board_alignment"
+            )
+        ),
+        "board_pick_authority_ik_uses_seeded_joint_targets": (
+            board_pick_authority_contract.get("ik_uses_seeded_joint_targets")
+        ),
         "board_pick_next_required_action_ids": board_pick.get(
             "next_required_action_ids"
         ),

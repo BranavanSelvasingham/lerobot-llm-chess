@@ -138,6 +138,14 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "stage_sequence_contract_errors",
         "observed_stage_sequence",
         "manual_piece_pose_after_reset_stage_ids",
+        "ik_provenance_status",
+        "ik_solution_source",
+        "ik_review_status",
+        "ik_uses_reviewed_model",
+        "ik_uses_reviewed_tcp_and_base_to_board_alignment",
+        "ik_uses_seeded_joint_targets",
+        "ik_authority_blocker_action_ids",
+        "ik_authority_blocker_count",
         "ready_for_model_backed_ik",
         "ready_for_policy_training",
         "physical_authority",
@@ -592,6 +600,18 @@ def summarize_case(
         ),
         "manual_piece_pose_used_after_reset": summary.get("manual_piece_pose_used_after_reset"),
         "robot_pose_seeded_for_source_fixture": summary.get("robot_pose_seeded_for_source_fixture"),
+        "ik_provenance_status": summary.get("ik_provenance_status"),
+        "ik_solution_source": summary.get("ik_solution_source"),
+        "ik_review_status": summary.get("ik_review_status"),
+        "ik_uses_reviewed_model": summary.get("ik_uses_reviewed_model"),
+        "ik_uses_reviewed_tcp_and_base_to_board_alignment": summary.get(
+            "ik_uses_reviewed_tcp_and_base_to_board_alignment"
+        ),
+        "ik_uses_seeded_joint_targets": summary.get("ik_uses_seeded_joint_targets"),
+        "ik_authority_blocker_action_ids": summary.get(
+            "ik_authority_blocker_action_ids"
+        ),
+        "ik_authority_blocker_count": summary.get("ik_authority_blocker_count"),
         "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
         "ready_for_policy_training": summary.get("ready_for_policy_training"),
         "physical_authority": summary.get("observed_evidence_is_physical_so101_authority"),
@@ -654,6 +674,54 @@ def summarize_case(
         f"{case_id}.ready_for_model_backed_ik",
         observations["ready_for_model_backed_ik"],
         False,
+    )
+    add_error(
+        errors,
+        f"{case_id}.ik_provenance_status",
+        observations["ik_provenance_status"],
+        "seeded_source_pose_not_reviewed_model_backed_ik" if expect_ok else "ik_not_attempted",
+    )
+    add_error(
+        errors,
+        f"{case_id}.ik_solution_source",
+        observations["ik_solution_source"],
+        "seeded_joint_targets" if expect_ok else "not_attempted",
+    )
+    add_error(
+        errors,
+        f"{case_id}.ik_review_status",
+        observations["ik_review_status"],
+        "not_reviewed_model_backed_ik" if expect_ok else "not_attempted",
+    )
+    add_error(
+        errors,
+        f"{case_id}.ik_uses_reviewed_model",
+        observations["ik_uses_reviewed_model"],
+        False,
+    )
+    add_error(
+        errors,
+        f"{case_id}.ik_uses_reviewed_tcp_and_base_to_board_alignment",
+        observations["ik_uses_reviewed_tcp_and_base_to_board_alignment"],
+        False,
+    )
+    add_error(
+        errors,
+        f"{case_id}.ik_uses_seeded_joint_targets",
+        observations["ik_uses_seeded_joint_targets"],
+        True if expect_ok else False,
+    )
+    add_error(
+        errors,
+        f"{case_id}.ik_authority_blocker_action_ids",
+        observations["ik_authority_blocker_action_ids"],
+        ["repeat_board_pick_with_reviewed_model_backed_ik"] if expect_ok else [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.ik_authority_blocker_count",
+        observations["ik_authority_blocker_count"],
+        1 if expect_ok else 0,
     )
     add_error(
         errors,
@@ -1031,6 +1099,18 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         "manual_piece_pose_after_reset_stage_ids": observations.get(
             "manual_piece_pose_after_reset_stage_ids"
         ),
+        "ik_provenance_status": observations.get("ik_provenance_status"),
+        "ik_solution_source": observations.get("ik_solution_source"),
+        "ik_review_status": observations.get("ik_review_status"),
+        "ik_uses_reviewed_model": observations.get("ik_uses_reviewed_model"),
+        "ik_uses_reviewed_tcp_and_base_to_board_alignment": observations.get(
+            "ik_uses_reviewed_tcp_and_base_to_board_alignment"
+        ),
+        "ik_uses_seeded_joint_targets": observations.get("ik_uses_seeded_joint_targets"),
+        "ik_authority_blocker_action_ids": observations.get(
+            "ik_authority_blocker_action_ids"
+        ),
+        "ik_authority_blocker_count": observations.get("ik_authority_blocker_count"),
         "ready_for_model_backed_ik": observations.get("ready_for_model_backed_ik"),
         "ready_for_policy_training": observations.get("ready_for_policy_training"),
         "physical_authority": observations.get("physical_authority"),
@@ -1071,6 +1151,8 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
         f"- `expected_gap_case_count`: `{summary['expected_gap_case_count']}`",
         f"- `invalid_task_case_count`: `{summary['invalid_task_case_count']}`",
         f"- `next_required_action_sync_ok`: `{summary['next_required_action_sync_ok']}`",
+        f"- `seeded_ik_case_count`: `{summary['seeded_ik_case_count']}`",
+        f"- `reviewed_model_backed_ik_case_count`: `{summary['reviewed_model_backed_ik_case_count']}`",
         f"- `failed_cases`: `{', '.join(summary['failed_case_ids']) if summary['failed_case_ids'] else 'none'}`",
         f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
         f"- `cases_csv`: `{summary['artifacts']['cases_csv']}`",
@@ -1102,6 +1184,7 @@ def write_readme(path: Path, summary: dict[str, Any]) -> None:
             "",
             "- All cases use generated `development_scaffold_not_reviewed` MJCF.",
             "- The passing case uses direct seeded source pose plus a scripted actuator sequence.",
+            "- IK provenance fields must identify seeded joint targets and the reviewed model-backed IK blocker.",
             "- Gap cases assert exact failed phase IDs so the fixture boundary does not drift silently.",
             "- `next_required_action_ids` must exactly match the actions derived from `next_required_for_goal`.",
             "- `ready_for_model_backed_ik` and `ready_for_policy_training` must remain false.",
@@ -1158,6 +1241,16 @@ def main() -> int:
         else 1
         for case in cases
     )
+    seeded_ik_cases = [
+        case
+        for case in cases
+        if case["observations"].get("ik_uses_seeded_joint_targets") is True
+    ]
+    reviewed_ik_cases = [
+        case
+        for case in cases
+        if case["observations"].get("ik_solution_source") == "reviewed_model_backed_ik"
+    ]
     summary_path = output_dir / "so101_mujoco_board_pick_probe_matrix_summary.json"
     csv_path = output_dir / "so101_mujoco_board_pick_probe_matrix_cases.csv"
     readme_path = output_dir / "README.md"
@@ -1173,6 +1266,14 @@ def main() -> int:
         "development_fixture_evidence_not_physical_so101_truth": True,
         "development_fixture_evidence_not_policy_training_truth": True,
         "ready_for_model_backed_ik": False,
+        "ik_provenance_status": "seeded_source_pose_not_reviewed_model_backed_ik",
+        "ik_solution_source": "seeded_joint_targets",
+        "ik_review_status": "not_reviewed_model_backed_ik",
+        "seeded_ik_case_count": len(seeded_ik_cases),
+        "reviewed_model_backed_ik_case_count": len(reviewed_ik_cases),
+        "ik_authority_blocker_action_ids": [
+            "repeat_board_pick_with_reviewed_model_backed_ik"
+        ],
         "ready_for_policy_training": False,
         "hardware_skipped": True,
         "gui_skipped": True,
@@ -1193,6 +1294,10 @@ def main() -> int:
         "verified_pick_place_case_ids": [case["case_id"] for case in verified_cases],
         "expected_gap_case_ids": [case["case_id"] for case in expected_gap_cases],
         "invalid_task_case_ids": [case["case_id"] for case in invalid_task_cases],
+        "seeded_ik_case_ids": [case["case_id"] for case in seeded_ik_cases],
+        "reviewed_model_backed_ik_case_ids": [
+            case["case_id"] for case in reviewed_ik_cases
+        ],
         "cases": cases,
         "artifacts": {
             "summary_json": str(summary_path),
