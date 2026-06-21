@@ -564,13 +564,15 @@ jobs:
           assert external_decision["candidate_operator_intake_decision_status"] == "candidate_intake_decision_recorded_not_authority", external_decision
           assert external_decision["candidate_operator_intake_selected_option"] == "external_pinned_source_root", external_decision
           assert external_decision["candidate_operator_command_plan_status"] == "candidate_operator_commands_ready_for_pinned_source_review", external_decision
-          assert external_decision["candidate_operator_command_plan_selected_option_command_count"] == 7, external_decision
+          assert external_decision["candidate_operator_command_plan_selected_option_command_count"] == 8, external_decision
           assert external_decision["candidate_operator_intake_option_count"] == 2, external_decision
-          assert external_decision["candidate_operator_intake_selected_requirement_count"] == 4, external_decision
+          assert external_decision["candidate_operator_intake_selected_requirement_count"] == 6, external_decision
           assert external_decision["candidate_operator_intake_selected_requirement_ids"] == [
               "external_checkout_path_declared",
               "external_upstream_commit_pinned",
               "external_file_digest_lock_reviewed",
+              "external_gripper_mapping_reviewed",
+              "external_collision_policy_reviewed",
               "external_reviewed_bundle_manifest_supplied",
           ], external_decision
           assert external_decision["ready_for_model_backed_ik"] is False, external_decision
@@ -583,14 +585,16 @@ jobs:
           assert vendor_decision["candidate_operator_intake_decision_status"] == "candidate_intake_decision_recorded_not_authority", vendor_decision
           assert vendor_decision["candidate_operator_intake_selected_option"] == "vendor_locked_bundle", vendor_decision
           assert vendor_decision["candidate_operator_command_plan_status"] == "candidate_operator_commands_ready_for_pinned_source_review", vendor_decision
-          assert vendor_decision["candidate_operator_command_plan_selected_option_command_count"] == 5, vendor_decision
+          assert vendor_decision["candidate_operator_command_plan_selected_option_command_count"] == 6, vendor_decision
           assert vendor_decision["candidate_operator_intake_option_count"] == 2, vendor_decision
-          assert vendor_decision["candidate_operator_intake_selected_requirement_count"] == 5, vendor_decision
+          assert vendor_decision["candidate_operator_intake_selected_requirement_count"] == 7, vendor_decision
           assert vendor_decision["candidate_operator_intake_selected_requirement_ids"] == [
               "vendor_import_path_declared",
               "vendor_upstream_commit_pinned",
               "vendor_license_provenance_reviewed",
               "vendor_file_digest_manifest_reviewed",
+              "vendor_gripper_mapping_reviewed",
+              "vendor_collision_policy_reviewed",
               "vendor_reviewed_bundle_manifest_supplied",
           ], vendor_decision
           assert vendor_decision["ready_for_model_backed_ik"] is False, vendor_decision
@@ -5657,6 +5661,8 @@ jobs:
                       "external_checkout_path_declared",
                       "external_upstream_commit_pinned",
                       "external_file_digest_lock_reviewed",
+                      "external_gripper_mapping_reviewed",
+                      "external_collision_policy_reviewed",
                       "external_reviewed_bundle_manifest_supplied",
                   ],
                   "vendor_locked_bundle": [
@@ -5664,12 +5670,14 @@ jobs:
                       "vendor_upstream_commit_pinned",
                       "vendor_license_provenance_reviewed",
                       "vendor_file_digest_manifest_reviewed",
+                      "vendor_gripper_mapping_reviewed",
+                      "vendor_collision_policy_reviewed",
                       "vendor_reviewed_bundle_manifest_supplied",
                   ],
               }, metrics
               assert metrics.get("public_candidate_recorded_operator_intake_selected_requirement_counts_by_option") == {
-                  "external_pinned_source_root": 4,
-                  "vendor_locked_bundle": 5,
+                  "external_pinned_source_root": 6,
+                  "vendor_locked_bundle": 7,
               }, metrics
               assert metrics.get("operator_action_status") in {
                   "operator_actions_ready_for_reviewed_model_authority_follow_up",
