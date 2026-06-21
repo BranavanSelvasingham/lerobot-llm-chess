@@ -94,6 +94,14 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "physical_authority_contract_ok",
         "physical_authority_contract_errors",
         "physical_authority_contract_fixture_ready_not_physical_so101_authority",
+        "candidate_handoff_context_status",
+        "candidate_handoff_context_model_authority",
+        "candidate_handoff_context_field_ids",
+        "candidate_handoff_context_locations_by_field",
+        "candidate_handoff_context_digest_authority_boundary",
+        "candidate_handoff_context_digest_row_count",
+        "candidate_handoff_context_digest_expected_file_count",
+        "candidate_handoff_context_digest_extra_lockable_file_count",
         "model_path_status",
         "model_path_suffix",
         "model_path_supported_suffix",
@@ -1080,6 +1088,18 @@ def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
                 "mesh_assets_status": "needs_review",
                 "missing_inputs": ["mesh_asset_authority"],
                 "next_actions": ["record_mesh_asset_authority"],
+                "candidate_handoff_context_status": (
+                    "candidate_handoff_context_present"
+                ),
+                "candidate_handoff_context_field_ids": [
+                    "candidate_source_lock_digest_handoff"
+                ],
+                "candidate_handoff_context_digest_authority_boundary": (
+                    "candidate_source_lock_digest_not_authority"
+                ),
+                "candidate_handoff_context_digest_row_count": 33,
+                "candidate_handoff_context_digest_expected_file_count": 20,
+                "candidate_handoff_context_digest_extra_lockable_file_count": 13,
             },
         },
         {
@@ -1572,6 +1592,76 @@ def summarize_case(
         physical_authority_contract.get("errors"),
         [],
     )
+    candidate_handoff_context = summary.get("candidate_handoff_context")
+    candidate_handoff_context = (
+        candidate_handoff_context
+        if isinstance(candidate_handoff_context, dict)
+        else {}
+    )
+    if "candidate_handoff_context_status" in expect:
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.status",
+            candidate_handoff_context.get("status"),
+            expect["candidate_handoff_context_status"],
+        )
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.model_authority",
+            candidate_handoff_context.get("model_authority"),
+            "candidate_handoff_context_not_authority",
+        )
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.ready_for_model_backed_ik",
+            candidate_handoff_context.get("ready_for_model_backed_ik"),
+            False,
+        )
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.physical_authority",
+            candidate_handoff_context.get(
+                "observed_evidence_is_physical_so101_authority"
+            ),
+            False,
+        )
+    if "candidate_handoff_context_field_ids" in expect:
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.handoff_field_ids",
+            candidate_handoff_context.get("handoff_field_ids"),
+            expect["candidate_handoff_context_field_ids"],
+        )
+    if "candidate_handoff_context_digest_authority_boundary" in expect:
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.digest_authority_boundary",
+            candidate_handoff_context.get("digest_handoff_authority_boundary"),
+            expect["candidate_handoff_context_digest_authority_boundary"],
+        )
+    if "candidate_handoff_context_digest_row_count" in expect:
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.digest_row_count",
+            candidate_handoff_context.get("digest_handoff_row_count"),
+            expect["candidate_handoff_context_digest_row_count"],
+        )
+    if "candidate_handoff_context_digest_expected_file_count" in expect:
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.digest_expected_file_count",
+            candidate_handoff_context.get("digest_handoff_expected_file_count"),
+            expect["candidate_handoff_context_digest_expected_file_count"],
+        )
+    if "candidate_handoff_context_digest_extra_lockable_file_count" in expect:
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.digest_extra_lockable_file_count",
+            candidate_handoff_context.get(
+                "digest_handoff_extra_lockable_file_count"
+            ),
+            expect["candidate_handoff_context_digest_extra_lockable_file_count"],
+        )
 
     for key, summary_key in (
         ("model_path_status", ("model_path",)),
@@ -2061,6 +2151,32 @@ def summarize_case(
                     "fixture_ready_not_physical_so101_authority"
                 )
             ),
+            "candidate_handoff_context_status": candidate_handoff_context.get(
+                "status"
+            ),
+            "candidate_handoff_context_model_authority": (
+                candidate_handoff_context.get("model_authority")
+            ),
+            "candidate_handoff_context_field_ids": candidate_handoff_context.get(
+                "handoff_field_ids"
+            ),
+            "candidate_handoff_context_locations_by_field": (
+                candidate_handoff_context.get("locations_by_field")
+            ),
+            "candidate_handoff_context_digest_authority_boundary": (
+                candidate_handoff_context.get("digest_handoff_authority_boundary")
+            ),
+            "candidate_handoff_context_digest_row_count": (
+                candidate_handoff_context.get("digest_handoff_row_count")
+            ),
+            "candidate_handoff_context_digest_expected_file_count": (
+                candidate_handoff_context.get("digest_handoff_expected_file_count")
+            ),
+            "candidate_handoff_context_digest_extra_lockable_file_count": (
+                candidate_handoff_context.get(
+                    "digest_handoff_extra_lockable_file_count"
+                )
+            ),
             "model_path_status": nested_status(summary, "model_path"),
             "model_path_suffix": (summary.get("model_path") or {}).get("suffix"),
             "model_path_supported_suffix": (summary.get("model_path") or {}).get(
@@ -2294,6 +2410,30 @@ def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
         ),
         "physical_authority_contract_fixture_ready_not_physical_so101_authority": obs.get(
             "physical_authority_contract_fixture_ready_not_physical_so101_authority"
+        ),
+        "candidate_handoff_context_status": obs.get(
+            "candidate_handoff_context_status"
+        ),
+        "candidate_handoff_context_model_authority": obs.get(
+            "candidate_handoff_context_model_authority"
+        ),
+        "candidate_handoff_context_field_ids": obs.get(
+            "candidate_handoff_context_field_ids"
+        ),
+        "candidate_handoff_context_locations_by_field": obs.get(
+            "candidate_handoff_context_locations_by_field"
+        ),
+        "candidate_handoff_context_digest_authority_boundary": obs.get(
+            "candidate_handoff_context_digest_authority_boundary"
+        ),
+        "candidate_handoff_context_digest_row_count": obs.get(
+            "candidate_handoff_context_digest_row_count"
+        ),
+        "candidate_handoff_context_digest_expected_file_count": obs.get(
+            "candidate_handoff_context_digest_expected_file_count"
+        ),
+        "candidate_handoff_context_digest_extra_lockable_file_count": obs.get(
+            "candidate_handoff_context_digest_extra_lockable_file_count"
         ),
         "model_path_status": obs.get("model_path_status"),
         "model_identity_status": obs.get("model_identity_status"),

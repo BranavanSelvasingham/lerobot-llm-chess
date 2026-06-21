@@ -3207,6 +3207,74 @@ def build_field_checks(
     ]
 
 
+def inspect_candidate_handoff_context(manifest: dict[str, Any] | None) -> dict[str, Any]:
+    manifest = manifest if isinstance(manifest, dict) else {}
+    observed_inputs = manifest.get("observed_inputs")
+    observed_inputs = observed_inputs if isinstance(observed_inputs, dict) else {}
+    handoff_fields = (
+        "candidate_source_lock_digest_handoff",
+        "candidate_operator_intake_handoff",
+        "candidate_review_checklist_handoff",
+    )
+    handoffs: dict[str, Any] = {}
+    locations_by_field: dict[str, list[str]] = {}
+    for field in handoff_fields:
+        field_locations: list[str] = []
+        direct_value = manifest.get(field)
+        observed_value = observed_inputs.get(field)
+        if isinstance(direct_value, dict):
+            handoffs[field] = direct_value
+            field_locations.append("manifest")
+        if isinstance(observed_value, dict):
+            handoffs.setdefault(field, observed_value)
+            field_locations.append("observed_inputs")
+        if field_locations:
+            locations_by_field[field] = field_locations
+    digest_handoff = handoffs.get("candidate_source_lock_digest_handoff")
+    digest_handoff = digest_handoff if isinstance(digest_handoff, dict) else {}
+    operator_handoff = handoffs.get("candidate_operator_intake_handoff")
+    operator_handoff = operator_handoff if isinstance(operator_handoff, dict) else {}
+    checklist_handoff = handoffs.get("candidate_review_checklist_handoff")
+    checklist_handoff = checklist_handoff if isinstance(checklist_handoff, dict) else {}
+    return {
+        "schema": "lerobot.sim.so101_model_bundle_manifest_candidate_handoff_context.v1",
+        "status": (
+            "candidate_handoff_context_present"
+            if handoffs
+            else "candidate_handoff_context_absent"
+        ),
+        "model_authority": "candidate_handoff_context_not_authority",
+        "observed_evidence_is_physical_so101_authority": False,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "handoff_field_ids": sorted(handoffs),
+        "handoff_field_count": len(handoffs),
+        "locations_by_field": locations_by_field,
+        "digest_handoff_authority_boundary": digest_handoff.get("authority_boundary"),
+        "digest_handoff_row_count": digest_handoff.get("digest_row_count"),
+        "digest_handoff_expected_file_count": digest_handoff.get(
+            "expected_file_digest_count"
+        ),
+        "digest_handoff_extra_lockable_file_count": digest_handoff.get(
+            "extra_lockable_file_count"
+        ),
+        "operator_handoff_selected_intake_option_id": operator_handoff.get(
+            "selected_intake_option_id"
+        ),
+        "checklist_handoff_scope_coverage_ready": checklist_handoff.get(
+            "required_review_scope_coverage_ready"
+        ),
+        "checklist_handoff_missing_required_review_scope_ids": checklist_handoff.get(
+            "missing_required_review_scope_ids"
+        ),
+        "authority_boundary": "candidate_handoff_context_not_authority",
+        "notes": [
+            "Candidate handoff fields are review context only and do not satisfy reviewed SO-101 authority.",
+            "Readiness is determined only by reviewed manifest fields and the non-blocking model contract result.",
+        ],
+    }
+
+
 def synthetic_fixture_authority_flags(
     authority: dict[str, Any],
     provenance: dict[str, Any],
@@ -4420,6 +4488,9 @@ def write_markdown(path: Path, summary: dict[str, Any], rows: list[dict[str, Any
         f"- `physical_authority_blockers`: `{'; '.join(summary['physical_authority_blockers']) if summary['physical_authority_blockers'] else 'none'}`",
         f"- `hardware_free_regression_fixture_ready`: `{str(summary['hardware_free_regression_fixture_ready']).lower()}`",
         f"- `synthetic_fixture_authority_fields`: `{'; '.join(summary['synthetic_fixture_authority_fields']) if summary['synthetic_fixture_authority_fields'] else 'none'}`",
+        f"- `candidate_handoff_context_status`: `{summary['candidate_handoff_context']['status']}`",
+        f"- `candidate_handoff_context_model_authority`: `{summary['candidate_handoff_context']['model_authority']}`",
+        f"- `candidate_handoff_context_field_ids`: `{', '.join(summary['candidate_handoff_context']['handoff_field_ids']) if summary['candidate_handoff_context']['handoff_field_ids'] else 'none'}`",
         f"- `manifest_path`: `{summary['manifest_request']['path']}`",
         f"- `model_path`: `{summary['model_path']['path']}`",
         f"- `asset_roots`: `{'; '.join(summary['asset_roots']['asset_roots']) if summary['asset_roots']['asset_roots'] else 'none'}`",
@@ -4593,6 +4664,7 @@ def build_summary(
     gripper_mapping = inspect_gripper_mapping_review(manifest)
     mesh_assets = inspect_mesh_assets(contract, manifest)
     collision_policy = inspect_collision_policy_review(manifest)
+    candidate_handoff_context = inspect_candidate_handoff_context(manifest)
     field_checks = build_field_checks(
         manifest_request,
         model_path,
@@ -4690,6 +4762,7 @@ def build_summary(
         "gripper_mapping": gripper_mapping,
         "mesh_assets": mesh_assets,
         "collision_policy": collision_policy,
+        "candidate_handoff_context": candidate_handoff_context,
         "target_frame": target_frame,
         "tcp_offset": tcp_offset,
         "base_to_board_alignment": alignment,
@@ -4923,6 +4996,15 @@ def main() -> int:
                 "physical_so101_model_authority_ready": summary["physical_so101_model_authority_ready"],
                 "physical_authority_blockers": summary["physical_authority_blockers"],
                 "hardware_free_regression_fixture_ready": summary["hardware_free_regression_fixture_ready"],
+                "candidate_handoff_context_status": summary[
+                    "candidate_handoff_context"
+                ]["status"],
+                "candidate_handoff_context_model_authority": summary[
+                    "candidate_handoff_context"
+                ]["model_authority"],
+                "candidate_handoff_context_field_ids": summary[
+                    "candidate_handoff_context"
+                ]["handoff_field_ids"],
                 "missing_inputs": summary["missing_inputs"],
                 "next_required_for_goal": summary["next_required_for_goal"],
                 "review_packet_status": summary["review_packet_status"],
