@@ -1013,6 +1013,7 @@ def candidate_reviewed_manifest_rerun_plan(summary: dict[str, Any]) -> dict[str,
             "model_bundle_manifest_needs_follow_up"
         ),
         "required_success_conditions": [
+            "selected_checkout_or_vendored_digest_lock_verified_against_pinned_commit",
             "reviewer_replaces_all_placeholders_with_reviewed_values",
             "reviewed_manifest_records_gripper_mapping_authority",
             "reviewed_manifest_records_collision_policy_authority",

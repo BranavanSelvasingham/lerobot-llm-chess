@@ -1571,6 +1571,7 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
     success_conditions = rerun_plan.get("required_success_conditions")
     success_conditions = success_conditions if isinstance(success_conditions, list) else []
     for required_condition in (
+        "selected_checkout_or_vendored_digest_lock_verified_against_pinned_commit",
         "reviewed_manifest_records_gripper_mapping_authority",
         "reviewed_manifest_records_collision_policy_authority",
         "manifest_checker_reports_ready_for_model_backed_ik_true",
