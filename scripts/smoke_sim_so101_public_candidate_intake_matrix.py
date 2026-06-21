@@ -148,6 +148,10 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_operator_intake_selected_requirement_row_ids",
         "candidate_review_checklist_model_authority",
         "candidate_review_checklist_row_count",
+        "candidate_review_checklist_scope_coverage_ready",
+        "candidate_review_checklist_missing_required_review_scope_ids",
+        "candidate_review_checklist_gripper_mapping_direct_action_ids",
+        "candidate_review_checklist_collision_policy_direct_action_ids",
         "candidate_seeded_review_manifest_template_model_authority",
         "candidate_review_observations_parsed_model_file_count",
         "candidate_readme_gripper_mapping_caveat",
@@ -1826,6 +1830,24 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
             "candidate_review_checklist_model_authority"
         ),
         "candidate_review_checklist_row_count": review_checklist.get("row_count"),
+        "candidate_review_checklist_scope_coverage_ready": review_checklist.get(
+            "required_review_scope_coverage_ready"
+        ),
+        "candidate_review_checklist_missing_required_review_scope_ids": (
+            review_checklist.get("missing_required_review_scope_ids")
+        ),
+        "candidate_review_checklist_gripper_mapping_direct_action_ids": (
+            (
+                review_checklist.get("direct_action_ids_by_required_review_scope")
+                or {}
+            ).get("gripper_mapping")
+        ),
+        "candidate_review_checklist_collision_policy_direct_action_ids": (
+            (
+                review_checklist.get("direct_action_ids_by_required_review_scope")
+                or {}
+            ).get("collision_policy")
+        ),
         "candidate_seeded_review_manifest_template_model_authority": summary.get(
             "candidate_seeded_review_manifest_template_model_authority"
         ),
