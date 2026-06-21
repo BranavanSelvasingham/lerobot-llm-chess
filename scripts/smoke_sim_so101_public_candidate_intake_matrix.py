@@ -1540,6 +1540,59 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         errors.append(f"{case_id}.candidate_review_checklist physical authority not false")
     if review_checklist.get("row_count") != 12:
         errors.append(f"{case_id}.candidate_review_checklist.row_count invalid")
+    if review_checklist.get("required_review_scope_coverage_ready") is not True:
+        errors.append(
+            f"{case_id}.candidate_review_checklist.required_review_scope_coverage_ready not true"
+        )
+    if review_checklist.get("missing_required_review_scope_ids") != []:
+        errors.append(
+            f"{case_id}.candidate_review_checklist.missing_required_review_scope_ids not empty"
+        )
+    checklist_required_scopes = review_checklist.get("required_review_scopes")
+    checklist_required_scopes = (
+        checklist_required_scopes
+        if isinstance(checklist_required_scopes, list)
+        else []
+    )
+    checklist_actions_by_scope = review_checklist.get(
+        "action_ids_by_required_review_scope"
+    )
+    checklist_actions_by_scope = (
+        checklist_actions_by_scope
+        if isinstance(checklist_actions_by_scope, dict)
+        else {}
+    )
+    checklist_direct_actions_by_scope = review_checklist.get(
+        "direct_action_ids_by_required_review_scope"
+    )
+    checklist_direct_actions_by_scope = (
+        checklist_direct_actions_by_scope
+        if isinstance(checklist_direct_actions_by_scope, dict)
+        else {}
+    )
+    expected_actions_by_scope = {
+        "gripper_mapping": ["review_gripper_mapping"],
+        "collision_policy": ["review_collision_policy"],
+    }
+    for required_scope, expected_action_ids in expected_actions_by_scope.items():
+        if required_scope not in checklist_required_scopes:
+            errors.append(
+                f"{case_id}.candidate_review_checklist.required_review_scopes missing {required_scope!r}"
+            )
+        expected_all_action_ids = [
+            *expected_action_ids,
+            "rerun_reviewed_bundle_manifest_checker",
+        ]
+        if checklist_actions_by_scope.get(required_scope) != expected_all_action_ids:
+            errors.append(
+                f"{case_id}.candidate_review_checklist.action_ids_by_required_review_scope[{required_scope!r}] "
+                f"expected {expected_all_action_ids!r}, got {checklist_actions_by_scope.get(required_scope)!r}"
+            )
+        if checklist_direct_actions_by_scope.get(required_scope) != expected_action_ids:
+            errors.append(
+                f"{case_id}.candidate_review_checklist.direct_action_ids_by_required_review_scope[{required_scope!r}] "
+                f"expected {expected_action_ids!r}, got {checklist_direct_actions_by_scope.get(required_scope)!r}"
+            )
     checklist_action_ids = review_checklist.get("action_ids")
     checklist_action_ids = checklist_action_ids if isinstance(checklist_action_ids, list) else []
     for required_action_id in (

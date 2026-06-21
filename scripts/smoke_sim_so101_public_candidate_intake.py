@@ -1882,6 +1882,20 @@ def build_candidate_review_checklist(summary: dict[str, Any]) -> dict[str, Any]:
             "authority_boundary": "candidate_review_checklist_not_authority",
         },
     ]
+    action_ids_by_scope: dict[str, list[str]] = {}
+    direct_action_ids_by_scope: dict[str, list[str]] = {}
+    for row in rows:
+        action_id = str(row["action_id"])
+        raw_scopes = str(row.get("required_review_scope") or "")
+        for scope in raw_scopes.split(","):
+            scope = scope.strip()
+            if scope:
+                action_ids_by_scope.setdefault(scope, []).append(action_id)
+                if action_id != "rerun_reviewed_bundle_manifest_checker":
+                    direct_action_ids_by_scope.setdefault(scope, []).append(action_id)
+    missing_required_scopes = [
+        scope for scope in REQUIRED_REVIEW_SCOPES if scope not in action_ids_by_scope
+    ]
     return {
         "schema": "lerobot.sim.so101_public_candidate_review_checklist.v1",
         "ok": True,
@@ -1892,6 +1906,11 @@ def build_candidate_review_checklist(summary: dict[str, Any]) -> dict[str, Any]:
         "ready_for_policy_training": False,
         "row_count": len(rows),
         "action_ids": [str(row["action_id"]) for row in rows],
+        "required_review_scopes": list(REQUIRED_REVIEW_SCOPES),
+        "action_ids_by_required_review_scope": action_ids_by_scope,
+        "direct_action_ids_by_required_review_scope": direct_action_ids_by_scope,
+        "missing_required_review_scope_ids": missing_required_scopes,
+        "required_review_scope_coverage_ready": not missing_required_scopes,
         "rows": rows,
     }
 
