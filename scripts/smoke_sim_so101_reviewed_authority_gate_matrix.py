@@ -390,7 +390,8 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
         "external_checkout_path_declared",
         "external_upstream_commit_pinned",
         "external_file_digest_lock_reviewed",
-        "external_simulation_caveats_reviewed",
+        "external_gripper_mapping_reviewed",
+        "external_collision_policy_reviewed",
         "external_reviewed_bundle_manifest_supplied",
     ]
     vendor_requirement_ids = [
@@ -398,7 +399,8 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
         "vendor_upstream_commit_pinned",
         "vendor_license_provenance_reviewed",
         "vendor_file_digest_manifest_reviewed",
-        "vendor_simulation_caveats_reviewed",
+        "vendor_gripper_mapping_reviewed",
+        "vendor_collision_policy_reviewed",
         "vendor_reviewed_bundle_manifest_supplied",
     ]
     review_handoff_artifacts = [
@@ -926,7 +928,8 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                         "external_checkout_path_declared",
                         "external_upstream_commit_pinned",
                         "external_file_digest_lock_reviewed",
-                        "external_simulation_caveats_reviewed",
+                        "external_gripper_mapping_reviewed",
+                        "external_collision_policy_reviewed",
                         "external_reviewed_bundle_manifest_supplied",
                     ],
                     "vendor_locked_bundle": [
@@ -934,13 +937,14 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                         "vendor_upstream_commit_pinned",
                         "vendor_license_provenance_reviewed",
                         "vendor_file_digest_manifest_reviewed",
-                        "vendor_simulation_caveats_reviewed",
+                        "vendor_gripper_mapping_reviewed",
+                        "vendor_collision_policy_reviewed",
                         "vendor_reviewed_bundle_manifest_supplied",
                     ],
                 },
                 "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option": {
-                    "external_pinned_source_root": 5,
-                    "vendor_locked_bundle": 6,
+                    "external_pinned_source_root": 6,
+                    "vendor_locked_bundle": 7,
                 },
                 "public_candidate_recorded_operator_command_selected_command_counts_by_option": {
                     "external_pinned_source_root": 8,

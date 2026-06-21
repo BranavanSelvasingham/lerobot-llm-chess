@@ -505,12 +505,13 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "operator_plan_status": "candidate_locked_operator_decision_required",
                 "operator_decision_status": "candidate_intake_decision_recorded_not_authority",
                 "selected_intake_option_id": "external_pinned_source_root",
-                "selected_requirement_count": 5,
+                "selected_requirement_count": 6,
                 "selected_requirement_ids": [
                     "external_checkout_path_declared",
                     "external_upstream_commit_pinned",
                     "external_file_digest_lock_reviewed",
-                    "external_simulation_caveats_reviewed",
+                    "external_gripper_mapping_reviewed",
+                    "external_collision_policy_reviewed",
                     "external_reviewed_bundle_manifest_supplied",
                 ],
             },
@@ -548,13 +549,14 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "operator_plan_status": "candidate_locked_operator_decision_required",
                 "operator_decision_status": "candidate_intake_decision_recorded_not_authority",
                 "selected_intake_option_id": "vendor_locked_bundle",
-                "selected_requirement_count": 6,
+                "selected_requirement_count": 7,
                 "selected_requirement_ids": [
                     "vendor_import_path_declared",
                     "vendor_upstream_commit_pinned",
                     "vendor_license_provenance_reviewed",
                     "vendor_file_digest_manifest_reviewed",
-                    "vendor_simulation_caveats_reviewed",
+                    "vendor_gripper_mapping_reviewed",
+                    "vendor_collision_policy_reviewed",
                     "vendor_reviewed_bundle_manifest_supplied",
                 ],
             },
@@ -851,6 +853,23 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         errors.append(
             f"{case_id}.candidate_seeded_review_manifest_template.physical authority not false"
         )
+    summary_required_scopes = summary.get("review_required_scopes")
+    summary_required_scopes = (
+        summary_required_scopes if isinstance(summary_required_scopes, list) else []
+    )
+    seeded_required_scopes = seeded_template.get("review_required_scopes")
+    seeded_required_scopes = (
+        seeded_required_scopes if isinstance(seeded_required_scopes, list) else []
+    )
+    for required_scope in ("gripper_mapping", "collision_policy"):
+        if required_scope not in summary_required_scopes:
+            errors.append(
+                f"{case_id}.review_required_scopes missing {required_scope!r}"
+            )
+        if required_scope not in seeded_required_scopes:
+            errors.append(
+                f"{case_id}.candidate_seeded_review_manifest_template.review_required_scopes missing {required_scope!r}"
+            )
     source_lock = summary.get("candidate_source_lock")
     source_lock = source_lock if isinstance(source_lock, dict) else {}
     expected_source_lock_ready = bool(
@@ -1199,7 +1218,7 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         errors.append(
             f"{case_id}.candidate_operator_intake_requirement_model_authority invalid"
         )
-    expected_requirement_row_count = 11
+    expected_requirement_row_count = 13
     if summary.get("candidate_operator_intake_requirement_row_count") != expected_requirement_row_count:
         errors.append(
             f"{case_id}.candidate_operator_intake_requirement_row_count invalid"
@@ -1519,14 +1538,17 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         errors.append(f"{case_id}.candidate_review_checklist.ready_for_model_backed_ik not false")
     if review_checklist.get("observed_evidence_is_physical_so101_authority") is not False:
         errors.append(f"{case_id}.candidate_review_checklist physical authority not false")
-    if review_checklist.get("row_count") != 10:
+    if review_checklist.get("row_count") != 12:
         errors.append(f"{case_id}.candidate_review_checklist.row_count invalid")
     checklist_action_ids = review_checklist.get("action_ids")
     checklist_action_ids = checklist_action_ids if isinstance(checklist_action_ids, list) else []
     for required_action_id in (
         "pin_upstream_soarm100_commit",
         "select_single_authoritative_model_variant",
-        "review_joint_limits_and_gripper_mapping",
+        "review_mesh_paths",
+        "review_collision_policy",
+        "review_joint_limits",
+        "review_gripper_mapping",
         "review_target_frame_authority",
         "review_tcp_offset_authority",
         "review_base_to_board_alignment_authority",

@@ -245,9 +245,10 @@ bundle fields.
 
 The review checklist is the operator queue for that replacement work. It covers
 pinning the upstream commit, locking file digests, selecting one model variant,
-reviewing source/license/export provenance, reviewing mesh/collision policy,
-reviewing joint limits and gripper mapping, reviewing target-frame/TCP/base
-alignment, and rerunning the reviewed bundle manifest checker. It reports
+reviewing source/license/export provenance, reviewing mesh paths, reviewing
+collision policy, reviewing joint limits, reviewing gripper mapping, reviewing
+target-frame/TCP/base alignment, and rerunning the reviewed bundle manifest
+checker. It reports
 `candidate_review_checklist_not_authority`, false physical SO-101 authority,
 and `ready_for_model_backed_ik: false`; it is an intake checklist, not a model
 approval.

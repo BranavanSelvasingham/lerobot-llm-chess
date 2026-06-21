@@ -33,6 +33,8 @@ REQUIRED_REVIEW_SCOPES = (
     "license",
     "mesh_assets",
     "joint_limits",
+    "gripper_mapping",
+    "collision_policy",
     "target_frame",
     "tcp_offset",
     "base_to_board_alignment",
@@ -630,10 +632,16 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
                 "manifest_or_review_field": "mesh_asset_authority",
             },
             {
-                "requirement_id": "external_simulation_caveats_reviewed",
-                "title": "Review SO-ARM100 simulation caveats",
-                "required_evidence": "review record resolving the README gripper linear-joint mapping caveat and removed base collision mesh policy",
-                "manifest_or_review_field": "gripper_mapping_authority,collision_policy_authority",
+                "requirement_id": "external_gripper_mapping_reviewed",
+                "title": "Review SO-ARM100 gripper mapping caveat",
+                "required_evidence": "review record resolving the README gripper linear-joint mapping caveat",
+                "manifest_or_review_field": "gripper_mapping_authority",
+            },
+            {
+                "requirement_id": "external_collision_policy_reviewed",
+                "title": "Review SO-ARM100 collision policy caveat",
+                "required_evidence": "review record resolving the removed base collision mesh policy",
+                "manifest_or_review_field": "collision_policy_authority",
             },
             {
                 "requirement_id": "external_reviewed_bundle_manifest_supplied",
@@ -668,10 +676,16 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
                 "manifest_or_review_field": "mesh_asset_authority",
             },
             {
-                "requirement_id": "vendor_simulation_caveats_reviewed",
-                "title": "Review vendored simulation caveats",
-                "required_evidence": "review record resolving the README gripper linear-joint mapping caveat and removed base collision mesh policy for the vendored subset",
-                "manifest_or_review_field": "gripper_mapping_authority,collision_policy_authority",
+                "requirement_id": "vendor_gripper_mapping_reviewed",
+                "title": "Review vendored gripper mapping caveat",
+                "required_evidence": "review record resolving the README gripper linear-joint mapping caveat for the vendored subset",
+                "manifest_or_review_field": "gripper_mapping_authority",
+            },
+            {
+                "requirement_id": "vendor_collision_policy_reviewed",
+                "title": "Review vendored collision policy caveat",
+                "required_evidence": "review record resolving the removed base collision mesh policy for the vendored subset",
+                "manifest_or_review_field": "collision_policy_authority",
             },
             {
                 "requirement_id": "vendor_reviewed_bundle_manifest_supplied",
@@ -1732,17 +1746,15 @@ def build_candidate_review_checklist(summary: dict[str, Any]) -> dict[str, Any]:
         },
         {
             "priority": 5,
-            "action_id": "review_mesh_paths_and_collision_policy",
+            "action_id": "review_mesh_paths",
             "gate": "reviewed_model_authority",
             "status": checklist_status(
                 caveats.get("relative_mesh_paths_declared") is True
-                or caveats.get("base_collision_meshes_removed") is True
             ),
-            "title": "Review mesh paths and collision policy",
-            "detail": "Confirm relative mesh paths, digest coverage, removed base collision meshes, and MuJoCo collision implications.",
+            "title": "Review mesh paths and digest coverage",
+            "detail": "Confirm relative mesh paths, asset roots, and digest coverage for the selected SO-101 bundle.",
             "candidate_observation": {
                 "relative_mesh_paths_declared": caveats.get("relative_mesh_paths_declared"),
-                "base_collision_meshes_removed": caveats.get("base_collision_meshes_removed"),
             },
             "required_review_scope": "mesh_assets",
             "manifest_fields": ["asset_roots", "mesh_asset_authority"],
@@ -1750,27 +1762,57 @@ def build_candidate_review_checklist(summary: dict[str, Any]) -> dict[str, Any]:
         },
         {
             "priority": 6,
-            "action_id": "review_joint_limits_and_gripper_mapping",
+            "action_id": "review_collision_policy",
+            "gate": "reviewed_model_authority",
+            "status": checklist_status(
+                caveats.get("base_collision_meshes_removed") is True
+            ),
+            "title": "Review collision policy",
+            "detail": "Resolve the removed base collision mesh caveat and record the accepted MuJoCo collision policy.",
+            "candidate_observation": {
+                "base_collision_meshes_removed": caveats.get("base_collision_meshes_removed"),
+            },
+            "required_review_scope": "collision_policy",
+            "manifest_fields": ["collision_policy_authority"],
+            "authority_boundary": "candidate_review_checklist_not_authority",
+        },
+        {
+            "priority": 7,
+            "action_id": "review_joint_limits",
             "gate": "reviewed_model_authority",
             "status": checklist_status(parsed_model_file_count > 0),
-            "title": "Review joint limits and gripper mapping",
-            "detail": "Compare parsed joint/range metadata with physical SO-101 limits and resolve the LeRobot gripper linear-joint mapping caveat.",
+            "title": "Review joint limits",
+            "detail": "Compare parsed joint/range metadata with reviewed physical SO-101 limits.",
             "candidate_observation": {
                 "parsed_model_file_count": parsed_model_file_count,
-                "gripper_linear_joint_mapping_not_reflected": caveats.get(
-                    "gripper_linear_joint_mapping_not_reflected"
-                ),
             },
             "required_review_scope": "joint_limits",
             "manifest_fields": [
                 "joint_limits_deg",
                 "joint_limit_authority",
-                "gripper_mapping_authority",
             ],
             "authority_boundary": "candidate_review_checklist_not_authority",
         },
         {
-            "priority": 7,
+            "priority": 8,
+            "action_id": "review_gripper_mapping",
+            "gate": "reviewed_model_authority",
+            "status": checklist_status(
+                caveats.get("gripper_linear_joint_mapping_not_reflected") is True
+            ),
+            "title": "Review gripper mapping",
+            "detail": "Resolve the LeRobot gripper linear-joint mapping caveat before trusting model-backed gripper motion.",
+            "candidate_observation": {
+                "gripper_linear_joint_mapping_not_reflected": caveats.get(
+                    "gripper_linear_joint_mapping_not_reflected"
+                ),
+            },
+            "required_review_scope": "gripper_mapping",
+            "manifest_fields": ["gripper_mapping_authority"],
+            "authority_boundary": "candidate_review_checklist_not_authority",
+        },
+        {
+            "priority": 9,
             "action_id": "review_target_frame_authority",
             "gate": "reviewed_model_authority",
             "status": "missing_review_input",
@@ -1788,7 +1830,7 @@ def build_candidate_review_checklist(summary: dict[str, Any]) -> dict[str, Any]:
             "authority_boundary": "candidate_review_checklist_not_authority",
         },
         {
-            "priority": 8,
+            "priority": 10,
             "action_id": "review_tcp_offset_authority",
             "gate": "reviewed_model_authority",
             "status": "missing_review_input",
@@ -1806,7 +1848,7 @@ def build_candidate_review_checklist(summary: dict[str, Any]) -> dict[str, Any]:
             "authority_boundary": "candidate_review_checklist_not_authority",
         },
         {
-            "priority": 9,
+            "priority": 11,
             "action_id": "review_base_to_board_alignment_authority",
             "gate": "reviewed_model_authority",
             "status": "missing_review_input",
@@ -1823,7 +1865,7 @@ def build_candidate_review_checklist(summary: dict[str, Any]) -> dict[str, Any]:
             "authority_boundary": "candidate_review_checklist_not_authority",
         },
         {
-            "priority": 10,
+            "priority": 12,
             "action_id": "rerun_reviewed_bundle_manifest_checker",
             "gate": "reviewed_model_authority",
             "status": "blocked",
