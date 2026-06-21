@@ -479,6 +479,8 @@ def public_candidate_source_lock_ready(output_dir: Path) -> dict[str, Any]:
     )
     rerun_success_conditions = [
         "reviewer_replaces_all_placeholders_with_reviewed_values",
+        "reviewed_manifest_records_gripper_mapping_authority",
+        "reviewed_manifest_records_collision_policy_authority",
         "manifest_checker_reports_ready_for_model_backed_ik_true",
         "manifest_checker_reports_physical_so101_model_authority_ready_true",
         "reviewed_mujoco_bundle_gate_loads_model_and_proves_joint_motion",
@@ -1003,6 +1005,8 @@ def case_specs(output_dir: Path) -> list[dict[str, Any]]:
                 ),
                 "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready": True,
                 "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions_contains": [
+                    "reviewed_manifest_records_gripper_mapping_authority",
+                    "reviewed_manifest_records_collision_policy_authority",
                     "manifest_checker_reports_physical_so101_model_authority_ready_true",
                     "reviewed_mujoco_bundle_gate_loads_model_and_proves_joint_motion",
                 ],
