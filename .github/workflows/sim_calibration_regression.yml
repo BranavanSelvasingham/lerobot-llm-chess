@@ -5087,6 +5087,12 @@ jobs:
               and row.get("exists") is True
               for row in artifacts_by_category["so101_public_candidate_intake_matrix"]
           ), artifacts_by_category["so101_public_candidate_intake_matrix"]
+          assert any(
+              row.get("label") == "so101_public_candidate_intake_matrix:candidate_intake_checked_external_decision:reviewed_manifest_rerun_plan"
+              and row.get("kind") == "json"
+              and row.get("exists") is True
+              for row in artifacts_by_category["so101_public_candidate_intake_matrix"]
+          ), artifacts_by_category["so101_public_candidate_intake_matrix"]
           for row in artifacts_by_category["so101_public_candidate_intake_matrix"]:
               metrics = row.get("metrics", {})
               assert metrics.get("model_authority") == "public_candidate_intake_matrix_not_authority", metrics
@@ -5161,29 +5167,37 @@ jobs:
               assert metrics.get("candidate_intake_unpinned_commit_ref_operator_intake_plan_status") == "candidate_operator_intake_inputs_incomplete", metrics
               assert metrics.get("candidate_intake_unpinned_commit_ref_operator_intake_decision_status") == "vendor_or_external_intake_not_declared", metrics
               assert metrics.get("candidate_intake_checked_operator_intake_requirement_model_authority") == "candidate_operator_intake_requirement_not_authority", metrics
-              assert metrics.get("candidate_intake_checked_operator_intake_requirement_row_count") == 9, metrics
+              assert metrics.get("candidate_intake_checked_operator_intake_requirement_row_count") == 13, metrics
               assert metrics.get("candidate_intake_checked_operator_intake_selected_requirement_row_count") == 0, metrics
-              assert metrics.get("candidate_intake_checked_operator_intake_unselected_requirement_row_count") == 9, metrics
+              assert metrics.get("candidate_intake_checked_operator_intake_unselected_requirement_row_count") == 13, metrics
               assert metrics.get("candidate_intake_checked_operator_intake_selected_requirement_row_ids") == [], metrics
+              assert metrics.get("candidate_intake_checked_reviewed_manifest_rerun_plan_model_authority") == "candidate_reviewed_manifest_rerun_plan_not_authority", metrics
+              assert metrics.get("candidate_intake_checked_reviewed_manifest_rerun_plan_status") == "candidate_reviewed_manifest_rerun_plan_blocked", metrics
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_plan_model_authority") == "candidate_operator_intake_plan_not_authority", metrics
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_decision_status") == "candidate_intake_decision_recorded_not_authority", metrics
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_option") == "external_pinned_source_root", metrics
-              assert metrics.get("candidate_intake_checked_external_decision_operator_command_plan_selected_option_command_count") == 7, metrics
-              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_requirement_count") == 4, metrics
+              assert metrics.get("candidate_intake_checked_external_decision_operator_command_plan_selected_option_command_count") == 8, metrics
+              assert metrics.get("candidate_intake_checked_external_decision_reviewed_manifest_rerun_plan_model_authority") == "candidate_reviewed_manifest_rerun_plan_not_authority", metrics
+              assert metrics.get("candidate_intake_checked_external_decision_reviewed_manifest_rerun_plan_status") == "candidate_reviewed_manifest_rerun_plan_ready", metrics
+              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_requirement_count") == 6, metrics
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_requirement_ids") == [
                   "external_checkout_path_declared",
                   "external_upstream_commit_pinned",
                   "external_file_digest_lock_reviewed",
+                  "external_gripper_mapping_reviewed",
+                  "external_collision_policy_reviewed",
                   "external_reviewed_bundle_manifest_supplied",
               ], metrics
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_requirement_model_authority") == "candidate_operator_intake_requirement_not_authority", metrics
-              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_requirement_row_count") == 9, metrics
-              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_requirement_row_count") == 4, metrics
-              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_unselected_requirement_row_count") == 5, metrics
+              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_requirement_row_count") == 13, metrics
+              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_requirement_row_count") == 6, metrics
+              assert metrics.get("candidate_intake_checked_external_decision_operator_intake_unselected_requirement_row_count") == 7, metrics
               assert metrics.get("candidate_intake_checked_external_decision_operator_intake_selected_requirement_row_ids") == [
                   "external_checkout_path_declared",
                   "external_upstream_commit_pinned",
                   "external_file_digest_lock_reviewed",
+                  "external_gripper_mapping_reviewed",
+                  "external_collision_policy_reviewed",
                   "external_reviewed_bundle_manifest_supplied",
               ], metrics
               assert metrics.get("candidate_intake_checked_external_decision_ready_for_model_backed_ik") is False, metrics
@@ -5195,24 +5209,30 @@ jobs:
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_plan_model_authority") == "candidate_operator_intake_plan_not_authority", metrics
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_decision_status") == "candidate_intake_decision_recorded_not_authority", metrics
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_option") == "vendor_locked_bundle", metrics
-              assert metrics.get("candidate_intake_checked_vendor_decision_operator_command_plan_selected_option_command_count") == 5, metrics
-              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_count") == 5, metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_operator_command_plan_selected_option_command_count") == 6, metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_reviewed_manifest_rerun_plan_model_authority") == "candidate_reviewed_manifest_rerun_plan_not_authority", metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_reviewed_manifest_rerun_plan_status") == "candidate_reviewed_manifest_rerun_plan_ready", metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_count") == 7, metrics
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_ids") == [
                   "vendor_import_path_declared",
                   "vendor_upstream_commit_pinned",
                   "vendor_license_provenance_reviewed",
                   "vendor_file_digest_manifest_reviewed",
+                  "vendor_gripper_mapping_reviewed",
+                  "vendor_collision_policy_reviewed",
                   "vendor_reviewed_bundle_manifest_supplied",
               ], metrics
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_requirement_model_authority") == "candidate_operator_intake_requirement_not_authority", metrics
-              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_requirement_row_count") == 9, metrics
-              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_row_count") == 5, metrics
-              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_unselected_requirement_row_count") == 4, metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_requirement_row_count") == 13, metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_row_count") == 7, metrics
+              assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_unselected_requirement_row_count") == 6, metrics
               assert metrics.get("candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_row_ids") == [
                   "vendor_import_path_declared",
                   "vendor_upstream_commit_pinned",
                   "vendor_license_provenance_reviewed",
                   "vendor_file_digest_manifest_reviewed",
+                  "vendor_gripper_mapping_reviewed",
+                  "vendor_collision_policy_reviewed",
                   "vendor_reviewed_bundle_manifest_supplied",
               ], metrics
               assert metrics.get("candidate_intake_checked_vendor_decision_ready_for_model_backed_ik") is False, metrics

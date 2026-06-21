@@ -4275,6 +4275,26 @@ def so101_public_candidate_intake_matrix_section(
             )
             if isinstance(case, dict)
             else None,
+            "candidate_reviewed_manifest_rerun_plan_model_authority": case.get(
+                "candidate_reviewed_manifest_rerun_plan_model_authority"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_reviewed_manifest_rerun_plan_status": case.get(
+                "candidate_reviewed_manifest_rerun_plan_status"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_reviewed_manifest_rerun_plan_selected_option": case.get(
+                "candidate_reviewed_manifest_rerun_plan_selected_option"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_reviewed_manifest_rerun_plan_source_lock_ready": case.get(
+                "candidate_reviewed_manifest_rerun_plan_source_lock_ready"
+            )
+            if isinstance(case, dict)
+            else None,
             "candidate_operator_intake_option_count": case.get(
                 "candidate_operator_intake_option_count"
             )
@@ -4331,6 +4351,9 @@ def so101_public_candidate_intake_matrix_section(
             ),
             "operator_command_plan_json_path": artifacts.get(
                 "candidate_operator_command_plan_json"
+            ),
+            "reviewed_manifest_rerun_plan_json_path": artifacts.get(
+                "candidate_reviewed_manifest_rerun_plan_json"
             ),
         }
 
@@ -4562,6 +4585,26 @@ def so101_public_candidate_intake_matrix_section(
             else None,
             "candidate_operator_command_plan_selected_option_command_count": checked_case.get(
                 "candidate_operator_command_plan_selected_option_command_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_reviewed_manifest_rerun_plan_model_authority": checked_case.get(
+                "candidate_reviewed_manifest_rerun_plan_model_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_reviewed_manifest_rerun_plan_status": checked_case.get(
+                "candidate_reviewed_manifest_rerun_plan_status"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_reviewed_manifest_rerun_plan_selected_option": checked_case.get(
+                "candidate_reviewed_manifest_rerun_plan_selected_option"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_reviewed_manifest_rerun_plan_source_lock_ready": checked_case.get(
+                "candidate_reviewed_manifest_rerun_plan_source_lock_ready"
             )
             if isinstance(checked_case, dict)
             else None,

@@ -27,7 +27,7 @@ CATEGORY_ORDER = {
     "perception_fixture": 13,
     "sim_camera_pose_fixture": 14,
     "so101_model_source_inventory": 15,
-    "so101_public_candidate_intake_matrix": 16,
+    "so101_public_candidate_intake_matrix": 26,
     "so101_reviewed_model_authority_gate": 17,
     "so101_model_bundle_probe": 18,
     "so101_model_bundle_manifest": 19,
@@ -3262,35 +3262,47 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
     matrix = matrix if isinstance(matrix, dict) else {}
     artifact_paths = matrix.get("artifacts")
     artifact_paths = artifact_paths if isinstance(artifact_paths, dict) else {}
-    checked_case = matrix.get("candidate_intake_checked")
-    checked_case = checked_case if isinstance(checked_case, dict) else {}
-    mjcf_model_selection_case = matrix.get("candidate_intake_checked_mjcf_model_selection")
+    matrix_cases = matrix.get("cases")
+    matrix_cases = matrix_cases if isinstance(matrix_cases, list) else []
+    cases_by_id = {
+        str(case.get("case_id")): case
+        for case in matrix_cases
+        if isinstance(case, dict) and case.get("case_id")
+    }
+
+    def matrix_case(case_id: str) -> dict[str, Any]:
+        case = matrix.get(case_id)
+        if isinstance(case, dict):
+            return case
+        case = cases_by_id.get(case_id)
+        return case if isinstance(case, dict) else {}
+
+    checked_case = matrix_case("candidate_intake_checked")
+    mjcf_model_selection_case = matrix_case("candidate_intake_checked_mjcf_model_selection")
     mjcf_model_selection_case = (
         mjcf_model_selection_case
         if isinstance(mjcf_model_selection_case, dict)
         else {}
     )
-    unpinned_commit_case = matrix.get("candidate_intake_unpinned_commit_ref")
+    unpinned_commit_case = matrix_case("candidate_intake_unpinned_commit_ref")
     unpinned_commit_case = (
         unpinned_commit_case if isinstance(unpinned_commit_case, dict) else {}
     )
-    invalid_model_selection_case = matrix.get(
-        "candidate_intake_invalid_model_selection"
-    )
+    invalid_model_selection_case = matrix_case("candidate_intake_invalid_model_selection")
     invalid_model_selection_case = (
         invalid_model_selection_case
         if isinstance(invalid_model_selection_case, dict)
         else {}
     )
-    extra_lockable_case = matrix.get("candidate_intake_extra_lockable_source_file")
+    extra_lockable_case = matrix_case("candidate_intake_extra_lockable_source_file")
     extra_lockable_case = (
         extra_lockable_case if isinstance(extra_lockable_case, dict) else {}
     )
-    external_decision_case = matrix.get("candidate_intake_checked_external_decision")
+    external_decision_case = matrix_case("candidate_intake_checked_external_decision")
     external_decision_case = (
         external_decision_case if isinstance(external_decision_case, dict) else {}
     )
-    vendor_decision_case = matrix.get("candidate_intake_checked_vendor_decision")
+    vendor_decision_case = matrix_case("candidate_intake_checked_vendor_decision")
     vendor_decision_case = (
         vendor_decision_case if isinstance(vendor_decision_case, dict) else {}
     )
@@ -3298,11 +3310,21 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
     recorded_decision_cases = (
         recorded_decision_cases if isinstance(recorded_decision_cases, dict) else {}
     )
-    recorded_decision_options = sorted(
-        key
-        for key, value in recorded_decision_cases.items()
-        if isinstance(key, str) and isinstance(value, dict)
-    )
+    if recorded_decision_cases:
+        recorded_decision_options = sorted(
+            key
+            for key, value in recorded_decision_cases.items()
+            if isinstance(key, str) and isinstance(value, dict)
+        )
+    else:
+        recorded_decision_options = sorted(
+            {
+                str(case.get("candidate_operator_intake_selected_option"))
+                for case in matrix_cases
+                if isinstance(case, dict)
+                and case.get("candidate_operator_intake_selected_option")
+            }
+        )
     child_records = matrix.get("child_records")
     child_records = child_records if isinstance(child_records, list) else []
     metrics = {
@@ -3636,6 +3658,14 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
                 "candidate_operator_command_plan_selected_option_command_count"
             )
         ),
+        "candidate_intake_checked_reviewed_manifest_rerun_plan_status": (
+            checked_case.get("candidate_reviewed_manifest_rerun_plan_status")
+        ),
+        "candidate_intake_checked_reviewed_manifest_rerun_plan_model_authority": (
+            checked_case.get(
+                "candidate_reviewed_manifest_rerun_plan_model_authority"
+            )
+        ),
         "candidate_intake_checked_operator_intake_option_count": checked_case.get(
             "candidate_operator_intake_option_count"
         ),
@@ -3679,6 +3709,14 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "candidate_intake_checked_external_decision_operator_command_plan_selected_option_command_count": (
             external_decision_case.get(
                 "candidate_operator_command_plan_selected_option_command_count"
+            )
+        ),
+        "candidate_intake_checked_external_decision_reviewed_manifest_rerun_plan_status": (
+            external_decision_case.get("candidate_reviewed_manifest_rerun_plan_status")
+        ),
+        "candidate_intake_checked_external_decision_reviewed_manifest_rerun_plan_model_authority": (
+            external_decision_case.get(
+                "candidate_reviewed_manifest_rerun_plan_model_authority"
             )
         ),
         "candidate_intake_checked_external_decision_operator_intake_selected_requirement_count": (
@@ -3741,6 +3779,14 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
         "candidate_intake_checked_vendor_decision_operator_command_plan_selected_option_command_count": (
             vendor_decision_case.get(
                 "candidate_operator_command_plan_selected_option_command_count"
+            )
+        ),
+        "candidate_intake_checked_vendor_decision_reviewed_manifest_rerun_plan_status": (
+            vendor_decision_case.get("candidate_reviewed_manifest_rerun_plan_status")
+        ),
+        "candidate_intake_checked_vendor_decision_reviewed_manifest_rerun_plan_model_authority": (
+            vendor_decision_case.get(
+                "candidate_reviewed_manifest_rerun_plan_model_authority"
             )
         ),
         "candidate_intake_checked_vendor_decision_operator_intake_selected_requirement_count": (
@@ -3893,6 +3939,20 @@ def collect_so101_public_candidate_intake_matrix_artifacts(
             source=(
                 "so101_public_candidate_intake_matrix.child_records."
                 f"{case_id}.artifacts.candidate_operator_command_plan_json"
+            ),
+            metrics=case_metrics,
+        )
+        add_path(
+            artifacts,
+            category="so101_public_candidate_intake_matrix",
+            label=f"so101_public_candidate_intake_matrix:{case_id}:reviewed_manifest_rerun_plan",
+            value=record_artifacts.get("candidate_reviewed_manifest_rerun_plan_json"),
+            suite_summary_path=suite_summary_path,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            source=(
+                "so101_public_candidate_intake_matrix.child_records."
+                f"{case_id}.artifacts.candidate_reviewed_manifest_rerun_plan_json"
             ),
             metrics=case_metrics,
         )

@@ -919,6 +919,87 @@ def attach_operator_intake_handoff_to_seeded_template(
     return handoff
 
 
+def candidate_reviewed_manifest_rerun_plan(summary: dict[str, Any]) -> dict[str, Any]:
+    artifacts = summary.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    source_lock = summary.get("candidate_source_lock")
+    source_lock = source_lock if isinstance(source_lock, dict) else {}
+    operator_plan = summary.get("candidate_operator_intake_plan")
+    operator_plan = operator_plan if isinstance(operator_plan, dict) else {}
+    operator_handoff = summary.get("candidate_operator_intake_handoff")
+    operator_handoff = operator_handoff if isinstance(operator_handoff, dict) else {}
+    selected_requirement_ids = operator_plan.get(
+        "selected_option_review_requirement_ids"
+    )
+    selected_requirement_ids = (
+        selected_requirement_ids if isinstance(selected_requirement_ids, list) else []
+    )
+    source_lock_ready = source_lock.get("source_lock_ready_for_review") is True
+    decision_recorded = (
+        operator_plan.get("decision_status")
+        == "candidate_intake_decision_recorded_not_authority"
+    )
+    direct_manifest_template_json = artifacts.get(
+        "candidate_direct_review_manifest_template_json"
+    )
+    reviewed_manifest_path = (
+        "<reviewed-edited-copy-of-"
+        "so101_public_candidate_review_manifest_template.direct.json>"
+    )
+    checker_output_dir = (
+        "/private/tmp/lerobot_sim/so101_model_bundle_manifest_reviewed_candidate"
+    )
+    command = [
+        "python",
+        "scripts/smoke_sim_so101_model_bundle_manifest.py",
+        "--manifest-path",
+        reviewed_manifest_path,
+        "--output-dir",
+        checker_output_dir,
+        "--python",
+        "<python-executable>",
+    ]
+    ready_for_operator_review = bool(source_lock_ready and decision_recorded)
+    return {
+        "schema": "lerobot.sim.so101_public_candidate_reviewed_manifest_rerun_plan.v1",
+        "status": (
+            "candidate_reviewed_manifest_rerun_plan_ready"
+            if ready_for_operator_review
+            else "candidate_reviewed_manifest_rerun_plan_blocked"
+        ),
+        "model_authority": "candidate_reviewed_manifest_rerun_plan_not_authority",
+        "observed_evidence_is_physical_so101_authority": False,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "source_lock_ready_for_review": source_lock_ready,
+        "operator_intake_decision_status": operator_plan.get("decision_status"),
+        "selected_intake_option_id": operator_plan.get("selected_intake_option_id"),
+        "selected_option_review_requirement_ids": selected_requirement_ids,
+        "selected_option_command_count": operator_handoff.get(
+            "selected_option_command_count"
+        ),
+        "direct_review_manifest_template_json": direct_manifest_template_json,
+        "reviewed_manifest_path_placeholder": reviewed_manifest_path,
+        "manifest_checker_command_template": command,
+        "expected_manifest_checker_status_before_review": (
+            "model_bundle_manifest_needs_follow_up"
+        ),
+        "required_success_conditions": [
+            "reviewer_replaces_all_placeholders_with_reviewed_values",
+            "manifest_checker_reports_ready_for_model_backed_ik_true",
+            "manifest_checker_reports_physical_so101_model_authority_ready_true",
+            "reviewed_mujoco_bundle_gate_loads_model_and_proves_joint_motion",
+        ],
+        "authority_boundary": "candidate_reviewed_manifest_rerun_plan_not_authority",
+        "review_instruction": (
+            "Use this as the handoff from public-candidate intake to the "
+            "reviewed bundle manifest checker. It does not execute the command "
+            "and does not promote candidate observations to reviewed SO-101 "
+            "model authority."
+        ),
+    }
+
+
 def candidate_review_checklist_handoff(summary: dict[str, Any]) -> dict[str, Any]:
     checklist = summary.get("candidate_review_checklist")
     checklist = checklist if isinstance(checklist, dict) else {}
@@ -2256,6 +2337,9 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `candidate_operator_intake_selected_option`: `{summary['candidate_operator_intake_plan'].get('selected_intake_option_id') or 'none'}`",
         f"- `candidate_operator_command_plan_model_authority`: `{summary['candidate_operator_command_plan_model_authority']}`",
         f"- `candidate_operator_command_plan_status`: `{summary['candidate_operator_command_plan_status']}`",
+        f"- `candidate_reviewed_manifest_rerun_plan_model_authority`: `{summary['candidate_reviewed_manifest_rerun_plan_model_authority']}`",
+        f"- `candidate_reviewed_manifest_rerun_plan_status`: `{summary['candidate_reviewed_manifest_rerun_plan_status']}`",
+        f"- `candidate_reviewed_manifest_rerun_plan_selected_option`: `{summary['candidate_reviewed_manifest_rerun_plan'].get('selected_intake_option_id') or 'none'}`",
         f"- `candidate_operator_intake_handoff_model_authority`: `{summary['candidate_operator_intake_handoff_model_authority']}`",
         f"- `candidate_operator_intake_handoff_selected_option`: `{summary['candidate_operator_intake_handoff'].get('selected_intake_option_id') or 'none'}`",
         f"- `candidate_operator_intake_handoff_selected_requirement_ids`: `{', '.join(summary['candidate_operator_intake_handoff'].get('selected_option_review_requirement_ids') or []) if summary['candidate_operator_intake_handoff'].get('selected_option_review_requirement_ids') else 'none'}`",
@@ -2286,6 +2370,7 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- `candidate_review_checklist_csv`: `{summary['artifacts']['candidate_review_checklist_csv']}`",
         f"- `candidate_operator_intake_plan_json`: `{summary['artifacts']['candidate_operator_intake_plan_json']}`",
         f"- `candidate_operator_command_plan_json`: `{summary['artifacts']['candidate_operator_command_plan_json']}`",
+        f"- `candidate_reviewed_manifest_rerun_plan_json`: `{summary['artifacts']['candidate_reviewed_manifest_rerun_plan_json']}`",
         f"- `candidate_operator_intake_requirements_csv`: `{summary['artifacts']['candidate_operator_intake_requirements_csv']}`",
         "",
         "## Next Required Actions",
@@ -2319,6 +2404,8 @@ def write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "The `candidate_operator_command_plan` JSON records explicit clone/fetch/checkout/intake/checker command steps for a pinned upstream checkout or vendored subset. The commands are not executed by this smoke and remain non-authoritative.",
             "",
             "The command plan also carries selected review requirement IDs, handoff artifact paths, and authority blockers so reviewers can trace digest, license/provenance, manifest, and reviewed-MuJoCo prerequisites without treating the plan as authority.",
+            "",
+            "The `candidate_reviewed_manifest_rerun_plan` JSON is the machine-readable bridge from the selected candidate intake option to `scripts/smoke_sim_so101_model_bundle_manifest.py`. It records the reviewed-manifest placeholder path, command template, and success conditions while staying non-authoritative.",
             "",
             "The `candidate_operator_intake_handoff` is copied into the seeded and direct manifest templates to preserve the selected external-source or vendored-bundle intake path for review. It remains non-authoritative and must not be copied into reviewed authority fields.",
             "",
@@ -2366,6 +2453,9 @@ def main() -> int:
     operator_command_plan_path = (
         output_dir / "so101_public_candidate_operator_command_plan.json"
     )
+    reviewed_manifest_rerun_plan_path = (
+        output_dir / "so101_public_candidate_reviewed_manifest_rerun_plan.json"
+    )
     operator_requirements_csv_path = (
         output_dir / "so101_public_candidate_operator_intake_requirements.csv"
     )
@@ -2383,6 +2473,9 @@ def main() -> int:
         "candidate_review_checklist_csv": str(review_checklist_csv_path),
         "candidate_operator_intake_plan_json": str(operator_plan_path),
         "candidate_operator_command_plan_json": str(operator_command_plan_path),
+        "candidate_reviewed_manifest_rerun_plan_json": str(
+            reviewed_manifest_rerun_plan_path
+        ),
         "candidate_operator_intake_requirements_csv": str(
             operator_requirements_csv_path
         ),
@@ -2460,6 +2553,16 @@ def main() -> int:
     operator_intake_handoff = attach_operator_intake_handoff_to_seeded_template(
         summary
     )
+    reviewed_manifest_rerun_plan = candidate_reviewed_manifest_rerun_plan(summary)
+    summary["candidate_reviewed_manifest_rerun_plan"] = (
+        reviewed_manifest_rerun_plan
+    )
+    summary["candidate_reviewed_manifest_rerun_plan_model_authority"] = (
+        reviewed_manifest_rerun_plan["model_authority"]
+    )
+    summary["candidate_reviewed_manifest_rerun_plan_status"] = (
+        reviewed_manifest_rerun_plan["status"]
+    )
     operator_requirement_rows = candidate_operator_intake_requirement_rows(
         operator_intake_plan
     )
@@ -2507,6 +2610,7 @@ def main() -> int:
     write_json(review_checklist_path, candidate_review_checklist)
     write_json(operator_plan_path, operator_intake_plan)
     write_json(operator_command_plan_path, operator_command_plan)
+    write_json(reviewed_manifest_rerun_plan_path, reviewed_manifest_rerun_plan)
     write_csv(
         operator_requirements_csv_path,
         operator_requirement_rows,
@@ -2595,6 +2699,20 @@ def main() -> int:
                 "candidate_operator_command_plan_status": summary[
                     "candidate_operator_command_plan_status"
                 ],
+                "candidate_reviewed_manifest_rerun_plan_model_authority": summary[
+                    "candidate_reviewed_manifest_rerun_plan_model_authority"
+                ],
+                "candidate_reviewed_manifest_rerun_plan_status": summary[
+                    "candidate_reviewed_manifest_rerun_plan_status"
+                ],
+                "candidate_reviewed_manifest_rerun_plan_selected_option": (
+                    reviewed_manifest_rerun_plan["selected_intake_option_id"]
+                ),
+                "candidate_reviewed_manifest_rerun_plan_command_template": (
+                    reviewed_manifest_rerun_plan[
+                        "manifest_checker_command_template"
+                    ]
+                ),
                 "candidate_operator_intake_handoff_model_authority": summary[
                     "candidate_operator_intake_handoff_model_authority"
                 ],

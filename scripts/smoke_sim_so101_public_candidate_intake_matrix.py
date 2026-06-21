@@ -143,6 +143,12 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_operator_command_plan_model_authority",
         "candidate_operator_command_plan_status",
         "candidate_operator_command_plan_selected_option_command_count",
+        "candidate_reviewed_manifest_rerun_plan_model_authority",
+        "candidate_reviewed_manifest_rerun_plan_status",
+        "candidate_reviewed_manifest_rerun_plan_selected_option",
+        "candidate_reviewed_manifest_rerun_plan_source_lock_ready",
+        "candidate_reviewed_manifest_rerun_plan_command_template",
+        "candidate_reviewed_manifest_rerun_plan_required_success_conditions",
         "candidate_operator_intake_option_count",
         "candidate_operator_intake_selected_requirement_count",
         "candidate_operator_intake_selected_requirement_ids",
@@ -1507,6 +1513,69 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
                 f"{case_id}.candidate_operator_command_plan.{command_key} "
                 f"missing source inventory steps {sorted(required_step_ids - step_ids)!r}"
             )
+    rerun_plan = summary.get("candidate_reviewed_manifest_rerun_plan")
+    rerun_plan = rerun_plan if isinstance(rerun_plan, dict) else {}
+    expected_rerun_plan_status = (
+        "candidate_reviewed_manifest_rerun_plan_ready"
+        if expected_source_lock_ready and expected_selected_option is not None
+        else "candidate_reviewed_manifest_rerun_plan_blocked"
+    )
+    if (
+        summary.get("candidate_reviewed_manifest_rerun_plan_model_authority")
+        != "candidate_reviewed_manifest_rerun_plan_not_authority"
+    ):
+        errors.append(
+            f"{case_id}.candidate_reviewed_manifest_rerun_plan_model_authority invalid"
+        )
+    if rerun_plan.get("model_authority") != "candidate_reviewed_manifest_rerun_plan_not_authority":
+        errors.append(f"{case_id}.candidate_reviewed_manifest_rerun_plan.model_authority invalid")
+    if rerun_plan.get("status") != expected_rerun_plan_status:
+        errors.append(
+            f"{case_id}.candidate_reviewed_manifest_rerun_plan.status expected "
+            f"{expected_rerun_plan_status!r}, got {rerun_plan.get('status')!r}"
+        )
+    if rerun_plan.get("observed_evidence_is_physical_so101_authority") is not False:
+        errors.append(
+            f"{case_id}.candidate_reviewed_manifest_rerun_plan physical authority not false"
+        )
+    if rerun_plan.get("ready_for_model_backed_ik") is not False:
+        errors.append(
+            f"{case_id}.candidate_reviewed_manifest_rerun_plan ready_for_model_backed_ik not false"
+        )
+    if rerun_plan.get("source_lock_ready_for_review") is not expected_source_lock_ready:
+        errors.append(
+            f"{case_id}.candidate_reviewed_manifest_rerun_plan source lock readiness invalid"
+        )
+    if rerun_plan.get("selected_intake_option_id") != expected_selected_option:
+        errors.append(
+            f"{case_id}.candidate_reviewed_manifest_rerun_plan selected option invalid"
+        )
+    if rerun_plan.get("selected_option_review_requirement_ids") != expected_requirement_ids:
+        errors.append(
+            f"{case_id}.candidate_reviewed_manifest_rerun_plan requirement ids invalid"
+        )
+    rerun_command = rerun_plan.get("manifest_checker_command_template")
+    rerun_command = rerun_command if isinstance(rerun_command, list) else []
+    for required_token in (
+        "scripts/smoke_sim_so101_model_bundle_manifest.py",
+        "--manifest-path",
+        "--output-dir",
+    ):
+        if required_token not in rerun_command:
+            errors.append(
+                f"{case_id}.candidate_reviewed_manifest_rerun_plan command missing {required_token!r}"
+            )
+    success_conditions = rerun_plan.get("required_success_conditions")
+    success_conditions = success_conditions if isinstance(success_conditions, list) else []
+    for required_condition in (
+        "manifest_checker_reports_ready_for_model_backed_ik_true",
+        "manifest_checker_reports_physical_so101_model_authority_ready_true",
+        "reviewed_mujoco_bundle_gate_loads_model_and_proves_joint_motion",
+    ):
+        if required_condition not in success_conditions:
+            errors.append(
+                f"{case_id}.candidate_reviewed_manifest_rerun_plan missing success condition {required_condition!r}"
+            )
     intake_options = operator_plan.get("intake_options")
     intake_options = intake_options if isinstance(intake_options, list) else []
     option_ids = [
@@ -1974,6 +2043,22 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         "candidate_operator_command_plan_status": operator_command_plan.get("status"),
         "candidate_operator_command_plan_selected_option_command_count": (
             operator_command_plan.get("selected_option_command_count")
+        ),
+        "candidate_reviewed_manifest_rerun_plan_model_authority": summary.get(
+            "candidate_reviewed_manifest_rerun_plan_model_authority"
+        ),
+        "candidate_reviewed_manifest_rerun_plan_status": rerun_plan.get("status"),
+        "candidate_reviewed_manifest_rerun_plan_selected_option": rerun_plan.get(
+            "selected_intake_option_id"
+        ),
+        "candidate_reviewed_manifest_rerun_plan_source_lock_ready": rerun_plan.get(
+            "source_lock_ready_for_review"
+        ),
+        "candidate_reviewed_manifest_rerun_plan_command_template": rerun_plan.get(
+            "manifest_checker_command_template"
+        ),
+        "candidate_reviewed_manifest_rerun_plan_required_success_conditions": rerun_plan.get(
+            "required_success_conditions"
         ),
         "candidate_operator_intake_option_count": len(intake_options),
         "candidate_operator_intake_selected_requirement_count": operator_plan.get(

@@ -202,6 +202,7 @@ The public-candidate intake smoke writes
 `so101_public_candidate_review_manifest_template.direct.json`,
 `so101_public_candidate_review_checklist.json`,
 `so101_public_candidate_review_checklist.csv`,
+`so101_public_candidate_reviewed_manifest_rerun_plan.json`,
 `so101_public_candidate_operator_intake_requirements.csv`, and `README.md`.
 It hashes the local candidate files and records the pinned upstream commit as
 intake evidence only. The source-lock JSON is the compact review handoff for
@@ -221,6 +222,14 @@ promote the public candidate to reviewed model truth. Its manifest draft uses
 `authority` and `provenance` empty, and always reports
 `ready_for_model_backed_ik: false`; copy those observed values into the real
 bundle manifest only after review.
+
+The reviewed-manifest rerun-plan JSON is the machine-readable handoff from the
+candidate source lock to `scripts/smoke_sim_so101_model_bundle_manifest.py`.
+It stays `candidate_reviewed_manifest_rerun_plan_not_authority`, keeps
+`ready_for_model_backed_ik: false`, and records the command template plus
+required success conditions. A locked source without an explicit
+external-source or vendor-bundle decision remains blocked; a selected intake
+decision makes only the operator rerun handoff ready.
 
 The seeded review-manifest template follows the reviewed bundle manifest field
 shape and pre-fills observable candidate path, asset-root, upstream, and source
@@ -266,8 +275,8 @@ missing-root, incomplete-candidate, and complete-candidate cases. All cases must
 keep `public_candidate_intake_not_authority`, false physical SO-101 authority,
 and `ready_for_model_backed_ik: false`; the complete fixture only proves digest
 locking, review-observation extraction, candidate-seeded template generation,
-candidate review-checklist generation, fail-closed manifest-checker preview,
-and artifact generation for review.
+candidate review-checklist generation, reviewed-manifest rerun-plan generation,
+fail-closed manifest-checker preview, and artifact generation for review.
 
 If the source is later declared authoritative, rerun the inventory with
 `--authoritative-path` for exactly one reviewed URDF/MJCF file plus
