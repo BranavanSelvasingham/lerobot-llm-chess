@@ -157,6 +157,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "candidate_operator_intake_selected_requirement_ids",
         "candidate_operator_intake_requirement_model_authority",
         "candidate_operator_intake_requirement_row_count",
+        "candidate_operator_intake_requirement_row_ids",
         "candidate_operator_intake_selected_requirement_row_count",
         "candidate_operator_intake_unselected_requirement_row_count",
         "candidate_operator_intake_selected_requirement_row_ids",
@@ -533,10 +534,11 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "operator_plan_status": "candidate_locked_operator_decision_required",
                 "operator_decision_status": "candidate_intake_decision_recorded_not_authority",
                 "selected_intake_option_id": "external_pinned_source_root",
-                "selected_requirement_count": 6,
+                "selected_requirement_count": 7,
                 "selected_requirement_ids": [
                     "external_checkout_path_declared",
                     "external_upstream_commit_pinned",
+                    "external_source_pin_verified",
                     "external_file_digest_lock_reviewed",
                     "external_gripper_mapping_reviewed",
                     "external_collision_policy_reviewed",
@@ -577,10 +579,11 @@ def case_specs(fixtures_dir: Path) -> list[dict[str, Any]]:
                 "operator_plan_status": "candidate_locked_operator_decision_required",
                 "operator_decision_status": "candidate_intake_decision_recorded_not_authority",
                 "selected_intake_option_id": "vendor_locked_bundle",
-                "selected_requirement_count": 7,
+                "selected_requirement_count": 8,
                 "selected_requirement_ids": [
                     "vendor_import_path_declared",
                     "vendor_upstream_commit_pinned",
+                    "vendor_source_pin_verified",
                     "vendor_license_provenance_reviewed",
                     "vendor_file_digest_manifest_reviewed",
                     "vendor_gripper_mapping_reviewed",
@@ -1225,7 +1228,7 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         errors.append(
             f"{case_id}.candidate_operator_intake_requirement_model_authority invalid"
         )
-    expected_requirement_row_count = 13
+    expected_requirement_row_count = 15
     if summary.get("candidate_operator_intake_requirement_row_count") != expected_requirement_row_count:
         errors.append(
             f"{case_id}.candidate_operator_intake_requirement_row_count invalid"
@@ -1257,6 +1260,19 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
             f"{case_id}.candidate_operator_intake_selected_requirement_row_ids "
             f"expected {expected_requirement_ids!r}, got {selected_requirement_row_ids!r}"
         )
+    requirement_row_ids = summary.get("candidate_operator_intake_requirement_row_ids")
+    requirement_row_ids = (
+        requirement_row_ids if isinstance(requirement_row_ids, list) else []
+    )
+    for required_requirement_id in (
+        "external_source_pin_verified",
+        "vendor_source_pin_verified",
+    ):
+        if required_requirement_id not in requirement_row_ids:
+            errors.append(
+                f"{case_id}.candidate_operator_intake_requirements missing "
+                f"{required_requirement_id!r}"
+            )
     operator_handoff = summary.get("candidate_operator_intake_handoff")
     operator_handoff = operator_handoff if isinstance(operator_handoff, dict) else {}
     if (
@@ -2132,6 +2148,9 @@ def summarize_case(record: dict[str, Any], summary: dict[str, Any], expect: dict
         ),
         "candidate_operator_intake_requirement_row_count": summary.get(
             "candidate_operator_intake_requirement_row_count"
+        ),
+        "candidate_operator_intake_requirement_row_ids": summary.get(
+            "candidate_operator_intake_requirement_row_ids"
         ),
         "candidate_operator_intake_selected_requirement_row_count": summary.get(
             "candidate_operator_intake_selected_requirement_row_count"

@@ -657,6 +657,12 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
                 "manifest_or_review_field": "provenance.source_reference",
             },
             {
+                "requirement_id": "external_source_pin_verified",
+                "title": "Verify checkout HEAD matches the pinned commit",
+                "required_evidence": "record that git rev-parse HEAD for the selected SO-ARM100 checkout equals the reviewed pinned commit SHA",
+                "manifest_or_review_field": "candidate_source_pin_verification_handoff",
+            },
+            {
                 "requirement_id": "external_file_digest_lock_reviewed",
                 "title": "Review complete lockable file digest handoff",
                 "required_evidence": "complete expected SO101 file digest set plus discovered lockable extra file digests from candidate_source_lock",
@@ -693,6 +699,12 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
                 "title": "Pin the vendored upstream source commit",
                 "required_evidence": "reviewed SO-ARM100 commit SHA used for the vendored subset",
                 "manifest_or_review_field": "provenance.source_reference",
+            },
+            {
+                "requirement_id": "vendor_source_pin_verified",
+                "title": "Verify vendored digest lock matches the pinned commit",
+                "required_evidence": "record that the vendored SO101 digest lock was copied from the reviewed pinned upstream commit SHA",
+                "manifest_or_review_field": "candidate_source_pin_verification_handoff",
             },
             {
                 "requirement_id": "vendor_license_provenance_reviewed",
@@ -825,6 +837,7 @@ def candidate_operator_intake_plan(summary: dict[str, Any]) -> dict[str, Any]:
         "review_flow": [
             "Choose external pinned source root or vendored locked bundle.",
             "Keep the selected upstream commit immutable in review evidence.",
+            "Verify the selected checkout HEAD or vendored digest lock against that pinned commit before editing reviewed authority fields.",
             "Review source lock digests, license/provenance, model variant, mesh roots, joint limits, target frame, gripper/TCP offset, and base-to-board alignment.",
             "Resolve the SO-ARM100 README gripper linear-joint mapping caveat and removed base collision mesh policy in reviewed fields.",
             "Edit the direct review manifest template with reviewed values only.",
@@ -2638,6 +2651,11 @@ def main() -> int:
     summary["candidate_operator_intake_unselected_requirement_row_count"] = (
         len(operator_requirement_rows) - len(selected_operator_requirement_rows)
     )
+    summary["candidate_operator_intake_requirement_row_ids"] = [
+        str(row["requirement_id"])
+        for row in operator_requirement_rows
+        if row.get("requirement_id")
+    ]
     summary["candidate_operator_intake_selected_requirement_row_ids"] = [
         str(row["requirement_id"])
         for row in selected_operator_requirement_rows

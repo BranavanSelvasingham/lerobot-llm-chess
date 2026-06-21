@@ -513,7 +513,9 @@ truth and must still be reconciled against the reviewed bundle manifest before
 model-backed IK or policy training can rely on them. The artifacts also list the
 command templates, explicit clone/fetch/checkout/intake/source-inventory/checker
 command steps, plus flat external/vendor review requirements for either a local
-external checkout or a vendored locked bundle. The source-inventory command
+external checkout or a vendored locked bundle; selected requirements include
+`external_source_pin_verified` or `vendor_source_pin_verified` so pin matching
+is a checklist row, not only a command-template caveat. The source-inventory command
 templates include both a candidate scan and a post-review authoritative-source
 rerun with reviewer/license/provenance placeholders; those commands are still
 operator guidance until real review metadata is supplied. The candidate review
