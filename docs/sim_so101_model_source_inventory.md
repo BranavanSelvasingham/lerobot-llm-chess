@@ -289,8 +289,66 @@ artifact handle. Do not use `--authoritative-root` on `Simulation/SO101` unless
 the root has been narrowed to one selected model file; the folder contains new
 and old calibration variants plus scene/support XML files.
 
-Local candidate evidence from 2026-06-20 used upstream commit
-`fda892cba81032c46c40976a48c9ceadbf40a9ca` as an intake snapshot only:
+Current candidate-source decision uses upstream commit
+`fda892cba81032c46c40976a48c9ceadbf40a9ca` and selected model
+`Simulation/SO101/so101_new_calib.xml` from
+`https://github.com/TheRobotStudio/SO-ARM100`. This is the approved external
+pinned source-root path for the next manifest-review step; it is not a vendored
+asset import and is not, by itself, physical SO-101 calibration truth. The
+selected MJCF digest is
+`d75253eb568e8a7214db9c631ab7bed4217f608a26f7276ebe9a7636cac82580`, and the
+upstream license basis is the pinned Apache-2.0 `LICENSE` file.
+
+The source-authority inventory can be rerun against the pinned checkout:
+
+```bash
+python scripts/smoke_sim_so101_model_source_inventory.py \
+  --root /private/tmp/lerobot_sim/soarm100_candidate/Simulation/SO101 \
+  --authoritative-path /private/tmp/lerobot_sim/soarm100_candidate/Simulation/SO101/so101_new_calib.xml \
+  --authority-source-reference https://github.com/TheRobotStudio/SO-ARM100/tree/fda892cba81032c46c40976a48c9ceadbf40a9ca/Simulation/SO101 \
+  --authority-license-basis https://github.com/TheRobotStudio/SO-ARM100/blob/fda892cba81032c46c40976a48c9ceadbf40a9ca/LICENSE \
+  --authority-review-scope model_identity \
+  --authority-review-scope provenance \
+  --authority-review-scope license \
+  --authority-reviewed-by user-approved-source-decision \
+  --authority-reviewed-at 2026-06-21 \
+  --authority-review-id user-approval-soarm100-fda892c-so101-new-calib-2026-06-21 \
+  --output-dir /private/tmp/lerobot_sim/soarm100_so101_source_inventory_authoritative_xml
+```
+
+Expected key fields from that run are `status: "authoritative_model_found"`,
+`authoritative_candidate_count: 1`,
+`source_authority_gate_status: "source_authority_ready"`,
+`source_authority_review_ready: true`, and next actions
+`run_so101_model_bundle_probe` plus
+`supply_reviewed_so101_model_bundle_manifest`.
+
+The bundle-manifest draft for this source decision is
+`/private/tmp/lerobot_sim/soarm100_so101_reviewed_manifest_external_source_draft/so101_model_bundle.reviewed_source_draft.json`.
+It records the approved external pin, selected model digest, provenance,
+license basis, asset roots, and mesh source-lock evidence, while preserving the
+upstream caveats as unresolved simulation work: the README says base collision
+meshes were removed and the LeRobot gripper linear-joint mapping is not yet
+reflected in the current URDF/MuJoCo files. Rechecking that draft with the
+bundle-manifest checker should remain fail-closed for physical authority:
+
+```bash
+python scripts/smoke_sim_so101_model_bundle_manifest.py \
+  --manifest-path /private/tmp/lerobot_sim/soarm100_so101_reviewed_manifest_external_source_draft/so101_model_bundle.reviewed_source_draft.json \
+  --output-dir /private/tmp/lerobot_sim/soarm100_so101_reviewed_manifest_external_source_draft/check \
+  --python python
+```
+
+Expected key fields are `status: "model_bundle_manifest_needs_follow_up"`,
+`mesh_assets_status: "present"`, `ready_for_model_backed_ik: false`,
+`physical_so101_model_authority_ready: false`, and blockers
+`record_collision_policy_authority`, `declare_reviewed_joint_limits`,
+`record_gripper_mapping_authority`, `declare_target_frame`,
+`calibrate_tcp_offset`, `calibrate_base_to_board_transform`, and
+`clear_model_contract_and_asset_preflight`.
+
+Earlier local candidate evidence used the same upstream commit as an intake
+snapshot only:
 
 - Source inventory against `Simulation/SO101` found `candidate_count: 6`,
   `likely_candidate_count: 4`, and `direct_contract_candidate_count: 2`, with
