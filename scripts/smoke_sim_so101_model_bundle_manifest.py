@@ -29,6 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_CHECKER_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_contract.py"
 SUPPORTED_MODEL_SUFFIXES = (".mjcf", ".urdf", ".xacro", ".xml")
 EXPECTED_TARGET_FRAME = "gripper_frame_link"
+ACCEPTED_TARGET_FRAMES = (EXPECTED_TARGET_FRAME, "gripperframe")
 EXPECTED_SO101_JOINTS = (
     "shoulder_pan",
     "shoulder_lift",
@@ -2051,11 +2052,14 @@ def inspect_target_frame(manifest: dict[str, Any] | None) -> dict[str, Any]:
             "notes": f"target_frame omitted; diagnostics use {EXPECTED_TARGET_FRAME} but readiness requires an explicit reviewed target frame.",
         }
     if isinstance(raw, str) and raw.strip():
+        target_frame_accepted = raw in ACCEPTED_TARGET_FRAMES
         diagnostics = [] if raw == EXPECTED_TARGET_FRAME else ["target_frame_differs_from_default"]
+        if not target_frame_accepted:
+            diagnostics.append("target_frame_not_accepted")
         review = inspect_target_frame_review(manifest, raw)
         if review["status"] != "present":
             diagnostics.extend(review.get("diagnostics", []))
-        if raw != EXPECTED_TARGET_FRAME:
+        if not target_frame_accepted:
             status = "invalid"
         elif review["status"] == "present":
             status = "present"
@@ -2065,6 +2069,7 @@ def inspect_target_frame(manifest: dict[str, Any] | None) -> dict[str, Any]:
             "status": status,
             "value": raw,
             "expected_value": EXPECTED_TARGET_FRAME,
+            "accepted_values": list(ACCEPTED_TARGET_FRAMES),
             "review": review,
             "review_status": review.get("status"),
             "review_diagnostics": review.get("diagnostics", []),

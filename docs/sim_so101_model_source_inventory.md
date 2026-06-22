@@ -347,6 +347,46 @@ Expected key fields are `status: "model_bundle_manifest_needs_follow_up"`,
 `calibrate_tcp_offset`, `calibrate_base_to_board_transform`, and
 `clear_model_contract_and_asset_preflight`.
 
+After filling simulation-derived fields from the pinned MJCF and the supplied
+board-center offset, the hardware-free simulation manifest is:
+
+`/private/tmp/lerobot_sim/soarm100_so101_simulation_manifest/so101_model_bundle.simulation_authority.json`
+
+It uses:
+
+- `target_frame: "gripperframe"` from the pinned MJCF site.
+- Body-joint limits extracted from MJCF `range` attributes and converted from
+  radians to degrees.
+- `gripper: [0.0, 100.0]` as the LeRobot command range, linearly mapped to the
+  pinned MJCF gripper joint range.
+- TCP offset `{x: 0.0, y: 0.0, z: 0.0}` because `gripperframe` is treated as
+  the simulation TCP/reference frame.
+- Base-to-board transform `translation_m: {x: 0.05, y: 0.0, z: 0.0}` and zero
+  RPY, using the supplied 5 cm board-center offset.
+- The upstream removed-base-collision policy as hardware-free simulation
+  collision authority.
+
+Validation against that manifest:
+
+```bash
+python scripts/smoke_sim_so101_model_bundle_manifest.py \
+  --manifest-path /private/tmp/lerobot_sim/soarm100_so101_simulation_manifest/so101_model_bundle.simulation_authority.json \
+  --output-dir /private/tmp/lerobot_sim/soarm100_so101_simulation_manifest/check \
+  --python python
+
+python scripts/smoke_sim_so101_reviewed_mujoco_bundle.py \
+  --manifest-path /private/tmp/lerobot_sim/soarm100_so101_simulation_manifest/so101_model_bundle.simulation_authority.json \
+  --output-dir /private/tmp/lerobot_sim/soarm100_so101_reviewed_mujoco_bundle_simulation_authority \
+  --python python
+```
+
+Expected key fields are `ready_for_model_backed_ik: true`,
+`hardware_free_regression_fixture_ready: true`, and
+`physical_so101_model_authority_ready: false`. The reviewed-MuJoCo bundle gate
+should report `status: "reviewed_mujoco_bundle_motion_checked"`,
+`reviewed_model_motion_checked: true`, and
+`motion_authority_status: "hardware_free_fixture_motion_checked_not_physical_so101_authority"`.
+
 Earlier local candidate evidence used the same upstream commit as an intake
 snapshot only:
 

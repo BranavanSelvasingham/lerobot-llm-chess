@@ -27,6 +27,7 @@ DRILL_PATH = REPO_ROOT / "scripts" / "smoke_sim_ik_reachability_drill.py"
 ASSET_PREFLIGHT_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_asset_preflight.py"
 SUPPORTED_SUFFIXES = {".urdf", ".xml", ".mjcf", ".xacro"}
 EXPECTED_TARGET_FRAME = "gripper_frame_link"
+ACCEPTED_TARGET_FRAMES = (EXPECTED_TARGET_FRAME, "gripperframe")
 EXPECTED_TCP_FIELD_NAMES = (
     "tcp_offset",
     "gripper_tip_offset",
@@ -709,13 +710,13 @@ def build_checklist_rows(
         row(
             "target_frame",
             "frame_contract",
-            "ok" if target_frame == EXPECTED_TARGET_FRAME else "action_required",
+            "ok" if target_frame in ACCEPTED_TARGET_FRAMES else "action_required",
             "warning",
             str(KINEMATICS_PATH),
             target_frame,
-            EXPECTED_TARGET_FRAME,
+            {"default": EXPECTED_TARGET_FRAME, "accepted": list(ACCEPTED_TARGET_FRAMES)},
             None,
-            "Default target frame for current RobotKinematics usage.",
+            "Default target frame for current RobotKinematics usage; gripperframe is accepted for the pinned upstream SO-ARM100 MuJoCo model.",
         ),
         row(
             "tcp_offset_source",

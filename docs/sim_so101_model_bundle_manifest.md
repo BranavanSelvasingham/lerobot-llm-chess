@@ -423,7 +423,11 @@ Accepted TCP aliases are `tcp_offset_m`, `gripper_tip_offset_m`,
 alias is present, every non-empty alias must resolve to the same finite vector
 in meters; conflicting aliases are not readiness evidence. Diagnostic output may
 use `gripper_frame_link` when `target_frame` is omitted, but readiness requires
-an explicit `target_frame` plus accepted reviewed target-frame authority.
+an explicit `target_frame` plus accepted reviewed target-frame authority. The
+development fixture contract uses `gripper_frame_link`; the pinned upstream
+SO-ARM100 MuJoCo model exposes the equivalent target site as `gripperframe`, so
+that value is accepted when declared with target-frame authority and visible in
+the model.
 
 `asset_roots` must be present as a JSON list of non-empty string paths. An
 explicit empty list is valid when the model directory alone resolves mesh paths,
@@ -517,8 +521,9 @@ SO-101 mesh truth.
 
 Target-frame authority must be declared in `target_frame_authority`,
 `target_frame_review`, `tcp_frame_authority`, or `target_frame_metadata`, and
-the manifest `target_frame` must match the current simulator-contract value
-`gripper_frame_link`.
+the manifest `target_frame` must match an accepted simulator-contract value:
+`gripper_frame_link` for repo development fixtures, or `gripperframe` for the
+pinned upstream SO-ARM100 MuJoCo model.
 Accepted target-frame review statuses are `reviewed`, `operator_reviewed`,
 `target_frame_reviewed`, `tcp_frame_reviewed`, and `model_bundle_reviewed`,
 plus `synthetic_fixture_reviewed_for_automation_only` only for explicitly
