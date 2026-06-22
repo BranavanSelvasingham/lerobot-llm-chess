@@ -32,6 +32,18 @@ The summary must keep `model_authority: "development_scaffold_not_reviewed"`,
 `development_fixture_evidence_not_policy_training_truth: true`,
 `ready_for_model_backed_ik: false`, and `ready_for_policy_training: false`.
 
+Pinned-source simulation gate evidence from the next-step run:
+
+```bash
+python scripts/smoke_sim_so101_mujoco_grasp_probe.py \
+  --output-dir /private/tmp/lerobot_sim/so101_mujoco_grasp_probe_next_gate
+```
+
+Expected key fields are `ok: true`,
+`status: "contact_grasp_lift_place_physics_verified"`,
+`lift_place_physics_verified: true`, `ready_for_model_backed_ik: false`, and
+`ready_for_policy_training: false`.
+
 This is still not physical SO-101 grasp truth. It uses the generated
 `development_scaffold_not_reviewed` MJCF, an enlarged/lightened contact-tuned
 fixture piece, and a fixture-start grasp. Follow it with

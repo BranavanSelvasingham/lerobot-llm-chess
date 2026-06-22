@@ -30,6 +30,17 @@ board/piece contact counts. The summary must report:
 - `ready_for_model_backed_ik: false`
 - `ready_for_policy_training: false`
 
+Pinned-source simulation gate evidence from the next-step run:
+
+```bash
+python scripts/smoke_sim_so101_mujoco_contact_probe.py \
+  --output-dir /private/tmp/lerobot_sim/so101_mujoco_contact_probe_next_gate
+```
+
+Expected key fields are `ok: true`, `status: "ok"`,
+`all_board_contacts_observed: true`, `ready_for_model_backed_ik: false`, and
+`ready_for_policy_training: false`.
+
 This is still not grasp validation. It only proves that the generated scene now
 has resettable piece state and board-contact plumbing. Gripper/piece grasp,
 lift, place, friction tuning, and physical IK truth still require the reviewed

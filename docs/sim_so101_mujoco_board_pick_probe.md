@@ -101,3 +101,24 @@ The summary keeps that handoff machine-readable through
 `repeat_board_pick_with_reviewed_model_backed_ik`, and the matrix requires the
 explicit action list to match the IDs derived from `next_required_for_goal`
 with empty two-way drift lists.
+
+Pinned-source simulation gate evidence from the next-step run:
+
+```bash
+python scripts/smoke_sim_so101_mujoco_board_pick_probe.py \
+  --output-dir /private/tmp/lerobot_sim/so101_mujoco_board_pick_probe_next_gate
+```
+
+Expected key fields are `ok: true`,
+`status: "development_board_source_pick_place_verified"`,
+`board_source_pick_place_verified: true`,
+`ik_provenance_status: "seeded_source_pose_not_reviewed_model_backed_ik"`,
+`ik_uses_seeded_joint_targets: true`, `ready_for_model_backed_ik: false`, and
+`ready_for_policy_training: false`.
+
+The pinned SO-ARM100 manifest and reviewed-MuJoCo bundle now clear model-backed
+MuJoCo motion as hardware-free simulation evidence, but this board-pick probe
+still uses the generated development scene and seeded joint targets. The next
+implementation gate is to repeat this board-source pick/place proof with the
+simulation-ready model handoff driving target-frame/TCP/base-to-board geometry
+instead of direct pose seeding.

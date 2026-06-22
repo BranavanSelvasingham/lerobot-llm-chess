@@ -85,6 +85,24 @@ point the next downstream gate away from `mujoco_scene_validity` or claim
 authority, physical SO-101 truth, or policy-training authority fail closed when
 the handoff is required.
 
+For the pinned SO-ARM100 simulation-authority manifest, the reviewed-MuJoCo
+bundle handoff is fixture-ready but not physical SO-101 authority. Requiring
+that handoff must therefore fail closed:
+
+```bash
+python scripts/smoke_sim_so101_mujoco_scene.py \
+  --reviewed-mujoco-handoff-json /private/tmp/lerobot_sim/soarm100_so101_reviewed_mujoco_bundle_simulation_authority/so101_reviewed_mujoco_bundle_downstream_handoff.json \
+  --require-reviewed-mujoco-handoff \
+  --output-dir /private/tmp/lerobot_sim/so101_mujoco_scene_require_sim_handoff
+```
+
+Expected key fields are
+`status: "reviewed_mujoco_handoff_required_but_not_ready"`,
+`reviewed_mujoco_handoff_intake_status: "fixture_handoff_not_physical_so101_authority"`,
+and `reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority: true`.
+Without `--require-reviewed-mujoco-handoff`, the scene still validates as
+development evidence while recording the same fixture-handoff boundary.
+
 Invalid scene requests fail closed with artifacts instead of a traceback. For
 example, an invalid chess square or identical source/target square writes
 `so101_mujoco_scene_summary.json`, an empty steps CSV, and `README.md`, returns
