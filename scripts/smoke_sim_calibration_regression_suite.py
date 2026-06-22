@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
+import re
 import subprocess
 import sys
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_DIR = Path("/private/tmp") / "lerobot_sim" / "calibration_regression_suite"
@@ -53,8 +57,164 @@ EVIDENCE_BUNDLE_MD_NAME = "sim_evidence_bundle.md"
 EVIDENCE_BUNDLE_JSON_NAME = "sim_evidence_bundle.json"
 IK_REACHABILITY_SUMMARY_NAME = "ik_reachability_drill_summary.json"
 SO101_MODEL_SOURCE_INVENTORY_SUMMARY_NAME = "so101_model_source_inventory_summary.json"
+SO101_MODEL_SOURCE_INVENTORY_REVIEW_PACKET_JSON_NAME = (
+    "so101_model_source_inventory_review_packet.json"
+)
+SO101_MODEL_SOURCE_INVENTORY_REVIEW_PACKET_CSV_NAME = (
+    "so101_model_source_inventory_review_packet.csv"
+)
+SO101_MODEL_SOURCE_INTAKE_CHECKLIST_JSON_NAME = (
+    "so101_model_source_intake_checklist.json"
+)
+SO101_MODEL_SOURCE_INTAKE_CHECKLIST_CSV_NAME = (
+    "so101_model_source_intake_checklist.csv"
+)
+SO101_MODEL_SOURCE_REVIEW_REQUIREMENTS_JSON_NAME = (
+    "so101_model_source_review_requirements.json"
+)
+SO101_MODEL_SOURCE_REVIEW_REQUIREMENTS_CSV_NAME = (
+    "so101_model_source_review_requirements.csv"
+)
+SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_DIR_NAME = "so101_public_candidate_intake_matrix"
+SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_SUMMARY_NAME = (
+    "so101_public_candidate_intake_matrix_summary.json"
+)
+SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_CASES_NAME = (
+    "so101_public_candidate_intake_matrix_cases.csv"
+)
+SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_README_NAME = "README.md"
+SO101_MODEL_BUNDLE_PROBE_DIR_NAME = "so101_model_bundle_probe"
+SO101_MODEL_BUNDLE_PROBE_SUMMARY_NAME = "so101_model_bundle_probe_summary.json"
 SO101_MODEL_BUNDLE_MANIFEST_SUMMARY_NAME = "so101_model_bundle_manifest_summary.json"
+SO101_MODEL_BUNDLE_MANIFEST_REVIEW_PACKET_JSON_NAME = (
+    "so101_model_bundle_manifest_review_packet.json"
+)
+SO101_MODEL_BUNDLE_MANIFEST_REVIEW_PACKET_CSV_NAME = (
+    "so101_model_bundle_manifest_review_packet.csv"
+)
+SO101_MODEL_BUNDLE_MANIFEST_REVIEW_REQUIREMENTS_JSON_NAME = (
+    "so101_model_bundle_manifest_review_requirements.json"
+)
+SO101_MODEL_BUNDLE_MANIFEST_REVIEW_REQUIREMENTS_CSV_NAME = (
+    "so101_model_bundle_manifest_review_requirements.csv"
+)
+SO101_MODEL_BUNDLE_MANIFEST_INTAKE_CHECKLIST_JSON_NAME = (
+    "so101_model_bundle_manifest_intake_checklist.json"
+)
+SO101_MODEL_BUNDLE_MANIFEST_INTAKE_CHECKLIST_CSV_NAME = (
+    "so101_model_bundle_manifest_intake_checklist.csv"
+)
+SO101_MODEL_BUNDLE_MANIFEST_TEMPLATE_JSON_NAME = (
+    "so101_model_bundle_manifest_template.json"
+)
 SO101_MODEL_CONTRACT_SUMMARY_NAME = "so101_model_contract_summary.json"
+SO101_REVIEWED_MODEL_AUTHORITY_GATE_SCHEMA = "lerobot.sim.so101_reviewed_model_authority_gate.v1"
+SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME = "so101_reviewed_model_authority_gate"
+SO101_REVIEWED_MODEL_AUTHORITY_GATE_SUMMARY_NAME = "so101_reviewed_model_authority_gate.json"
+SO101_REVIEWED_MODEL_AUTHORITY_GATE_CHECKLIST_NAME = "so101_reviewed_model_authority_gate_checklist.csv"
+SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_JSON_NAME = (
+    "so101_reviewed_model_authority_blocker_packet.json"
+)
+SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_CSV_NAME = (
+    "so101_reviewed_model_authority_blocker_packet.csv"
+)
+SO101_REVIEWED_MODEL_AUTHORITY_OPERATOR_ACTIONS_JSON_NAME = (
+    "so101_reviewed_model_authority_operator_actions.json"
+)
+SO101_REVIEWED_MODEL_AUTHORITY_OPERATOR_ACTIONS_CSV_NAME = (
+    "so101_reviewed_model_authority_operator_actions.csv"
+)
+SO101_REVIEWED_MODEL_AUTHORITY_GATE_README_NAME = "README.md"
+SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME = "so101_reviewed_mujoco_bundle"
+SO101_REVIEWED_MUJOCO_BUNDLE_SUMMARY_NAME = "so101_reviewed_mujoco_bundle_summary.json"
+SO101_REVIEWED_MUJOCO_BUNDLE_MOTION_CHECKS_NAME = (
+    "so101_reviewed_mujoco_bundle_motion_checks.csv"
+)
+SO101_REVIEWED_MUJOCO_BUNDLE_DOWNSTREAM_HANDOFF_NAME = (
+    "so101_reviewed_mujoco_bundle_downstream_handoff.json"
+)
+SO101_REVIEWED_MUJOCO_BUNDLE_DOWNSTREAM_HANDOFF_CSV_NAME = (
+    "so101_reviewed_mujoco_bundle_downstream_handoff.csv"
+)
+SO101_MUJOCO_SCENE_DIR_NAME = "so101_mujoco_scene"
+SO101_MUJOCO_SCENE_SUMMARY_NAME = "so101_mujoco_scene_summary.json"
+SO101_CHESS_ENV_DIR_NAME = "so101_chess_env"
+SO101_CHESS_ENV_SUMMARY_NAME = "so101_chess_env_summary.json"
+SO101_ENV_RESETS_DIR_NAME = "so101_env_resets"
+SO101_ENV_RESETS_SUMMARY_NAME = "so101_env_resets_summary.json"
+SO101_MUJOCO_CONTACT_PROBE_DIR_NAME = "so101_mujoco_contact_probe"
+SO101_MUJOCO_CONTACT_PROBE_SUMMARY_NAME = "so101_mujoco_contact_probe_summary.json"
+SO101_MUJOCO_GRASP_PROBE_DIR_NAME = "so101_mujoco_grasp_probe"
+SO101_MUJOCO_GRASP_PROBE_SUMMARY_NAME = "so101_mujoco_grasp_probe_summary.json"
+SO101_MUJOCO_BOARD_PICK_PROBE_DIR_NAME = "so101_mujoco_board_pick_probe"
+SO101_MUJOCO_BOARD_PICK_PROBE_SUMMARY_NAME = "so101_mujoco_board_pick_probe_summary.json"
+SO101_TRAINING_READINESS_GATE_SCHEMA = "lerobot.sim.so101_training_readiness_gate.v1"
+SO101_TRAINING_READINESS_GATE_DIR_NAME = "so101_training_readiness_gate"
+SO101_TRAINING_READINESS_GATE_SUMMARY_NAME = "so101_training_readiness_gate.json"
+SO101_TRAINING_READINESS_GATE_CHECKLIST_NAME = "so101_training_readiness_gate_checklist.csv"
+SO101_TRAINING_READINESS_GATE_PRIORITY_QUEUE_NAME = (
+    "so101_training_readiness_gate_priority_queue.csv"
+)
+SO101_TRAINING_READINESS_GATE_README_NAME = "README.md"
+SO101_TRAINING_ROLLOUTS_DIR_NAME = "so101_training_rollouts"
+SO101_TRAINING_ROLLOUTS_SUMMARY_NAME = "so101_training_rollouts_summary.json"
+REVIEWED_SO101_MODEL_AUTHORITY = "reviewed_so101_model_bundle_manifest"
+SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_SCHEMA = (
+    "lerobot.sim.so101_reviewed_mujoco_bundle_downstream_handoff.v1"
+)
+SO101_CONTROL_JOINT_IDS = (
+    "shoulder_pan",
+    "shoulder_lift",
+    "elbow_flex",
+    "wrist_flex",
+    "wrist_roll",
+    "gripper",
+)
+SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_ITEM_IDS = (
+    "model_authority",
+    "model_identity",
+    "target_frame",
+    "tcp_offset_m",
+    "base_to_board_alignment",
+    "joint_limits",
+    "mesh_assets",
+    "mujoco_motion",
+    "downstream_gate_handoff",
+)
+SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_GATE_ID = "reviewed_mujoco_handoff"
+SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_ORDER = (
+    "mujoco_scene_validity",
+    "gymnasium_task_wiring",
+    "reviewed_model_backed_contact_grasp_pick_place",
+)
+SO101_REVIEWED_MUJOCO_NEXT_DOWNSTREAM_GATE_AFTER_READY = (
+    SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_ORDER[0]
+)
+SO101_TRAINING_PRIORITY_STAGE_IDS = (
+    "reviewed_model_authority",
+    "mujoco_scene_validity",
+    "gymnasium_task_wiring",
+    "scripted_contact_grasp_pick_place",
+    "focused_training_rollouts",
+)
+SO101_BOARD_PICK_REQUIRED_PHASE_IDS = (
+    "source_reset",
+    "two_finger_grasp",
+    "lift_clearance",
+    "transfer_toward_target",
+    "release_place",
+)
+SO101_BOARD_PICK_REQUIRED_STAGE_SEQUENCE = (
+    "source_reset_piece_on_board",
+    "lower_open_at_source",
+    "close_on_source_piece_forward",
+    "close_on_source_piece_after_settle",
+    "lift_from_source_without_manual_piece_pose",
+    "transfer_to_target_without_manual_piece_pose",
+    "lower_to_target_without_manual_piece_pose",
+    "release_on_target_without_manual_piece_pose",
+    "retreat_after_release_without_manual_piece_pose",
+)
 BASELINE_CORNERS = [[32, 338], [594, 340], [540, 20], [86, 12]]
 PERTURBED_CORNERS = [[34, 337], [592, 342], [538, 22], [88, 14]]
 
@@ -177,6 +337,47 @@ def parse_args() -> argparse.Namespace:
             "--authoritative-root. Repeatable. This is separate from --ik-model-path."
         ),
     )
+    parser.add_argument(
+        "--so101-source-authority-reviewed-by",
+        default=None,
+        help="Reviewer/operator identifier forwarded to the SO-101 model-source inventory.",
+    )
+    parser.add_argument(
+        "--so101-source-authority-reviewed-at",
+        default=None,
+        help="Deterministic review date/string forwarded to the SO-101 model-source inventory.",
+    )
+    parser.add_argument(
+        "--so101-source-authority-review-id",
+        default=None,
+        help="Review ticket, issue, commit, or checklist identifier forwarded to the source inventory.",
+    )
+    parser.add_argument(
+        "--so101-source-authority-review-url",
+        default=None,
+        help="URL to the reviewed source-authority record forwarded to the source inventory.",
+    )
+    parser.add_argument(
+        "--so101-source-authority-source-reference",
+        default=None,
+        help="CAD/export/source reference forwarded to the SO-101 model-source inventory.",
+    )
+    parser.add_argument(
+        "--so101-source-authority-review-scope",
+        action="append",
+        choices=SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS,
+        default=[],
+        help=(
+            "Source-authority review scope forwarded to the SO-101 model-source inventory. "
+            "Repeat for every required scope: "
+            f"{', '.join(SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS)}."
+        ),
+    )
+    parser.add_argument(
+        "--so101-source-authority-license-basis",
+        default=None,
+        help="Reviewed license or redistribution basis forwarded to the SO-101 model-source inventory.",
+    )
     parser.add_argument("--base-profile", default=DEFAULT_BASE_PROFILE)
     parser.add_argument("--source-square", default="e4")
     parser.add_argument("--target-square", default="e5")
@@ -202,6 +403,14 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n")
 
 
+def csv_cell(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list, tuple)):
+        return json.dumps(value, sort_keys=True)
+    return str(value)
+
+
 def markdown_bool(value: Any) -> str:
     if value is True:
         return "true"
@@ -222,6 +431,401 @@ def markdown_list_value(values: Any) -> str:
     return "; ".join(str(value) for value in values)
 
 
+def markdown_compact_value(value: Any) -> str:
+    if isinstance(value, dict):
+        if not value:
+            return "{}"
+        return "{" + ", ".join(
+            f"{key}={markdown_compact_value(mapped)}"
+            for key, mapped in sorted(value.items(), key=lambda item: str(item[0]))
+        ) + "}"
+    if isinstance(value, list):
+        return "[" + ", ".join(markdown_compact_value(item) for item in value) + "]"
+    if value is None:
+        return "none"
+    return markdown_bool(value) if isinstance(value, bool) else str(value)
+
+
+def markdown_mapping_value(values: Any) -> str:
+    if not isinstance(values, dict) or not values:
+        return "none"
+    return "; ".join(
+        f"{key}={markdown_compact_value(value)}"
+        for key, value in sorted(values.items(), key=lambda item: str(item[0]))
+    )
+
+
+def unique_string_values(values: list[Any]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for value in values:
+        if not isinstance(value, str) or not value:
+            continue
+        if value in seen:
+            continue
+        seen.add(value)
+        unique.append(value)
+    return unique
+
+
+def prioritized_gate_actions(*action_groups: Any) -> list[dict[str, Any]]:
+    actions: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for group in action_groups:
+        if not isinstance(group, list):
+            continue
+        for action in group:
+            if not isinstance(action, dict):
+                continue
+            action_id = action.get("action_id")
+            if not isinstance(action_id, str) or not action_id or action_id in seen:
+                continue
+            seen.add(action_id)
+            actions.append(
+                {
+                    "priority": len(actions) + 1,
+                    "action_id": action_id,
+                    "gate": action.get("gate"),
+                    "title": action.get("title"),
+                    "detail": action.get("detail"),
+                    **(
+                        {"missing_input": action.get("missing_input")}
+                        if action.get("missing_input") not in (None, "")
+                        else {}
+                    ),
+                }
+            )
+    return actions
+
+
+def first_non_empty_mapping_value(value: dict[str, Any], field_names: tuple[str, ...]) -> Any:
+    for field_name in field_names:
+        field_value = value.get(field_name)
+        if isinstance(field_value, str) and field_value.strip():
+            return field_value
+        if field_value not in (None, "", [], {}):
+            return field_value
+    return None
+
+
+PLACEHOLDER_REVIEW_EVIDENCE_VALUES = {
+    "na",
+    "n/a",
+    "none",
+    "not applicable",
+    "not supplied",
+    "null",
+    "required",
+    "review required",
+    "tbd",
+    "todo",
+    "unknown",
+}
+PLACEHOLDER_REVIEW_EVIDENCE_PREFIXES = (
+    "fixme",
+    "placeholder",
+    "tbd",
+    "todo",
+    "unknown",
+)
+SOURCE_AUTHORITY_REVIEW_EVIDENCE_KEYS = (
+    "authority_reviewed_by",
+    "authority_reviewed_at",
+    "authority_review_id",
+    "authority_review_url",
+)
+SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS = (
+    "model_identity",
+    "provenance",
+    "license",
+)
+SOURCE_AUTHORITY_REVIEW_SCOPE_FIELDS = (
+    "review_scope",
+    "review_scopes",
+    "source_review_scope",
+    "source_review_scopes",
+)
+
+
+def normalized_review_text(value: Any) -> str:
+    return " ".join(str(value).strip().lower().replace("_", " ").replace("-", " ").split())
+
+
+def placeholder_review_evidence(value: Any) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    stripped = value.strip()
+    if stripped.startswith("<") and stripped.endswith(">"):
+        return True
+    normalized = normalized_review_text(value)
+    return normalized in PLACEHOLDER_REVIEW_EVIDENCE_VALUES or any(
+        normalized.startswith(prefix) for prefix in PLACEHOLDER_REVIEW_EVIDENCE_PREFIXES
+    )
+
+
+def invalid_review_url(value: Any) -> bool:
+    if value in (None, "", [], {}):
+        return False
+    if not isinstance(value, str):
+        return True
+    parsed = urlparse(value.strip())
+    return parsed.scheme not in {"http", "https"} or not parsed.netloc
+
+
+def invalid_reviewed_at(value: Any) -> bool:
+    if value in (None, "", [], {}):
+        return False
+    if not isinstance(value, str):
+        return True
+    raw = value.strip()
+    if not re.match(r"^\d{4}-\d{2}-\d{2}($|[T ])", raw):
+        return True
+    try:
+        parsed_date = date.fromisoformat(raw)
+        return parsed_date > date.today()
+    except ValueError:
+        pass
+    normalized = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+    try:
+        parsed_datetime = datetime.fromisoformat(normalized)
+    except ValueError:
+        return True
+    now = (
+        datetime.now(parsed_datetime.tzinfo)
+        if parsed_datetime.tzinfo is not None
+        else datetime.now()
+    )
+    return parsed_datetime > now
+
+
+def invalid_source_authority_review_evidence(field_name: str, value: Any) -> bool:
+    if field_name == "authority_reviewed_at":
+        return invalid_reviewed_at(value)
+    if field_name != "authority_review_url":
+        return False
+    return invalid_review_url(value)
+
+
+def normalized_review_scope_ids(value: Any) -> list[str]:
+    raw_values: list[Any]
+    if value is None:
+        raw_values = []
+    elif isinstance(value, (list, tuple, set)):
+        raw_values = list(value)
+    else:
+        raw_values = [value]
+
+    seen: set[str] = set()
+    normalized: list[str] = []
+    for raw_value in raw_values:
+        for raw_scope in str(raw_value).split(","):
+            scope = raw_scope.strip().lower().replace("-", "_")
+            if not scope or scope in seen:
+                continue
+            seen.add(scope)
+            normalized.append(scope)
+    return normalized
+
+
+def mapping_review_scope_ids(mapping: dict[str, Any]) -> list[str]:
+    for field_name in SOURCE_AUTHORITY_REVIEW_SCOPE_FIELDS:
+        value = mapping.get(field_name)
+        scopes = normalized_review_scope_ids(value)
+        if scopes:
+            return scopes
+    return []
+
+
+SOURCE_AUTHORITY_REVIEW_EVIDENCE_REQUIRED_GROUPS = (
+    ("review_actor", ("authority_reviewed_by",)),
+    (
+        "review_trace",
+        ("authority_reviewed_at", "authority_review_id", "authority_review_url"),
+    ),
+    ("review_artifact", ("authority_review_id", "authority_review_url")),
+)
+
+
+def source_authority_review_evidence_group_summary(valid_review_fields: set[str]) -> dict[str, Any]:
+    required_groups = [
+        {"group": group_name, "fields": list(group_fields)}
+        for group_name, group_fields in SOURCE_AUTHORITY_REVIEW_EVIDENCE_REQUIRED_GROUPS
+    ]
+    missing_required_groups = [
+        group["group"]
+        for group in required_groups
+        if not any(field in valid_review_fields for field in group["fields"])
+    ]
+    satisfied_required_groups = [
+        group["group"]
+        for group in required_groups
+        if any(field in valid_review_fields for field in group["fields"])
+    ]
+    return {
+        "required_groups": required_groups,
+        "missing_required_groups": missing_required_groups,
+        "satisfied_required_groups": satisfied_required_groups,
+    }
+
+
+def so101_source_authority_review_forwarding(
+    *,
+    args: argparse.Namespace,
+    bundle: dict[str, Any] | None,
+    bundle_inventory_forwarding: dict[str, Any],
+) -> dict[str, Any]:
+    values = {
+        "authority_reviewed_by": args.so101_source_authority_reviewed_by,
+        "authority_reviewed_at": args.so101_source_authority_reviewed_at,
+        "authority_review_id": args.so101_source_authority_review_id,
+        "authority_review_url": args.so101_source_authority_review_url,
+        "authority_source_reference": args.so101_source_authority_source_reference,
+        "authority_review_scope_ids": normalized_review_scope_ids(
+            args.so101_source_authority_review_scope
+        ),
+        "authority_license_basis": args.so101_source_authority_license_basis,
+    }
+    explicit_values = {key: value for key, value in values.items() if value}
+    source = "explicit_cli" if explicit_values else "not_supplied"
+
+    if not explicit_values and bundle_inventory_forwarding.get("used_for_source_inventory") is True:
+        bundle = bundle if isinstance(bundle, dict) else {}
+        authority = bundle.get("authority")
+        authority = authority if isinstance(authority, dict) else {}
+        authority_value = authority.get("value")
+        authority_value = authority_value if isinstance(authority_value, dict) else {}
+        provenance = bundle.get("provenance")
+        provenance = provenance if isinstance(provenance, dict) else {}
+        provenance_value = provenance.get("value")
+        provenance_value = provenance_value if isinstance(provenance_value, dict) else {}
+        values = {
+            "authority_reviewed_by": first_non_empty_mapping_value(authority_value, ("reviewed_by",)),
+            "authority_reviewed_at": first_non_empty_mapping_value(authority_value, ("reviewed_at",)),
+            "authority_review_id": first_non_empty_mapping_value(authority_value, ("review_id",)),
+            "authority_review_url": first_non_empty_mapping_value(authority_value, ("review_url",)),
+            "authority_source_reference": first_non_empty_mapping_value(
+                provenance_value,
+                ("source_url", "source_uri", "cad_url", "repository_url", "source_path", "source_reference"),
+            ),
+            "authority_review_scope_ids": mapping_review_scope_ids(authority_value)
+            or mapping_review_scope_ids(provenance_value),
+            "authority_license_basis": first_non_empty_mapping_value(
+                provenance_value,
+                ("license", "license_url", "license_file", "license_review", "license_basis"),
+            ),
+        }
+        source = "so101_model_bundle_manifest"
+
+    supplied_review_fields = [
+        key for key in SOURCE_AUTHORITY_REVIEW_EVIDENCE_KEYS if values.get(key)
+    ]
+    placeholder_review_fields = [
+        key for key in supplied_review_fields if placeholder_review_evidence(values.get(key))
+    ]
+    invalid_review_fields = [
+        key
+        for key in supplied_review_fields
+        if key not in placeholder_review_fields
+        and invalid_source_authority_review_evidence(key, values.get(key))
+    ]
+    valid_review_fields = [
+        key
+        for key in supplied_review_fields
+        if key not in placeholder_review_fields and key not in invalid_review_fields
+    ]
+    review_evidence_groups = source_authority_review_evidence_group_summary(
+        set(valid_review_fields)
+    )
+    supplied_review_scope_ids = normalized_review_scope_ids(
+        values.get("authority_review_scope_ids")
+    )
+    missing_review_scope_ids = [
+        scope
+        for scope in SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS
+        if scope not in supplied_review_scope_ids
+    ]
+    missing_required_fields = []
+    diagnostics = [f"authority_review_evidence_placeholder:{field}" for field in placeholder_review_fields]
+    diagnostics.extend(
+        f"authority_review_evidence_invalid:{field}" for field in invalid_review_fields
+    )
+    required_metadata = {
+        "authority_source_reference": values.get("authority_source_reference"),
+        "authority_license_basis": values.get("authority_license_basis"),
+    }
+    supplied_required_metadata = {
+        key: value for key, value in required_metadata.items() if value
+    }
+    required_metadata_placeholder_fields = [
+        key
+        for key, value in supplied_required_metadata.items()
+        if placeholder_review_evidence(value)
+    ]
+    valid_required_metadata_fields = [
+        key
+        for key in supplied_required_metadata
+        if key not in required_metadata_placeholder_fields
+    ]
+    diagnostics.extend(
+        f"authority_required_metadata_placeholder:{field}"
+        for field in required_metadata_placeholder_fields
+    )
+    diagnostics.extend(
+        f"authority_review_evidence_missing_required_group:{group}"
+        for group in review_evidence_groups["missing_required_groups"]
+    )
+    if not valid_review_fields:
+        missing_required_fields.append("authority_review_evidence")
+    else:
+        missing_required_fields.extend(
+            f"authority_review_evidence:{group}"
+            for group in review_evidence_groups["missing_required_groups"]
+        )
+    missing_required_fields.extend(
+        f"authority_review_scope:{scope}" for scope in missing_review_scope_ids
+    )
+    for field in required_metadata:
+        if field not in valid_required_metadata_fields:
+            missing_required_fields.append(field)
+    return {
+        "source": source,
+        "ready_if_authoritative_source_declared": (
+            not missing_required_fields
+            and not placeholder_review_fields
+            and not invalid_review_fields
+            and not required_metadata_placeholder_fields
+        ),
+        "missing_required_fields": missing_required_fields,
+        "required_review_scope_ids": list(SOURCE_AUTHORITY_REQUIRED_REVIEW_SCOPE_IDS),
+        "supplied_review_scope_ids": supplied_review_scope_ids,
+        "missing_review_scope_ids": missing_review_scope_ids,
+        "review_scope_ready": not missing_review_scope_ids,
+        "review_evidence_valid_fields": valid_review_fields,
+        "review_evidence_placeholder_fields": placeholder_review_fields,
+        "review_evidence_invalid_fields": invalid_review_fields,
+        "required_metadata_fields": sorted(required_metadata),
+        "required_metadata_valid_fields": sorted(valid_required_metadata_fields),
+        "required_metadata_placeholder_fields": sorted(required_metadata_placeholder_fields),
+        "review_evidence_required_groups": review_evidence_groups["required_groups"],
+        "review_evidence_satisfied_required_groups": review_evidence_groups[
+            "satisfied_required_groups"
+        ],
+        "review_evidence_missing_required_groups": review_evidence_groups[
+            "missing_required_groups"
+        ],
+        "diagnostics": diagnostics,
+        **values,
+        "notes": [
+            "These values are forwarded only to the SO-101 model-source inventory.",
+            "Placeholder review evidence, source references, or license bases such as TODO/TBD/unknown or unedited <...> template tokens do not satisfy source-authority readiness.",
+            "If authority_reviewed_at is supplied, it must be an ISO YYYY-MM-DD date or ISO datetime and must not be in the future.",
+            "Source-authority review evidence requires reviewer identity plus a stable artifact handle: authority_review_id or authority_review_url.",
+            "Source-authority readiness also requires explicit review scopes for model identity, provenance, and license, plus a non-placeholder source reference and license basis.",
+            "They do not replace the bundle manifest's reviewed authority/provenance/readiness gate.",
+        ],
+    }
+
+
 def so101_model_source_inventory_config(
     args: argparse.Namespace,
     *,
@@ -230,6 +834,7 @@ def so101_model_source_inventory_config(
     authoritative_model_paths: list[Path],
     authoritative_model_roots: list[Path],
     bundle_inventory_forwarding: dict[str, Any],
+    source_authority_review: dict[str, Any],
     effective_ik_model_path: Path | None,
 ) -> dict[str, Any]:
     roots = cli_path_values(model_source_roots)
@@ -242,6 +847,7 @@ def so101_model_source_inventory_config(
         "model_source_extra_roots": extra_roots,
         "authoritative_model_paths": authoritative_paths,
         "authoritative_model_roots": authoritative_roots,
+        "source_authority_review": source_authority_review,
         "model_source_root_source": bundle_inventory_forwarding.get("model_source_root_source"),
         "authoritative_model_path_source": bundle_inventory_forwarding.get(
             "authoritative_model_path_source"
@@ -258,7 +864,8 @@ def so101_model_source_inventory_config(
         "notes": [
             "--ik-model-path is forwarded only to the model contract checker and IK reachability drill.",
             "Inventory authority must be declared with --so101-authoritative-model-path or --so101-authoritative-model-root.",
-            "A ready bundle manifest may supply a reviewed model path as inventory root and authoritative path when no explicit inventory source options were supplied.",
+            "Inventory source-authority review metadata is forwarded separately and does not replace the reviewed bundle manifest gate.",
+            "Only a physically reviewed ready bundle manifest may supply an inventory root and authoritative path when no explicit inventory source options were supplied.",
         ],
     }
 
@@ -281,8 +888,13 @@ def so101_inventory_forwarding_decision(
     authoritative_paths = list(args.so101_authoritative_model_path)
     authoritative_roots = list(args.so101_authoritative_model_root)
     model_path = path_from_string(bundle_forwarding.get("model_path"))
+    physical_authority_ready = (
+        bundle_forwarding.get("physical_so101_model_authority_ready") is True
+    )
+    fixture_ready = bundle_forwarding.get("hardware_free_regression_fixture_ready") is True
     use_bundle = (
         bundle_forwarding.get("ready_for_model_backed_ik") is True
+        and physical_authority_ready
         and not explicit_source_inputs
         and model_path is not None
     )
@@ -295,6 +907,12 @@ def so101_inventory_forwarding_decision(
         reason = "explicit_source_inventory_inputs_supplied"
     elif bundle_forwarding.get("ready_for_model_backed_ik") is not True:
         reason = f"bundle_not_ready_for_inventory_authority:{bundle_forwarding.get('manifest_status')}"
+    elif not physical_authority_ready:
+        reason = (
+            "bundle_ready_fixture_not_physical_source_authority"
+            if fixture_ready
+            else "bundle_ready_without_physical_source_authority"
+        )
     elif model_path is None:
         reason = "bundle_ready_without_model_path"
 
@@ -302,6 +920,9 @@ def so101_inventory_forwarding_decision(
         "used_for_source_inventory": use_bundle,
         "diagnostic_only": not use_bundle,
         "diagnostic_only_reason": None if use_bundle else reason,
+        "requires_physical_so101_model_authority": True,
+        "physical_so101_model_authority_ready": physical_authority_ready,
+        "hardware_free_regression_fixture_ready": fixture_ready,
         "model_source_root_source": "so101_model_bundle_manifest" if use_bundle else (
             "explicit_cli" if args.so101_model_source_root else "default_repo_roots"
         ),
@@ -312,7 +933,8 @@ def so101_inventory_forwarding_decision(
         "ready_for_model_backed_ik": bundle_forwarding.get("ready_for_model_backed_ik"),
         "model_path": str(model_path) if model_path is not None else None,
         "notes": [
-            "The bundle manifest supplies source-inventory authority only when ready_for_model_backed_ik is true.",
+            "The bundle manifest supplies source-inventory authority only when ready_for_model_backed_ik and physical_so101_model_authority_ready are both true.",
+            "Hardware-free fixture-ready bundles may still feed contract/IK regression, but they do not become source-inventory authority.",
             "Explicit source inventory CLI options take precedence over bundle-derived inventory inputs.",
         ],
     }
@@ -413,6 +1035,8 @@ def so101_bundle_forwarding_decision(
     asset_roots = bundle.get("asset_roots")
     asset_roots = asset_roots if isinstance(asset_roots, dict) else {}
     ready = bundle.get("ready_for_model_backed_ik") is True
+    physical_authority_ready = bundle.get("physical_so101_model_authority_ready") is True
+    fixture_ready = bundle.get("hardware_free_regression_fixture_ready") is True
     explicit_model_path = args.ik_model_path is not None
     explicit_asset_roots = bool(args.ik_model_asset_root)
     manifest_status = bundle.get("status") or manifest_request.get("status")
@@ -450,6 +1074,14 @@ def so101_bundle_forwarding_decision(
         "manifest_status": manifest_status,
         "manifest_path": manifest_request.get("path"),
         "ready_for_model_backed_ik": ready,
+        "physical_so101_model_authority_ready": physical_authority_ready,
+        "hardware_free_regression_fixture_ready": fixture_ready,
+        "model_authority": bundle.get("model_authority"),
+        "physical_authority_gate_status": bundle.get("physical_authority_gate_status"),
+        "synthetic_fixture_authority_fields": bundle.get(
+            "synthetic_fixture_authority_fields"
+        )
+        or [],
         "model_path": str(bundle_model_path) if bundle_model_path is not None else None,
         "asset_roots": [str(path) for path in bundle_asset_roots],
         "explicit_ik_model_path_supplied": explicit_model_path,
@@ -481,6 +1113,7 @@ def so101_model_source_inventory_command(
     model_source_extra_roots: list[Path],
     authoritative_model_paths: list[Path],
     authoritative_model_roots: list[Path],
+    source_authority_review: dict[str, Any],
 ) -> list[str]:
     command = [
         python,
@@ -496,6 +1129,83 @@ def so101_model_source_inventory_command(
         command.extend(["--authoritative-path", str(path.expanduser())])
     for root in authoritative_model_roots:
         command.extend(["--authoritative-root", str(root.expanduser())])
+    for source_key, cli_name in (
+        ("authority_reviewed_by", "--authority-reviewed-by"),
+        ("authority_reviewed_at", "--authority-reviewed-at"),
+        ("authority_review_id", "--authority-review-id"),
+        ("authority_review_url", "--authority-review-url"),
+        ("authority_source_reference", "--authority-source-reference"),
+        ("authority_license_basis", "--authority-license-basis"),
+    ):
+        value = source_authority_review.get(source_key)
+        if value:
+            command.extend([cli_name, str(value)])
+    for scope_id in source_authority_review.get("supplied_review_scope_ids") or []:
+        command.extend(["--authority-review-scope", str(scope_id)])
+    return command
+
+
+def recommended_contract_model_path(inventory: dict[str, Any] | None) -> Path | None:
+    inventory = inventory if isinstance(inventory, dict) else {}
+    recommended = inventory.get("recommended_contract_check")
+    recommended = recommended if isinstance(recommended, dict) else {}
+    candidate_path = recommended.get("candidate_path")
+    return path_from_string(candidate_path)
+
+
+def so101_public_candidate_intake_matrix_command(
+    *,
+    python: str,
+    matrix_dir: Path,
+) -> list[str]:
+    return [
+        python,
+        str(REPO_ROOT / "scripts" / "smoke_sim_so101_public_candidate_intake_matrix.py"),
+        "--output-dir",
+        str(matrix_dir),
+        "--python",
+        python,
+    ]
+
+
+def so101_model_bundle_probe_command(
+    *,
+    python: str,
+    probe_dir: Path,
+    model_path: Path | None,
+    asset_roots: list[Path],
+    target_frame: str,
+    source_authority_review: dict[str, Any],
+) -> list[str]:
+    command = [
+        python,
+        str(REPO_ROOT / "scripts" / "smoke_sim_so101_model_bundle_probe.py"),
+        "--output-dir",
+        str(probe_dir),
+        "--python",
+        python,
+        "--target-frame",
+        target_frame,
+    ]
+    if model_path is not None:
+        command.extend(["--model-path", str(model_path.expanduser())])
+    if (
+        model_path is not None
+        and source_authority_review.get("ready_if_authoritative_source_declared") is True
+    ):
+        for source_key, cli_name in (
+            ("authority_reviewed_by", "--authority-reviewed-by"),
+            ("authority_reviewed_at", "--authority-reviewed-at"),
+            ("authority_review_id", "--authority-review-id"),
+            ("authority_review_url", "--authority-review-url"),
+        ):
+            value = source_authority_review.get(source_key)
+            if value:
+                command.extend([cli_name, str(value)])
+        for scope_id in source_authority_review.get("supplied_review_scope_ids") or []:
+            command.extend(["--authority-review-scope", str(scope_id)])
+    for asset_root in asset_roots:
+        command.extend(["--asset-root", str(asset_root.expanduser())])
     return command
 
 
@@ -994,6 +1704,8 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
     so101_inventory = so101_inventory if isinstance(so101_inventory, dict) else {}
     so101_source_config = so101_inventory.get("source_configuration")
     so101_source_config = so101_source_config if isinstance(so101_source_config, dict) else {}
+    so101_bundle_probe = summary.get("so101_model_bundle_probe")
+    so101_bundle_probe = so101_bundle_probe if isinstance(so101_bundle_probe, dict) else {}
     so101_bundle = summary.get("so101_model_bundle_manifest")
     so101_bundle = so101_bundle if isinstance(so101_bundle, dict) else {}
     so101_bundle_forwarding = so101_bundle.get("forwarding")
@@ -1006,12 +1718,47 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
     so101_bundle_tcp = so101_bundle_tcp if isinstance(so101_bundle_tcp, dict) else {}
     so101_bundle_alignment = so101_bundle.get("base_to_board_alignment")
     so101_bundle_alignment = so101_bundle_alignment if isinstance(so101_bundle_alignment, dict) else {}
+    so101_bundle_next_action_ids = [
+        action.get("action_id")
+        for action in so101_bundle.get("next_required_for_goal", [])
+        if isinstance(action, dict) and action.get("action_id")
+    ]
+    so101_reviewed_mujoco_bundle = summary.get("so101_reviewed_mujoco_bundle")
+    so101_reviewed_mujoco_bundle = (
+        so101_reviewed_mujoco_bundle if isinstance(so101_reviewed_mujoco_bundle, dict) else {}
+    )
+    so101_authority_gate = summary.get("so101_reviewed_model_authority_gate")
+    so101_authority_gate = so101_authority_gate if isinstance(so101_authority_gate, dict) else {}
     so101_contract = summary.get("so101_model_contract")
     so101_contract = so101_contract if isinstance(so101_contract, dict) else {}
     so101_contract_config = summary.get("so101_model_contract_config")
     so101_contract_config = so101_contract_config if isinstance(so101_contract_config, dict) else {}
     so101_asset_preflight = so101_contract.get("model_asset_preflight")
     so101_asset_preflight = so101_asset_preflight if isinstance(so101_asset_preflight, dict) else {}
+    so101_mujoco_scene = summary.get("so101_mujoco_scene")
+    so101_mujoco_scene = so101_mujoco_scene if isinstance(so101_mujoco_scene, dict) else {}
+    so101_chess_env = summary.get("so101_chess_env")
+    so101_chess_env = so101_chess_env if isinstance(so101_chess_env, dict) else {}
+    so101_env_resets = summary.get("so101_env_resets")
+    so101_env_resets = so101_env_resets if isinstance(so101_env_resets, dict) else {}
+    so101_mujoco_contact_probe = summary.get("so101_mujoco_contact_probe")
+    so101_mujoco_contact_probe = (
+        so101_mujoco_contact_probe if isinstance(so101_mujoco_contact_probe, dict) else {}
+    )
+    so101_mujoco_grasp_probe = summary.get("so101_mujoco_grasp_probe")
+    so101_mujoco_grasp_probe = (
+        so101_mujoco_grasp_probe if isinstance(so101_mujoco_grasp_probe, dict) else {}
+    )
+    so101_mujoco_board_pick_probe = summary.get("so101_mujoco_board_pick_probe")
+    so101_mujoco_board_pick_probe = (
+        so101_mujoco_board_pick_probe
+        if isinstance(so101_mujoco_board_pick_probe, dict)
+        else {}
+    )
+    so101_training_rollouts = summary.get("so101_training_rollouts")
+    so101_training_rollouts = (
+        so101_training_rollouts if isinstance(so101_training_rollouts, dict) else {}
+    )
     readme_path = output_dir / ARTIFACT_ENTRYPOINT_NAME
     lines = [
         "# Simulator Calibration Regression Artifacts",
@@ -1080,10 +1827,45 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `sim_camera_pose_fixture/sim_camera_pose_fixture_summary.json`",
         "- `so101_model_bundle_manifest/so101_model_bundle_manifest_summary.json`",
         "- `so101_model_bundle_manifest/so101_model_bundle_manifest_checklist.csv`",
+        f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_REVIEW_PACKET_JSON_NAME}`",
+        f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_REVIEW_PACKET_CSV_NAME}`",
+        f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_REVIEW_REQUIREMENTS_JSON_NAME}`",
+        f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_REVIEW_REQUIREMENTS_CSV_NAME}`",
+        f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_INTAKE_CHECKLIST_JSON_NAME}`",
+        f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_INTAKE_CHECKLIST_CSV_NAME}`",
+        f"- `so101_model_bundle_manifest/{SO101_MODEL_BUNDLE_MANIFEST_TEMPLATE_JSON_NAME}`",
         "- `so101_model_bundle_manifest/README.md`",
+        f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_SUMMARY_NAME}`",
+        f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_CHECKLIST_NAME}`",
+        f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_JSON_NAME}`",
+        f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_CSV_NAME}`",
+        f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_OPERATOR_ACTIONS_JSON_NAME}`",
+        f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_OPERATOR_ACTIONS_CSV_NAME}`",
+        f"- `{SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME}/{SO101_REVIEWED_MODEL_AUTHORITY_GATE_README_NAME}`",
+        f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/{SO101_REVIEWED_MUJOCO_BUNDLE_SUMMARY_NAME}`",
+        f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/so101_reviewed_mujoco_bundle_checklist.csv`",
+        f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/{SO101_REVIEWED_MUJOCO_BUNDLE_MOTION_CHECKS_NAME}`",
+        f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/{SO101_REVIEWED_MUJOCO_BUNDLE_DOWNSTREAM_HANDOFF_NAME}`",
+        f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/{SO101_REVIEWED_MUJOCO_BUNDLE_DOWNSTREAM_HANDOFF_CSV_NAME}`",
+        f"- `{SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME}/README.md`",
         "- `so101_model_source_inventory/so101_model_source_inventory_summary.json`",
         "- `so101_model_source_inventory/so101_model_source_candidates.csv`",
+        f"- `so101_model_source_inventory/{SO101_MODEL_SOURCE_INVENTORY_REVIEW_PACKET_JSON_NAME}`",
+        f"- `so101_model_source_inventory/{SO101_MODEL_SOURCE_INVENTORY_REVIEW_PACKET_CSV_NAME}`",
+        f"- `so101_model_source_inventory/{SO101_MODEL_SOURCE_INTAKE_CHECKLIST_JSON_NAME}`",
+        f"- `so101_model_source_inventory/{SO101_MODEL_SOURCE_INTAKE_CHECKLIST_CSV_NAME}`",
+        f"- `so101_model_source_inventory/{SO101_MODEL_SOURCE_REVIEW_REQUIREMENTS_JSON_NAME}`",
+        f"- `so101_model_source_inventory/{SO101_MODEL_SOURCE_REVIEW_REQUIREMENTS_CSV_NAME}`",
         "- `so101_model_source_inventory/README.md`",
+        f"- `{SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_DIR_NAME}/{SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_SUMMARY_NAME}`",
+        f"- `{SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_DIR_NAME}/{SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_CASES_NAME}`",
+        f"- `{SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_DIR_NAME}/{SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_README_NAME}`",
+        f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/{SO101_MODEL_BUNDLE_PROBE_SUMMARY_NAME}`",
+        f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/so101_model_bundle.candidate.json`",
+        f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/so101_model_bundle_review_packet.json`",
+        f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/so101_model_bundle_review_packet.csv`",
+        f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/so101_model_bundle_probe_checklist.csv`",
+        f"- `{SO101_MODEL_BUNDLE_PROBE_DIR_NAME}/README.md`",
         "- `so101_model_contract/so101_model_contract_summary.json`",
         "- `so101_model_contract/so101_model_contract_checklist.csv`",
         "- `so101_model_contract/README.md`",
@@ -1093,6 +1875,17 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
         "- `ik_reachability_drill/ik_reachability_drill_summary.json`",
         "- `ik_reachability_drill/ik_reachability_drill_rows.csv`",
         "- `ik_reachability_drill/ik_reachability_drill_heatmap.png`",
+        f"- `{SO101_MUJOCO_SCENE_DIR_NAME}/{SO101_MUJOCO_SCENE_SUMMARY_NAME}`",
+        f"- `{SO101_CHESS_ENV_DIR_NAME}/{SO101_CHESS_ENV_SUMMARY_NAME}`",
+        f"- `{SO101_ENV_RESETS_DIR_NAME}/{SO101_ENV_RESETS_SUMMARY_NAME}`",
+        f"- `{SO101_MUJOCO_CONTACT_PROBE_DIR_NAME}/{SO101_MUJOCO_CONTACT_PROBE_SUMMARY_NAME}`",
+        f"- `{SO101_MUJOCO_GRASP_PROBE_DIR_NAME}/{SO101_MUJOCO_GRASP_PROBE_SUMMARY_NAME}`",
+        f"- `{SO101_MUJOCO_BOARD_PICK_PROBE_DIR_NAME}/{SO101_MUJOCO_BOARD_PICK_PROBE_SUMMARY_NAME}`",
+        f"- `{SO101_TRAINING_READINESS_GATE_DIR_NAME}/{SO101_TRAINING_READINESS_GATE_SUMMARY_NAME}`",
+        f"- `{SO101_TRAINING_READINESS_GATE_DIR_NAME}/{SO101_TRAINING_READINESS_GATE_CHECKLIST_NAME}`",
+        f"- `{SO101_TRAINING_READINESS_GATE_DIR_NAME}/{SO101_TRAINING_READINESS_GATE_PRIORITY_QUEUE_NAME}`",
+        f"- `{SO101_TRAINING_READINESS_GATE_DIR_NAME}/{SO101_TRAINING_READINESS_GATE_README_NAME}`",
+        f"- `{SO101_TRAINING_ROLLOUTS_DIR_NAME}/{SO101_TRAINING_ROLLOUTS_SUMMARY_NAME}`",
         "- `gripper_camera_pov_review/gripper_camera_pov_review_summary.json`",
         "- `pick_place_scenario_matrix/scenario_matrix_summary.json`",
         "- `app_entrypoint/smoke_sim_app_entrypoints_summary.json`",
@@ -1321,6 +2114,37 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             "gripper opening, and synthetic visibility/occlusion/clearance rows."
         ),
         (
+            "- SO-101 reviewed model authority gate: "
+            f"status `{so101_authority_gate.get('status')}`; ready "
+            f"`{markdown_bool(so101_authority_gate.get('ready'))}`; source authority "
+            f"`{markdown_bool(so101_authority_gate.get('source_authority_ready'))}`; "
+            f"physical bundle authority "
+            f"`{markdown_bool(so101_authority_gate.get('physical_so101_model_authority_ready'))}`; "
+            f"physical reviewed MuJoCo motion "
+            f"`{markdown_bool(so101_authority_gate.get('physical_reviewed_model_motion_checked'))}`; "
+            "fixture evidence is not physical SO-101 truth "
+            f"`{markdown_bool(so101_authority_gate.get('development_fixture_evidence_not_physical_so101_truth'))}`."
+        ),
+        (
+            "- SO-101 reviewed model authority blockers: "
+            f"`{markdown_list_value(so101_authority_gate.get('blockers'))}`."
+        ),
+        (
+            "- SO-101 training readiness gate: "
+            f"status `{summary.get('so101_training_readiness_gate', {}).get('status')}`; "
+            f"ready `{markdown_bool(summary.get('so101_training_readiness_gate', {}).get('ready'))}`; "
+            "reviewed model-backed board pick/place "
+            f"`{markdown_bool(summary.get('so101_training_readiness_gate', {}).get('reviewed_model_backed_board_source_pick_place'))}`; "
+            "rollout ready "
+            f"`{markdown_bool(summary.get('so101_training_readiness_gate', {}).get('rollout_ready_for_policy_training'))}`; "
+            "fixture evidence is not policy training truth "
+            f"`{markdown_bool(summary.get('so101_training_readiness_gate', {}).get('development_fixture_evidence_not_policy_training_truth'))}`."
+        ),
+        (
+            "- SO-101 training readiness blockers: "
+            f"`{markdown_list_value(summary.get('so101_training_readiness_gate', {}).get('blockers'))}`."
+        ),
+        (
             "- SO-101 model-source inventory evidence records repo-local model-source "
             "candidate counts, authoritative-source status, provenance/license diagnostics, "
             "and a recommended contract-check candidate only when one is discovered; "
@@ -1338,6 +2162,24 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             "`--ik-model-path` authority `false`."
         ),
         (
+            "- SO-101 model bundle probe: "
+            f"status `{so101_bundle_probe.get('status')}`; model_authority "
+            f"`{so101_bundle_probe.get('model_authority')}`; selected model "
+            f"`{so101_bundle_probe.get('selected_model_path') or 'none'}`; "
+            f"manifest status `{so101_bundle_probe.get('manifest_status')}`; "
+            f"ready_for_model_backed_ik "
+            f"`{markdown_bool(so101_bundle_probe.get('ready_for_model_backed_ik'))}`; "
+            f"review packet `{so101_bundle_probe.get('review_packet_status')}` with "
+            f"`{so101_bundle_probe.get('review_packet_item_count')}` items; "
+            f"next actions `{markdown_list_value(so101_bundle_probe.get('next_required_action_ids'))}`."
+        ),
+        (
+            "- SO-101 model bundle probe caveat: the generated candidate manifest is a "
+            "review draft only, and the review packet is operator intake only; neither "
+            "closes source authority, physical model authority, or physical reviewed "
+            "MuJoCo motion."
+        ),
+        (
             "- SO-101 model bundle manifest evidence records the reviewed bundle request, "
             "model path, asset roots, target frame, TCP/gripper-tip offset, base-to-board "
             "alignment, child contract diagnostics, and nested asset-preflight diagnostics."
@@ -1346,6 +2188,9 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             "- SO-101 model bundle manifest status: "
             f"`{so101_bundle.get('status')}`; ready_for_model_backed_ik "
             f"`{markdown_bool(so101_bundle.get('ready_for_model_backed_ik'))}`; "
+            f"model_authority `{so101_bundle.get('model_authority')}`; "
+            f"physical authority `{markdown_bool(so101_bundle.get('physical_so101_model_authority_ready'))}`; "
+            f"fixture ready `{markdown_bool(so101_bundle.get('hardware_free_regression_fixture_ready'))}`; "
             f"model `{so101_bundle_model_path.get('path') or 'none'}`; roots "
             f"`{markdown_list_value(so101_bundle_asset_roots.get('asset_roots'))}`; "
             f"target frame `{so101_bundle.get('target_frame', {}).get('value') if isinstance(so101_bundle.get('target_frame'), dict) else None}`; "
@@ -1353,11 +2198,25 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             f"`{so101_bundle_alignment.get('status')}`."
         ),
         (
+            "- SO-101 model bundle next required actions: "
+            f"`{markdown_list_value(so101_bundle_next_action_ids)}`."
+        ),
+        (
             "- SO-101 model bundle forwarding: "
             f"diagnostic_only `{markdown_bool(so101_bundle_forwarding.get('diagnostic_only'))}`; "
             f"reason `{so101_bundle_forwarding.get('diagnostic_only_reason')}`; "
             f"effective model path source `{so101_bundle_forwarding.get('ik_model_path_source')}`; "
             f"effective asset-root source `{so101_bundle_forwarding.get('ik_model_asset_root_source')}`."
+        ),
+        (
+            "- SO-101 reviewed MuJoCo bundle gate: "
+            f"status `{so101_reviewed_mujoco_bundle.get('status')}`; "
+            f"model_authority `{so101_reviewed_mujoco_bundle.get('model_authority')}`; "
+            f"physical authority `{markdown_bool(so101_reviewed_mujoco_bundle.get('physical_so101_model_authority_ready'))}`; "
+            f"fixture ready `{markdown_bool(so101_reviewed_mujoco_bundle.get('hardware_free_regression_fixture_ready'))}`; "
+            f"ready_for_model_backed_ik `{markdown_bool(so101_reviewed_mujoco_bundle.get('ready_for_model_backed_ik'))}`; "
+            f"reviewed_model_motion_checked `{markdown_bool(so101_reviewed_mujoco_bundle.get('reviewed_model_motion_checked'))}`; "
+            "a ready reviewed bundle must load in MuJoCo and map/move every SO-101 joint before training evidence is trusted."
         ),
         (
             "- SO-101 model contract evidence records model availability, direct "
@@ -1382,6 +2241,37 @@ def write_artifact_entrypoint_readme(output_dir: Path, summary: dict[str, Any]) 
             "- IK reachability evidence records deterministic Cartesian/delta/radial command "
             "feasibility with summary JSON, rows CSV, and a heatmap PNG; missing repo-local "
             "SO-101 models remain an explicit non-failing fallback diagnostic."
+        ),
+        (
+            "- SO-101 MuJoCo scene evidence: "
+            f"status `{so101_mujoco_scene.get('status')}`; model authority "
+            f"`{so101_mujoco_scene.get('model_authority')}`; ready_for_model_backed_ik "
+            f"`{markdown_bool(so101_mujoco_scene.get('ready_for_model_backed_ik'))}`; "
+            "this proves development-scaffold MuJoCo plumbing, not physical IK truth."
+        ),
+        (
+            "- SO-101 Gymnasium env evidence: "
+            f"status `{so101_chess_env.get('status')}`; MuJoCo backend "
+            f"`{(so101_chess_env.get('sim_status') or {}).get('ok') if isinstance(so101_chess_env.get('sim_status'), dict) else None}`; "
+            f"scripted pick/place `{(so101_chess_env.get('scripted_pick_place') or {}).get('scripted_pick_place_complete') if isinstance(so101_chess_env.get('scripted_pick_place'), dict) else None}`."
+        ),
+        (
+            "- SO-101 reset/contact/rollout evidence: resets "
+            f"`{markdown_bool(so101_env_resets.get('all_resets_ok'))}`, board contact "
+            f"`{markdown_bool(so101_mujoco_contact_probe.get('all_board_contacts_observed'))}`, "
+            f"gripper contact `{markdown_bool(so101_mujoco_grasp_probe.get('gripper_contact_observed'))}`, "
+            f"lift/place physics `{markdown_bool(so101_mujoco_grasp_probe.get('lift_place_physics_verified'))}`, "
+            f"board-source pick/place `{markdown_bool(so101_mujoco_board_pick_probe.get('board_source_pick_place_verified'))}`, "
+            f"board-source final target XY error `{so101_mujoco_board_pick_probe.get('final_target_xy_error_m')}`, "
+            f"scripted rollout episodes `{so101_training_rollouts.get('episode_count')}` and transitions "
+            f"`{so101_training_rollouts.get('transition_count')}`, rollout prerequisites "
+            f"`{markdown_bool(so101_training_rollouts.get('development_prerequisites_satisfied'))}`, "
+            f"ready_for_policy_training `{markdown_bool(so101_training_rollouts.get('ready_for_policy_training'))}`."
+        ),
+        (
+            "- SO-101 MuJoCo next required items stay open: reviewed model bundle, mesh roots, "
+            "joint/frame/TCP authority, base-to-board alignment, and replacement of the seeded "
+            "development board-source pickup with reviewed model-backed IK before serious policy training."
         ),
         (
             "- App-entrypoint metadata evidence runs `smoke_sim_app_entrypoints.py --sim` "
@@ -2530,6 +3420,297 @@ def ik_reachability_section(ik: dict[str, Any] | None, summary_path: Path) -> di
     }
 
 
+def so101_mujoco_smoke_section(smoke: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
+    smoke = smoke if isinstance(smoke, dict) else {}
+    artifacts = smoke.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    dependencies = smoke.get("dependencies")
+    dependencies = dependencies if isinstance(dependencies, dict) else {}
+    next_required = smoke.get("next_required_for_goal")
+    next_required = next_required if isinstance(next_required, list) else []
+    next_required_action_ids = smoke.get("next_required_action_ids")
+    next_required_action_ids = (
+        unique_string_values(next_required_action_ids)
+        if isinstance(next_required_action_ids, list)
+        else unique_string_values([action.get("action_id") for action in next_required if isinstance(action, dict)])
+    )
+    next_required_for_goal_action_ids = smoke.get("next_required_for_goal_action_ids")
+    next_required_for_goal_action_ids = (
+        unique_string_values(next_required_for_goal_action_ids)
+        if isinstance(next_required_for_goal_action_ids, list)
+        else unique_string_values(
+            [
+                action.get("action_id")
+                for action in next_required
+                if isinstance(action, dict)
+            ]
+        )
+    )
+    next_required_action_ids_missing_from_next_required = [
+        action_id
+        for action_id in next_required_action_ids
+        if action_id not in next_required_for_goal_action_ids
+    ]
+    next_required_actions_missing_from_action_ids = [
+        action_id
+        for action_id in next_required_for_goal_action_ids
+        if action_id not in next_required_action_ids
+    ]
+    next_required_action_ids_match_next_required = (
+        next_required_action_ids == next_required_for_goal_action_ids
+    )
+    next_required_action_count = smoke.get("next_required_action_count")
+    if not isinstance(next_required_action_count, int):
+        next_required_action_count = len(next_required)
+    section: dict[str, Any] = {
+        "summary_path": artifacts.get("summary_json") or str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(smoke.get("ok", False)),
+        "status": smoke.get("status"),
+        "artifacts": {
+            "summary_json": artifacts.get("summary_json") or str(summary_path),
+            **{key: value for key, value in artifacts.items() if key != "summary_json"},
+        },
+        "dependencies": dependencies,
+        "model_authority": smoke.get("model_authority"),
+        "physical_so101_model_authority_ready": smoke.get("physical_so101_model_authority_ready"),
+        "hardware_free_regression_fixture_ready": smoke.get("hardware_free_regression_fixture_ready"),
+        "synthetic_fixture_authority_fields": smoke.get("synthetic_fixture_authority_fields"),
+        "observed_evidence_is_physical_so101_authority": smoke.get(
+            "observed_evidence_is_physical_so101_authority"
+        ),
+        "observed_evidence_is_policy_training_authority": smoke.get(
+            "observed_evidence_is_policy_training_authority"
+        ),
+        "development_fixture_evidence_not_physical_so101_truth": smoke.get(
+            "development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "development_fixture_evidence_not_policy_training_truth": smoke.get(
+            "development_fixture_evidence_not_policy_training_truth"
+        ),
+        "ready_for_model_backed_ik": smoke.get("ready_for_model_backed_ik"),
+        "ik_provenance_status": smoke.get("ik_provenance_status"),
+        "ik_solution_source": smoke.get("ik_solution_source"),
+        "ik_review_status": smoke.get("ik_review_status"),
+        "ik_uses_reviewed_model": smoke.get("ik_uses_reviewed_model"),
+        "ik_uses_reviewed_tcp_and_base_to_board_alignment": smoke.get(
+            "ik_uses_reviewed_tcp_and_base_to_board_alignment"
+        ),
+        "ik_uses_seeded_joint_targets": smoke.get("ik_uses_seeded_joint_targets"),
+        "ik_authority_blocker_action_ids": smoke.get(
+            "ik_authority_blocker_action_ids"
+        ),
+        "ik_authority_blocker_count": smoke.get("ik_authority_blocker_count"),
+        "limitations": smoke.get("limitations"),
+        "next_required_for_goal": next_required,
+        "next_required_action_ids": next_required_action_ids,
+        "next_required_for_goal_action_ids": next_required_for_goal_action_ids,
+        "next_required_action_ids_match_next_required": (
+            smoke.get("next_required_action_ids_match_next_required")
+            if isinstance(
+                smoke.get("next_required_action_ids_match_next_required"), bool
+            )
+            else next_required_action_ids_match_next_required
+        ),
+        "next_required_action_ids_missing_from_next_required": (
+            smoke.get("next_required_action_ids_missing_from_next_required")
+            if isinstance(
+                smoke.get("next_required_action_ids_missing_from_next_required"),
+                list,
+            )
+            else next_required_action_ids_missing_from_next_required
+        ),
+        "next_required_actions_missing_from_action_ids": (
+            smoke.get("next_required_actions_missing_from_action_ids")
+            if isinstance(
+                smoke.get("next_required_actions_missing_from_action_ids"),
+                list,
+            )
+            else next_required_actions_missing_from_action_ids
+        ),
+        "next_required_action_count": next_required_action_count,
+    }
+    for key in (
+        "mujoco_model_load",
+        "mujoco_joint_limit_enablement",
+        "joint_limit_model_consistency",
+        "sim_robot_mujoco_sync",
+        "env_scripted_pick_place",
+        "sim_status",
+        "contact_model",
+        "scripted_pick_place",
+        "reset_count",
+        "all_resets_ok",
+        "all_mujoco_fallback_free",
+        "invalid_reset_count",
+        "invalid_reset_case_ids",
+        "invalid_reset_failed_case_ids",
+        "all_invalid_resets_rejected",
+        "recovery_after_invalid_resets_ok",
+        "all_piece_resets_ok",
+        "all_board_contacts_observed",
+        "probe_count",
+        "gripper_contact_observed",
+        "two_finger_contact_observed",
+        "settled_gripper_contact_observed",
+        "source_square",
+        "source_pick_started_at_source",
+        "source_pick_xy_tolerance_m",
+        "close_two_finger_contact_observed",
+        "lift_verified",
+        "lift_without_manual_piece_pose_m",
+        "lift_z_threshold_m",
+        "board_contact_cleared_during_lift",
+        "transfer_verified",
+        "transfer_xy_m",
+        "transfer_xy_threshold_m",
+        "transfer_target_xy_error_m",
+        "transfer_source_to_target_progress_m",
+        "lower_contact_retained_before_release",
+        "lower_board_contact_observed_before_release",
+        "lower_target_within_tolerance_before_release",
+        "lower_place_z_within_tolerance_before_release",
+        "lower_target_xy_error_m",
+        "lower_place_z_error_m",
+        "place_without_manual_piece_pose_verified",
+        "lift_place_physics_verified",
+        "board_source_pick_place_verified",
+        "release_contact_cleared",
+        "release_contact_cleared_after_retreat",
+        "final_board_contact_observed",
+        "final_target_xy_error_m",
+        "target_xy_tolerance_m",
+        "final_place_z_error_m",
+        "place_z_tolerance_m",
+        "pick_place_phase_evidence",
+        "pick_place_phase_ids",
+        "pick_place_failed_phase_ids",
+        "pick_place_phase_count",
+        "pick_place_all_required_phases_verified",
+        "required_stage_sequence",
+        "observed_stage_sequence",
+        "missing_stage_ids",
+        "unexpected_stage_ids",
+        "stage_sequence_order_ok",
+        "manual_piece_pose_after_reset_stage_ids",
+        "stage_sequence_contract_ok",
+        "stage_sequence_contract_errors",
+        "source_to_target_progress_m",
+        "target_square",
+        "piece_reset_to_source_before_run",
+        "manual_piece_pose_used_for_fixture",
+        "manual_piece_pose_used_after_fixture",
+        "manual_piece_pose_used_after_reset",
+        "robot_pose_seeded_for_source_fixture",
+        "robot_motion_mode",
+        "episode_count",
+        "transition_count",
+        "all_scripted_pick_place_complete",
+        "all_mujoco_piece_release_synced",
+        "development_prerequisites_satisfied",
+        "board_pick_prerequisite",
+        "gymnasium_required",
+        "mujoco_backend_required",
+        "mujoco_backend_loaded",
+        "joint_state_fallback_active",
+        "gymnasium_task_wiring_status",
+        "gymnasium_api_contract",
+        "mujoco_scene_validity_status",
+        "reviewed_mujoco_handoff_requested",
+        "reviewed_mujoco_handoff_required",
+        "reviewed_mujoco_handoff_path",
+        "reviewed_mujoco_handoff_intake_status",
+        "reviewed_mujoco_handoff_intake_ok",
+        "reviewed_mujoco_handoff_contract_ok",
+        "reviewed_mujoco_handoff_ready",
+        "reviewed_mujoco_handoff_source_status",
+        "reviewed_mujoco_handoff_schema",
+        "reviewed_mujoco_handoff_model_authority",
+        "reviewed_mujoco_handoff_observed_evidence_is_authority",
+        "reviewed_mujoco_handoff_physical_truth_claimed",
+        "reviewed_mujoco_fixture_handoff_ready_not_physical_so101_authority",
+        "reviewed_mujoco_handoff_motion_authority_status",
+        "reviewed_mujoco_handoff_physical_motion_checked",
+        "reviewed_mujoco_handoff_hardware_free_fixture_motion_checked",
+        "reviewed_mujoco_handoff_motion_evidence_not_physical_so101_authority",
+        "reviewed_mujoco_handoff_physical_so101_model_authority_ready",
+        "reviewed_mujoco_handoff_model_identity_contract_ok",
+        "reviewed_mujoco_handoff_model_identity_status",
+        "reviewed_mujoco_handoff_model_identity_matches",
+        "reviewed_mujoco_handoff_model_path",
+        "reviewed_mujoco_handoff_declared_model_sha256",
+        "reviewed_mujoco_handoff_observed_model_sha256",
+        "reviewed_mujoco_handoff_joint_limit_enablement_ok",
+        "reviewed_mujoco_handoff_joint_limit_enablement_status",
+        "reviewed_mujoco_handoff_missing_limited_joints",
+        "reviewed_mujoco_handoff_explicit_action_ids",
+        "reviewed_mujoco_handoff_next_required_action_ids",
+        "reviewed_mujoco_handoff_action_ids_match_next_required",
+        "reviewed_mujoco_handoff_action_ids_missing_from_next_required",
+        "reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids",
+        "reviewed_mujoco_handoff_priority_gate_id",
+        "reviewed_mujoco_handoff_priority_gate_order",
+        "reviewed_mujoco_handoff_next_downstream_gate_after_ready",
+        "reviewed_mujoco_handoff_blocks_downstream_gates_until_ready",
+        "reviewed_mujoco_handoff_ready_does_not_imply_policy_training_ready",
+        "reviewed_mujoco_handoff_priority_contract_ok",
+        "reviewed_mujoco_handoff_item_ids",
+        "reviewed_mujoco_handoff_blockers",
+        "scene_uses_reviewed_mujoco_handoff",
+        "max_steps",
+        "square_geom_count",
+        "target_frame_site_present",
+        "target_marker_present",
+        "training_authority_status",
+        "training_authority_blockers",
+        "ready_for_policy_training",
+        "rollout_use",
+        "serious_policy_training_blockers",
+        "serious_policy_training_blocker_action_ids",
+        "manifest_status",
+        "manifest_request",
+        "model_path",
+        "asset_roots",
+        "target_frame",
+        "tcp_offset",
+        "base_to_board_alignment",
+        "reviewed_model_motion_checked",
+        "motion_authority_status",
+        "physical_reviewed_model_motion_checked",
+        "hardware_free_fixture_motion_checked",
+        "motion_evidence_not_physical_so101_authority",
+        "motion_authority",
+        "downstream_handoff_schema",
+        "downstream_handoff_status",
+        "downstream_handoff_model_authority",
+        "downstream_handoff_model_identity_contract_ok",
+        "downstream_handoff_model_identity_status",
+        "downstream_handoff_model_identity_matches",
+        "downstream_handoff_model_path",
+        "downstream_handoff_declared_model_sha256",
+        "downstream_handoff_observed_model_sha256",
+        "downstream_handoff_ready",
+        "fixture_handoff_ready_not_physical_so101_authority",
+        "downstream_handoff_observed_evidence_is_authority",
+        "downstream_handoff_physical_so101_truth_claimed",
+        "downstream_handoff_policy_training_authority_claimed",
+        "downstream_handoff_development_fixture_evidence_not_physical_so101_truth",
+        "downstream_handoff_development_fixture_evidence_not_policy_training_truth",
+        "downstream_handoff_item_count",
+        "downstream_handoff_item_ids",
+        "downstream_priority_gate_id",
+        "downstream_priority_gate_order",
+        "next_downstream_gate_after_ready",
+        "blocks_downstream_gates_until_ready",
+        "ready_does_not_imply_policy_training_ready",
+        "require_ready_reviewed_model",
+        "missing_inputs",
+    ):
+        if key in smoke:
+            section[key] = smoke.get(key)
+    return section
+
+
 def so101_model_contract_section(contract: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
     contract = contract if isinstance(contract, dict) else {}
     model_request = contract.get("model_request")
@@ -2628,10 +3809,62 @@ def so101_model_source_inventory_section(
         "output_dir": str(summary_path.parent),
         "ok": bool(inventory.get("ok", False)),
         "status": inventory.get("status"),
+        "model_authority": inventory.get("model_authority"),
+        "observed_evidence_is_physical_so101_authority": inventory.get(
+            "observed_evidence_is_physical_so101_authority"
+        ),
+        "observed_evidence_is_policy_training_authority": inventory.get(
+            "observed_evidence_is_policy_training_authority"
+        ),
+        "development_fixture_evidence_not_physical_so101_truth": inventory.get(
+            "development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "development_fixture_evidence_not_policy_training_truth": inventory.get(
+            "development_fixture_evidence_not_policy_training_truth"
+        ),
+        "physical_so101_model_authority_ready": inventory.get(
+            "physical_so101_model_authority_ready"
+        ),
+        "ready_for_model_backed_ik": inventory.get("ready_for_model_backed_ik"),
+        "ready_for_policy_training": inventory.get("ready_for_policy_training"),
         "candidate_count": inventory.get("candidate_count"),
         "likely_candidate_count": inventory.get("likely_candidate_count"),
         "direct_contract_candidate_count": inventory.get("direct_contract_candidate_count"),
         "authoritative_candidate_count": inventory.get("authoritative_candidate_count"),
+        "authoritative_source_selection_status": inventory.get(
+            "authoritative_source_selection_status"
+        ),
+        "authoritative_candidate_ids": inventory.get("authoritative_candidate_ids") or [],
+        "authoritative_candidate_paths": inventory.get("authoritative_candidate_paths") or [],
+        "selected_authoritative_candidate_id": inventory.get(
+            "selected_authoritative_candidate_id"
+        ),
+        "selected_authoritative_candidate_path": inventory.get(
+            "selected_authoritative_candidate_path"
+        ),
+        "selected_authoritative_candidate_sha256": inventory.get(
+            "selected_authoritative_candidate_sha256"
+        ),
+        "source_authority_review_status": inventory.get("source_authority_review_status"),
+        "source_authority_review_ready": inventory.get("source_authority_review_ready"),
+        "source_authority_review": inventory.get("source_authority_review"),
+        "source_authority_review_scope_ready": inventory.get(
+            "source_authority_review_scope_ready"
+        ),
+        "source_authority_required_review_scope_ids": inventory.get(
+            "source_authority_required_review_scope_ids"
+        )
+        or [],
+        "source_authority_supplied_review_scope_ids": inventory.get(
+            "source_authority_supplied_review_scope_ids"
+        )
+        or [],
+        "source_authority_missing_review_scope_ids": inventory.get(
+            "source_authority_missing_review_scope_ids"
+        )
+        or [],
+        "source_authority_gate_status": inventory.get("source_authority_gate_status"),
+        "source_authority_blockers": inventory.get("source_authority_blockers") or [],
         "root_count": inventory.get("root_count"),
         "source_configuration": source_configuration,
         "configured_model_source_roots": source_configuration.get("model_source_roots"),
@@ -2644,18 +3877,1139 @@ def so101_model_source_inventory_section(
             if recommended_contract_check
             else None
         ),
+        "known_public_candidate_source_count": inventory.get(
+            "known_public_candidate_source_count"
+        ),
+        "known_public_candidate_sources": inventory.get("known_public_candidate_sources")
+        or [],
+        "next_required_for_goal": inventory.get("next_required_for_goal") or [],
+        "next_required_action_ids": inventory.get("next_required_action_ids") or [],
+        "review_packet_status": inventory.get("review_packet_status"),
+        "review_packet_model_authority": inventory.get("review_packet_model_authority"),
+        "review_packet_item_count": inventory.get("review_packet_item_count"),
+        "review_packet_item_ids": inventory.get("review_packet_item_ids") or [],
+        "review_packet_needs_operator_review_item_ids": inventory.get(
+            "review_packet_needs_operator_review_item_ids"
+        )
+        or [],
+        "review_packet_action_ids": inventory.get("review_packet_action_ids") or [],
+        "review_packet_observed_evidence_is_authority": inventory.get(
+            "review_packet_observed_evidence_is_authority"
+        ),
+        "review_packet_development_fixture_evidence_not_physical_so101_truth": inventory.get(
+            "review_packet_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "review_packet_physical_so101_model_authority_ready": inventory.get(
+            "review_packet_physical_so101_model_authority_ready"
+        ),
+        "source_intake_status": inventory.get("source_intake_status"),
+        "source_intake_model_authority": inventory.get("source_intake_model_authority"),
+        "source_intake_action_count": inventory.get("source_intake_action_count"),
+        "source_intake_action_ids": inventory.get("source_intake_action_ids") or [],
+        "source_intake_observed_evidence_is_authority": inventory.get(
+            "source_intake_observed_evidence_is_authority"
+        ),
+        "source_intake_physical_so101_model_authority_ready": inventory.get(
+            "source_intake_physical_so101_model_authority_ready"
+        ),
+        "source_intake_development_fixture_evidence_not_physical_so101_truth": inventory.get(
+            "source_intake_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "source_intake_checklist_json_path": inventory.get(
+            "source_intake_checklist_json_path"
+        )
+        or artifacts.get("source_intake_checklist_json"),
+        "source_intake_checklist_csv_path": inventory.get(
+            "source_intake_checklist_csv_path"
+        )
+        or artifacts.get("source_intake_checklist_csv"),
+        "source_intake_checklist": inventory.get("source_intake_checklist"),
+        "source_review_requirements_status": inventory.get(
+            "source_review_requirements_status"
+        ),
+        "source_review_requirements_model_authority": inventory.get(
+            "source_review_requirements_model_authority"
+        ),
+        "source_review_requirements_requirement_count": inventory.get(
+            "source_review_requirements_requirement_count"
+        ),
+        "source_review_requirements_action_required_requirement_ids": inventory.get(
+            "source_review_requirements_action_required_requirement_ids"
+        )
+        or [],
+        "source_review_requirements_observed_evidence_is_authority": inventory.get(
+            "source_review_requirements_observed_evidence_is_authority"
+        ),
+        "source_review_requirements_physical_so101_model_authority_ready": inventory.get(
+            "source_review_requirements_physical_so101_model_authority_ready"
+        ),
+        "source_review_requirements_development_fixture_evidence_not_physical_so101_truth": inventory.get(
+            "source_review_requirements_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "source_review_requirements_json_path": inventory.get(
+            "source_review_requirements_json_path"
+        )
+        or artifacts.get("source_review_requirements_json"),
+        "source_review_requirements_csv_path": inventory.get(
+            "source_review_requirements_csv_path"
+        )
+        or artifacts.get("source_review_requirements_csv"),
+        "source_review_requirements": inventory.get("source_review_requirements"),
         "diagnostics": diagnostics,
         "artifacts": {
             "summary_json": artifacts.get("summary_json")
             if isinstance(artifacts.get("summary_json"), str)
             else str(summary_path),
             "candidates_csv": artifacts.get("candidates_csv"),
+            "review_packet_json": artifacts.get("review_packet_json"),
+            "review_packet_csv": artifacts.get("review_packet_csv"),
+            "source_intake_checklist_json": artifacts.get("source_intake_checklist_json"),
+            "source_intake_checklist_csv": artifacts.get("source_intake_checklist_csv"),
+            "source_review_requirements_json": artifacts.get(
+                "source_review_requirements_json"
+            ),
+            "source_review_requirements_csv": artifacts.get(
+                "source_review_requirements_csv"
+            ),
             "readme_md": artifacts.get("readme_md"),
         },
         "hardware_skipped": inventory.get("hardware_skipped"),
         "gui_skipped": inventory.get("gui_skipped"),
         "openai_skipped": inventory.get("openai_skipped"),
         "limitations": inventory.get("limitations"),
+    }
+
+
+def so101_public_candidate_intake_matrix_section(
+    matrix: dict[str, Any] | None,
+    summary_path: Path,
+) -> dict[str, Any]:
+    matrix = matrix if isinstance(matrix, dict) else {}
+    cases = matrix.get("cases")
+    cases = cases if isinstance(cases, list) else []
+    child_records = matrix.get("child_records")
+    child_records = child_records if isinstance(child_records, list) else []
+    checked_case = next(
+        (
+            case
+            for case in cases
+            if isinstance(case, dict) and case.get("case_id") == "candidate_intake_checked"
+        ),
+        {},
+    )
+    mjcf_model_selection_case = next(
+        (
+            case
+            for case in cases
+            if isinstance(case, dict)
+            and case.get("case_id") == "candidate_intake_checked_mjcf_model_selection"
+        ),
+        {},
+    )
+    unpinned_commit_case = next(
+        (
+            case
+            for case in cases
+            if isinstance(case, dict)
+            and case.get("case_id") == "candidate_intake_unpinned_commit_ref"
+        ),
+        {},
+    )
+    extra_lockable_case = next(
+        (
+            case
+            for case in cases
+            if isinstance(case, dict)
+            and case.get("case_id") == "candidate_intake_extra_lockable_source_file"
+        ),
+        {},
+    )
+    invalid_model_selection_case = next(
+        (
+            case
+            for case in cases
+            if isinstance(case, dict)
+            and case.get("case_id") == "candidate_intake_invalid_model_selection"
+        ),
+        {},
+    )
+    external_decision_case = next(
+        (
+            case
+            for case in cases
+            if isinstance(case, dict)
+            and case.get("case_id") == "candidate_intake_checked_external_decision"
+        ),
+        {},
+    )
+    vendor_decision_case = next(
+        (
+            case
+            for case in cases
+            if isinstance(case, dict)
+            and case.get("case_id") == "candidate_intake_checked_vendor_decision"
+        ),
+        {},
+    )
+    checked_record = next(
+        (
+            record
+            for record in child_records
+            if isinstance(record, dict) and record.get("case_id") == "candidate_intake_checked"
+        ),
+        {},
+    )
+    preview = checked_record.get("seeded_template_manifest_preview")
+    preview = preview if isinstance(preview, dict) else {}
+    external_decision_record = next(
+        (
+            record
+            for record in child_records
+            if isinstance(record, dict)
+            and record.get("case_id") == "candidate_intake_checked_external_decision"
+        ),
+        {},
+    )
+    external_decision_artifacts = external_decision_record.get("artifacts")
+    external_decision_artifacts = (
+        external_decision_artifacts if isinstance(external_decision_artifacts, dict) else {}
+    )
+    vendor_decision_record = next(
+        (
+            record
+            for record in child_records
+            if isinstance(record, dict)
+            and record.get("case_id") == "candidate_intake_checked_vendor_decision"
+        ),
+        {},
+    )
+    vendor_decision_artifacts = vendor_decision_record.get("artifacts")
+    vendor_decision_artifacts = (
+        vendor_decision_artifacts if isinstance(vendor_decision_artifacts, dict) else {}
+    )
+
+    def compact_model_selection_case(case: dict[str, Any]) -> dict[str, Any]:
+        case = case if isinstance(case, dict) else {}
+        return {
+            "status": case.get("status"),
+            "model_present": case.get("model_present"),
+            "selected_model_supported": case.get("selected_model_supported"),
+            "selected_model_status": case.get("selected_model_status"),
+            "candidate_source_lock_selected_model_observation_root_tag": case.get(
+                "candidate_source_lock_selected_model_observation_root_tag"
+            ),
+            "candidate_source_lock_selected_model_expected_joint_coverage_status": case.get(
+                "candidate_source_lock_selected_model_expected_joint_coverage_status"
+            ),
+            "candidate_source_lock_selected_model_expected_joint_observed_count": case.get(
+                "candidate_source_lock_selected_model_expected_joint_observed_count"
+            ),
+            "candidate_source_lock_selected_model_expected_joint_missing_count": case.get(
+                "candidate_source_lock_selected_model_expected_joint_missing_count"
+            ),
+            "candidate_source_lock_selected_model_unexpected_joint_count": case.get(
+                "candidate_source_lock_selected_model_unexpected_joint_count"
+            ),
+            "candidate_source_lock_selected_model_observation_mesh_reference_count": case.get(
+                "candidate_source_lock_selected_model_observation_mesh_reference_count"
+            ),
+            "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status": case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status"
+            ),
+            "candidate_source_lock_selected_model_mesh_reference_digest_match_count": case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_match_count"
+            ),
+            "candidate_source_lock_selected_model_mesh_reference_digest_missing_count": case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_missing_count"
+            ),
+        }
+
+    def compact_decision_case(
+        case: dict[str, Any],
+        record: dict[str, Any],
+        artifacts: dict[str, Any],
+    ) -> dict[str, Any]:
+        return {
+            "status": case.get("status") if isinstance(case, dict) else None,
+            "model_present": case.get("model_present") if isinstance(case, dict) else None,
+            "selected_model_supported": case.get("selected_model_supported")
+            if isinstance(case, dict)
+            else None,
+            "selected_model_status": case.get("selected_model_status")
+            if isinstance(case, dict)
+            else None,
+            "candidate_model_observation_model_authority": case.get(
+                "candidate_model_observation_model_authority"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_model_observation_row_count": case.get(
+                "candidate_model_observation_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_model_observation_scene_row_count": case.get(
+                "candidate_model_observation_scene_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_model_observation_selectable_model_row_count": case.get(
+                "candidate_model_observation_selectable_model_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_model_observation_parsed_selectable_model_row_count": case.get(
+                "candidate_model_observation_parsed_selectable_model_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_model_observation_selected_model_row_count": case.get(
+                "candidate_model_observation_selected_model_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_ready_for_review": case.get(
+                "candidate_source_lock_ready_for_review"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_digest_model_authority": case.get(
+                "candidate_source_lock_digest_model_authority"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_digest_row_count": case.get(
+                "candidate_source_lock_digest_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_authority": case.get(
+                "candidate_source_lock_selected_model_observation_authority"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_observed": case.get(
+                "candidate_source_lock_selected_model_observation_observed"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_parse_ok": case.get(
+                "candidate_source_lock_selected_model_observation_parse_ok"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_root_tag": case.get(
+                "candidate_source_lock_selected_model_observation_root_tag"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_coverage_status": case.get(
+                "candidate_source_lock_selected_model_expected_joint_coverage_status"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_observed_count": case.get(
+                "candidate_source_lock_selected_model_expected_joint_observed_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_missing_count": case.get(
+                "candidate_source_lock_selected_model_expected_joint_missing_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_unexpected_joint_count": case.get(
+                "candidate_source_lock_selected_model_unexpected_joint_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status": case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_mesh_reference_digest_match_count": case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_match_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_mesh_reference_digest_missing_count": case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_missing_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_source_lock_selected_model_digest_row_count": case.get(
+                "candidate_source_lock_selected_model_digest_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "upstream_commit": case.get("upstream_commit")
+            if isinstance(case, dict)
+            else None,
+            "upstream_commit_sha_valid": case.get("upstream_commit_sha_valid")
+            if isinstance(case, dict)
+            else None,
+            "upstream_commit_status": case.get("upstream_commit_status")
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_plan_model_authority": case.get(
+                "candidate_operator_intake_plan_model_authority"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_plan_status": case.get(
+                "candidate_operator_intake_plan_status"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_decision_status": case.get(
+                "candidate_operator_intake_decision_status"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_selected_option": case.get(
+                "candidate_operator_intake_selected_option"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_command_plan_model_authority": case.get(
+                "candidate_operator_command_plan_model_authority"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_command_plan_status": case.get(
+                "candidate_operator_command_plan_status"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_command_plan_selected_option_command_count": case.get(
+                "candidate_operator_command_plan_selected_option_command_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_reviewed_manifest_rerun_plan_model_authority": case.get(
+                "candidate_reviewed_manifest_rerun_plan_model_authority"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_reviewed_manifest_rerun_plan_status": case.get(
+                "candidate_reviewed_manifest_rerun_plan_status"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_reviewed_manifest_rerun_plan_selected_option": case.get(
+                "candidate_reviewed_manifest_rerun_plan_selected_option"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_reviewed_manifest_rerun_plan_source_lock_ready": case.get(
+                "candidate_reviewed_manifest_rerun_plan_source_lock_ready"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_option_count": case.get(
+                "candidate_operator_intake_option_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_selected_requirement_count": case.get(
+                "candidate_operator_intake_selected_requirement_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_selected_requirement_ids": case.get(
+                "candidate_operator_intake_selected_requirement_ids"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_requirement_model_authority": case.get(
+                "candidate_operator_intake_requirement_model_authority"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_requirement_row_count": case.get(
+                "candidate_operator_intake_requirement_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_selected_requirement_row_count": case.get(
+                "candidate_operator_intake_selected_requirement_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_unselected_requirement_row_count": case.get(
+                "candidate_operator_intake_unselected_requirement_row_count"
+            )
+            if isinstance(case, dict)
+            else None,
+            "candidate_operator_intake_selected_requirement_row_ids": case.get(
+                "candidate_operator_intake_selected_requirement_row_ids"
+            )
+            if isinstance(case, dict)
+            else None,
+            "ready_for_model_backed_ik": case.get("ready_for_model_backed_ik")
+            if isinstance(case, dict)
+            else None,
+            "observed_evidence_is_physical_so101_authority": case.get(
+                "observed_evidence_is_physical_so101_authority"
+            )
+            if isinstance(case, dict)
+            else None,
+            "summary_path": record.get("summary_path")
+            if isinstance(record, dict)
+            else None,
+            "operator_intake_plan_json_path": artifacts.get(
+                "candidate_operator_intake_plan_json"
+            ),
+            "operator_command_plan_json_path": artifacts.get(
+                "candidate_operator_command_plan_json"
+            ),
+            "reviewed_manifest_rerun_plan_json_path": artifacts.get(
+                "candidate_reviewed_manifest_rerun_plan_json"
+            ),
+        }
+
+    recorded_decision_cases = {
+        "external_pinned_source_root": compact_decision_case(
+            external_decision_case,
+            external_decision_record,
+            external_decision_artifacts,
+        ),
+        "vendor_locked_bundle": compact_decision_case(
+            vendor_decision_case,
+            vendor_decision_record,
+            vendor_decision_artifacts,
+        ),
+    }
+    return {
+        "summary_path": str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(matrix.get("ok", False)),
+        "status": matrix.get("status"),
+        "model_authority": matrix.get("model_authority"),
+        "observed_evidence_is_physical_so101_authority": matrix.get(
+            "observed_evidence_is_physical_so101_authority"
+        ),
+        "ready_for_model_backed_ik": matrix.get("ready_for_model_backed_ik"),
+        "ready_for_policy_training": matrix.get("ready_for_policy_training"),
+        "case_count": matrix.get("case_count"),
+        "case_ids": matrix.get("case_ids") or [],
+        "failed_case_ids": matrix.get("failed_case_ids") or [],
+        "case_count_with_extra_lockable_files": matrix.get(
+            "case_count_with_extra_lockable_files"
+        ),
+        "cases_with_extra_lockable_files": matrix.get(
+            "cases_with_extra_lockable_files"
+        )
+        or [],
+        "candidate_intake_checked": {
+            "status": checked_case.get("status") if isinstance(checked_case, dict) else None,
+            "model_present": checked_case.get("model_present")
+            if isinstance(checked_case, dict)
+            else None,
+            "selected_model_supported": checked_case.get("selected_model_supported")
+            if isinstance(checked_case, dict)
+            else None,
+            "selected_model_status": checked_case.get("selected_model_status")
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_model_observation_model_authority": checked_case.get(
+                "candidate_model_observation_model_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_model_observation_row_count": checked_case.get(
+                "candidate_model_observation_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_model_observation_scene_row_count": checked_case.get(
+                "candidate_model_observation_scene_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_model_observation_selectable_model_row_count": checked_case.get(
+                "candidate_model_observation_selectable_model_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_model_observation_parsed_selectable_model_row_count": checked_case.get(
+                "candidate_model_observation_parsed_selectable_model_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_model_observation_selected_model_row_count": checked_case.get(
+                "candidate_model_observation_selected_model_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "present_expected_file_count": checked_case.get("present_expected_file_count")
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_review_checklist_row_count": checked_case.get(
+                "candidate_review_checklist_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_review_checklist_model_authority": checked_case.get(
+                "candidate_review_checklist_model_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_model_authority": checked_case.get(
+                "candidate_source_lock_model_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_status": checked_case.get(
+                "candidate_source_lock_status"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_ready_for_review": checked_case.get(
+                "candidate_source_lock_ready_for_review"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_authority": checked_case.get(
+                "candidate_source_lock_selected_model_observation_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_observed": checked_case.get(
+                "candidate_source_lock_selected_model_observation_observed"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_parse_ok": checked_case.get(
+                "candidate_source_lock_selected_model_observation_parse_ok"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_root_tag": checked_case.get(
+                "candidate_source_lock_selected_model_observation_root_tag"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_coverage_status": checked_case.get(
+                "candidate_source_lock_selected_model_expected_joint_coverage_status"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_observed_count": checked_case.get(
+                "candidate_source_lock_selected_model_expected_joint_observed_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_missing_count": checked_case.get(
+                "candidate_source_lock_selected_model_expected_joint_missing_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_unexpected_joint_count": checked_case.get(
+                "candidate_source_lock_selected_model_unexpected_joint_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status": checked_case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_coverage_status"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_mesh_reference_digest_match_count": checked_case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_match_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_mesh_reference_digest_missing_count": checked_case.get(
+                "candidate_source_lock_selected_model_mesh_reference_digest_missing_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_digest_model_authority": checked_case.get(
+                "candidate_source_lock_digest_model_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_digest_row_count": checked_case.get(
+                "candidate_source_lock_digest_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_expected_file_digest_count": checked_case.get(
+                "candidate_source_lock_expected_file_digest_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_extra_lockable_file_count": checked_case.get(
+                "candidate_source_lock_extra_lockable_file_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_extra_lockable_relative_paths": checked_case.get(
+                "candidate_source_lock_extra_lockable_relative_paths"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_digest_row_count": checked_case.get(
+                "candidate_source_lock_selected_model_digest_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "upstream_commit": checked_case.get("upstream_commit")
+            if isinstance(checked_case, dict)
+            else None,
+            "upstream_commit_sha_valid": checked_case.get("upstream_commit_sha_valid")
+            if isinstance(checked_case, dict)
+            else None,
+            "upstream_commit_status": checked_case.get("upstream_commit_status")
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_intake_plan_model_authority": checked_case.get(
+                "candidate_operator_intake_plan_model_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_intake_plan_status": checked_case.get(
+                "candidate_operator_intake_plan_status"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_intake_decision_status": checked_case.get(
+                "candidate_operator_intake_decision_status"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_intake_selected_option": checked_case.get(
+                "candidate_operator_intake_selected_option"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_command_plan_model_authority": checked_case.get(
+                "candidate_operator_command_plan_model_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_command_plan_status": checked_case.get(
+                "candidate_operator_command_plan_status"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_command_plan_selected_option_command_count": checked_case.get(
+                "candidate_operator_command_plan_selected_option_command_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_reviewed_manifest_rerun_plan_model_authority": checked_case.get(
+                "candidate_reviewed_manifest_rerun_plan_model_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_reviewed_manifest_rerun_plan_status": checked_case.get(
+                "candidate_reviewed_manifest_rerun_plan_status"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_reviewed_manifest_rerun_plan_selected_option": checked_case.get(
+                "candidate_reviewed_manifest_rerun_plan_selected_option"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_reviewed_manifest_rerun_plan_source_lock_ready": checked_case.get(
+                "candidate_reviewed_manifest_rerun_plan_source_lock_ready"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_intake_option_count": checked_case.get(
+                "candidate_operator_intake_option_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_intake_requirement_model_authority": checked_case.get(
+                "candidate_operator_intake_requirement_model_authority"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_intake_requirement_row_count": checked_case.get(
+                "candidate_operator_intake_requirement_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_intake_selected_requirement_row_count": checked_case.get(
+                "candidate_operator_intake_selected_requirement_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_intake_unselected_requirement_row_count": checked_case.get(
+                "candidate_operator_intake_unselected_requirement_row_count"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "candidate_operator_intake_selected_requirement_row_ids": checked_case.get(
+                "candidate_operator_intake_selected_requirement_row_ids"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "seeded_template_manifest_checker_status": checked_case.get(
+                "seeded_template_manifest_checker_status"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "seeded_template_manifest_checker_ready_for_model_backed_ik": checked_case.get(
+                "seeded_template_manifest_checker_ready_for_model_backed_ik"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "seeded_template_manifest_checker_physical_ready": checked_case.get(
+                "seeded_template_manifest_checker_physical_ready"
+            )
+            if isinstance(checked_case, dict)
+            else None,
+            "direct_manifest_path": preview.get("direct_manifest_path"),
+            "preview_summary_path": preview.get("summary_path"),
+        },
+        "candidate_intake_extra_lockable_source_file": {
+            "status": extra_lockable_case.get("status")
+            if isinstance(extra_lockable_case, dict)
+            else None,
+            "candidate_source_lock_ready_for_review": extra_lockable_case.get(
+                "candidate_source_lock_ready_for_review"
+            )
+            if isinstance(extra_lockable_case, dict)
+            else None,
+            "candidate_source_lock_digest_row_count": extra_lockable_case.get(
+                "candidate_source_lock_digest_row_count"
+            )
+            if isinstance(extra_lockable_case, dict)
+            else None,
+            "candidate_source_lock_expected_file_digest_count": extra_lockable_case.get(
+                "candidate_source_lock_expected_file_digest_count"
+            )
+            if isinstance(extra_lockable_case, dict)
+            else None,
+            "candidate_source_lock_extra_lockable_file_count": extra_lockable_case.get(
+                "candidate_source_lock_extra_lockable_file_count"
+            )
+            if isinstance(extra_lockable_case, dict)
+            else None,
+            "candidate_source_lock_extra_lockable_relative_paths": extra_lockable_case.get(
+                "candidate_source_lock_extra_lockable_relative_paths"
+            )
+            if isinstance(extra_lockable_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_digest_row_count": extra_lockable_case.get(
+                "candidate_source_lock_selected_model_digest_row_count"
+            )
+            if isinstance(extra_lockable_case, dict)
+            else None,
+            "candidate_operator_intake_plan_status": extra_lockable_case.get(
+                "candidate_operator_intake_plan_status"
+            )
+            if isinstance(extra_lockable_case, dict)
+            else None,
+            "observed_evidence_is_physical_so101_authority": extra_lockable_case.get(
+                "observed_evidence_is_physical_so101_authority"
+            )
+            if isinstance(extra_lockable_case, dict)
+            else None,
+        },
+        "candidate_intake_checked_mjcf_model_selection": (
+            compact_model_selection_case(mjcf_model_selection_case)
+        ),
+        "candidate_intake_unpinned_commit_ref": {
+            "status": unpinned_commit_case.get("status")
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "model_present": unpinned_commit_case.get("model_present")
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "upstream_commit": unpinned_commit_case.get("upstream_commit")
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "upstream_commit_sha_valid": unpinned_commit_case.get(
+                "upstream_commit_sha_valid"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "upstream_commit_status": unpinned_commit_case.get(
+                "upstream_commit_status"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "candidate_source_lock_status": unpinned_commit_case.get(
+                "candidate_source_lock_status"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "candidate_source_lock_ready_for_review": unpinned_commit_case.get(
+                "candidate_source_lock_ready_for_review"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_digest_row_count": unpinned_commit_case.get(
+                "candidate_source_lock_selected_model_digest_row_count"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "candidate_operator_intake_plan_status": unpinned_commit_case.get(
+                "candidate_operator_intake_plan_status"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "candidate_operator_intake_decision_status": unpinned_commit_case.get(
+                "candidate_operator_intake_decision_status"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "candidate_operator_command_plan_status": unpinned_commit_case.get(
+                "candidate_operator_command_plan_status"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "ready_for_model_backed_ik": unpinned_commit_case.get(
+                "ready_for_model_backed_ik"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+            "observed_evidence_is_physical_so101_authority": unpinned_commit_case.get(
+                "observed_evidence_is_physical_so101_authority"
+            )
+            if isinstance(unpinned_commit_case, dict)
+            else None,
+        },
+        "candidate_intake_invalid_model_selection": {
+            "status": invalid_model_selection_case.get("status")
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "model_present": invalid_model_selection_case.get("model_present")
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "selected_model_supported": invalid_model_selection_case.get(
+                "selected_model_supported"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "selected_model_status": invalid_model_selection_case.get(
+                "selected_model_status"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_model_observation_selected_model_row_count": invalid_model_selection_case.get(
+                "candidate_model_observation_selected_model_row_count"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_model_observation_parsed_selectable_model_row_count": invalid_model_selection_case.get(
+                "candidate_model_observation_parsed_selectable_model_row_count"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_observed": invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_observation_observed"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_observation_parse_ok": invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_observation_parse_ok"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_coverage_status": invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_expected_joint_coverage_status"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_observed_count": invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_expected_joint_observed_count"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_expected_joint_missing_count": invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_expected_joint_missing_count"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_unexpected_joint_count": invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_unexpected_joint_count"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "model_sha256_observed": invalid_model_selection_case.get(
+                "model_sha256_observed"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_status": invalid_model_selection_case.get(
+                "candidate_source_lock_status"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_ready_for_review": invalid_model_selection_case.get(
+                "candidate_source_lock_ready_for_review"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_source_lock_selected_model_digest_row_count": invalid_model_selection_case.get(
+                "candidate_source_lock_selected_model_digest_row_count"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_operator_intake_plan_status": invalid_model_selection_case.get(
+                "candidate_operator_intake_plan_status"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_operator_intake_decision_status": invalid_model_selection_case.get(
+                "candidate_operator_intake_decision_status"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "candidate_operator_command_plan_status": invalid_model_selection_case.get(
+                "candidate_operator_command_plan_status"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "ready_for_model_backed_ik": invalid_model_selection_case.get(
+                "ready_for_model_backed_ik"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+            "observed_evidence_is_physical_so101_authority": invalid_model_selection_case.get(
+                "observed_evidence_is_physical_so101_authority"
+            )
+            if isinstance(invalid_model_selection_case, dict)
+            else None,
+        },
+        "candidate_intake_checked_external_decision": {
+            **recorded_decision_cases["external_pinned_source_root"],
+        },
+        "candidate_intake_checked_vendor_decision": {
+            **recorded_decision_cases["vendor_locked_bundle"],
+        },
+        "recorded_operator_intake_decision_cases": recorded_decision_cases,
+        "artifacts": {
+            "summary_json": matrix.get("summary_json") or str(summary_path),
+            "cases_csv": matrix.get("cases_csv"),
+            "readme_md": matrix.get("readme_md"),
+        },
+        "child_records": child_records,
+    }
+
+
+def so101_model_bundle_probe_section(
+    probe: dict[str, Any] | None,
+    summary_path: Path,
+    selected_model_path: Path | None,
+    asset_roots: list[Path],
+) -> dict[str, Any]:
+    probe = probe if isinstance(probe, dict) else {}
+    artifacts = probe.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    model_request = probe.get("model_request")
+    model_request = model_request if isinstance(model_request, dict) else {}
+    asset_root_config = probe.get("asset_roots")
+    asset_root_config = asset_root_config if isinstance(asset_root_config, dict) else {}
+    authority = probe.get("authority")
+    authority = authority if isinstance(authority, dict) else {}
+    provenance = probe.get("provenance")
+    provenance = provenance if isinstance(provenance, dict) else {}
+    contract_checker = probe.get("contract_checker")
+    contract_checker = contract_checker if isinstance(contract_checker, dict) else {}
+    manifest_checker = probe.get("manifest_checker")
+    manifest_checker = manifest_checker if isinstance(manifest_checker, dict) else {}
+    return {
+        "summary_path": str(summary_path),
+        "output_dir": str(summary_path.parent),
+        "ok": bool(probe.get("ok", False)),
+        "status": probe.get("status"),
+        "model_authority": probe.get("model_authority"),
+        "observed_evidence_is_physical_so101_authority": probe.get(
+            "observed_evidence_is_physical_so101_authority"
+        ),
+        "observed_evidence_is_policy_training_authority": probe.get(
+            "observed_evidence_is_policy_training_authority"
+        ),
+        "development_fixture_evidence_not_physical_so101_truth": probe.get(
+            "development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "development_fixture_evidence_not_policy_training_truth": probe.get(
+            "development_fixture_evidence_not_policy_training_truth"
+        ),
+        "physical_so101_model_authority_ready": probe.get(
+            "physical_so101_model_authority_ready"
+        ),
+        "ready_for_policy_training": probe.get("ready_for_policy_training"),
+        "selected_model_path": str(selected_model_path.expanduser()) if selected_model_path is not None else None,
+        "configured_asset_roots": [str(path.expanduser()) for path in asset_roots],
+        "model_request_status": probe.get("model_request_status"),
+        "model_request": model_request,
+        "contract_status": probe.get("contract_status"),
+        "asset_preflight_status": probe.get("asset_preflight_status"),
+        "asset_preflight_mesh_reference_count": probe.get("asset_preflight_mesh_reference_count"),
+        "asset_preflight_present_asset_count": probe.get("asset_preflight_present_asset_count"),
+        "asset_preflight_missing_asset_count": probe.get("asset_preflight_missing_asset_count"),
+        "asset_preflight_unresolved_reference_count": probe.get("asset_preflight_unresolved_reference_count"),
+        "observed_source_hints_status": probe.get("observed_source_hints_status"),
+        "observed_source_hints_onshape_urls": probe.get("observed_source_hints_onshape_urls"),
+        "observed_source_hints_export_tool_hints": probe.get("observed_source_hints_export_tool_hints"),
+        "observed_source_hints_license_status": probe.get("observed_source_hints_license_status"),
+        "observed_source_hints_license_path": probe.get("observed_source_hints_license_path"),
+        "observed_source_hints_sha256": probe.get("observed_source_hints_sha256"),
+        "observed_joint_limits_status": probe.get("observed_joint_limits_status"),
+        "observed_joint_limits_complete": probe.get("observed_joint_limits_complete"),
+        "observed_joint_limits_missing_joints": probe.get("observed_joint_limits_missing_joints"),
+        "mesh_asset_review_status": probe.get("mesh_asset_review_status"),
+        "mesh_asset_review_unique_missing_reference_count": probe.get(
+            "mesh_asset_review_unique_missing_reference_count"
+        ),
+        "mesh_asset_review_missing_references": probe.get("mesh_asset_review_missing_references"),
+        "mesh_asset_review_unique_unresolved_reference_count": probe.get(
+            "mesh_asset_review_unique_unresolved_reference_count"
+        ),
+        "mesh_asset_review_unresolved_references": probe.get("mesh_asset_review_unresolved_references"),
+        "manifest_status": probe.get("manifest_status"),
+        "ready_for_model_backed_ik": probe.get("ready_for_model_backed_ik"),
+        "missing_inputs": probe.get("missing_inputs") or [],
+        "review_packet_status": probe.get("review_packet_status"),
+        "review_packet_model_authority": probe.get("review_packet_model_authority"),
+        "review_packet_item_count": probe.get("review_packet_item_count"),
+        "review_packet_item_ids": probe.get("review_packet_item_ids") or [],
+        "review_packet_observed_evidence_is_authority": probe.get(
+            "review_packet_observed_evidence_is_authority"
+        ),
+        "review_packet_development_fixture_evidence_not_physical_so101_truth": probe.get(
+            "review_packet_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "next_required_for_goal": probe.get("next_required_for_goal") or [],
+        "next_required_action_ids": probe.get("next_required_action_ids") or [],
+        "authority": authority,
+        "provenance": provenance,
+        "asset_roots": asset_root_config,
+        "contract_checker": contract_checker,
+        "manifest_checker": manifest_checker,
+        "artifacts": {
+            "summary_json": artifacts.get("summary_json")
+            if isinstance(artifacts.get("summary_json"), str)
+            else str(summary_path),
+            "checklist_csv": artifacts.get("checklist_csv"),
+            "readme_md": artifacts.get("readme_md"),
+            "candidate_manifest_json": artifacts.get("candidate_manifest_json"),
+            "review_packet_json": artifacts.get("review_packet_json"),
+            "review_packet_csv": artifacts.get("review_packet_csv"),
+            "contract_summary_json": artifacts.get("contract_summary_json"),
+            "contract_checklist_csv": artifacts.get("contract_checklist_csv"),
+            "manifest_check_summary_json": artifacts.get("manifest_check_summary_json"),
+            "manifest_checklist_csv": artifacts.get("manifest_checklist_csv"),
+        },
+        "hardware_skipped": probe.get("hardware_skipped"),
+        "gui_skipped": probe.get("gui_skipped"),
+        "openai_skipped": probe.get("openai_skipped"),
+        "limitations": probe.get("limitations"),
+        "notes": [
+            "The suite-indexed bundle probe is a manifest drafting aid.",
+            "It never upgrades source authority or physical SO-101 authority on its own.",
+            "Use the generated candidate manifest only after replacing placeholders with reviewed authority, provenance, TCP, joint-limit, mesh, and board-alignment evidence.",
+        ],
     }
 
 
@@ -2672,6 +5026,8 @@ def so101_model_bundle_manifest_section(
     manifest_request = manifest_request if isinstance(manifest_request, dict) else {}
     model_path = bundle.get("model_path")
     model_path = model_path if isinstance(model_path, dict) else {}
+    model_identity = bundle.get("model_identity")
+    model_identity = model_identity if isinstance(model_identity, dict) else {}
     asset_roots = bundle.get("asset_roots")
     asset_roots = asset_roots if isinstance(asset_roots, dict) else {}
     target_frame = bundle.get("target_frame")
@@ -2692,6 +5048,10 @@ def so101_model_bundle_manifest_section(
     authority = authority if isinstance(authority, dict) else {}
     provenance = bundle.get("provenance")
     provenance = provenance if isinstance(provenance, dict) else {}
+    joint_limits = bundle.get("joint_limits")
+    joint_limits = joint_limits if isinstance(joint_limits, dict) else {}
+    mesh_assets = bundle.get("mesh_assets")
+    mesh_assets = mesh_assets if isinstance(mesh_assets, dict) else {}
     field_checks = bundle.get("field_checks")
     field_checks = field_checks if isinstance(field_checks, list) else []
     return {
@@ -2702,6 +5062,124 @@ def so101_model_bundle_manifest_section(
         "config": config,
         "forwarding": forwarding,
         "ready_for_model_backed_ik": bundle.get("ready_for_model_backed_ik"),
+        "model_authority": bundle.get("model_authority"),
+        "observed_evidence_is_physical_so101_authority": bundle.get(
+            "observed_evidence_is_physical_so101_authority"
+        ),
+        "observed_evidence_is_policy_training_authority": bundle.get(
+            "observed_evidence_is_policy_training_authority"
+        ),
+        "development_fixture_evidence_not_physical_so101_truth": bundle.get(
+            "development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "development_fixture_evidence_not_policy_training_truth": bundle.get(
+            "development_fixture_evidence_not_policy_training_truth"
+        ),
+        "ready_for_policy_training": bundle.get("ready_for_policy_training"),
+        "physical_authority_gate_status": bundle.get("physical_authority_gate_status"),
+        "physical_so101_model_authority_ready": bundle.get("physical_so101_model_authority_ready"),
+        "physical_authority_blockers": bundle.get("physical_authority_blockers"),
+        "hardware_free_regression_fixture_ready": bundle.get("hardware_free_regression_fixture_ready"),
+        "synthetic_fixture_authority_fields": bundle.get("synthetic_fixture_authority_fields"),
+        "review_packet_status": bundle.get("review_packet_status"),
+        "review_packet_model_authority": bundle.get("review_packet_model_authority"),
+        "review_packet_item_count": bundle.get("review_packet_item_count"),
+        "review_packet_item_ids": bundle.get("review_packet_item_ids"),
+        "review_packet_needs_operator_review_item_ids": bundle.get(
+            "review_packet_needs_operator_review_item_ids"
+        ),
+        "review_packet_action_ids": bundle.get("review_packet_action_ids"),
+        "review_packet_actions_match_next_required": bundle.get(
+            "review_packet_actions_match_next_required"
+        ),
+        "review_packet_actions_missing_from_next_required": bundle.get(
+            "review_packet_actions_missing_from_next_required"
+        ),
+        "next_required_actions_missing_from_review_packet": bundle.get(
+            "next_required_actions_missing_from_review_packet"
+        ),
+        "review_packet_observed_evidence_is_authority": bundle.get(
+            "review_packet_observed_evidence_is_authority"
+        ),
+        "review_packet_development_fixture_evidence_not_physical_so101_truth": bundle.get(
+            "review_packet_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "review_requirements_status": bundle.get("review_requirements_status"),
+        "review_requirements_model_authority": bundle.get(
+            "review_requirements_model_authority"
+        ),
+        "review_requirements_requirement_count": bundle.get(
+            "review_requirements_requirement_count"
+        ),
+        "review_requirements_requirement_ids": bundle.get(
+            "review_requirements_requirement_ids"
+        ),
+        "review_requirements_observed_evidence_is_authority": bundle.get(
+            "review_requirements_observed_evidence_is_authority"
+        ),
+        "review_requirements_physical_so101_truth_claimed": bundle.get(
+            "review_requirements_physical_so101_truth_claimed"
+        ),
+        "review_requirements_development_fixture_evidence_not_physical_so101_truth": bundle.get(
+            "review_requirements_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "review_requirements_json_path": bundle.get("review_requirements_json_path")
+        or artifacts.get("review_requirements_json"),
+        "review_requirements_csv_path": bundle.get("review_requirements_csv_path")
+        or artifacts.get("review_requirements_csv"),
+        "review_requirements": bundle.get("review_requirements"),
+        "bundle_intake_status": bundle.get("bundle_intake_status"),
+        "bundle_intake_model_authority": bundle.get("bundle_intake_model_authority"),
+        "bundle_intake_action_count": bundle.get("bundle_intake_action_count"),
+        "bundle_intake_action_ids": bundle.get("bundle_intake_action_ids"),
+        "bundle_intake_actions_match_next_required": bundle.get(
+            "bundle_intake_actions_match_next_required"
+        ),
+        "bundle_intake_actions_missing_from_next_required": bundle.get(
+            "bundle_intake_actions_missing_from_next_required"
+        ),
+        "next_required_actions_missing_from_bundle_intake": bundle.get(
+            "next_required_actions_missing_from_bundle_intake"
+        ),
+        "bundle_intake_observed_evidence_is_authority": bundle.get(
+            "bundle_intake_observed_evidence_is_authority"
+        ),
+        "bundle_intake_physical_so101_truth_claimed": bundle.get(
+            "bundle_intake_physical_so101_truth_claimed"
+        ),
+        "bundle_intake_development_fixture_evidence_not_physical_so101_truth": bundle.get(
+            "bundle_intake_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "bundle_intake_checklist_json_path": bundle.get(
+            "bundle_intake_checklist_json_path"
+        )
+        or artifacts.get("bundle_intake_checklist_json"),
+        "bundle_intake_checklist_csv_path": bundle.get("bundle_intake_checklist_csv_path")
+        or artifacts.get("bundle_intake_checklist_csv"),
+        "bundle_intake_checklist": bundle.get("bundle_intake_checklist"),
+        "reviewed_manifest_template_status": bundle.get(
+            "reviewed_manifest_template_status"
+        ),
+        "reviewed_manifest_template_model_authority": bundle.get(
+            "reviewed_manifest_template_model_authority"
+        ),
+        "reviewed_manifest_template_observed_evidence_is_authority": bundle.get(
+            "reviewed_manifest_template_observed_evidence_is_authority"
+        ),
+        "reviewed_manifest_template_physical_so101_truth_claimed": bundle.get(
+            "reviewed_manifest_template_physical_so101_truth_claimed"
+        ),
+        "reviewed_manifest_template_development_fixture_evidence_not_physical_so101_truth": bundle.get(
+            "reviewed_manifest_template_development_fixture_evidence_not_physical_so101_truth"
+        ),
+        "reviewed_manifest_template_json_path": bundle.get(
+            "reviewed_manifest_template_json_path"
+        )
+        or artifacts.get("reviewed_manifest_template_json"),
+        "reviewed_manifest_template": bundle.get("reviewed_manifest_template"),
+        "next_required_for_goal": bundle.get("next_required_for_goal"),
+        "next_required_action_ids": bundle.get("next_required_action_ids"),
+        "next_required_action_count": bundle.get("next_required_action_count"),
         "manifest_request": {
             "status": manifest_request.get("status"),
             "path": manifest_request.get("path"),
@@ -2713,8 +5191,18 @@ def so101_model_bundle_manifest_section(
             "raw": model_path.get("raw"),
             "path": model_path.get("path"),
             "exists": model_path.get("exists"),
+            "is_file": model_path.get("is_file"),
             "suffix": model_path.get("suffix"),
+            "sha256": model_path.get("sha256"),
             "diagnostics": model_path.get("diagnostics"),
+        },
+        "model_identity": {
+            "status": model_identity.get("status"),
+            "field": model_identity.get("field"),
+            "declared_sha256": model_identity.get("declared_sha256"),
+            "observed_sha256": model_identity.get("observed_sha256"),
+            "matches": model_identity.get("matches"),
+            "diagnostics": model_identity.get("diagnostics"),
         },
         "asset_roots": {
             "status": asset_roots.get("status"),
@@ -2724,7 +5212,42 @@ def so101_model_bundle_manifest_section(
             "diagnostics": asset_roots.get("diagnostics"),
         },
         "authority_status": authority.get("status"),
+        "authority_diagnostics": authority.get("diagnostics"),
+        "authority_review_evidence_valid_fields": authority.get("review_evidence_valid_fields"),
+        "authority_review_evidence_placeholder_fields": authority.get("review_evidence_placeholder_fields"),
+        "authority_review_evidence_invalid_fields": authority.get("review_evidence_invalid_fields"),
+        "authority_required_review_scope_ids": authority.get("required_review_scope_ids"),
+        "authority_supplied_review_scope_ids": authority.get("supplied_review_scope_ids"),
+        "authority_missing_review_scope_ids": authority.get("missing_review_scope_ids"),
+        "authority_review_scope_ready": authority.get("review_scope_ready"),
         "provenance_status": provenance.get("status"),
+        "provenance_diagnostics": provenance.get("diagnostics"),
+        "provenance_synthetic_fixture_only": provenance.get("synthetic_fixture_only"),
+        "provenance_fixture_only_fields": provenance.get("fixture_only_fields"),
+        "provenance_blocking_diagnostics": provenance.get("blocking_diagnostics"),
+        "provenance_source_field": provenance.get("source_field"),
+        "provenance_export_field": provenance.get("export_field"),
+        "provenance_license_field": provenance.get("license_field"),
+        "provenance_source_placeholder_fields": provenance.get("source_placeholder_fields"),
+        "provenance_export_placeholder_fields": provenance.get("export_placeholder_fields"),
+        "provenance_license_placeholder_fields": provenance.get("license_placeholder_fields"),
+        "joint_limits": {
+            "status": joint_limits.get("status"),
+            "field": joint_limits.get("field"),
+            "expected_joints": joint_limits.get("expected_joints"),
+            "missing_joints": joint_limits.get("missing_joints"),
+            "invalid_joints": joint_limits.get("invalid_joints"),
+            "diagnostics": joint_limits.get("diagnostics"),
+        },
+        "mesh_assets": {
+            "status": mesh_assets.get("status"),
+            "mesh_reference_count": mesh_assets.get("mesh_reference_count"),
+            "present_asset_count": mesh_assets.get("present_asset_count"),
+            "missing_asset_count": mesh_assets.get("missing_asset_count"),
+            "unresolved_reference_count": mesh_assets.get("unresolved_reference_count"),
+            "asset_preflight_status": mesh_assets.get("asset_preflight_status"),
+            "diagnostics": mesh_assets.get("diagnostics"),
+        },
         "target_frame": {
             "status": target_frame.get("status"),
             "value": target_frame.get("value"),
@@ -2774,6 +5297,17 @@ def so101_model_bundle_manifest_section(
             if isinstance(artifacts.get("summary_json"), str)
             else str(summary_path),
             "checklist_csv": artifacts.get("checklist_csv"),
+            "review_packet_json": artifacts.get("review_packet_json"),
+            "review_packet_csv": artifacts.get("review_packet_csv"),
+            "review_requirements_json": artifacts.get("review_requirements_json"),
+            "review_requirements_csv": artifacts.get("review_requirements_csv"),
+            "bundle_intake_checklist_json": artifacts.get(
+                "bundle_intake_checklist_json"
+            ),
+            "bundle_intake_checklist_csv": artifacts.get("bundle_intake_checklist_csv"),
+            "reviewed_manifest_template_json": artifacts.get(
+                "reviewed_manifest_template_json"
+            ),
             "readme_md": artifacts.get("readme_md"),
         },
         "hardware_skipped": bundle.get("hardware_skipped"),
@@ -2781,6 +5315,4681 @@ def so101_model_bundle_manifest_section(
         "openai_skipped": bundle.get("openai_skipped"),
         "limitations": bundle.get("limitations"),
     }
+
+
+def normalized_gate_path(value: Any) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return str(Path(value).expanduser().resolve(strict=False))
+
+
+def normalized_sha256(value: Any) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip().lower()
+    if text.startswith("sha256:"):
+        text = text.removeprefix("sha256:").strip()
+    if len(text) != 64:
+        return None
+    if any(char not in "0123456789abcdef" for char in text):
+        return None
+    return text
+
+
+def normalized_path_is_same_or_within(path: str | None, root: str | None) -> bool:
+    if not path or not root:
+        return False
+    try:
+        Path(path).relative_to(Path(root))
+    except ValueError:
+        return False
+    return True
+
+
+def so101_source_bundle_consistency_section(
+    source_inventory: dict[str, Any],
+    bundle_manifest: dict[str, Any],
+    *,
+    source_authority_ready: bool,
+    physical_authority_ready: bool,
+) -> dict[str, Any]:
+    source_configuration = source_inventory.get("source_configuration")
+    source_configuration = (
+        source_configuration if isinstance(source_configuration, dict) else {}
+    )
+    bundle_model_path = normalized_gate_path(
+        (bundle_manifest.get("model_path") or {}).get("path")
+        if isinstance(bundle_manifest.get("model_path"), dict)
+        else None
+    )
+    source_authoritative_paths = [
+        path
+        for path in (
+            normalized_gate_path(value)
+            for value in source_configuration.get("authoritative_model_paths") or []
+        )
+        if path
+    ]
+    source_authoritative_roots = [
+        path
+        for path in (
+            normalized_gate_path(value)
+            for value in source_configuration.get("authoritative_model_roots") or []
+        )
+        if path
+    ]
+    selected_authoritative_candidate_path = normalized_gate_path(
+        source_inventory.get("selected_authoritative_candidate_path")
+    )
+    selected_authoritative_candidate_sha256 = normalized_sha256(
+        source_inventory.get("selected_authoritative_candidate_sha256")
+    )
+    selected_declared_by_authoritative_path = bool(
+        selected_authoritative_candidate_path
+        and selected_authoritative_candidate_path in source_authoritative_paths
+    )
+    selected_within_authoritative_root = bool(
+        selected_authoritative_candidate_path
+        and any(
+            normalized_path_is_same_or_within(
+                selected_authoritative_candidate_path,
+                root,
+            )
+            for root in source_authoritative_roots
+        )
+    )
+    source_configuration_declares_authority = bool(
+        source_authoritative_paths or source_authoritative_roots
+    )
+    selected_covered_by_source_configuration = (
+        selected_declared_by_authoritative_path or selected_within_authoritative_root
+    )
+    bundle_model_identity = bundle_manifest.get("model_identity")
+    bundle_model_identity = (
+        bundle_model_identity if isinstance(bundle_model_identity, dict) else {}
+    )
+    bundle_model_declared_sha256 = normalized_sha256(
+        bundle_model_identity.get("declared_sha256")
+    )
+    bundle_model_observed_sha256 = normalized_sha256(
+        bundle_model_identity.get("observed_sha256")
+    )
+    bundle_model_sha256 = bundle_model_declared_sha256
+    bundle_observed_digest_missing = bool(
+        bundle_model_declared_sha256 and not bundle_model_observed_sha256
+    )
+    bundle_observed_digest_conflicts_with_declared = bool(
+        bundle_model_declared_sha256
+        and bundle_model_observed_sha256
+        and bundle_model_declared_sha256 != bundle_model_observed_sha256
+    )
+
+    selected_path_matches_bundle = bool(
+        bundle_model_path
+        and selected_authoritative_candidate_path
+        and bundle_model_path == selected_authoritative_candidate_path
+    )
+    selected_digest_matches_bundle = bool(
+        selected_authoritative_candidate_sha256
+        and bundle_model_declared_sha256
+        and selected_authoritative_candidate_sha256 == bundle_model_declared_sha256
+    )
+
+    prerequisites_ready = source_authority_ready and physical_authority_ready
+    if not prerequisites_ready:
+        status = "not_checked_prerequisites_not_ready"
+        ready = False
+        blocker = None
+    elif not bundle_model_path:
+        status = "bundle_model_path_missing"
+        ready = False
+        blocker = "select_reviewed_so101_model_path"
+    elif not selected_authoritative_candidate_path:
+        status = "source_authoritative_model_path_missing"
+        ready = False
+        blocker = "select_reviewed_authoritative_so101_source_model_path"
+    elif not source_configuration_declares_authority:
+        status = "source_authoritative_model_selection_unconfigured"
+        ready = False
+        blocker = "declare_reviewed_authoritative_so101_source_path_or_root"
+    elif not selected_covered_by_source_configuration:
+        status = "source_authoritative_model_selection_mismatch"
+        ready = False
+        blocker = "align_selected_so101_source_model_with_authoritative_declaration"
+    elif not selected_path_matches_bundle:
+        status = "source_bundle_model_path_mismatch"
+        ready = False
+        blocker = "align_source_inventory_with_bundle_manifest_model_path"
+    elif not selected_authoritative_candidate_sha256 or not bundle_model_declared_sha256:
+        status = "source_bundle_model_digest_missing"
+        ready = False
+        blocker = "record_reviewed_so101_model_file_sha256"
+    elif bundle_observed_digest_missing:
+        status = "bundle_model_observed_digest_missing"
+        ready = False
+        blocker = "verify_reviewed_so101_bundle_model_file_sha256"
+    elif bundle_observed_digest_conflicts_with_declared:
+        status = "bundle_model_observed_digest_mismatch"
+        ready = False
+        blocker = "inspect_reviewed_so101_bundle_model_file_sha256"
+    elif not selected_digest_matches_bundle:
+        status = "source_bundle_model_digest_mismatch"
+        ready = False
+        blocker = "align_source_inventory_with_bundle_manifest_model_digest"
+    elif selected_path_matches_bundle:
+        status = "source_bundle_model_path_and_digest_consistent"
+        ready = True
+        blocker = None
+    matched_by = (
+        "selected_authoritative_candidate_path_and_sha256"
+        if ready and selected_path_matches_bundle and selected_digest_matches_bundle
+        else None
+    )
+
+    return {
+        "ready": ready,
+        "status": status,
+        "checked": prerequisites_ready,
+        "prerequisites_ready": prerequisites_ready,
+        "bundle_model_path": bundle_model_path,
+        "source_authoritative_model_paths": source_authoritative_paths,
+        "source_authoritative_model_roots": source_authoritative_roots,
+        "selected_authoritative_candidate_path": selected_authoritative_candidate_path,
+        "selected_authoritative_candidate_declared_by_authoritative_path": (
+            selected_declared_by_authoritative_path
+        ),
+        "selected_authoritative_candidate_within_authoritative_root": (
+            selected_within_authoritative_root
+        ),
+        "selected_authoritative_candidate_covered_by_source_configuration": (
+            selected_covered_by_source_configuration
+        ),
+        "selected_authoritative_candidate_path_matches_bundle": selected_path_matches_bundle,
+        "selected_authoritative_candidate_sha256": selected_authoritative_candidate_sha256,
+        "bundle_model_declared_sha256": bundle_model_declared_sha256,
+        "bundle_model_observed_sha256": bundle_model_observed_sha256,
+        "bundle_model_sha256": bundle_model_sha256,
+        "bundle_model_observed_sha256_missing": bundle_observed_digest_missing,
+        "bundle_model_observed_sha256_matches_declared": bool(
+            bundle_model_declared_sha256
+            and bundle_model_observed_sha256
+            and bundle_model_declared_sha256 == bundle_model_observed_sha256
+        ),
+        "selected_authoritative_candidate_sha256_matches_bundle": selected_digest_matches_bundle,
+        "matched_by": matched_by,
+        "blocker": blocker,
+        "notes": [
+            "This check prevents source authority and bundle authority from closing on different model paths or digests.",
+            "It is evaluated only after source authority and physical bundle authority are otherwise ready.",
+            "A source-authority-ready inventory must still identify a selected model path covered by the authoritative path/root declarations in that same child summary.",
+            "The bundle manifest declared digest must match the selected authoritative model candidate digest.",
+            "The observed bundle model digest is diagnostic evidence and does not substitute for a reviewed manifest declaration, but it must not be missing or conflict with the declared digest when the bundle claims physical authority.",
+        ],
+    }
+
+
+def so101_reviewed_mujoco_motion_bundle_consistency_section(
+    bundle_manifest: dict[str, Any],
+    reviewed_mujoco_bundle: dict[str, Any],
+    *,
+    physical_authority_ready: bool,
+    source_bundle_consistency_ready: bool,
+    physical_reviewed_motion_child_ready: bool,
+) -> dict[str, Any]:
+    bundle_model_path = normalized_gate_path(
+        (bundle_manifest.get("model_path") or {}).get("path")
+        if isinstance(bundle_manifest.get("model_path"), dict)
+        else None
+    )
+    motion_model_path = normalized_gate_path(
+        (reviewed_mujoco_bundle.get("model_path") or {}).get("path")
+        if isinstance(reviewed_mujoco_bundle.get("model_path"), dict)
+        else None
+    )
+    bundle_model_identity = bundle_manifest.get("model_identity")
+    bundle_model_identity = (
+        bundle_model_identity if isinstance(bundle_model_identity, dict) else {}
+    )
+    motion_model_identity = reviewed_mujoco_bundle.get("model_identity")
+    motion_model_identity = (
+        motion_model_identity if isinstance(motion_model_identity, dict) else {}
+    )
+    bundle_model_declared_sha256 = normalized_sha256(
+        bundle_model_identity.get("declared_sha256")
+    )
+    motion_model_declared_sha256 = normalized_sha256(
+        motion_model_identity.get("declared_sha256")
+    )
+    motion_model_observed_sha256 = normalized_sha256(
+        motion_model_identity.get("observed_sha256")
+    )
+    prerequisites_ready = (
+        physical_authority_ready
+        and source_bundle_consistency_ready
+        and physical_reviewed_motion_child_ready
+    )
+    model_path_matches = bool(
+        bundle_model_path and motion_model_path and bundle_model_path == motion_model_path
+    )
+    model_digest_matches = bool(
+        bundle_model_declared_sha256
+        and motion_model_declared_sha256
+        and bundle_model_declared_sha256 == motion_model_declared_sha256
+    )
+    motion_observed_digest_missing = bool(
+        motion_model_declared_sha256 and not motion_model_observed_sha256
+    )
+    motion_observed_digest_conflicts_with_declared = bool(
+        motion_model_declared_sha256
+        and motion_model_observed_sha256
+        and motion_model_declared_sha256 != motion_model_observed_sha256
+    )
+    if not prerequisites_ready:
+        status = "not_checked_prerequisites_not_ready"
+        ready = False
+        blocker = None
+    elif not motion_model_path:
+        status = "reviewed_mujoco_motion_model_path_missing"
+        ready = False
+        blocker = "rerun_reviewed_mujoco_motion_with_bundle_model_path"
+    elif not bundle_model_path:
+        status = "bundle_model_path_missing"
+        ready = False
+        blocker = "select_reviewed_so101_model_path"
+    elif not model_path_matches:
+        status = "reviewed_mujoco_motion_model_path_mismatch"
+        ready = False
+        blocker = "align_reviewed_mujoco_motion_with_bundle_model_path"
+    elif not motion_model_declared_sha256 or not bundle_model_declared_sha256:
+        status = "reviewed_mujoco_motion_model_digest_missing"
+        ready = False
+        blocker = "record_reviewed_mujoco_motion_model_sha256"
+    elif motion_observed_digest_missing:
+        status = "reviewed_mujoco_motion_model_observed_digest_missing"
+        ready = False
+        blocker = "verify_reviewed_mujoco_motion_model_file_sha256"
+    elif motion_observed_digest_conflicts_with_declared:
+        status = "reviewed_mujoco_motion_model_observed_digest_mismatch"
+        ready = False
+        blocker = "inspect_reviewed_mujoco_motion_model_file_sha256"
+    elif not model_digest_matches:
+        status = "reviewed_mujoco_motion_model_digest_mismatch"
+        ready = False
+        blocker = "align_reviewed_mujoco_motion_with_bundle_model_digest"
+    else:
+        status = "reviewed_mujoco_motion_matches_bundle_model_identity"
+        ready = True
+        blocker = None
+
+    return {
+        "ready": ready,
+        "status": status,
+        "checked": prerequisites_ready,
+        "prerequisites_ready": prerequisites_ready,
+        "bundle_model_path": bundle_model_path,
+        "reviewed_mujoco_motion_model_path": motion_model_path,
+        "reviewed_mujoco_motion_model_path_matches_bundle": model_path_matches,
+        "bundle_model_declared_sha256": bundle_model_declared_sha256,
+        "reviewed_mujoco_motion_model_declared_sha256": motion_model_declared_sha256,
+        "reviewed_mujoco_motion_model_observed_sha256": motion_model_observed_sha256,
+        "reviewed_mujoco_motion_model_sha256_matches_bundle": model_digest_matches,
+        "reviewed_mujoco_motion_model_observed_sha256_missing": (
+            motion_observed_digest_missing
+        ),
+        "reviewed_mujoco_motion_model_observed_sha256_matches_declared": bool(
+            motion_model_declared_sha256
+            and motion_model_observed_sha256
+            and motion_model_declared_sha256 == motion_model_observed_sha256
+        ),
+        "blocker": blocker,
+        "notes": [
+            "This check prevents physical-reviewed MuJoCo motion evidence from closing authority for a different model path or digest than the reviewed bundle manifest.",
+            "It is evaluated only after source-to-bundle identity is ready and the reviewed-MuJoCo child reports physical motion ready.",
+            "The reviewed-MuJoCo motion summary must also carry an observed model-file digest that matches its reviewed declared digest.",
+        ],
+    }
+
+
+def so101_reviewed_model_authority_gate_section(
+    source_inventory: dict[str, Any],
+    bundle_manifest: dict[str, Any],
+    reviewed_mujoco_bundle: dict[str, Any],
+    public_candidate_intake_matrix: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    public_candidate_intake_matrix = (
+        public_candidate_intake_matrix
+        if isinstance(public_candidate_intake_matrix, dict)
+        else {}
+    )
+    public_candidate_checked = public_candidate_intake_matrix.get(
+        "candidate_intake_checked"
+    )
+    public_candidate_checked = (
+        public_candidate_checked if isinstance(public_candidate_checked, dict) else {}
+    )
+    public_candidate_child_records = public_candidate_intake_matrix.get("child_records")
+    public_candidate_child_records = (
+        public_candidate_child_records
+        if isinstance(public_candidate_child_records, list)
+        else []
+    )
+    public_candidate_checked_record = next(
+        (
+            record
+            for record in public_candidate_child_records
+            if isinstance(record, dict)
+            and record.get("case_id") == "candidate_intake_checked"
+        ),
+        {},
+    )
+    public_candidate_checked_artifacts = public_candidate_checked_record.get("artifacts")
+    public_candidate_checked_artifacts = (
+        public_candidate_checked_artifacts
+        if isinstance(public_candidate_checked_artifacts, dict)
+        else {}
+    )
+    public_candidate_operator_command_plan = {}
+    public_candidate_operator_command_plan_error = None
+    operator_command_plan_json_path = public_candidate_checked_artifacts.get(
+        "candidate_operator_command_plan_json"
+    )
+    if isinstance(operator_command_plan_json_path, str):
+        operator_command_plan_payload, operator_command_plan_error = read_json_object(
+            Path(operator_command_plan_json_path)
+        )
+        public_candidate_operator_command_plan = (
+            operator_command_plan_payload
+            if isinstance(operator_command_plan_payload, dict)
+            else {}
+        )
+        public_candidate_operator_command_plan_error = operator_command_plan_error
+    public_candidate_reviewed_manifest_rerun_plan = {}
+    public_candidate_reviewed_manifest_rerun_plan_error = None
+    reviewed_manifest_rerun_plan_json_path = public_candidate_checked_artifacts.get(
+        "candidate_reviewed_manifest_rerun_plan_json"
+    )
+    if isinstance(reviewed_manifest_rerun_plan_json_path, str):
+        reviewed_manifest_rerun_plan_payload, rerun_plan_error = read_json_object(
+            Path(reviewed_manifest_rerun_plan_json_path)
+        )
+        public_candidate_reviewed_manifest_rerun_plan = (
+            reviewed_manifest_rerun_plan_payload
+            if isinstance(reviewed_manifest_rerun_plan_payload, dict)
+            else {}
+        )
+        public_candidate_reviewed_manifest_rerun_plan_error = rerun_plan_error
+    recorded_operator_intake_decision_cases = public_candidate_intake_matrix.get(
+        "recorded_operator_intake_decision_cases"
+    )
+    recorded_operator_intake_decision_cases = (
+        recorded_operator_intake_decision_cases
+        if isinstance(recorded_operator_intake_decision_cases, dict)
+        else {}
+    )
+    recorded_operator_intake_decision_options = [
+        option
+        for option in (
+            "external_pinned_source_root",
+            "vendor_locked_bundle",
+        )
+        if isinstance(recorded_operator_intake_decision_cases.get(option), dict)
+    ]
+    recorded_operator_intake_selected_requirement_ids_by_option = {
+        option: recorded_operator_intake_decision_cases[option].get(
+            "candidate_operator_intake_selected_requirement_ids"
+        )
+        for option in recorded_operator_intake_decision_options
+    }
+    recorded_operator_intake_selected_requirement_counts_by_option = {
+        option: recorded_operator_intake_decision_cases[option].get(
+            "candidate_operator_intake_selected_requirement_count"
+        )
+        for option in recorded_operator_intake_decision_options
+    }
+    recorded_operator_command_selected_command_counts_by_option = {
+        option: recorded_operator_intake_decision_cases[option].get(
+            "candidate_operator_command_plan_selected_option_command_count"
+        )
+        for option in recorded_operator_intake_decision_options
+    }
+    recorded_operator_command_selected_requirement_ids_by_option = {
+        option: recorded_operator_intake_decision_cases[option].get(
+            "candidate_operator_intake_selected_requirement_ids"
+        )
+        for option in recorded_operator_intake_decision_options
+    }
+    review_handoff_artifacts = public_candidate_operator_command_plan.get(
+        "review_handoff_artifacts"
+    )
+    review_handoff_artifacts = (
+        review_handoff_artifacts if isinstance(review_handoff_artifacts, list) else []
+    )
+    review_handoff_artifact_ids = unique_string_values(
+        [
+            artifact.get("artifact_id")
+            for artifact in review_handoff_artifacts
+            if isinstance(artifact, dict)
+        ]
+    )
+    review_handoff_artifact_paths = {
+        artifact.get("artifact_id"): artifact.get("path")
+        for artifact in review_handoff_artifacts
+        if isinstance(artifact, dict) and artifact.get("artifact_id")
+    }
+    review_handoff_artifact_authority_boundaries = {
+        artifact.get("artifact_id"): artifact.get("authority_boundary")
+        for artifact in review_handoff_artifacts
+        if isinstance(artifact, dict) and artifact.get("artifact_id")
+    }
+    authority_blockers_until_reviewed = public_candidate_operator_command_plan.get(
+        "authority_blockers_until_reviewed"
+    )
+    authority_blockers_until_reviewed = (
+        authority_blockers_until_reviewed
+        if isinstance(authority_blockers_until_reviewed, list)
+        else []
+    )
+    public_candidate_source_lock_handoff = {
+        "status": (
+            "candidate_source_lock_ready_for_review"
+            if public_candidate_checked.get("candidate_source_lock_ready_for_review")
+            is True
+            else "candidate_source_lock_not_ready_for_review"
+        ),
+        "model_authority": public_candidate_checked.get(
+            "candidate_source_lock_model_authority"
+        )
+        or "candidate_source_lock_not_authority",
+        "ready_for_review": public_candidate_checked.get(
+            "candidate_source_lock_ready_for_review"
+        )
+        is True,
+        "source_lock_json_path": public_candidate_checked_artifacts.get(
+            "candidate_source_lock_json"
+        ),
+        "operator_intake_plan_json_path": public_candidate_checked_artifacts.get(
+            "candidate_operator_intake_plan_json"
+        ),
+        "operator_intake_plan_status": public_candidate_checked.get(
+            "candidate_operator_intake_plan_status"
+        ),
+        "operator_intake_plan_model_authority": public_candidate_checked.get(
+            "candidate_operator_intake_plan_model_authority"
+        )
+        or "candidate_operator_intake_plan_not_authority",
+        "operator_intake_decision_status": public_candidate_checked.get(
+            "candidate_operator_intake_decision_status"
+        ),
+        "operator_intake_option_count": public_candidate_checked.get(
+            "candidate_operator_intake_option_count"
+        ),
+        "operator_command_plan_json_path": operator_command_plan_json_path,
+        "operator_command_plan_parse_error": public_candidate_operator_command_plan_error,
+        "operator_command_plan_status": public_candidate_checked.get(
+            "candidate_operator_command_plan_status"
+        )
+        or public_candidate_operator_command_plan.get("status"),
+        "operator_command_plan_model_authority": public_candidate_checked.get(
+            "candidate_operator_command_plan_model_authority"
+        )
+        or public_candidate_operator_command_plan.get("model_authority")
+        or "candidate_operator_command_plan_not_authority",
+        "operator_command_plan_selected_option_command_count": (
+            public_candidate_checked.get(
+                "candidate_operator_command_plan_selected_option_command_count"
+            )
+            if public_candidate_checked.get(
+                "candidate_operator_command_plan_selected_option_command_count"
+            )
+            is not None
+            else public_candidate_operator_command_plan.get(
+                "selected_option_command_count"
+            )
+        ),
+        "operator_command_plan_selected_option_review_requirement_count": (
+            public_candidate_operator_command_plan.get(
+                "selected_option_review_requirement_count"
+            )
+        ),
+        "operator_command_plan_selected_option_review_requirement_ids": (
+            public_candidate_operator_command_plan.get(
+                "selected_option_review_requirement_ids"
+            )
+            or []
+        ),
+        "operator_command_plan_review_handoff_artifact_ids": (
+            review_handoff_artifact_ids
+        ),
+        "operator_command_plan_review_handoff_artifact_paths": (
+            review_handoff_artifact_paths
+        ),
+        "operator_command_plan_review_handoff_artifact_authority_boundaries": (
+            review_handoff_artifact_authority_boundaries
+        ),
+        "operator_command_plan_authority_blockers_until_reviewed": (
+            authority_blockers_until_reviewed
+        ),
+        "reviewed_manifest_rerun_plan_json_path": (
+            reviewed_manifest_rerun_plan_json_path
+        ),
+        "reviewed_manifest_rerun_plan_parse_error": (
+            public_candidate_reviewed_manifest_rerun_plan_error
+        ),
+        "reviewed_manifest_rerun_plan_status": public_candidate_checked.get(
+            "candidate_reviewed_manifest_rerun_plan_status"
+        )
+        or public_candidate_reviewed_manifest_rerun_plan.get("status"),
+        "reviewed_manifest_rerun_plan_model_authority": public_candidate_checked.get(
+            "candidate_reviewed_manifest_rerun_plan_model_authority"
+        )
+        or public_candidate_reviewed_manifest_rerun_plan.get("model_authority")
+        or "candidate_reviewed_manifest_rerun_plan_not_authority",
+        "reviewed_manifest_rerun_plan_selected_option": public_candidate_checked.get(
+            "candidate_reviewed_manifest_rerun_plan_selected_option"
+        )
+        or public_candidate_reviewed_manifest_rerun_plan.get(
+            "selected_intake_option_id"
+        ),
+        "reviewed_manifest_rerun_plan_source_lock_ready": (
+            public_candidate_checked.get(
+                "candidate_reviewed_manifest_rerun_plan_source_lock_ready"
+            )
+            if public_candidate_checked.get(
+                "candidate_reviewed_manifest_rerun_plan_source_lock_ready"
+            )
+            is not None
+            else public_candidate_reviewed_manifest_rerun_plan.get(
+                "source_lock_ready_for_review"
+            )
+        ),
+        "reviewed_manifest_rerun_plan_required_success_conditions": (
+            public_candidate_reviewed_manifest_rerun_plan.get(
+                "required_success_conditions"
+            )
+            or []
+        ),
+        "review_checklist_scope_coverage_ready": public_candidate_checked.get(
+            "candidate_review_checklist_scope_coverage_ready"
+        ),
+        "review_checklist_missing_required_review_scope_ids": (
+            public_candidate_checked.get(
+                "candidate_review_checklist_missing_required_review_scope_ids"
+            )
+        ),
+        "review_checklist_gripper_mapping_direct_action_ids": (
+            public_candidate_checked.get(
+                "candidate_review_checklist_gripper_mapping_direct_action_ids"
+            )
+        ),
+        "review_checklist_collision_policy_direct_action_ids": (
+            public_candidate_checked.get(
+                "candidate_review_checklist_collision_policy_direct_action_ids"
+            )
+        ),
+        "selected_model_expected_joint_coverage_status": public_candidate_checked.get(
+            "candidate_source_lock_selected_model_expected_joint_coverage_status"
+        ),
+        "selected_model_expected_joint_observed_count": public_candidate_checked.get(
+            "candidate_source_lock_selected_model_expected_joint_observed_count"
+        ),
+        "selected_model_expected_joint_missing_count": public_candidate_checked.get(
+            "candidate_source_lock_selected_model_expected_joint_missing_count"
+        ),
+        "selected_model_unexpected_joint_count": public_candidate_checked.get(
+            "candidate_source_lock_selected_model_unexpected_joint_count"
+        ),
+        "recorded_operator_intake_decision_options": (
+            recorded_operator_intake_decision_options
+        ),
+        "recorded_operator_intake_selected_requirement_ids_by_option": (
+            recorded_operator_intake_selected_requirement_ids_by_option
+        ),
+        "recorded_operator_intake_selected_requirement_counts_by_option": (
+            recorded_operator_intake_selected_requirement_counts_by_option
+        ),
+        "recorded_operator_command_selected_command_counts_by_option": (
+            recorded_operator_command_selected_command_counts_by_option
+        ),
+        "recorded_operator_command_selected_requirement_ids_by_option": (
+            recorded_operator_command_selected_requirement_ids_by_option
+        ),
+        "recorded_operator_intake_decision_cases": (
+            recorded_operator_intake_decision_cases
+        ),
+        "review_manifest_template_path": public_candidate_checked.get(
+            "direct_manifest_path"
+        ),
+        "candidate_intake_matrix_summary_path": public_candidate_intake_matrix.get(
+            "summary_path"
+        ),
+        "candidate_intake_matrix_status": public_candidate_intake_matrix.get("status"),
+        "physical_so101_authority_ready": False,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "notes": [
+            "The public candidate source lock is review handoff context only.",
+            "It does not satisfy source authority, reviewed bundle authority, or reviewed MuJoCo motion.",
+        ],
+    }
+    source_authority_status_ready = (
+        source_inventory.get("source_authority_gate_status") == "source_authority_ready"
+    )
+    source_authority_blockers = unique_string_values(
+        source_inventory.get("source_authority_blockers") or []
+    )
+    source_next_required = source_inventory.get("next_required_action_ids")
+    source_next_required_action_ids = unique_string_values(
+        source_next_required if isinstance(source_next_required, list) else []
+    )
+    source_next_required_for_goal = source_inventory.get("next_required_for_goal")
+    source_next_required_for_goal_action_ids = unique_string_values(
+        [
+            action.get("action_id")
+            for action in source_next_required_for_goal
+            if isinstance(action, dict)
+        ]
+        if isinstance(source_next_required_for_goal, list)
+        else []
+    )
+    source_authority_pending_action_ids = unique_string_values(
+        [
+            *source_next_required_action_ids,
+            *source_next_required_for_goal_action_ids,
+        ]
+    )
+    source_authority_contradictory_ready_state = bool(
+        source_authority_status_ready
+        and (source_authority_blockers or source_authority_pending_action_ids)
+    )
+    source_authority_ready = (
+        source_authority_status_ready
+        and not source_authority_blockers
+        and not source_authority_pending_action_ids
+    )
+    physical_bundle_authority_status_ready = (
+        bundle_manifest.get("physical_so101_model_authority_ready") is True
+    )
+    physical_bundle_authority_blockers = unique_string_values(
+        bundle_manifest.get("physical_authority_blockers") or []
+    )
+    bundle_next_required = bundle_manifest.get("next_required_action_ids")
+    physical_bundle_next_required_action_ids = unique_string_values(
+        bundle_next_required if isinstance(bundle_next_required, list) else []
+    )
+    bundle_next_required_for_goal = bundle_manifest.get("next_required_for_goal")
+    physical_bundle_next_required_for_goal_action_ids = unique_string_values(
+        [
+            action.get("action_id")
+            for action in bundle_next_required_for_goal
+            if isinstance(action, dict)
+        ]
+        if isinstance(bundle_next_required_for_goal, list)
+        else []
+    )
+    physical_bundle_authority_pending_action_ids = unique_string_values(
+        [
+            *physical_bundle_next_required_action_ids,
+            *physical_bundle_next_required_for_goal_action_ids,
+        ]
+    )
+    physical_bundle_authority_contradictory_ready_state = bool(
+        physical_bundle_authority_status_ready
+        and (
+            physical_bundle_authority_blockers
+            or physical_bundle_authority_pending_action_ids
+        )
+    )
+    physical_authority_ready = (
+        physical_bundle_authority_status_ready
+        and not physical_bundle_authority_blockers
+        and not physical_bundle_authority_pending_action_ids
+    )
+    bundle_fixture_ready = bundle_manifest.get("hardware_free_regression_fixture_ready") is True
+    physical_reviewed_motion_reported = (
+        reviewed_mujoco_bundle.get("physical_reviewed_model_motion_checked") is True
+    )
+    fixture_motion_checked = reviewed_mujoco_bundle.get("hardware_free_fixture_motion_checked") is True
+    development_fixture_evidence_present = bundle_fixture_ready or fixture_motion_checked
+    reviewed_mujoco_bundle_status = reviewed_mujoco_bundle.get("status")
+    reviewed_mujoco_motion_authority_status = reviewed_mujoco_bundle.get(
+        "motion_authority_status"
+    )
+    reviewed_mujoco_motion_missing_inputs = unique_string_values(
+        reviewed_mujoco_bundle.get("missing_inputs") or []
+    )
+    reviewed_mujoco_next_required = reviewed_mujoco_bundle.get("next_required_for_goal")
+    reviewed_mujoco_next_required_action_ids = unique_string_values(
+        [
+            action.get("action_id") if isinstance(action, dict) else action
+            for action in reviewed_mujoco_next_required
+        ]
+        if isinstance(reviewed_mujoco_next_required, list)
+        else []
+    )
+    physical_reviewed_motion_status_ready = (
+        reviewed_mujoco_bundle_status == "reviewed_mujoco_bundle_motion_checked"
+        and reviewed_mujoco_motion_authority_status
+        == "physical_reviewed_model_motion_checked"
+    )
+    reviewed_mujoco_motion_contradictory_ready_state = bool(
+        physical_reviewed_motion_reported
+        and physical_reviewed_motion_status_ready
+        and (
+            reviewed_mujoco_motion_missing_inputs
+            or reviewed_mujoco_next_required_action_ids
+        )
+    )
+    physical_reviewed_motion_child_ready = (
+        physical_reviewed_motion_reported and physical_reviewed_motion_status_ready
+        and not reviewed_mujoco_motion_missing_inputs
+        and not reviewed_mujoco_next_required_action_ids
+    )
+    source_bundle_consistency = so101_source_bundle_consistency_section(
+        source_inventory,
+        bundle_manifest,
+        source_authority_ready=source_authority_ready,
+        physical_authority_ready=physical_authority_ready,
+    )
+    source_bundle_consistency_ready = source_bundle_consistency.get("ready") is True
+    reviewed_mujoco_motion_bundle_consistency = (
+        so101_reviewed_mujoco_motion_bundle_consistency_section(
+            bundle_manifest,
+            reviewed_mujoco_bundle,
+            physical_authority_ready=physical_authority_ready,
+            source_bundle_consistency_ready=source_bundle_consistency_ready,
+            physical_reviewed_motion_child_ready=physical_reviewed_motion_child_ready,
+        )
+    )
+    reviewed_mujoco_motion_bundle_consistency_ready = (
+        reviewed_mujoco_motion_bundle_consistency.get("ready") is True
+    )
+    physical_reviewed_motion_ready = (
+        physical_reviewed_motion_child_ready
+        and reviewed_mujoco_motion_bundle_consistency_ready
+    )
+    ready = (
+        source_authority_ready
+        and physical_authority_ready
+        and source_bundle_consistency_ready
+        and physical_reviewed_motion_ready
+        and not development_fixture_evidence_present
+    )
+    development_fixture_evidence_not_physical_truth = (
+        not ready or development_fixture_evidence_present
+    )
+
+    blockers = unique_string_values(
+        [
+            *(source_inventory.get("source_authority_blockers") or []),
+            *(
+                ["resolve_contradictory_source_authority_gate_state"]
+                if source_authority_contradictory_ready_state
+                else []
+            ),
+            *physical_bundle_authority_blockers,
+            *(
+                ["resolve_contradictory_physical_bundle_authority_gate_state"]
+                if physical_bundle_authority_contradictory_ready_state
+                else []
+            ),
+            *(
+                []
+                if source_bundle_consistency.get("blocker") is None
+                else [source_bundle_consistency["blocker"]]
+            ),
+            *(
+                []
+                if reviewed_mujoco_motion_bundle_consistency.get("blocker") is None
+                else [reviewed_mujoco_motion_bundle_consistency["blocker"]]
+            ),
+            *(
+                ["resolve_contradictory_reviewed_mujoco_motion_gate_state"]
+                if reviewed_mujoco_motion_contradictory_ready_state
+                else []
+            ),
+            *(
+                []
+                if physical_reviewed_motion_child_ready
+                else [
+                    "load_reviewed_model_in_mujoco",
+                    "prove_physical_reviewed_model_motion",
+                ]
+            ),
+            *(
+                ["replace_development_fixture_evidence_with_reviewed_physical_so101_authority"]
+                if development_fixture_evidence_present
+                else []
+            ),
+        ]
+    )
+    consistency_status = source_bundle_consistency.get("status")
+    if consistency_status == "source_bundle_model_path_mismatch":
+        consistency_actions = [
+            {
+                "action_id": "align_source_inventory_with_bundle_manifest_model_path",
+                "gate": "reviewed_model_authority",
+                "title": "Align source inventory and bundle model paths",
+                "detail": (
+                    "Use the same reviewed SO-101 model path in the source inventory "
+                    "and the reviewed bundle manifest before closing model authority."
+                ),
+            }
+        ]
+    elif consistency_status == "source_authoritative_model_path_missing":
+        consistency_actions = [
+            {
+                "action_id": "select_reviewed_authoritative_so101_source_model_path",
+                "gate": "reviewed_model_authority",
+                "title": "Select reviewed authoritative SO-101 source model path",
+                "detail": (
+                    "Record selected_authoritative_candidate_path in the source inventory "
+                    "before comparing source authority with the reviewed bundle manifest."
+                ),
+            }
+        ]
+    elif consistency_status == "source_authoritative_model_selection_unconfigured":
+        consistency_actions = [
+            {
+                "action_id": "declare_reviewed_authoritative_so101_source_path_or_root",
+                "gate": "reviewed_model_authority",
+                "title": "Declare reviewed authoritative SO-101 source path or root",
+                "detail": (
+                    "Rerun the source inventory with the reviewed authoritative model "
+                    "path or root so the selected source model is covered by explicit "
+                    "authority declarations."
+                ),
+            }
+        ]
+    elif consistency_status == "source_authoritative_model_selection_mismatch":
+        consistency_actions = [
+            {
+                "action_id": "align_selected_so101_source_model_with_authoritative_declaration",
+                "gate": "reviewed_model_authority",
+                "title": "Align selected SO-101 source model with authority declaration",
+                "detail": (
+                    "Resolve the source inventory so selected_authoritative_candidate_path "
+                    "matches an authoritative model path or is inside an authoritative "
+                    "model root before comparing it with the bundle manifest."
+                ),
+            }
+        ]
+    elif consistency_status == "source_bundle_model_digest_mismatch":
+        consistency_actions = [
+            {
+                "action_id": "align_source_inventory_with_bundle_manifest_model_digest",
+                "gate": "reviewed_model_authority",
+                "title": "Align source inventory and bundle model digests",
+                "detail": (
+                    "Use the same reviewed SO-101 model file digest in the source inventory "
+                    "and the reviewed bundle manifest before closing model authority."
+                ),
+            }
+        ]
+    elif consistency_status == "bundle_model_observed_digest_missing":
+        consistency_actions = [
+            {
+                "action_id": "verify_reviewed_so101_bundle_model_file_sha256",
+                "gate": "reviewed_model_authority",
+                "title": "Verify reviewed SO-101 bundle model file digest",
+                "detail": (
+                    "Re-run the reviewed bundle manifest check against a readable "
+                    "model file so the observed SHA-256 can be compared with the "
+                    "reviewed manifest declaration."
+                ),
+            }
+        ]
+    elif consistency_status == "bundle_model_observed_digest_mismatch":
+        consistency_actions = [
+            {
+                "action_id": "inspect_reviewed_so101_bundle_model_file_sha256",
+                "gate": "reviewed_model_authority",
+                "title": "Inspect reviewed SO-101 bundle model file digest",
+                "detail": (
+                    "Resolve the mismatch between the bundle manifest's reviewed "
+                    "model SHA-256 declaration and the observed model file digest "
+                    "before closing SO-101 model authority."
+                ),
+            }
+        ]
+    elif consistency_status == "source_bundle_model_digest_missing":
+        consistency_actions = [
+            {
+                "action_id": "record_reviewed_so101_model_file_sha256",
+                "gate": "reviewed_model_authority",
+                "title": "Record reviewed SO-101 model digest",
+                "detail": (
+                    "Record the selected authoritative source SHA-256 and matching bundle "
+                    "model_sha256 before checking source-to-bundle identity consistency."
+                ),
+            }
+        ]
+    elif consistency_status == "bundle_model_path_missing":
+        consistency_actions = [
+            {
+                "action_id": "select_reviewed_so101_model_path",
+                "gate": "reviewed_model_authority",
+                "title": "Select reviewed SO-101 bundle model path",
+                "detail": (
+                    "Record the reviewed SO-101 model path in the bundle manifest "
+                    "before checking source-to-bundle model identity consistency."
+                ),
+            }
+        ]
+    else:
+        consistency_actions = []
+    motion_consistency_status = reviewed_mujoco_motion_bundle_consistency.get("status")
+    if motion_consistency_status == "reviewed_mujoco_motion_model_path_missing":
+        motion_consistency_actions = [
+            {
+                "action_id": "rerun_reviewed_mujoco_motion_with_bundle_model_path",
+                "gate": "mujoco_scene_validity",
+                "title": "Rerun reviewed MuJoCo motion with bundle model path",
+                "detail": (
+                    "Regenerate the reviewed-MuJoCo bundle evidence from the reviewed "
+                    "bundle manifest so the motion summary carries the same model path."
+                ),
+            }
+        ]
+    elif motion_consistency_status == "reviewed_mujoco_motion_model_path_mismatch":
+        motion_consistency_actions = [
+            {
+                "action_id": "align_reviewed_mujoco_motion_with_bundle_model_path",
+                "gate": "mujoco_scene_validity",
+                "title": "Align reviewed MuJoCo motion model path",
+                "detail": (
+                    "Rerun or replace the reviewed-MuJoCo motion evidence so its model "
+                    "path matches the reviewed bundle manifest model path."
+                ),
+            }
+        ]
+    elif motion_consistency_status == "reviewed_mujoco_motion_model_digest_missing":
+        motion_consistency_actions = [
+            {
+                "action_id": "record_reviewed_mujoco_motion_model_sha256",
+                "gate": "mujoco_scene_validity",
+                "title": "Record reviewed MuJoCo motion model digest",
+                "detail": (
+                    "Ensure the reviewed-MuJoCo motion summary carries the reviewed "
+                    "model SHA-256 from the bundle manifest before closing authority."
+                ),
+            }
+        ]
+    elif (
+        motion_consistency_status
+        == "reviewed_mujoco_motion_model_observed_digest_missing"
+    ):
+        motion_consistency_actions = [
+            {
+                "action_id": "verify_reviewed_mujoco_motion_model_file_sha256",
+                "gate": "mujoco_scene_validity",
+                "title": "Verify reviewed MuJoCo motion model file digest",
+                "detail": (
+                    "Rerun the reviewed-MuJoCo motion check against a readable "
+                    "model file so the observed SHA-256 can be compared with the "
+                    "reviewed motion declaration."
+                ),
+            }
+        ]
+    elif (
+        motion_consistency_status
+        == "reviewed_mujoco_motion_model_observed_digest_mismatch"
+    ):
+        motion_consistency_actions = [
+            {
+                "action_id": "inspect_reviewed_mujoco_motion_model_file_sha256",
+                "gate": "mujoco_scene_validity",
+                "title": "Inspect reviewed MuJoCo motion model file digest",
+                "detail": (
+                    "Resolve the mismatch between the reviewed-MuJoCo motion "
+                    "model SHA-256 declaration and the observed model file digest "
+                    "before closing SO-101 model authority."
+                ),
+            }
+        ]
+    elif motion_consistency_status == "reviewed_mujoco_motion_model_digest_mismatch":
+        motion_consistency_actions = [
+            {
+                "action_id": "align_reviewed_mujoco_motion_with_bundle_model_digest",
+                "gate": "mujoco_scene_validity",
+                "title": "Align reviewed MuJoCo motion model digest",
+                "detail": (
+                    "Rerun or replace the reviewed-MuJoCo motion evidence so its model "
+                    "digest matches the reviewed bundle manifest declaration."
+                ),
+            }
+        ]
+    else:
+        motion_consistency_actions = []
+    source_authority_contradiction_actions = (
+        [
+            {
+                "action_id": "resolve_contradictory_source_authority_gate_state",
+                "gate": "reviewed_model_authority",
+                "title": "Resolve contradictory source-authority state",
+                "detail": (
+                    "Rerun or inspect the SO-101 model-source inventory because it "
+                    "reports source_authority_ready while still carrying source "
+                    "blockers or pending source-authority actions."
+                ),
+            }
+        ]
+        if source_authority_contradictory_ready_state
+        else []
+    )
+    physical_bundle_authority_contradiction_actions = (
+        [
+            {
+                "action_id": "resolve_contradictory_physical_bundle_authority_gate_state",
+                "gate": "reviewed_model_authority",
+                "title": "Resolve contradictory physical-bundle authority state",
+                "detail": (
+                    "Rerun or inspect the SO-101 model-bundle manifest because it "
+                    "reports physical_so101_model_authority_ready while still "
+                    "carrying physical-authority blockers or pending bundle actions."
+                ),
+            }
+        ]
+        if physical_bundle_authority_contradictory_ready_state
+        else []
+    )
+    reviewed_mujoco_motion_contradiction_actions = (
+        [
+            {
+                "action_id": "resolve_contradictory_reviewed_mujoco_motion_gate_state",
+                "gate": "mujoco_scene_validity",
+                "title": "Resolve contradictory reviewed MuJoCo motion state",
+                "detail": (
+                    "Rerun or inspect the reviewed MuJoCo bundle summary because it "
+                    "reports physical reviewed motion while still carrying missing "
+                    "inputs or pending reviewed-motion actions."
+                ),
+            }
+        ]
+        if reviewed_mujoco_motion_contradictory_ready_state
+        else []
+    )
+    motion_actions = (
+        [
+            {
+                "action_id": "load_reviewed_model_in_mujoco",
+                "gate": "mujoco_scene_validity",
+                "title": "Load the reviewed SO-101 model in MuJoCo",
+                "detail": (
+                    "Load the reviewed bundle in MuJoCo with the declared mesh roots, "
+                    "joint map, target frame, TCP offset, and base-to-board alignment."
+                ),
+            },
+            {
+                "action_id": "prove_physical_reviewed_model_motion",
+                "gate": "mujoco_scene_validity",
+                "title": "Prove reviewed SO-101 joint motion",
+                "detail": (
+                    "Move every reviewed SO-101 joint in MuJoCo without fallback behavior "
+                    "and record physical-reviewed motion evidence."
+                ),
+            },
+        ]
+        if not physical_reviewed_motion_reported
+        or not physical_reviewed_motion_status_ready
+        else []
+    )
+    fixture_boundary_actions = (
+        [
+            {
+                "action_id": (
+                    "replace_development_fixture_evidence_with_reviewed_physical_so101_authority"
+                ),
+                "gate": "reviewed_model_authority",
+                "title": "Replace fixture-only evidence before closing authority",
+                "detail": (
+                    "Resolve any hardware-free fixture readiness or fixture-motion flags "
+                    "before treating the aggregate SO-101 model authority gate as reviewed "
+                    "physical truth."
+                ),
+            }
+        ]
+        if development_fixture_evidence_present
+        else []
+    )
+    next_required_for_goal = prioritized_gate_actions(
+        source_inventory.get("next_required_for_goal"),
+        source_authority_contradiction_actions,
+        bundle_manifest.get("next_required_for_goal"),
+        physical_bundle_authority_contradiction_actions,
+        reviewed_mujoco_bundle.get("next_required_for_goal"),
+        reviewed_mujoco_motion_contradiction_actions,
+        consistency_actions,
+        motion_consistency_actions,
+        fixture_boundary_actions,
+        motion_actions,
+    )
+    return {
+        "status": "reviewed_model_authority_ready"
+        if ready
+        else "reviewed_model_authority_blocked",
+        "model_authority": (
+            "reviewed_so101_model_authority_gate"
+            if ready
+            else "reviewed_model_authority_gate_not_authority"
+        ),
+        "ready": ready,
+        "reviewed_model_authority_ready": ready,
+        "observed_evidence_is_physical_so101_authority": ready,
+        "observed_evidence_is_policy_training_authority": False,
+        "development_fixture_evidence_not_physical_so101_truth": (
+            development_fixture_evidence_not_physical_truth
+        ),
+        "development_fixture_evidence_not_policy_training_truth": True,
+        "ready_for_model_backed_ik": ready,
+        "ready_for_policy_training": False,
+        "source_authority_ready": source_authority_ready,
+        "source_authority_status_ready": source_authority_status_ready,
+        "source_authority_gate_status": source_inventory.get("source_authority_gate_status"),
+        "source_authority_blockers": source_authority_blockers,
+        "source_authority_pending_action_ids": source_authority_pending_action_ids,
+        "source_authority_contradictory_ready_state": (
+            source_authority_contradictory_ready_state
+        ),
+        "physical_so101_model_authority_ready": physical_authority_ready,
+        "physical_bundle_authority_status_ready": physical_bundle_authority_status_ready,
+        "physical_bundle_authority_blockers": physical_bundle_authority_blockers,
+        "physical_bundle_authority_pending_action_ids": (
+            physical_bundle_authority_pending_action_ids
+        ),
+        "physical_bundle_authority_contradictory_ready_state": (
+            physical_bundle_authority_contradictory_ready_state
+        ),
+        "hardware_free_regression_fixture_ready": bundle_fixture_ready,
+        "physical_authority_gate_status": bundle_manifest.get("physical_authority_gate_status"),
+        "source_bundle_consistency_ready": source_bundle_consistency_ready,
+        "source_bundle_consistency_status": source_bundle_consistency.get("status"),
+        "source_bundle_consistency": source_bundle_consistency,
+        "public_candidate_source_lock_handoff": public_candidate_source_lock_handoff,
+        "public_candidate_source_lock_ready_for_review": (
+            public_candidate_source_lock_handoff["ready_for_review"]
+        ),
+        "public_candidate_source_lock_json_path": (
+            public_candidate_source_lock_handoff["source_lock_json_path"]
+        ),
+        "public_candidate_operator_intake_plan_json_path": (
+            public_candidate_source_lock_handoff["operator_intake_plan_json_path"]
+        ),
+        "public_candidate_operator_intake_plan_status": (
+            public_candidate_source_lock_handoff["operator_intake_plan_status"]
+        ),
+        "public_candidate_operator_intake_decision_status": (
+            public_candidate_source_lock_handoff["operator_intake_decision_status"]
+        ),
+        "public_candidate_operator_intake_plan_model_authority": (
+            public_candidate_source_lock_handoff[
+                "operator_intake_plan_model_authority"
+            ]
+        ),
+        "public_candidate_operator_command_plan_json_path": (
+            public_candidate_source_lock_handoff["operator_command_plan_json_path"]
+        ),
+        "public_candidate_operator_command_plan_status": (
+            public_candidate_source_lock_handoff["operator_command_plan_status"]
+        ),
+        "public_candidate_operator_command_plan_model_authority": (
+            public_candidate_source_lock_handoff[
+                "operator_command_plan_model_authority"
+            ]
+        ),
+        "public_candidate_operator_command_plan_review_handoff_artifact_ids": (
+            public_candidate_source_lock_handoff[
+                "operator_command_plan_review_handoff_artifact_ids"
+            ]
+        ),
+        "public_candidate_operator_command_plan_authority_blockers_until_reviewed": (
+            public_candidate_source_lock_handoff[
+                "operator_command_plan_authority_blockers_until_reviewed"
+            ]
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_json_path": (
+            public_candidate_source_lock_handoff[
+                "reviewed_manifest_rerun_plan_json_path"
+            ]
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_status": (
+            public_candidate_source_lock_handoff[
+                "reviewed_manifest_rerun_plan_status"
+            ]
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_model_authority": (
+            public_candidate_source_lock_handoff[
+                "reviewed_manifest_rerun_plan_model_authority"
+            ]
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_selected_option": (
+            public_candidate_source_lock_handoff[
+                "reviewed_manifest_rerun_plan_selected_option"
+            ]
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready": (
+            public_candidate_source_lock_handoff[
+                "reviewed_manifest_rerun_plan_source_lock_ready"
+            ]
+        ),
+        "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions": (
+            public_candidate_source_lock_handoff[
+                "reviewed_manifest_rerun_plan_required_success_conditions"
+            ]
+        ),
+        "public_candidate_review_checklist_scope_coverage_ready": (
+            public_candidate_source_lock_handoff[
+                "review_checklist_scope_coverage_ready"
+            ]
+        ),
+        "public_candidate_review_checklist_missing_required_review_scope_ids": (
+            public_candidate_source_lock_handoff[
+                "review_checklist_missing_required_review_scope_ids"
+            ]
+        ),
+        "public_candidate_review_checklist_gripper_mapping_direct_action_ids": (
+            public_candidate_source_lock_handoff[
+                "review_checklist_gripper_mapping_direct_action_ids"
+            ]
+        ),
+        "public_candidate_review_checklist_collision_policy_direct_action_ids": (
+            public_candidate_source_lock_handoff[
+                "review_checklist_collision_policy_direct_action_ids"
+            ]
+        ),
+        "public_candidate_recorded_operator_intake_decision_options": (
+            public_candidate_source_lock_handoff[
+                "recorded_operator_intake_decision_options"
+            ]
+        ),
+        "public_candidate_recorded_operator_intake_selected_requirement_ids_by_option": (
+            public_candidate_source_lock_handoff[
+                "recorded_operator_intake_selected_requirement_ids_by_option"
+            ]
+        ),
+        "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option": (
+            public_candidate_source_lock_handoff[
+                "recorded_operator_intake_selected_requirement_counts_by_option"
+            ]
+        ),
+        "public_candidate_recorded_operator_command_selected_command_counts_by_option": (
+            public_candidate_source_lock_handoff[
+                "recorded_operator_command_selected_command_counts_by_option"
+            ]
+        ),
+        "public_candidate_recorded_operator_command_selected_requirement_ids_by_option": (
+            public_candidate_source_lock_handoff[
+                "recorded_operator_command_selected_requirement_ids_by_option"
+            ]
+        ),
+        "public_candidate_review_manifest_template_path": (
+            public_candidate_source_lock_handoff["review_manifest_template_path"]
+        ),
+        "reviewed_mujoco_motion_bundle_consistency_ready": (
+            reviewed_mujoco_motion_bundle_consistency_ready
+        ),
+        "reviewed_mujoco_motion_bundle_consistency_status": (
+            reviewed_mujoco_motion_bundle_consistency.get("status")
+        ),
+        "reviewed_mujoco_motion_bundle_consistency": (
+            reviewed_mujoco_motion_bundle_consistency
+        ),
+        "physical_reviewed_model_motion_checked": physical_reviewed_motion_ready,
+        "physical_reviewed_model_motion_reported": physical_reviewed_motion_reported,
+        "physical_reviewed_model_motion_status_ready": physical_reviewed_motion_status_ready,
+        "physical_reviewed_model_motion_child_ready": physical_reviewed_motion_child_ready,
+        "reviewed_mujoco_motion_missing_inputs": reviewed_mujoco_motion_missing_inputs,
+        "reviewed_mujoco_motion_pending_action_ids": reviewed_mujoco_next_required_action_ids,
+        "reviewed_mujoco_motion_contradictory_ready_state": (
+            reviewed_mujoco_motion_contradictory_ready_state
+        ),
+        "hardware_free_fixture_motion_checked": fixture_motion_checked,
+        "development_fixture_evidence_present": development_fixture_evidence_present,
+        "reviewed_mujoco_bundle_status": reviewed_mujoco_bundle_status,
+        "reviewed_mujoco_motion_authority_status": reviewed_mujoco_motion_authority_status,
+        "blockers": blockers,
+        "blocker_count": len(blockers),
+        "next_required_for_goal": next_required_for_goal,
+        "next_required_action_ids": [
+            action["action_id"] for action in next_required_for_goal
+        ],
+        "next_required_action_count": len(next_required_for_goal),
+        "source_authority_next_required_action_ids": source_next_required_action_ids,
+        "physical_bundle_next_required_action_ids": physical_bundle_next_required_action_ids,
+        "reviewed_mujoco_next_required_action_ids": reviewed_mujoco_next_required_action_ids,
+        "source_inventory_summary_path": source_inventory.get("summary_path"),
+        "bundle_manifest_summary_path": bundle_manifest.get("summary_path"),
+        "reviewed_mujoco_bundle_summary_path": reviewed_mujoco_bundle.get("summary_path"),
+        "notes": [
+            "This top-level gate is a summary over the source inventory, bundle manifest, and reviewed MuJoCo bundle artifacts.",
+            "It is ready only when source authority, physical bundle authority, source-to-bundle model path/digest consistency, and physical-reviewed MuJoCo motion are all true.",
+            "Any hardware-free fixture readiness or fixture-motion evidence fails the aggregate gate closed, even if another child summary also reports a physical-ready flag.",
+            "Physical-reviewed MuJoCo motion must have a matching child status and motion-authority status, not only a lone boolean flag.",
+            "Physical-reviewed MuJoCo motion must also carry the same reviewed model path and digest as the reviewed bundle manifest.",
+            "The source-authority model path/digest and bundle manifest model path/digest must be consistent before authority can close.",
+            "Development fixture evidence remains useful automation coverage but does not close reviewed physical SO-101 authority.",
+        ],
+    }
+
+
+def so101_reviewed_model_authority_blocker_packet(gate: dict[str, Any]) -> dict[str, Any]:
+    source_bundle_consistency = gate.get("source_bundle_consistency")
+    source_bundle_consistency = (
+        source_bundle_consistency if isinstance(source_bundle_consistency, dict) else {}
+    )
+    public_candidate_source_lock_handoff = gate.get(
+        "public_candidate_source_lock_handoff"
+    )
+    public_candidate_source_lock_handoff = (
+        public_candidate_source_lock_handoff
+        if isinstance(public_candidate_source_lock_handoff, dict)
+        else {}
+    )
+    source_bundle_consistency_ready = gate.get("source_bundle_consistency_ready") is True
+    consistency_status = source_bundle_consistency.get("status")
+    if consistency_status == "bundle_model_path_missing":
+        source_bundle_consistency_next_action_id = "select_reviewed_so101_model_path"
+    elif consistency_status == "source_authoritative_model_path_missing":
+        source_bundle_consistency_next_action_id = (
+            "select_reviewed_authoritative_so101_source_model_path"
+        )
+    elif consistency_status == "source_authoritative_model_selection_unconfigured":
+        source_bundle_consistency_next_action_id = (
+            "declare_reviewed_authoritative_so101_source_path_or_root"
+        )
+    elif consistency_status == "source_authoritative_model_selection_mismatch":
+        source_bundle_consistency_next_action_id = (
+            "align_selected_so101_source_model_with_authoritative_declaration"
+        )
+    elif consistency_status == "source_bundle_model_digest_missing":
+        source_bundle_consistency_next_action_id = "record_reviewed_so101_model_file_sha256"
+    elif consistency_status == "bundle_model_observed_digest_missing":
+        source_bundle_consistency_next_action_id = (
+            "verify_reviewed_so101_bundle_model_file_sha256"
+        )
+    elif consistency_status == "bundle_model_observed_digest_mismatch":
+        source_bundle_consistency_next_action_id = (
+            "inspect_reviewed_so101_bundle_model_file_sha256"
+        )
+    elif consistency_status == "source_bundle_model_digest_mismatch":
+        source_bundle_consistency_next_action_id = (
+            "align_source_inventory_with_bundle_manifest_model_digest"
+        )
+    else:
+        source_bundle_consistency_next_action_id = (
+            "align_source_inventory_with_bundle_manifest_model_path"
+        )
+    motion_bundle_consistency = gate.get("reviewed_mujoco_motion_bundle_consistency")
+    motion_bundle_consistency = (
+        motion_bundle_consistency if isinstance(motion_bundle_consistency, dict) else {}
+    )
+    motion_bundle_consistency_status = motion_bundle_consistency.get("status")
+    if motion_bundle_consistency_status == "reviewed_mujoco_motion_model_path_missing":
+        physical_motion_next_action_id = "rerun_reviewed_mujoco_motion_with_bundle_model_path"
+    elif motion_bundle_consistency_status == "reviewed_mujoco_motion_model_path_mismatch":
+        physical_motion_next_action_id = (
+            "align_reviewed_mujoco_motion_with_bundle_model_path"
+        )
+    elif motion_bundle_consistency_status == "reviewed_mujoco_motion_model_digest_missing":
+        physical_motion_next_action_id = "record_reviewed_mujoco_motion_model_sha256"
+    elif (
+        motion_bundle_consistency_status
+        == "reviewed_mujoco_motion_model_observed_digest_missing"
+    ):
+        physical_motion_next_action_id = (
+            "verify_reviewed_mujoco_motion_model_file_sha256"
+        )
+    elif (
+        motion_bundle_consistency_status
+        == "reviewed_mujoco_motion_model_observed_digest_mismatch"
+    ):
+        physical_motion_next_action_id = (
+            "inspect_reviewed_mujoco_motion_model_file_sha256"
+        )
+    elif motion_bundle_consistency_status == "reviewed_mujoco_motion_model_digest_mismatch":
+        physical_motion_next_action_id = (
+            "align_reviewed_mujoco_motion_with_bundle_model_digest"
+        )
+    elif gate.get("reviewed_mujoco_motion_contradictory_ready_state") is True:
+        reviewed_mujoco_next_required_action_ids = gate.get(
+            "reviewed_mujoco_next_required_action_ids"
+        )
+        reviewed_mujoco_next_required_action_ids = (
+            reviewed_mujoco_next_required_action_ids
+            if isinstance(reviewed_mujoco_next_required_action_ids, list)
+            else []
+        )
+        physical_motion_next_action_id = (
+            reviewed_mujoco_next_required_action_ids[0]
+            if reviewed_mujoco_next_required_action_ids
+            else "resolve_contradictory_reviewed_mujoco_motion_gate_state"
+        )
+    else:
+        physical_motion_next_action_id = "prove_physical_reviewed_model_motion"
+    physical_bundle_authority_ready = (
+        gate.get("physical_so101_model_authority_ready") is True
+    )
+    source_next_required_action_ids = gate.get("source_authority_next_required_action_ids")
+    source_next_required_action_ids = (
+        source_next_required_action_ids
+        if isinstance(source_next_required_action_ids, list)
+        else []
+    )
+    bundle_next_required_action_ids = gate.get("physical_bundle_next_required_action_ids")
+    bundle_next_required_action_ids = (
+        bundle_next_required_action_ids
+        if isinstance(bundle_next_required_action_ids, list)
+        else []
+    )
+    if source_next_required_action_ids:
+        source_next_action_id = source_next_required_action_ids[0]
+    elif gate.get("source_authority_contradictory_ready_state") is True:
+        source_next_action_id = "resolve_contradictory_source_authority_gate_state"
+    else:
+        source_next_action_id = "review_and_declare_authoritative_so101_model_source"
+    bundle_next_action_id = (
+        bundle_next_required_action_ids[0]
+        if bundle_next_required_action_ids
+        else "resolve_contradictory_physical_bundle_authority_gate_state"
+        if gate.get("physical_bundle_authority_contradictory_ready_state") is True
+        else "supply_reviewed_so101_model_bundle_manifest"
+    )
+    item_specs = [
+        {
+            "item_id": "source_authority_ready",
+            "gate": "reviewed_model_authority",
+            "required_state": "source_authority_ready",
+            "observed_ready": gate.get("source_authority_ready") is True,
+            "evidence_artifact_path": gate.get("source_inventory_summary_path"),
+            "next_action_id": source_next_action_id,
+            "operator_action": (
+                "Scan or supply candidate SO-101 model-source roots, then review "
+                "provenance/license/source authority and rerun the source inventory "
+                "with authoritative path/root plus review metadata."
+            ),
+            "public_candidate_source_lock_status": (
+                public_candidate_source_lock_handoff.get("status")
+            ),
+            "public_candidate_source_lock_ready_for_review": (
+                public_candidate_source_lock_handoff.get("ready_for_review")
+            ),
+            "public_candidate_source_lock_json_path": (
+                public_candidate_source_lock_handoff.get("source_lock_json_path")
+            ),
+            "public_candidate_operator_intake_plan_json_path": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_intake_plan_json_path"
+                )
+            ),
+            "public_candidate_operator_intake_plan_status": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_intake_plan_status"
+                )
+            ),
+            "public_candidate_operator_intake_decision_status": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_intake_decision_status"
+                )
+            ),
+            "public_candidate_operator_intake_plan_model_authority": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_intake_plan_model_authority"
+                )
+            ),
+            "public_candidate_operator_command_plan_json_path": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_command_plan_json_path"
+                )
+            ),
+            "public_candidate_operator_command_plan_status": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_command_plan_status"
+                )
+            ),
+            "public_candidate_operator_command_plan_model_authority": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_command_plan_model_authority"
+                )
+            ),
+            "public_candidate_operator_command_plan_review_handoff_artifact_ids": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_command_plan_review_handoff_artifact_ids"
+                )
+            ),
+            "public_candidate_operator_command_plan_authority_blockers_until_reviewed": (
+                public_candidate_source_lock_handoff.get(
+                    "operator_command_plan_authority_blockers_until_reviewed"
+                )
+            ),
+            "public_candidate_reviewed_manifest_rerun_plan_json_path": (
+                public_candidate_source_lock_handoff.get(
+                    "reviewed_manifest_rerun_plan_json_path"
+                )
+            ),
+            "public_candidate_reviewed_manifest_rerun_plan_status": (
+                public_candidate_source_lock_handoff.get(
+                    "reviewed_manifest_rerun_plan_status"
+                )
+            ),
+            "public_candidate_reviewed_manifest_rerun_plan_model_authority": (
+                public_candidate_source_lock_handoff.get(
+                    "reviewed_manifest_rerun_plan_model_authority"
+                )
+            ),
+            "public_candidate_reviewed_manifest_rerun_plan_selected_option": (
+                public_candidate_source_lock_handoff.get(
+                    "reviewed_manifest_rerun_plan_selected_option"
+                )
+            ),
+            "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready": (
+                public_candidate_source_lock_handoff.get(
+                    "reviewed_manifest_rerun_plan_source_lock_ready"
+                )
+            ),
+            "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions": (
+                public_candidate_source_lock_handoff.get(
+                    "reviewed_manifest_rerun_plan_required_success_conditions"
+                )
+            ),
+            "public_candidate_review_checklist_scope_coverage_ready": (
+                public_candidate_source_lock_handoff.get(
+                    "review_checklist_scope_coverage_ready"
+                )
+            ),
+            "public_candidate_review_checklist_missing_required_review_scope_ids": (
+                public_candidate_source_lock_handoff.get(
+                    "review_checklist_missing_required_review_scope_ids"
+                )
+            ),
+            "public_candidate_review_checklist_gripper_mapping_direct_action_ids": (
+                public_candidate_source_lock_handoff.get(
+                    "review_checklist_gripper_mapping_direct_action_ids"
+                )
+            ),
+            "public_candidate_review_checklist_collision_policy_direct_action_ids": (
+                public_candidate_source_lock_handoff.get(
+                    "review_checklist_collision_policy_direct_action_ids"
+                )
+            ),
+            "public_candidate_recorded_operator_intake_decision_options": (
+                public_candidate_source_lock_handoff.get(
+                    "recorded_operator_intake_decision_options"
+                )
+            ),
+            "public_candidate_recorded_operator_intake_selected_requirement_ids_by_option": (
+                public_candidate_source_lock_handoff.get(
+                    "recorded_operator_intake_selected_requirement_ids_by_option"
+                )
+            ),
+            "public_candidate_recorded_operator_intake_selected_requirement_counts_by_option": (
+                public_candidate_source_lock_handoff.get(
+                    "recorded_operator_intake_selected_requirement_counts_by_option"
+                )
+            ),
+            "public_candidate_recorded_operator_command_selected_command_counts_by_option": (
+                public_candidate_source_lock_handoff.get(
+                    "recorded_operator_command_selected_command_counts_by_option"
+                )
+            ),
+            "public_candidate_recorded_operator_command_selected_requirement_ids_by_option": (
+                public_candidate_source_lock_handoff.get(
+                    "recorded_operator_command_selected_requirement_ids_by_option"
+                )
+            ),
+            "public_candidate_review_manifest_template_path": (
+                public_candidate_source_lock_handoff.get(
+                    "review_manifest_template_path"
+                )
+            ),
+            "public_candidate_source_lock_model_authority": (
+                public_candidate_source_lock_handoff.get("model_authority")
+            ),
+        },
+        {
+            "item_id": "physical_bundle_authority_ready",
+            "gate": "reviewed_model_authority",
+            "required_state": "physical_so101_model_authority_ready",
+            "observed_ready": gate.get("physical_so101_model_authority_ready") is True,
+            "evidence_artifact_path": gate.get("bundle_manifest_summary_path"),
+            "next_action_id": bundle_next_action_id,
+            "operator_action": (
+                "Supply a reviewed SO-101 model bundle manifest with mesh roots, reviewed "
+                "joint limits, target frame, TCP offset, and base-to-board alignment."
+            ),
+        },
+        {
+            "item_id": "source_bundle_consistency",
+            "gate": "reviewed_model_authority",
+            "required_state": "source_bundle_model_path_and_digest_consistent",
+            "observed_ready": gate.get("source_bundle_consistency_ready") is True,
+            "blocked_by_prior_requirements": (
+                source_bundle_consistency.get("status")
+                == "not_checked_prerequisites_not_ready"
+            ),
+            "blocked_by_prior_requirement_ids": [
+                "source_authority_ready",
+                "physical_bundle_authority_ready",
+            ],
+            "evidence_artifact_path": gate.get("summary_path"),
+            "next_action_id": source_bundle_consistency_next_action_id,
+            "operator_action": (
+                "Use the same reviewed SO-101 model path in the source inventory and "
+                "bundle manifest, and record the same reviewed SHA-256 digest for that "
+                "file; an authoritative root alone does not authorize a different "
+                "selected model file."
+            ),
+            "source_bundle_consistency_status": consistency_status,
+            "source_bundle_consistency_blocker": source_bundle_consistency.get(
+                "blocker"
+            ),
+            "selected_authoritative_candidate_path": source_bundle_consistency.get(
+                "selected_authoritative_candidate_path"
+            ),
+            "bundle_model_path": source_bundle_consistency.get("bundle_model_path"),
+            "selected_authoritative_candidate_sha256": (
+                source_bundle_consistency.get("selected_authoritative_candidate_sha256")
+            ),
+            "bundle_model_declared_sha256": source_bundle_consistency.get(
+                "bundle_model_declared_sha256"
+            ),
+            "bundle_model_observed_sha256": source_bundle_consistency.get(
+                "bundle_model_observed_sha256"
+            ),
+        },
+        {
+            "item_id": "physical_reviewed_mujoco_motion_checked",
+            "gate": "mujoco_scene_validity",
+            "required_state": "physical_reviewed_model_motion_checked",
+            "observed_ready": gate.get("physical_reviewed_model_motion_checked") is True,
+            "blocked_by_prior_requirements": (
+                not physical_bundle_authority_ready or not source_bundle_consistency_ready
+            ),
+            "blocked_by_prior_requirement_ids": [
+                "physical_bundle_authority_ready",
+                "source_bundle_consistency",
+            ],
+            "evidence_artifact_path": gate.get("reviewed_mujoco_bundle_summary_path"),
+            "next_action_id": physical_motion_next_action_id,
+            "operator_action": (
+                "Load the reviewed bundle in MuJoCo, map all SO-101 joints, find the target "
+                "frame, prove SimRobot joint motion without fallback behavior, and keep "
+                "the motion summary tied to the same reviewed model path and digest."
+            ),
+            "reviewed_mujoco_motion_bundle_consistency_status": (
+                motion_bundle_consistency_status
+            ),
+            "reviewed_mujoco_motion_bundle_consistency_blocker": (
+                motion_bundle_consistency.get("blocker")
+            ),
+            "bundle_model_path": motion_bundle_consistency.get("bundle_model_path"),
+            "reviewed_mujoco_motion_model_path": motion_bundle_consistency.get(
+                "reviewed_mujoco_motion_model_path"
+            ),
+            "bundle_model_declared_sha256": motion_bundle_consistency.get(
+                "bundle_model_declared_sha256"
+            ),
+            "reviewed_mujoco_motion_model_declared_sha256": (
+                motion_bundle_consistency.get(
+                    "reviewed_mujoco_motion_model_declared_sha256"
+                )
+            ),
+            "reviewed_mujoco_motion_model_observed_sha256": (
+                motion_bundle_consistency.get(
+                    "reviewed_mujoco_motion_model_observed_sha256"
+                )
+            ),
+        },
+    ]
+    items: list[dict[str, Any]] = []
+    all_blockers = gate.get("blockers") or []
+
+    def blocker_item_status(spec: dict[str, Any]) -> str:
+        if spec["observed_ready"]:
+            return "ready"
+        if spec.get("blocked_by_prior_requirements"):
+            return "blocked_by_prior_requirements"
+        return "action_required"
+
+    item_status_by_id = {
+        spec["item_id"]: blocker_item_status(spec)
+        for spec in item_specs
+        if isinstance(spec.get("item_id"), str)
+    }
+
+    for priority, spec in enumerate(item_specs, start=1):
+        status = blocker_item_status(spec)
+        blocked_by_prior_requirement_ids = (
+            spec.get("blocked_by_prior_requirement_ids", [])
+            if status == "blocked_by_prior_requirements"
+            else []
+        )
+        related_blockers = [
+            blocker
+            for blocker in all_blockers
+            if (
+                spec["item_id"] == "source_authority_ready"
+                and ("source" in blocker or "authoritative" in blocker)
+            )
+            or (
+                spec["item_id"] == "physical_bundle_authority_ready"
+                and (
+                    "manifest" in blocker
+                    or "mesh" in blocker
+                    or "joint" in blocker
+                    or "target" in blocker
+                    or "tcp" in blocker
+                    or "base" in blocker
+                    or "contract" in blocker
+                    or "physical_bundle" in blocker
+                    or "physical_authority" in blocker
+                )
+            )
+            or (
+                spec["item_id"] == "source_bundle_consistency"
+                and (
+                    "align_source_inventory" in blocker
+                    or "model_path" in blocker
+                    or "model_digest" in blocker
+                    or "model_sha256" in blocker
+                    or "sha256" in blocker
+                    or "declare_reviewed_authoritative_so101_source_path_or_root" in blocker
+                    or "align_selected_so101_source_model" in blocker
+                    or "record_reviewed_so101_model_file_sha256" in blocker
+                    or "verify_reviewed_so101_bundle_model_file_sha256" in blocker
+                    or "inspect_reviewed_so101_bundle_model_file_sha256" in blocker
+                )
+            )
+            or (
+                spec["item_id"] == "physical_reviewed_mujoco_motion_checked"
+                and (
+                    (
+                        not spec.get("blocked_by_prior_requirements")
+                        and (
+                            "mujoco" in blocker
+                            or "motion" in blocker
+                            or "rerun_reviewed_mujoco_motion" in blocker
+                            or "align_reviewed_mujoco_motion" in blocker
+                            or "record_reviewed_mujoco_motion" in blocker
+                            or "reviewed_mujoco_motion" in blocker
+                        )
+                    )
+                    or (
+                        spec.get("blocked_by_prior_requirements")
+                        and (
+                            "manifest" in blocker
+                            or "mesh" in blocker
+                            or "joint" in blocker
+                            or "target" in blocker
+                            or "tcp" in blocker
+                            or "base" in blocker
+                            or "contract" in blocker
+                            or "align_source_inventory" in blocker
+                            or "model_path" in blocker
+                        )
+                    )
+                )
+            )
+        ]
+        if (
+            not related_blockers
+            and not spec["observed_ready"]
+            and not spec.get("blocked_by_prior_requirements")
+        ):
+            related_blockers = [spec["next_action_id"]]
+        items.append(
+            {
+                "priority": priority,
+                **spec,
+                "status": status,
+                "blockers": related_blockers,
+                "blocked_by_prior_requirement_ids": blocked_by_prior_requirement_ids,
+                "blocked_by_prior_requirement_statuses": {
+                    requirement_id: item_status_by_id.get(requirement_id)
+                    for requirement_id in blocked_by_prior_requirement_ids
+                },
+                "development_fixture_evidence_not_physical_so101_truth": gate.get(
+                    "development_fixture_evidence_not_physical_so101_truth"
+                )
+                is True,
+            }
+        )
+
+    if gate.get("development_fixture_evidence_present") is True:
+        items.append(
+            {
+                "priority": len(items) + 1,
+                "item_id": "development_fixture_authority_boundary",
+                "gate": "authority_boundary",
+                "required_state": "no_development_fixture_evidence_in_ready_gate",
+                "observed_ready": False,
+                "status": "action_required",
+                "evidence_artifact_path": gate.get("summary_path"),
+                "next_action_id": (
+                    "replace_development_fixture_evidence_with_reviewed_physical_so101_authority"
+                ),
+                "operator_action": (
+                    "Resolve hardware-free fixture readiness or fixture-motion evidence "
+                    "before treating the aggregate gate as reviewed physical SO-101 truth."
+                ),
+                "blockers": [
+                    "replace_development_fixture_evidence_with_reviewed_physical_so101_authority"
+                ],
+                "development_fixture_evidence_not_physical_so101_truth": True,
+            }
+        )
+    elif gate.get("development_fixture_evidence_not_physical_so101_truth") is True:
+        items.append(
+            {
+                "priority": len(items) + 1,
+                "item_id": "development_fixture_authority_boundary",
+                "gate": "authority_boundary",
+                "required_state": "development_fixture_evidence_not_physical_so101_truth",
+                "observed_ready": True,
+                "status": "caveat_enforced",
+                "evidence_artifact_path": gate.get("summary_path"),
+                "next_action_id": "do_not_promote_fixture_evidence_to_physical_truth",
+                "operator_action": (
+                    "Keep development scaffold evidence as automation coverage only until the "
+                    "reviewed source, bundle, and MuJoCo motion gates are all ready."
+                ),
+                "blockers": [],
+                "development_fixture_evidence_not_physical_so101_truth": True,
+            }
+        )
+
+    action_required_item_ids = [
+        item["item_id"] for item in items if item.get("status") == "action_required"
+    ]
+    blocked_by_prior_item_ids = [
+        item["item_id"]
+        for item in items
+        if item.get("status") == "blocked_by_prior_requirements"
+    ]
+    ready = gate.get("ready") is True
+    training_priority_gate_order = list(SO101_TRAINING_PRIORITY_STAGE_IDS)
+    next_training_gate_after_ready = (
+        training_priority_gate_order[1] if len(training_priority_gate_order) > 1 else None
+    )
+    blocks_serious_policy_training_until_ready = not ready
+    policy_training_authority_boundary = {
+        "training_priority_gate_id": training_priority_gate_order[0],
+        "training_priority_gate_order": training_priority_gate_order,
+        "next_training_gate_after_ready": next_training_gate_after_ready,
+        "blocks_serious_policy_training_until_ready": (
+            blocks_serious_policy_training_until_ready
+        ),
+        "ready_does_not_imply_policy_training_ready": True,
+        "development_fixture_evidence_not_policy_training_truth": True,
+        "status": (
+            "blocked_by_reviewed_model_authority"
+            if blocks_serious_policy_training_until_ready
+            else "advance_to_mujoco_scene_validity"
+        ),
+        "notes": [
+            "Reviewed model authority is the first serious-training gate.",
+            "Clearing this gate only allows MuJoCo scene validity work to become the next priority; it does not authorize policy training.",
+            "Development fixture evidence remains automation coverage, not policy-training authority.",
+        ],
+    }
+    return {
+        "schema": "lerobot.sim.so101_reviewed_model_authority_blocker_packet.v1",
+        "ok": True,
+        "status": (
+            "reviewed_model_authority_ready"
+            if ready
+            else "reviewed_model_authority_blocked"
+        ),
+        "model_authority": "blocker_packet_not_authority",
+        "ready": ready,
+        "training_priority_gate_id": training_priority_gate_order[0],
+        "training_priority_gate_order": training_priority_gate_order,
+        "next_training_gate_after_ready": next_training_gate_after_ready,
+        "blocks_serious_policy_training_until_ready": (
+            blocks_serious_policy_training_until_ready
+        ),
+        "serious_policy_training_dependency_status": (
+            policy_training_authority_boundary["status"]
+        ),
+        "ready_does_not_imply_policy_training_ready": True,
+        "policy_training_authority_boundary": policy_training_authority_boundary,
+        "action_required_item_ids": action_required_item_ids,
+        "action_required_count": len(action_required_item_ids),
+        "blocked_by_prior_requirements_item_ids": blocked_by_prior_item_ids,
+        "blocked_by_prior_requirements_count": len(blocked_by_prior_item_ids),
+        "item_count": len(items),
+        "item_ids": [item["item_id"] for item in items],
+        "next_action_ids": [
+            item["next_action_id"]
+            for item in items
+            if item.get("status") == "action_required" and item.get("next_action_id")
+        ],
+        "source_inventory_summary_path": gate.get("source_inventory_summary_path"),
+        "bundle_manifest_summary_path": gate.get("bundle_manifest_summary_path"),
+        "reviewed_mujoco_bundle_summary_path": gate.get(
+            "reviewed_mujoco_bundle_summary_path"
+        ),
+        "development_fixture_evidence_not_physical_so101_truth": gate.get(
+            "development_fixture_evidence_not_physical_so101_truth"
+        )
+        is True,
+        "items": items,
+        "caveats": [
+            "This packet is a blocker review aid, not reviewed physical SO-101 model authority.",
+            "The gate is ready only when source authority, physical bundle authority, source-to-bundle model path/digest consistency, and physical-reviewed MuJoCo motion are all true.",
+            "Development fixture evidence remains automation coverage and must not be used as physical calibration truth.",
+        ],
+    }
+
+
+def reviewed_model_authority_command_template(
+    action_id: str | None,
+    item: dict[str, Any],
+) -> tuple[str, list[str]]:
+    output_root = DEFAULT_OUTPUT_DIR.parent
+    python = sys.executable
+    action_id = action_id or ""
+    source_actions = {
+        "scan_or_supply_so101_model_source_root",
+        "review_and_declare_authoritative_so101_model_source",
+        "record_source_authority_review_metadata",
+        "select_single_authoritative_so101_model_source",
+        "select_so101_relevant_authoritative_model_source",
+        "select_reviewed_authoritative_so101_source_model_path",
+        "declare_reviewed_authoritative_so101_source_path_or_root",
+        "align_selected_so101_source_model_with_authoritative_declaration",
+    }
+    manifest_actions = {
+        "supply_reviewed_so101_model_bundle_manifest",
+        "select_reviewed_so101_model_path",
+        "record_reviewed_so101_model_file_sha256",
+        "record_reviewed_model_source_authority",
+        "record_model_provenance",
+        "declare_model_asset_roots",
+        "resolve_so101_mesh_assets",
+        "declare_reviewed_joint_limits",
+        "declare_target_frame",
+        "calibrate_tcp_offset",
+        "calibrate_base_to_board_transform",
+        "clear_model_contract_and_asset_preflight",
+        "align_source_inventory_with_bundle_manifest_model_path",
+        "align_source_inventory_with_bundle_manifest_model_digest",
+        "verify_reviewed_so101_bundle_model_file_sha256",
+        "inspect_reviewed_so101_bundle_model_file_sha256",
+        "resolve_contradictory_physical_bundle_authority_gate_state",
+    }
+    motion_actions = {
+        "load_reviewed_model_in_mujoco",
+        "prove_physical_reviewed_model_motion",
+        "rerun_reviewed_mujoco_motion_with_bundle_model_path",
+        "align_reviewed_mujoco_motion_with_bundle_model_path",
+        "record_reviewed_mujoco_motion_model_sha256",
+        "verify_reviewed_mujoco_motion_model_file_sha256",
+        "inspect_reviewed_mujoco_motion_model_file_sha256",
+        "align_reviewed_mujoco_motion_with_bundle_model_digest",
+        "resolve_contradictory_reviewed_mujoco_motion_gate_state",
+    }
+    if action_id == "scan_or_supply_so101_model_source_root":
+        return (
+            "source_inventory_scan",
+            [
+                python,
+                "scripts/smoke_sim_so101_model_source_inventory.py",
+                "--root",
+                "<reviewed-so101-model-source-root>",
+                "--output-dir",
+                str(output_root / "so101_model_source_inventory_reviewed"),
+            ],
+        )
+    if action_id in source_actions or item.get("item_id") == "source_authority_ready":
+        return (
+            "source_inventory_authority",
+            [
+                python,
+                "scripts/smoke_sim_so101_model_source_inventory.py",
+                "--root",
+                "<reviewed-so101-model-source-root>",
+                "--authoritative-path",
+                "<reviewed-so101-model.urdf-or-mjcf>",
+                "--authority-reviewed-by",
+                "<reviewer-or-team>",
+                "--authority-reviewed-at",
+                "<review-date-YYYY-MM-DD>",
+                "--authority-review-id",
+                "<stable-review-artifact-id>",
+                "--authority-source-reference",
+                "<reviewed-source-reference>",
+                "--authority-license-basis",
+                "<reviewed-license-basis>",
+                "--authority-review-scope",
+                "model_identity",
+                "--authority-review-scope",
+                "provenance",
+                "--authority-review-scope",
+                "license",
+                "--output-dir",
+                str(output_root / "so101_model_source_inventory_reviewed"),
+            ],
+        )
+    if action_id == "run_so101_model_bundle_probe":
+        return (
+            "model_bundle_probe",
+            [
+                python,
+                "scripts/smoke_sim_so101_model_bundle_probe.py",
+                "--model-path",
+                "<reviewed-so101-model.urdf-or-mjcf>",
+                "--asset-root",
+                "<reviewed-mesh-or-asset-root>",
+                "--output-dir",
+                str(output_root / "so101_model_bundle_probe_reviewed"),
+                "--python",
+                python,
+            ],
+        )
+    if action_id in manifest_actions or item.get("item_id") in {
+        "physical_bundle_authority_ready",
+        "source_bundle_consistency",
+    }:
+        return (
+            "model_bundle_manifest",
+            [
+                python,
+                "scripts/smoke_sim_so101_model_bundle_manifest.py",
+                "--manifest-path",
+                "<reviewed-so101-model-bundle.json>",
+                "--output-dir",
+                str(output_root / "so101_model_bundle_manifest_reviewed"),
+                "--python",
+                python,
+            ],
+        )
+    if action_id in motion_actions or item.get("item_id") == "physical_reviewed_mujoco_motion_checked":
+        return (
+            "reviewed_mujoco_bundle",
+            [
+                python,
+                "scripts/smoke_sim_so101_reviewed_mujoco_bundle.py",
+                "--manifest-path",
+                "<reviewed-so101-model-bundle.json>",
+                "--output-dir",
+                str(output_root / "so101_reviewed_mujoco_bundle_reviewed"),
+                "--python",
+                python,
+                "--require-ready-reviewed-model",
+            ],
+        )
+    return (
+        "calibration_regression_suite",
+        [
+            python,
+            "scripts/smoke_sim_calibration_regression_suite.py",
+            "--so101-model-bundle-manifest",
+            "<reviewed-so101-model-bundle.json>",
+            "--output-dir",
+            str(output_root / "calibration_regression_suite_reviewed_so101"),
+            "--python",
+            python,
+            "--include-negative-check",
+        ],
+    )
+
+
+def so101_reviewed_model_authority_operator_actions(
+    gate: dict[str, Any],
+    blocker_packet: dict[str, Any],
+) -> dict[str, Any]:
+    actions: list[dict[str, Any]] = []
+    for item in blocker_packet.get("items") or []:
+        if not isinstance(item, dict):
+            continue
+        next_action_id = item.get("next_action_id")
+        scope, command = reviewed_model_authority_command_template(
+            next_action_id if isinstance(next_action_id, str) else None,
+            item,
+        )
+        actions.append(
+            {
+                "priority": len(actions) + 1,
+                "item_id": item.get("item_id"),
+                "status": item.get("status"),
+                "gate": item.get("gate"),
+                "required_state": item.get("required_state"),
+                "next_action_id": next_action_id,
+                "command_scope": scope,
+                "command": command,
+                "evidence_artifact_path": item.get("evidence_artifact_path"),
+                "blocked_by_prior_requirement_ids": (
+                    item.get("blocked_by_prior_requirement_ids") or []
+                ),
+                "blocked_by_prior_requirement_statuses": (
+                    item.get("blocked_by_prior_requirement_statuses") or {}
+                ),
+                "operator_action": item.get("operator_action"),
+                "public_candidate_source_lock_status": item.get(
+                    "public_candidate_source_lock_status"
+                ),
+                "public_candidate_source_lock_ready_for_review": item.get(
+                    "public_candidate_source_lock_ready_for_review"
+                ),
+                "public_candidate_source_lock_json_path": item.get(
+                    "public_candidate_source_lock_json_path"
+                ),
+                "public_candidate_operator_intake_plan_json_path": item.get(
+                    "public_candidate_operator_intake_plan_json_path"
+                ),
+                "public_candidate_operator_intake_plan_status": item.get(
+                    "public_candidate_operator_intake_plan_status"
+                ),
+                "public_candidate_operator_intake_decision_status": item.get(
+                    "public_candidate_operator_intake_decision_status"
+                ),
+                "public_candidate_operator_intake_plan_model_authority": item.get(
+                    "public_candidate_operator_intake_plan_model_authority"
+                ),
+                "public_candidate_operator_command_plan_json_path": item.get(
+                    "public_candidate_operator_command_plan_json_path"
+                ),
+                "public_candidate_operator_command_plan_status": item.get(
+                    "public_candidate_operator_command_plan_status"
+                ),
+                "public_candidate_operator_command_plan_model_authority": item.get(
+                    "public_candidate_operator_command_plan_model_authority"
+                ),
+                "public_candidate_operator_command_plan_review_handoff_artifact_ids": item.get(
+                    "public_candidate_operator_command_plan_review_handoff_artifact_ids"
+                ),
+                "public_candidate_operator_command_plan_authority_blockers_until_reviewed": item.get(
+                    "public_candidate_operator_command_plan_authority_blockers_until_reviewed"
+                ),
+                "public_candidate_reviewed_manifest_rerun_plan_json_path": item.get(
+                    "public_candidate_reviewed_manifest_rerun_plan_json_path"
+                ),
+                "public_candidate_reviewed_manifest_rerun_plan_status": item.get(
+                    "public_candidate_reviewed_manifest_rerun_plan_status"
+                ),
+                "public_candidate_reviewed_manifest_rerun_plan_model_authority": item.get(
+                    "public_candidate_reviewed_manifest_rerun_plan_model_authority"
+                ),
+                "public_candidate_reviewed_manifest_rerun_plan_selected_option": item.get(
+                    "public_candidate_reviewed_manifest_rerun_plan_selected_option"
+                ),
+                "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready": item.get(
+                    "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready"
+                ),
+                "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions": item.get(
+                    "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions"
+                ),
+                "public_candidate_review_checklist_scope_coverage_ready": item.get(
+                    "public_candidate_review_checklist_scope_coverage_ready"
+                ),
+                "public_candidate_review_checklist_missing_required_review_scope_ids": item.get(
+                    "public_candidate_review_checklist_missing_required_review_scope_ids"
+                ),
+                "public_candidate_review_checklist_gripper_mapping_direct_action_ids": item.get(
+                    "public_candidate_review_checklist_gripper_mapping_direct_action_ids"
+                ),
+                "public_candidate_review_checklist_collision_policy_direct_action_ids": item.get(
+                    "public_candidate_review_checklist_collision_policy_direct_action_ids"
+                ),
+                "public_candidate_review_manifest_template_path": item.get(
+                    "public_candidate_review_manifest_template_path"
+                ),
+                "public_candidate_source_lock_model_authority": item.get(
+                    "public_candidate_source_lock_model_authority"
+                ),
+                "development_fixture_evidence_not_physical_so101_truth": item.get(
+                    "development_fixture_evidence_not_physical_so101_truth"
+                )
+                is True,
+            }
+        )
+    immediate_action_ids = [
+        action["next_action_id"]
+        for action in actions
+        if action.get("status") == "action_required" and action.get("next_action_id")
+    ]
+    blocker_packet_next_action_ids = unique_string_values(
+        blocker_packet.get("next_action_ids")
+        if isinstance(blocker_packet.get("next_action_ids"), list)
+        else []
+    )
+    immediate_action_ids = unique_string_values(immediate_action_ids)
+    immediate_actions_missing_from_blocker_packet = [
+        action_id
+        for action_id in immediate_action_ids
+        if action_id not in blocker_packet_next_action_ids
+    ]
+    blocker_packet_actions_missing_from_operator_actions = [
+        action_id
+        for action_id in blocker_packet_next_action_ids
+        if action_id not in immediate_action_ids
+    ]
+    return {
+        "schema": "lerobot.sim.so101_reviewed_model_authority_operator_actions.v1",
+        "ok": True,
+        "status": (
+            "reviewed_model_authority_ready_no_operator_actions_required"
+            if gate.get("ready") is True
+            else "operator_actions_ready_for_reviewed_model_authority_follow_up"
+        ),
+        "model_authority": "operator_actions_not_authority",
+        "ready": gate.get("ready") is True,
+        "observed_evidence_is_authority": False,
+        "physical_so101_truth_claimed": False,
+        "policy_training_authority_claimed": False,
+        "development_fixture_evidence_not_physical_so101_truth": True,
+        "development_fixture_evidence_not_policy_training_truth": True,
+        "ready_for_model_backed_ik": False,
+        "ready_for_policy_training": False,
+        "training_priority_gate_id": blocker_packet.get("training_priority_gate_id"),
+        "next_training_gate_after_ready": blocker_packet.get(
+            "next_training_gate_after_ready"
+        ),
+        "blocker_packet_status": blocker_packet.get("status"),
+        "blocker_packet_model_authority": blocker_packet.get("model_authority"),
+        "blocker_packet_next_action_ids": blocker_packet_next_action_ids,
+        "action_count": len(actions),
+        "immediate_action_count": len(immediate_action_ids),
+        "immediate_action_ids": immediate_action_ids,
+        "immediate_actions_match_blocker_packet": (
+            not immediate_actions_missing_from_blocker_packet
+            and not blocker_packet_actions_missing_from_operator_actions
+        ),
+        "immediate_actions_missing_from_blocker_packet": (
+            immediate_actions_missing_from_blocker_packet
+        ),
+        "blocker_packet_actions_missing_from_operator_actions": (
+            blocker_packet_actions_missing_from_operator_actions
+        ),
+        "blocked_by_prior_requirements_count": len(
+            [
+                action
+                for action in actions
+                if action.get("status") == "blocked_by_prior_requirements"
+            ]
+        ),
+        "command_template_count": len(
+            [action for action in actions if action.get("command")]
+        ),
+        "command_scopes": unique_string_values(
+            [
+                action.get("command_scope")
+                for action in actions
+                if isinstance(action.get("command_scope"), str)
+            ]
+        ),
+        "actions": actions,
+        "caveats": [
+            "This operator-action checklist is command guidance only; it is not reviewed physical SO-101 authority.",
+            "Placeholder values must be replaced with reviewed model, source, manifest, calibration, and review evidence before rerunning commands.",
+            "A passing command rerun is still only authority evidence when the reviewed source, bundle, consistency, and reviewed-MuJoCo motion gates all report ready.",
+            "Development fixture evidence remains automation coverage and must not be used as physical calibration truth or policy-training authority.",
+        ],
+    }
+
+
+def write_so101_reviewed_model_authority_gate_artifacts(
+    output_dir: Path,
+    gate: dict[str, Any],
+) -> dict[str, Any]:
+    gate_dir = output_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_DIR_NAME
+    summary_path = gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_SUMMARY_NAME
+    checklist_path = gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_CHECKLIST_NAME
+    blocker_packet_path = (
+        gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_JSON_NAME
+    )
+    blocker_packet_csv_path = (
+        gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_BLOCKER_PACKET_CSV_NAME
+    )
+    operator_actions_path = (
+        gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_OPERATOR_ACTIONS_JSON_NAME
+    )
+    operator_actions_csv_path = (
+        gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_OPERATOR_ACTIONS_CSV_NAME
+    )
+    readme_path = gate_dir / SO101_REVIEWED_MODEL_AUTHORITY_GATE_README_NAME
+    artifacts = {
+        "summary_json": str(summary_path),
+        "checklist_csv": str(checklist_path),
+        "blocker_packet_json": str(blocker_packet_path),
+        "blocker_packet_csv": str(blocker_packet_csv_path),
+        "operator_actions_json": str(operator_actions_path),
+        "operator_actions_csv": str(operator_actions_csv_path),
+        "readme_md": str(readme_path),
+    }
+    blocker_packet = so101_reviewed_model_authority_blocker_packet(
+        {
+            **gate,
+            "summary_path": str(summary_path),
+        }
+    )
+    operator_actions = so101_reviewed_model_authority_operator_actions(
+        gate,
+        blocker_packet,
+    )
+    gate_next_action_ids = unique_string_values(
+        gate.get("next_required_action_ids")
+        if isinstance(gate.get("next_required_action_ids"), list)
+        else []
+    )
+    blocker_packet_next_action_ids = unique_string_values(
+        blocker_packet.get("next_action_ids")
+        if isinstance(blocker_packet.get("next_action_ids"), list)
+        else []
+    )
+    blocker_packet_actions_missing_from_gate_queue = [
+        action_id
+        for action_id in blocker_packet_next_action_ids
+        if action_id not in gate_next_action_ids
+    ]
+    payload = {
+        "schema": SO101_REVIEWED_MODEL_AUTHORITY_GATE_SCHEMA,
+        **gate,
+        "ok": bool(gate.get("ready")),
+        "summary_path": str(summary_path),
+        "artifact_dir": str(gate_dir),
+        "artifacts": artifacts,
+        "review_status": (
+            "ready_for_reviewed_model_backed_work"
+            if gate.get("ready") is True
+            else "blocked_before_reviewed_model_backed_work"
+        ),
+        "authority_sources": {
+            "source_inventory_summary_path": gate.get("source_inventory_summary_path"),
+            "bundle_manifest_summary_path": gate.get("bundle_manifest_summary_path"),
+            "reviewed_mujoco_bundle_summary_path": gate.get(
+                "reviewed_mujoco_bundle_summary_path"
+            ),
+        },
+        "blocker_packet_status": blocker_packet["status"],
+        "blocker_packet_model_authority": blocker_packet["model_authority"],
+        "blocker_packet_item_count": blocker_packet["item_count"],
+        "blocker_packet_action_required_count": blocker_packet["action_required_count"],
+        "blocker_packet_action_required_item_ids": blocker_packet[
+            "action_required_item_ids"
+        ],
+        "blocker_packet_blocked_by_prior_requirements_count": blocker_packet[
+            "blocked_by_prior_requirements_count"
+        ],
+        "blocker_packet_blocked_by_prior_requirements_item_ids": blocker_packet[
+            "blocked_by_prior_requirements_item_ids"
+        ],
+        "blocker_packet_next_action_ids": blocker_packet["next_action_ids"],
+        "training_priority_gate_id": blocker_packet["training_priority_gate_id"],
+        "training_priority_gate_order": blocker_packet["training_priority_gate_order"],
+        "next_training_gate_after_ready": blocker_packet[
+            "next_training_gate_after_ready"
+        ],
+        "blocks_serious_policy_training_until_ready": blocker_packet[
+            "blocks_serious_policy_training_until_ready"
+        ],
+        "serious_policy_training_dependency_status": blocker_packet[
+            "serious_policy_training_dependency_status"
+        ],
+        "ready_does_not_imply_policy_training_ready": blocker_packet[
+            "ready_does_not_imply_policy_training_ready"
+        ],
+        "policy_training_authority_boundary": blocker_packet[
+            "policy_training_authority_boundary"
+        ],
+        "blocker_packet_next_actions_in_gate_queue": (
+            not blocker_packet_actions_missing_from_gate_queue
+        ),
+        "blocker_packet_next_actions_missing_from_gate_queue": (
+            blocker_packet_actions_missing_from_gate_queue
+        ),
+        "gate_next_actions_checked_against_blocker_packet": gate_next_action_ids,
+        "blocker_packet": blocker_packet,
+        "operator_action_status": operator_actions["status"],
+        "operator_action_model_authority": operator_actions["model_authority"],
+        "operator_action_count": operator_actions["action_count"],
+        "operator_action_immediate_action_count": operator_actions[
+            "immediate_action_count"
+        ],
+        "operator_action_immediate_action_ids": operator_actions[
+            "immediate_action_ids"
+        ],
+        "operator_action_immediate_actions_match_blocker_packet": operator_actions[
+            "immediate_actions_match_blocker_packet"
+        ],
+        "operator_action_immediate_actions_missing_from_blocker_packet": (
+            operator_actions["immediate_actions_missing_from_blocker_packet"]
+        ),
+        "blocker_packet_actions_missing_from_operator_actions": (
+            operator_actions["blocker_packet_actions_missing_from_operator_actions"]
+        ),
+        "operator_action_command_template_count": operator_actions[
+            "command_template_count"
+        ],
+        "operator_action_command_scopes": operator_actions["command_scopes"],
+        "operator_actions_json_path": str(operator_actions_path),
+        "operator_actions_csv_path": str(operator_actions_csv_path),
+        "operator_actions": operator_actions,
+    }
+    blocker_items_by_id = {
+        item.get("item_id"): item
+        for item in blocker_packet.get("items", [])
+        if isinstance(item, dict) and item.get("item_id")
+    }
+
+    def checklist_priority(item_id: str) -> int | None:
+        item = blocker_items_by_id.get(item_id)
+        return item.get("priority") if isinstance(item, dict) else None
+
+    def checklist_status(item_id: str, fallback_status: str) -> str:
+        item = blocker_items_by_id.get(item_id)
+        status = item.get("status") if isinstance(item, dict) else None
+        return status if isinstance(status, str) and status else fallback_status
+
+    def checklist_next_action_id(item_id: str) -> str | None:
+        item = blocker_items_by_id.get(item_id)
+        action_id = item.get("next_action_id") if isinstance(item, dict) else None
+        return action_id if isinstance(action_id, str) and action_id else None
+
+    def checklist_blocked_by_prior_requirement_ids(item_id: str) -> list[str]:
+        item = blocker_items_by_id.get(item_id)
+        blocked = (
+            item.get("blocked_by_prior_requirement_ids")
+            if isinstance(item, dict)
+            else None
+        )
+        return [str(value) for value in blocked] if isinstance(blocked, list) else []
+
+    def checklist_blocked_by_prior_requirement_statuses(item_id: str) -> dict[str, str]:
+        item = blocker_items_by_id.get(item_id)
+        statuses = (
+            item.get("blocked_by_prior_requirement_statuses")
+            if isinstance(item, dict)
+            else None
+        )
+        return (
+            {str(key): str(value) for key, value in statuses.items()}
+            if isinstance(statuses, dict)
+            else {}
+        )
+
+    checklist_rows = [
+        {
+            "requirement_id": "source_authority_ready",
+            "category": "reviewed_model_authority",
+            "priority": checklist_priority("source_authority_ready"),
+            "status": checklist_status(
+                "source_authority_ready",
+                "ok"
+                if gate.get("source_authority_ready") is True
+                else "action_required",
+            ),
+            "observed_value": markdown_bool(gate.get("source_authority_ready")),
+            "expected_value": "true",
+            "blocked_by_prior_requirement_ids": checklist_blocked_by_prior_requirement_ids(
+                "source_authority_ready"
+            ),
+            "blocked_by_prior_requirement_statuses": checklist_blocked_by_prior_requirement_statuses(
+                "source_authority_ready"
+            ),
+            "next_action_id": checklist_next_action_id("source_authority_ready"),
+            "blockers": "; ".join(
+                blocker
+                for blocker in gate.get("blockers", [])
+                if "source" in blocker or "authoritative" in blocker
+            ),
+            "notes": "Model source authority must be reviewed before the bundle can close the gate.",
+        },
+        {
+            "requirement_id": "physical_bundle_authority_ready",
+            "category": "reviewed_model_authority",
+            "priority": checklist_priority("physical_bundle_authority_ready"),
+            "status": checklist_status(
+                "physical_bundle_authority_ready",
+                "ok"
+                if gate.get("physical_so101_model_authority_ready") is True
+                else "action_required",
+            ),
+            "observed_value": markdown_bool(gate.get("physical_so101_model_authority_ready")),
+            "expected_value": "true",
+            "blocked_by_prior_requirement_ids": checklist_blocked_by_prior_requirement_ids(
+                "physical_bundle_authority_ready"
+            ),
+            "blocked_by_prior_requirement_statuses": checklist_blocked_by_prior_requirement_statuses(
+                "physical_bundle_authority_ready"
+            ),
+            "next_action_id": checklist_next_action_id(
+                "physical_bundle_authority_ready"
+            ),
+            "blockers": "; ".join(gate.get("blockers", [])),
+            "notes": "The bundle manifest must provide physical SO-101 authority, not only a development fixture.",
+        },
+        {
+            "requirement_id": "source_bundle_consistency",
+            "category": "reviewed_model_authority",
+            "priority": checklist_priority("source_bundle_consistency"),
+            "status": checklist_status(
+                "source_bundle_consistency",
+                (
+                    "ok"
+                    if gate.get("source_bundle_consistency_ready") is True
+                    else "blocked_by_prior_requirements"
+                    if gate.get("source_bundle_consistency_status")
+                    == "not_checked_prerequisites_not_ready"
+                    else "action_required"
+                ),
+            ),
+            "observed_value": gate.get("source_bundle_consistency_status"),
+            "expected_value": "source_bundle_model_path_and_digest_consistent",
+            "blocked_by_prior_requirement_ids": checklist_blocked_by_prior_requirement_ids(
+                "source_bundle_consistency"
+            ),
+            "blocked_by_prior_requirement_statuses": checklist_blocked_by_prior_requirement_statuses(
+                "source_bundle_consistency"
+            ),
+            "next_action_id": checklist_next_action_id("source_bundle_consistency"),
+            "blockers": "; ".join(
+                blocker
+                for blocker in gate.get("blockers", [])
+                if (
+                    "align_source_inventory" in blocker
+                    or "model_path" in blocker
+                    or "model digest" in blocker
+                    or "model_sha256" in blocker
+                )
+            ),
+            "notes": "The reviewed source inventory and reviewed bundle manifest must identify the same SO-101 model path and SHA-256 digest.",
+        },
+        {
+            "requirement_id": "physical_reviewed_mujoco_motion_checked",
+            "category": "mujoco_scene_validity",
+            "priority": checklist_priority("physical_reviewed_mujoco_motion_checked"),
+            "status": checklist_status(
+                "physical_reviewed_mujoco_motion_checked",
+                "ok"
+                if gate.get("physical_reviewed_model_motion_checked") is True
+                else "action_required",
+            ),
+            "observed_value": markdown_bool(gate.get("physical_reviewed_model_motion_checked")),
+            "expected_value": "true",
+            "blocked_by_prior_requirement_ids": checklist_blocked_by_prior_requirement_ids(
+                "physical_reviewed_mujoco_motion_checked"
+            ),
+            "blocked_by_prior_requirement_statuses": checklist_blocked_by_prior_requirement_statuses(
+                "physical_reviewed_mujoco_motion_checked"
+            ),
+            "next_action_id": checklist_next_action_id(
+                "physical_reviewed_mujoco_motion_checked"
+            ),
+            "blockers": "; ".join(
+                blocker
+                for blocker in gate.get("blockers", [])
+                if "mujoco" in blocker or "motion" in blocker or "model" in blocker
+            ),
+            "notes": "A ready reviewed manifest must load in MuJoCo and prove SO-101 joint motion.",
+        },
+        {
+            "requirement_id": "development_fixture_caveat",
+            "category": "authority_boundary",
+            "priority": checklist_priority("development_fixture_authority_boundary"),
+            "status": checklist_status(
+                "development_fixture_authority_boundary",
+                "ok"
+                if gate.get("development_fixture_evidence_not_physical_so101_truth") is True
+                else "review_required",
+            ),
+            "observed_value": markdown_bool(
+                gate.get("development_fixture_evidence_not_physical_so101_truth")
+            ),
+            "expected_value": "true while the gate is blocked or fixture-only evidence exists",
+            "blocked_by_prior_requirement_ids": checklist_blocked_by_prior_requirement_ids(
+                "development_fixture_authority_boundary"
+            ),
+            "blocked_by_prior_requirement_statuses": checklist_blocked_by_prior_requirement_statuses(
+                "development_fixture_authority_boundary"
+            ),
+            "next_action_id": checklist_next_action_id(
+                "development_fixture_authority_boundary"
+            ),
+            "blockers": "; ".join(gate.get("blockers", [])),
+            "notes": "Development fixture evidence remains automation coverage only.",
+        },
+        {
+            "requirement_id": "serious_policy_training_boundary",
+            "category": "authority_boundary",
+            "priority": None,
+            "status": "ok"
+            if payload["ready_does_not_imply_policy_training_ready"] is True
+            and payload["training_priority_gate_id"] == SO101_TRAINING_PRIORITY_STAGE_IDS[0]
+            and payload["next_training_gate_after_ready"]
+            == SO101_TRAINING_PRIORITY_STAGE_IDS[1]
+            else "action_required",
+            "observed_value": json.dumps(
+                payload["policy_training_authority_boundary"], sort_keys=True
+            ),
+            "expected_value": (
+                "reviewed model authority is the first gate; clearing it advances "
+                "only to MuJoCo scene validity, not policy training"
+            ),
+            "blocked_by_prior_requirement_ids": [],
+            "blocked_by_prior_requirement_statuses": {},
+            "next_action_id": payload["next_training_gate_after_ready"],
+            "blockers": "; ".join(gate.get("blockers", [])),
+            "notes": "The reviewed-authority gate explicitly blocks serious training until ready and still does not authorize policy rollouts by itself.",
+        },
+    ]
+    payload["checklist_status_by_requirement_id"] = {
+        row["requirement_id"]: row["status"] for row in checklist_rows
+    }
+    payload["checklist_next_action_ids_by_requirement_id"] = {
+        row["requirement_id"]: row["next_action_id"]
+        for row in checklist_rows
+        if row.get("next_action_id")
+    }
+    payload["checklist_blocked_by_prior_requirement_ids_by_requirement_id"] = {
+        row["requirement_id"]: row["blocked_by_prior_requirement_ids"]
+        for row in checklist_rows
+        if row.get("blocked_by_prior_requirement_ids")
+    }
+    payload["checklist_blocked_by_prior_requirement_statuses_by_requirement_id"] = {
+        row["requirement_id"]: row["blocked_by_prior_requirement_statuses"]
+        for row in checklist_rows
+        if row.get("blocked_by_prior_requirement_statuses")
+    }
+    gate_dir.mkdir(parents=True, exist_ok=True)
+    write_json(summary_path, payload)
+    fieldnames = (
+        "priority",
+        "requirement_id",
+        "category",
+        "status",
+        "observed_value",
+        "expected_value",
+        "blocked_by_prior_requirement_ids",
+        "blocked_by_prior_requirement_statuses",
+        "next_action_id",
+        "blockers",
+        "notes",
+    )
+    with checklist_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in checklist_rows:
+            writer.writerow({field: csv_cell(row.get(field)) for field in fieldnames})
+    write_json(blocker_packet_path, blocker_packet)
+    write_json(operator_actions_path, operator_actions)
+    blocker_fieldnames = (
+        "priority",
+        "item_id",
+        "gate",
+        "required_state",
+        "status",
+        "observed_ready",
+        "blocked_by_prior_requirement_ids",
+        "blocked_by_prior_requirement_statuses",
+        "next_action_id",
+        "source_bundle_consistency_status",
+        "source_bundle_consistency_blocker",
+        "selected_authoritative_candidate_path",
+        "bundle_model_path",
+        "selected_authoritative_candidate_sha256",
+        "bundle_model_declared_sha256",
+        "bundle_model_observed_sha256",
+        "reviewed_mujoco_motion_bundle_consistency_status",
+        "reviewed_mujoco_motion_bundle_consistency_blocker",
+        "reviewed_mujoco_motion_model_path",
+        "reviewed_mujoco_motion_model_declared_sha256",
+        "reviewed_mujoco_motion_model_observed_sha256",
+        "public_candidate_source_lock_status",
+        "public_candidate_source_lock_ready_for_review",
+        "public_candidate_source_lock_json_path",
+        "public_candidate_operator_intake_plan_json_path",
+        "public_candidate_operator_intake_plan_status",
+        "public_candidate_operator_intake_decision_status",
+        "public_candidate_operator_intake_plan_model_authority",
+        "public_candidate_operator_command_plan_json_path",
+        "public_candidate_operator_command_plan_status",
+        "public_candidate_operator_command_plan_model_authority",
+        "public_candidate_operator_command_plan_review_handoff_artifact_ids",
+        "public_candidate_operator_command_plan_authority_blockers_until_reviewed",
+        "public_candidate_reviewed_manifest_rerun_plan_json_path",
+        "public_candidate_reviewed_manifest_rerun_plan_status",
+        "public_candidate_reviewed_manifest_rerun_plan_model_authority",
+        "public_candidate_reviewed_manifest_rerun_plan_selected_option",
+        "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready",
+        "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions",
+        "public_candidate_review_checklist_scope_coverage_ready",
+        "public_candidate_review_checklist_missing_required_review_scope_ids",
+        "public_candidate_review_checklist_gripper_mapping_direct_action_ids",
+        "public_candidate_review_checklist_collision_policy_direct_action_ids",
+        "public_candidate_review_manifest_template_path",
+        "public_candidate_source_lock_model_authority",
+        "evidence_artifact_path",
+        "blockers",
+        "operator_action",
+        "development_fixture_evidence_not_physical_so101_truth",
+    )
+    with blocker_packet_csv_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=blocker_fieldnames)
+        writer.writeheader()
+        for item in blocker_packet["items"]:
+            writer.writerow({field: csv_cell(item.get(field)) for field in blocker_fieldnames})
+    operator_action_fieldnames = (
+        "priority",
+        "item_id",
+        "status",
+        "gate",
+        "required_state",
+        "next_action_id",
+        "command_scope",
+        "command",
+        "evidence_artifact_path",
+        "blocked_by_prior_requirement_ids",
+        "blocked_by_prior_requirement_statuses",
+        "operator_action",
+        "public_candidate_source_lock_status",
+        "public_candidate_source_lock_ready_for_review",
+        "public_candidate_source_lock_json_path",
+        "public_candidate_operator_intake_plan_json_path",
+        "public_candidate_operator_intake_plan_status",
+        "public_candidate_operator_intake_decision_status",
+        "public_candidate_operator_intake_plan_model_authority",
+        "public_candidate_operator_command_plan_json_path",
+        "public_candidate_operator_command_plan_status",
+        "public_candidate_operator_command_plan_model_authority",
+        "public_candidate_operator_command_plan_review_handoff_artifact_ids",
+        "public_candidate_operator_command_plan_authority_blockers_until_reviewed",
+        "public_candidate_reviewed_manifest_rerun_plan_json_path",
+        "public_candidate_reviewed_manifest_rerun_plan_status",
+        "public_candidate_reviewed_manifest_rerun_plan_model_authority",
+        "public_candidate_reviewed_manifest_rerun_plan_selected_option",
+        "public_candidate_reviewed_manifest_rerun_plan_source_lock_ready",
+        "public_candidate_reviewed_manifest_rerun_plan_required_success_conditions",
+        "public_candidate_review_checklist_scope_coverage_ready",
+        "public_candidate_review_checklist_missing_required_review_scope_ids",
+        "public_candidate_review_checklist_gripper_mapping_direct_action_ids",
+        "public_candidate_review_checklist_collision_policy_direct_action_ids",
+        "public_candidate_review_manifest_template_path",
+        "public_candidate_source_lock_model_authority",
+        "development_fixture_evidence_not_physical_so101_truth",
+    )
+    with operator_actions_csv_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=operator_action_fieldnames)
+        writer.writeheader()
+        for action in operator_actions["actions"]:
+            writer.writerow(
+                {
+                    field: csv_cell(action.get(field))
+                    for field in operator_action_fieldnames
+                }
+            )
+    blocker_lines = (
+        [f"- `{blocker}`" for blocker in gate.get("blockers", [])]
+        if gate.get("blockers")
+        else ["- none"]
+    )
+    readme_path.write_text(
+        "\n".join(
+            [
+                "# SO-101 Reviewed Model Authority Gate",
+                "",
+                f"- Status: `{gate.get('status')}`",
+                f"- Model authority: `{gate.get('model_authority')}`",
+                f"- Ready: `{markdown_bool(gate.get('ready'))}`",
+                "- Observed physical SO-101 authority: "
+                f"`{markdown_bool(gate.get('observed_evidence_is_physical_so101_authority'))}`",
+                "- Observed policy-training authority: "
+                f"`{markdown_bool(gate.get('observed_evidence_is_policy_training_authority'))}`",
+                "- Development fixture evidence is not policy-training truth: "
+                f"`{markdown_bool(gate.get('development_fixture_evidence_not_policy_training_truth'))}`",
+                "- Ready for model-backed IK: "
+                f"`{markdown_bool(gate.get('ready_for_model_backed_ik'))}`",
+                "- Ready for policy training: "
+                f"`{markdown_bool(gate.get('ready_for_policy_training'))}`",
+                f"- Source authority ready: `{markdown_bool(gate.get('source_authority_ready'))}`",
+                "- Physical SO-101 model authority ready: "
+                f"`{markdown_bool(gate.get('physical_so101_model_authority_ready'))}`",
+                "- Source/bundle model identity consistency: "
+                f"`{gate.get('source_bundle_consistency_status')}`",
+                "- Physical reviewed MuJoCo motion checked: "
+                f"`{markdown_bool(gate.get('physical_reviewed_model_motion_checked'))}`",
+                "- Development fixture evidence is not physical SO-101 truth: "
+                f"`{markdown_bool(gate.get('development_fixture_evidence_not_physical_so101_truth'))}`",
+                "- Immediate action required items: "
+                f"`{markdown_list_value(payload.get('blocker_packet_action_required_item_ids'))}`",
+                "- Prioritized next required actions: "
+                f"`{markdown_list_value(gate.get('next_required_action_ids'))}`",
+                "- Blocks serious policy training until ready: "
+                f"`{markdown_bool(payload.get('blocks_serious_policy_training_until_ready'))}`",
+                "- Next training gate after authority: "
+                f"`{payload.get('next_training_gate_after_ready')}`",
+                "- Ready does not imply policy training ready: "
+                f"`{markdown_bool(payload.get('ready_does_not_imply_policy_training_ready'))}`",
+                "- Blocker packet next actions are in gate queue: "
+                f"`{markdown_bool(payload.get('blocker_packet_next_actions_in_gate_queue'))}`",
+                "- Blocker packet next actions missing from gate queue: "
+                f"`{markdown_list_value(payload.get('blocker_packet_next_actions_missing_from_gate_queue'))}`",
+                "- Blocked by prior requirement items: "
+                f"`{markdown_list_value(payload.get('blocker_packet_blocked_by_prior_requirements_item_ids'))}`",
+                "- Blocked prior requirement statuses: "
+                f"`{markdown_mapping_value(payload.get('checklist_blocked_by_prior_requirement_statuses_by_requirement_id'))}`",
+                f"- Blocker packet: `{blocker_packet_path}`",
+                f"- Blocker packet rows: `{blocker_packet_csv_path}`",
+                f"- Operator actions: `{operator_actions_path}`",
+                f"- Operator action rows: `{operator_actions_csv_path}`",
+                "- Operator action status: "
+                f"`{payload.get('operator_action_status')}`",
+                "- Operator immediate actions match blocker packet: "
+                f"`{markdown_bool(payload.get('operator_action_immediate_actions_match_blocker_packet'))}`",
+                "- Operator actions missing from blocker packet: "
+                f"`{markdown_list_value(payload.get('operator_action_immediate_actions_missing_from_blocker_packet'))}`",
+                "- Blocker packet actions missing from operator actions: "
+                f"`{markdown_list_value(payload.get('blocker_packet_actions_missing_from_operator_actions'))}`",
+                "- Operator action command scopes: "
+                f"`{markdown_list_value(payload.get('operator_action_command_scopes'))}`",
+                "",
+                "## Blockers",
+                "",
+                *blocker_lines,
+                "",
+                "## Evidence Sources",
+                "",
+                f"- Source inventory: `{gate.get('source_inventory_summary_path')}`",
+                f"- Bundle manifest: `{gate.get('bundle_manifest_summary_path')}`",
+                f"- Reviewed MuJoCo bundle: `{gate.get('reviewed_mujoco_bundle_summary_path')}`",
+                "",
+                "This artifact is a hardware-free gate summary. It is ready only when source authority, physical bundle authority, source-to-bundle model path/digest consistency, and physical-reviewed MuJoCo motion are all true.",
+                "",
+            ]
+        )
+    )
+    return payload
+
+
+def _summary_path(value: dict[str, Any]) -> str | None:
+    path = value.get("summary_path")
+    return path if isinstance(path, str) and path else None
+
+
+def _json_number(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
+def _json_string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if isinstance(item, (str, int, float))]
+
+
+def so101_board_pick_phase_evidence_ready(board_pick: dict[str, Any]) -> bool:
+    phase_ids = _json_string_list(board_pick.get("pick_place_phase_ids"))
+    failed_phase_ids = _json_string_list(board_pick.get("pick_place_failed_phase_ids"))
+    phase_count = board_pick.get("pick_place_phase_count")
+    phase_evidence = board_pick.get("pick_place_phase_evidence")
+    if (
+        phase_ids != list(SO101_BOARD_PICK_REQUIRED_PHASE_IDS)
+        or failed_phase_ids
+        or phase_count != len(SO101_BOARD_PICK_REQUIRED_PHASE_IDS)
+        or board_pick.get("pick_place_all_required_phases_verified") is not True
+        or not isinstance(phase_evidence, list)
+        or len(phase_evidence) != len(SO101_BOARD_PICK_REQUIRED_PHASE_IDS)
+    ):
+        return False
+    for expected_phase_id, row in zip(SO101_BOARD_PICK_REQUIRED_PHASE_IDS, phase_evidence):
+        if not isinstance(row, dict):
+            return False
+        if row.get("phase_id") != expected_phase_id or row.get("ok") is not True:
+            return False
+        if not isinstance(row.get("criteria"), list) or not row["criteria"]:
+            return False
+        if not isinstance(row.get("metrics"), dict) or not row["metrics"]:
+            return False
+        if expected_phase_id == "release_place":
+            criteria = row.get("criteria")
+            metrics = row.get("metrics")
+            for expected_criterion in (
+                "lower_contact_retained_before_release",
+                "lower_board_contact_observed_before_release",
+                "lower_target_xy_error_within_tolerance_before_release",
+                "lower_place_z_error_within_tolerance_before_release",
+            ):
+                if expected_criterion not in criteria:
+                    return False
+            for expected_metric in (
+                "lower_contact_retained_before_release",
+                "lower_board_contact_observed_before_release",
+                "lower_target_xy_error_m",
+                "lower_place_z_error_m",
+            ):
+                if expected_metric not in metrics:
+                    return False
+    return True
+
+
+def so101_board_pick_stage_sequence_ready(board_pick: dict[str, Any]) -> bool:
+    required_sequence = _json_string_list(board_pick.get("required_stage_sequence"))
+    observed_sequence = _json_string_list(board_pick.get("observed_stage_sequence"))
+    missing_stage_ids = _json_string_list(board_pick.get("missing_stage_ids"))
+    unexpected_stage_ids = _json_string_list(board_pick.get("unexpected_stage_ids"))
+    manual_pose_after_reset_stage_ids = _json_string_list(
+        board_pick.get("manual_piece_pose_after_reset_stage_ids")
+    )
+    stage_contract_errors = _json_string_list(
+        board_pick.get("stage_sequence_contract_errors")
+    )
+    expected_sequence = list(SO101_BOARD_PICK_REQUIRED_STAGE_SEQUENCE)
+    return (
+        required_sequence == expected_sequence
+        and observed_sequence == expected_sequence
+        and missing_stage_ids == []
+        and unexpected_stage_ids == []
+        and board_pick.get("stage_sequence_order_ok") is True
+        and board_pick.get("stage_sequence_contract_ok") is True
+        and stage_contract_errors == []
+        and manual_pose_after_reset_stage_ids == []
+    )
+
+
+def so101_board_pick_detailed_evidence_ready(board_pick: dict[str, Any]) -> bool:
+    lower_target_xy_error_m = _json_number(board_pick.get("lower_target_xy_error_m"))
+    final_target_xy_error_m = _json_number(board_pick.get("final_target_xy_error_m"))
+    target_xy_tolerance_m = _json_number(board_pick.get("target_xy_tolerance_m"))
+    lower_place_z_error_m = _json_number(board_pick.get("lower_place_z_error_m"))
+    final_place_z_error_m = _json_number(board_pick.get("final_place_z_error_m"))
+    place_z_tolerance_m = _json_number(board_pick.get("place_z_tolerance_m"))
+    lower_target_within_tolerance = (
+        lower_target_xy_error_m is not None
+        and target_xy_tolerance_m is not None
+        and lower_target_xy_error_m <= target_xy_tolerance_m
+    )
+    final_target_within_tolerance = (
+        final_target_xy_error_m is not None
+        and target_xy_tolerance_m is not None
+        and final_target_xy_error_m <= target_xy_tolerance_m
+    )
+    lower_place_z_within_tolerance = (
+        lower_place_z_error_m is not None
+        and place_z_tolerance_m is not None
+        and lower_place_z_error_m <= place_z_tolerance_m
+    )
+    final_place_z_within_tolerance = (
+        final_place_z_error_m is not None
+        and place_z_tolerance_m is not None
+        and final_place_z_error_m <= place_z_tolerance_m
+    )
+    return (
+        board_pick.get("board_source_pick_place_verified") is True
+        and board_pick.get("source_pick_started_at_source") is True
+        and board_pick.get("close_two_finger_contact_observed") is True
+        and board_pick.get("lift_verified") is True
+        and board_pick.get("board_contact_cleared_during_lift") is True
+        and board_pick.get("transfer_verified") is True
+        and board_pick.get("lower_contact_retained_before_release") is True
+        and board_pick.get("lower_board_contact_observed_before_release") is True
+        and board_pick.get("lower_target_within_tolerance_before_release") is True
+        and board_pick.get("lower_place_z_within_tolerance_before_release") is True
+        and board_pick.get("place_without_manual_piece_pose_verified") is True
+        and board_pick.get("release_contact_cleared_after_retreat") is True
+        and board_pick.get("final_board_contact_observed") is True
+        and lower_target_within_tolerance
+        and final_target_within_tolerance
+        and lower_place_z_within_tolerance
+        and final_place_z_within_tolerance
+        and so101_board_pick_phase_evidence_ready(board_pick)
+        and so101_board_pick_stage_sequence_ready(board_pick)
+    )
+
+
+def so101_board_pick_authority_contract(
+    board_pick: dict[str, Any],
+    *,
+    detailed_evidence_ready: bool,
+) -> dict[str, Any]:
+    reviewed_model_authority_ready = (
+        board_pick.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
+    )
+    ready_for_model_backed_ik = board_pick.get("ready_for_model_backed_ik") is True
+    ik_solution_source = board_pick.get("ik_solution_source")
+    ik_uses_reviewed_model = board_pick.get("ik_uses_reviewed_model") is True
+    ik_uses_reviewed_tcp_and_base = (
+        board_pick.get("ik_uses_reviewed_tcp_and_base_to_board_alignment") is True
+    )
+    ik_uses_seeded_joint_targets = (
+        board_pick.get("ik_uses_seeded_joint_targets") is True
+    )
+    seeded_source_pose = board_pick.get("robot_pose_seeded_for_source_fixture") is True
+    manual_pose_after_reset = board_pick.get("manual_piece_pose_used_after_reset") is True
+    physical_truth_claimed = (
+        board_pick.get("observed_evidence_is_physical_so101_authority") is True
+    )
+    policy_training_claimed = board_pick.get("ready_for_policy_training") is True
+    policy_authority_claimed = (
+        board_pick.get("observed_evidence_is_policy_training_authority") is True
+    )
+
+    blockers: list[str] = []
+    if not detailed_evidence_ready:
+        blockers.append("provide_complete_board_pick_detailed_evidence")
+    if not reviewed_model_authority_ready:
+        blockers.append("use_reviewed_so101_model_authority_for_board_pick")
+    if not ready_for_model_backed_ik:
+        blockers.append("repeat_board_pick_with_reviewed_model_backed_ik")
+    if ik_solution_source != "reviewed_model_backed_ik":
+        blockers.append("replace_seeded_board_pick_ik_solution_source")
+    if not ik_uses_reviewed_model:
+        blockers.append("use_reviewed_model_for_board_pick_ik")
+    if not ik_uses_reviewed_tcp_and_base:
+        blockers.append("use_reviewed_tcp_and_base_to_board_alignment_for_board_pick_ik")
+    if ik_uses_seeded_joint_targets:
+        blockers.append("remove_seeded_joint_targets_from_board_pick_ik")
+    if seeded_source_pose:
+        blockers.append("remove_seeded_source_pose_from_board_pick")
+    if manual_pose_after_reset:
+        blockers.append("remove_manual_piece_pose_after_reset_from_board_pick")
+    if physical_truth_claimed:
+        blockers.append("remove_physical_so101_truth_claim_from_board_pick")
+    if policy_training_claimed or policy_authority_claimed:
+        blockers.append("remove_policy_training_authority_claim_from_board_pick")
+
+    ready = not blockers
+    if ready:
+        status = "reviewed_model_backed_board_source_pick_place_verified"
+    elif not reviewed_model_authority_ready:
+        status = "board_pick_not_reviewed_model_authority"
+    elif not ready_for_model_backed_ik:
+        status = "board_pick_not_model_backed_ik"
+    elif ik_solution_source != "reviewed_model_backed_ik":
+        status = "board_pick_ik_solution_source_not_reviewed"
+    elif not ik_uses_reviewed_model or not ik_uses_reviewed_tcp_and_base:
+        status = "board_pick_ik_missing_reviewed_model_or_alignment"
+    elif ik_uses_seeded_joint_targets:
+        status = "board_pick_seeded_joint_targets_not_reviewed_ik"
+    elif seeded_source_pose:
+        status = "board_pick_seeded_source_pose_not_reviewed_ik"
+    elif manual_pose_after_reset:
+        status = "board_pick_manual_piece_pose_after_reset"
+    elif physical_truth_claimed:
+        status = "board_pick_physical_truth_claimed"
+    elif policy_training_claimed or policy_authority_claimed:
+        status = "board_pick_policy_training_authority_claimed"
+    elif not detailed_evidence_ready:
+        status = "board_pick_detailed_evidence_incomplete"
+    else:
+        status = "board_pick_authority_contract_blocked"
+
+    return {
+        "ready": ready,
+        "status": status,
+        "blockers": blockers,
+        "reviewed_model_authority_ready": reviewed_model_authority_ready,
+        "ready_for_model_backed_ik": ready_for_model_backed_ik,
+        "ik_solution_source": ik_solution_source,
+        "ik_uses_reviewed_model": ik_uses_reviewed_model,
+        "ik_uses_reviewed_tcp_and_base_to_board_alignment": ik_uses_reviewed_tcp_and_base,
+        "ik_uses_seeded_joint_targets": ik_uses_seeded_joint_targets,
+        "seeded_source_pose": seeded_source_pose,
+        "manual_piece_pose_after_reset": manual_pose_after_reset,
+        "physical_truth_claimed": physical_truth_claimed,
+        "policy_training_claimed": policy_training_claimed,
+        "policy_authority_claimed": policy_authority_claimed,
+        "detailed_evidence_ready": detailed_evidence_ready,
+    }
+
+
+def so101_board_pick_priority_action_ids(
+    board_pick: dict[str, Any],
+    board_pick_authority_contract: dict[str, Any],
+) -> list[str]:
+    next_action_ids = unique_string_values(board_pick.get("next_required_action_ids") or [])
+    repeat_action_ids = [
+        action_id
+        for action_id in next_action_ids
+        if action_id == "repeat_board_pick_with_reviewed_model_backed_ik"
+    ]
+    if repeat_action_ids:
+        return repeat_action_ids
+    blockers = unique_string_values(board_pick_authority_contract.get("blockers") or [])
+    repeat_blockers = [
+        blocker
+        for blocker in blockers
+        if blocker == "repeat_board_pick_with_reviewed_model_backed_ik"
+    ]
+    if repeat_blockers:
+        return repeat_blockers
+    return blockers or next_action_ids or ["repeat_board_pick_with_reviewed_model_backed_ik"]
+
+
+def so101_reviewed_mujoco_downstream_handoff_contract(
+    reviewed_mujoco_bundle: dict[str, Any],
+) -> dict[str, Any]:
+    schema = reviewed_mujoco_bundle.get("downstream_handoff_schema")
+    item_ids = reviewed_mujoco_bundle.get("downstream_handoff_item_ids")
+    item_ids = [str(item) for item in item_ids] if isinstance(item_ids, list) else []
+    missing_item_ids = sorted(
+        set(SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_ITEM_IDS) - set(item_ids)
+    )
+    item_count = reviewed_mujoco_bundle.get("downstream_handoff_item_count")
+    item_count_ok = (
+        isinstance(item_count, int)
+        and item_count == len(item_ids)
+        and item_count >= len(SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_ITEM_IDS)
+    )
+    raw_ready = reviewed_mujoco_bundle.get("downstream_handoff_ready") is True
+    fixture_ready = (
+        reviewed_mujoco_bundle.get("fixture_handoff_ready_not_physical_so101_authority")
+        is True
+    )
+    physical_motion_checked = (
+        reviewed_mujoco_bundle.get("physical_reviewed_model_motion_checked") is True
+    )
+    fixture_motion_checked = (
+        reviewed_mujoco_bundle.get("hardware_free_fixture_motion_checked") is True
+    )
+    reviewed_model_motion_checked = (
+        reviewed_mujoco_bundle.get("reviewed_model_motion_checked") is True
+    )
+    motion_authority_status = reviewed_mujoco_bundle.get("motion_authority_status")
+    physical_model_authority_ready = (
+        reviewed_mujoco_bundle.get("physical_so101_model_authority_ready") is True
+    )
+    handoff_model_identity_status = reviewed_mujoco_bundle.get(
+        "downstream_handoff_model_identity_status"
+    )
+    handoff_model_identity_matches = (
+        reviewed_mujoco_bundle.get("downstream_handoff_model_identity_matches")
+        is True
+    )
+    handoff_model_path = reviewed_mujoco_bundle.get("downstream_handoff_model_path")
+    handoff_model_declared_sha256 = reviewed_mujoco_bundle.get(
+        "downstream_handoff_declared_model_sha256"
+    )
+    handoff_model_observed_sha256 = reviewed_mujoco_bundle.get(
+        "downstream_handoff_observed_model_sha256"
+    )
+    handoff_model_identity_contract_ok = (
+        reviewed_mujoco_bundle.get("downstream_handoff_model_identity_contract_ok")
+        is True
+        and isinstance(handoff_model_path, str)
+        and bool(handoff_model_path)
+        and handoff_model_identity_status == "present"
+        and handoff_model_identity_matches
+        and isinstance(handoff_model_declared_sha256, str)
+        and isinstance(handoff_model_observed_sha256, str)
+        and bool(handoff_model_declared_sha256)
+        and handoff_model_declared_sha256 == handoff_model_observed_sha256
+    )
+    motion_evidence_not_physical = (
+        reviewed_mujoco_bundle.get(
+            "motion_evidence_not_physical_so101_authority"
+        )
+        is True
+    )
+    status = reviewed_mujoco_bundle.get("downstream_handoff_status")
+    physical_truth_claimed = (
+        reviewed_mujoco_bundle.get("downstream_handoff_physical_so101_truth_claimed")
+        is True
+    )
+    policy_training_authority_claimed = (
+        reviewed_mujoco_bundle.get("downstream_handoff_policy_training_authority_claimed")
+        is True
+    )
+    development_fixture_not_truth = (
+        reviewed_mujoco_bundle.get(
+            "downstream_handoff_development_fixture_evidence_not_physical_so101_truth"
+        )
+        is True
+    )
+    development_fixture_not_policy_training_truth = (
+        reviewed_mujoco_bundle.get(
+            "downstream_handoff_development_fixture_evidence_not_policy_training_truth"
+        )
+        is True
+    )
+    handoff_raw_missing_inputs = reviewed_mujoco_bundle.get("missing_inputs")
+    handoff_missing_inputs = unique_string_values(
+        handoff_raw_missing_inputs if isinstance(handoff_raw_missing_inputs, list) else []
+    )
+    handoff_next_required = reviewed_mujoco_bundle.get("next_required_for_goal")
+    handoff_next_required_action_ids = unique_string_values(
+        [
+            action.get("action_id") if isinstance(action, dict) else action
+            for action in handoff_next_required
+        ]
+        if isinstance(handoff_next_required, list)
+        else []
+    )
+    handoff_raw_explicit_action_ids = reviewed_mujoco_bundle.get(
+        "next_required_action_ids"
+    )
+    handoff_explicit_action_ids = unique_string_values(
+        handoff_raw_explicit_action_ids
+        if isinstance(handoff_raw_explicit_action_ids, list)
+        else []
+    )
+    handoff_pending_action_ids = unique_string_values(
+        [
+            *handoff_explicit_action_ids,
+            *handoff_next_required_action_ids,
+        ]
+    )
+    ready_handoff_has_open_work = (raw_ready or fixture_ready) and bool(
+        handoff_missing_inputs or handoff_pending_action_ids
+    )
+    mujoco_motion_inputs = reviewed_mujoco_bundle.get("mujoco_motion_inputs")
+    mujoco_motion_inputs = (
+        mujoco_motion_inputs if isinstance(mujoco_motion_inputs, dict) else {}
+    )
+    joint_limit_enablement = mujoco_motion_inputs.get("mujoco_joint_limit_enablement")
+    if not isinstance(joint_limit_enablement, dict):
+        joint_limit_enablement = reviewed_mujoco_bundle.get(
+            "mujoco_joint_limit_enablement"
+        )
+    joint_limit_enablement = (
+        joint_limit_enablement if isinstance(joint_limit_enablement, dict) else {}
+    )
+    joint_limit_enablement_ok = joint_limit_enablement.get("ok") is True
+    joint_limit_enablement_status = joint_limit_enablement.get("status")
+    raw_missing_limited_joints = joint_limit_enablement.get("missing_limited_joints")
+    missing_limited_joints = unique_string_values(
+        raw_missing_limited_joints
+        if isinstance(raw_missing_limited_joints, list)
+        else []
+    )
+    ready_joint_limit_enablement_contract_ok = (
+        joint_limit_enablement_ok
+        and joint_limit_enablement_status == "so101_mujoco_joints_limited"
+        and missing_limited_joints == []
+    )
+    raw_priority_gate_order = reviewed_mujoco_bundle.get(
+        "downstream_priority_gate_order"
+    )
+    priority_gate_order = unique_string_values(
+        raw_priority_gate_order if isinstance(raw_priority_gate_order, list) else []
+    )
+    priority_gate_id = reviewed_mujoco_bundle.get("downstream_priority_gate_id")
+    next_downstream_gate_after_ready = reviewed_mujoco_bundle.get(
+        "next_downstream_gate_after_ready"
+    )
+    blocks_downstream_gates_until_ready = reviewed_mujoco_bundle.get(
+        "blocks_downstream_gates_until_ready"
+    )
+    ready_does_not_imply_policy_training_ready = reviewed_mujoco_bundle.get(
+        "ready_does_not_imply_policy_training_ready"
+    )
+    priority_contract_ok = (
+        priority_gate_id == SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_GATE_ID
+        and priority_gate_order == list(SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_ORDER)
+        and next_downstream_gate_after_ready
+        == SO101_REVIEWED_MUJOCO_NEXT_DOWNSTREAM_GATE_AFTER_READY
+        and blocks_downstream_gates_until_ready is True
+        and ready_does_not_imply_policy_training_ready is True
+    )
+
+    physical_ready_contract_ok = (
+        not raw_ready
+        or (
+            physical_motion_checked
+            and reviewed_model_motion_checked
+            and status == "physical_reviewed_mujoco_handoff_ready"
+            and motion_authority_status == "physical_reviewed_model_motion_checked"
+            and physical_model_authority_ready
+            and fixture_ready is False
+            and fixture_motion_checked is False
+            and motion_evidence_not_physical is False
+        )
+    )
+    fixture_contract_ok = (
+        not fixture_ready
+        or (
+            raw_ready is False
+            and physical_motion_checked is False
+            and fixture_motion_checked
+            and reviewed_model_motion_checked
+            and status == "fixture_mujoco_handoff_ready_not_physical_authority"
+            and motion_authority_status
+            == "hardware_free_fixture_motion_checked_not_physical_so101_authority"
+            and motion_evidence_not_physical
+        )
+    )
+    blockers: list[str] = []
+    if schema != SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_SCHEMA:
+        blockers.append("provide_current_reviewed_mujoco_downstream_handoff_schema")
+    if reviewed_mujoco_bundle.get("downstream_handoff_model_authority") != (
+        "downstream_handoff_not_authority"
+    ):
+        blockers.append("repair_reviewed_mujoco_downstream_handoff_authority")
+    if (
+        reviewed_mujoco_bundle.get(
+            "downstream_handoff_observed_evidence_is_authority"
+        )
+        is not False
+    ):
+        blockers.append("mark_downstream_handoff_as_non_authority_snapshot")
+    if physical_truth_claimed:
+        blockers.append("remove_physical_so101_truth_claim_from_downstream_handoff")
+    if policy_training_authority_claimed:
+        blockers.append("remove_policy_training_authority_claim_from_downstream_handoff")
+    if not development_fixture_not_truth:
+        blockers.append("mark_downstream_handoff_development_fixture_boundary")
+    if not development_fixture_not_policy_training_truth:
+        blockers.append("mark_downstream_handoff_policy_training_boundary")
+    if missing_item_ids:
+        blockers.append("provide_complete_reviewed_mujoco_downstream_handoff_items")
+    if not item_count_ok:
+        blockers.append("fix_reviewed_mujoco_downstream_handoff_item_count")
+    if priority_gate_id != SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_GATE_ID:
+        blockers.append("provide_reviewed_mujoco_downstream_priority_gate_id")
+    if priority_gate_order != list(SO101_REVIEWED_MUJOCO_DOWNSTREAM_PRIORITY_ORDER):
+        blockers.append("provide_reviewed_mujoco_downstream_priority_gate_order")
+    if (
+        next_downstream_gate_after_ready
+        != SO101_REVIEWED_MUJOCO_NEXT_DOWNSTREAM_GATE_AFTER_READY
+    ):
+        blockers.append("provide_reviewed_mujoco_next_downstream_gate")
+    if blocks_downstream_gates_until_ready is not True:
+        blockers.append("mark_reviewed_mujoco_handoff_blocks_downstream_gates")
+    if ready_does_not_imply_policy_training_ready is not True:
+        blockers.append("mark_reviewed_mujoco_handoff_not_policy_training_ready")
+    if (raw_ready or fixture_ready) and handoff_missing_inputs:
+        blockers.append("resolve_ready_reviewed_mujoco_handoff_missing_inputs")
+    if (raw_ready or fixture_ready) and handoff_pending_action_ids:
+        blockers.append("resolve_ready_reviewed_mujoco_handoff_pending_actions")
+    if (raw_ready or fixture_ready) and not ready_joint_limit_enablement_contract_ok:
+        blockers.append("provide_reviewed_mujoco_joint_limit_enablement_evidence")
+    if (raw_ready or fixture_ready) and not (
+        isinstance(handoff_model_path, str) and bool(handoff_model_path)
+    ):
+        blockers.append("provide_reviewed_mujoco_model_path_evidence")
+    if (raw_ready or fixture_ready) and not isinstance(
+        handoff_model_declared_sha256, str
+    ):
+        blockers.append("provide_reviewed_mujoco_declared_model_sha256")
+    if (raw_ready or fixture_ready) and not isinstance(
+        handoff_model_observed_sha256, str
+    ):
+        blockers.append("provide_reviewed_mujoco_observed_model_sha256")
+    if (
+        (raw_ready or fixture_ready)
+        and isinstance(handoff_model_declared_sha256, str)
+        and isinstance(handoff_model_observed_sha256, str)
+        and handoff_model_declared_sha256 != handoff_model_observed_sha256
+    ):
+        blockers.append("repair_reviewed_mujoco_model_sha256_mismatch")
+    if (raw_ready or fixture_ready) and not handoff_model_identity_contract_ok:
+        blockers.append("provide_reviewed_mujoco_model_identity_evidence")
+    if raw_ready and not physical_ready_contract_ok:
+        blockers.append("repair_physical_reviewed_mujoco_handoff_readiness_flags")
+    if fixture_ready and not fixture_contract_ok:
+        blockers.append("repair_fixture_reviewed_mujoco_handoff_flags")
+    if reviewed_mujoco_bundle.get("downstream_handoff_ready") != (
+        physical_motion_checked
+    ):
+        blockers.append("align_downstream_handoff_ready_with_physical_motion_check")
+    if reviewed_model_motion_checked != (
+        physical_motion_checked or fixture_motion_checked
+    ):
+        blockers.append("align_reviewed_model_motion_checked_with_motion_source")
+
+    contract_ok = not blockers
+    ready = contract_ok and raw_ready
+    fixture_contract_ready = contract_ok and fixture_ready
+    if not contract_ok:
+        contract_status = "handoff_contract_invalid"
+    elif ready:
+        contract_status = "physical_reviewed_mujoco_handoff_ready"
+    elif fixture_contract_ready:
+        contract_status = "fixture_handoff_not_physical_so101_authority"
+    else:
+        contract_status = "reviewed_mujoco_handoff_not_ready"
+    next_action_ids = unique_string_values(
+        [
+            *blockers,
+            *([] if ready else ["make_reviewed_mujoco_downstream_handoff_ready"]),
+        ]
+    )
+    return {
+        "contract_ok": contract_ok,
+        "contract_status": contract_status,
+        "ready": ready,
+        "raw_ready": raw_ready,
+        "fixture_handoff_ready_not_physical_so101_authority": fixture_contract_ready,
+        "raw_fixture_handoff_ready_not_physical_so101_authority": fixture_ready,
+        "schema": schema,
+        "expected_schema": SO101_REVIEWED_MUJOCO_DOWNSTREAM_HANDOFF_SCHEMA,
+        "status": status,
+        "model_authority": reviewed_mujoco_bundle.get(
+            "downstream_handoff_model_authority"
+        ),
+        "observed_evidence_is_authority": reviewed_mujoco_bundle.get(
+            "downstream_handoff_observed_evidence_is_authority"
+        ),
+        "physical_truth_claimed": physical_truth_claimed,
+        "policy_training_authority_claimed": policy_training_authority_claimed,
+        "development_fixture_evidence_not_physical_so101_truth": (
+            development_fixture_not_truth
+        ),
+        "development_fixture_evidence_not_policy_training_truth": (
+            development_fixture_not_policy_training_truth
+        ),
+        "item_count": item_count,
+        "item_ids": item_ids,
+        "missing_item_ids": missing_item_ids,
+        "priority_gate_id": priority_gate_id,
+        "priority_gate_order": priority_gate_order,
+        "next_downstream_gate_after_ready": next_downstream_gate_after_ready,
+        "blocks_downstream_gates_until_ready": blocks_downstream_gates_until_ready,
+        "ready_does_not_imply_policy_training_ready": ready_does_not_imply_policy_training_ready,
+        "priority_contract_ok": priority_contract_ok,
+        "missing_inputs": handoff_missing_inputs,
+        "pending_action_ids": handoff_pending_action_ids,
+        "ready_handoff_has_open_work": ready_handoff_has_open_work,
+        "blockers": blockers,
+        "next_action_ids": next_action_ids,
+        "physical_motion_checked": physical_motion_checked,
+        "hardware_free_fixture_motion_checked": fixture_motion_checked,
+        "reviewed_model_motion_checked": reviewed_model_motion_checked,
+        "motion_authority_status": motion_authority_status,
+        "physical_so101_model_authority_ready": physical_model_authority_ready,
+        "model_identity_contract_ok": handoff_model_identity_contract_ok,
+        "model_identity_status": handoff_model_identity_status,
+        "model_identity_matches": handoff_model_identity_matches,
+        "model_path": handoff_model_path,
+        "model_declared_sha256": handoff_model_declared_sha256,
+        "model_observed_sha256": handoff_model_observed_sha256,
+        "motion_evidence_not_physical_so101_authority": motion_evidence_not_physical,
+        "joint_limit_enablement_ok": joint_limit_enablement_ok,
+        "joint_limit_enablement_status": joint_limit_enablement_status,
+        "missing_limited_joints": missing_limited_joints,
+        "required_limited_joints": list(SO101_CONTROL_JOINT_IDS),
+    }
+
+
+def so101_rollout_action_contract(training_rollouts: dict[str, Any]) -> dict[str, Any]:
+    next_required_for_goal = training_rollouts.get("next_required_for_goal")
+    next_required_for_goal = (
+        next_required_for_goal if isinstance(next_required_for_goal, list) else []
+    )
+    next_required_for_goal_action_ids = training_rollouts.get(
+        "next_required_for_goal_action_ids"
+    )
+    next_required_for_goal_action_ids = (
+        unique_string_values(next_required_for_goal_action_ids)
+        if isinstance(next_required_for_goal_action_ids, list)
+        else unique_string_values(
+            [
+                action.get("action_id")
+                for action in next_required_for_goal
+                if isinstance(action, dict)
+            ]
+        )
+    )
+    next_required_action_ids = training_rollouts.get("next_required_action_ids")
+    next_required_action_ids = (
+        unique_string_values(next_required_action_ids)
+        if isinstance(next_required_action_ids, list)
+        else next_required_for_goal_action_ids
+    )
+    blocker_action_ids = training_rollouts.get(
+        "serious_policy_training_blocker_action_ids"
+    )
+    blocker_action_ids = (
+        unique_string_values(blocker_action_ids)
+        if isinstance(blocker_action_ids, list)
+        else next_required_action_ids
+    )
+    missing_from_next_required = [
+        action_id
+        for action_id in next_required_action_ids
+        if action_id not in next_required_for_goal_action_ids
+    ]
+    missing_from_action_ids = [
+        action_id
+        for action_id in next_required_for_goal_action_ids
+        if action_id not in next_required_action_ids
+    ]
+    explicit_missing_from_next_required = training_rollouts.get(
+        "next_required_action_ids_missing_from_next_required"
+    )
+    explicit_missing_from_action_ids = training_rollouts.get(
+        "next_required_actions_missing_from_action_ids"
+    )
+    if isinstance(explicit_missing_from_next_required, list):
+        missing_from_next_required = unique_string_values(
+            explicit_missing_from_next_required
+        )
+    if isinstance(explicit_missing_from_action_ids, list):
+        missing_from_action_ids = unique_string_values(
+            explicit_missing_from_action_ids
+        )
+    action_ids_match = (
+        training_rollouts.get("next_required_action_ids_match_next_required")
+        if isinstance(
+            training_rollouts.get("next_required_action_ids_match_next_required"),
+            bool,
+        )
+        else next_required_action_ids == next_required_for_goal_action_ids
+    )
+    action_ids_sync_ok = (
+        action_ids_match is True
+        and missing_from_next_required == []
+        and missing_from_action_ids == []
+        and blocker_action_ids == next_required_action_ids
+    )
+    no_open_actions = (
+        next_required_for_goal == []
+        and next_required_action_ids == []
+        and blocker_action_ids == []
+    )
+    return {
+        "next_required_for_goal": next_required_for_goal,
+        "next_required_action_ids": next_required_action_ids,
+        "next_required_for_goal_action_ids": next_required_for_goal_action_ids,
+        "serious_policy_training_blocker_action_ids": blocker_action_ids,
+        "next_required_action_ids_match_next_required": action_ids_match,
+        "next_required_action_ids_missing_from_next_required": missing_from_next_required,
+        "next_required_actions_missing_from_action_ids": missing_from_action_ids,
+        "next_required_action_count": len(next_required_for_goal),
+        "action_ids_sync_ok": action_ids_sync_ok,
+        "ready_has_no_open_actions": no_open_actions,
+    }
+
+
+def so101_training_priority_gate_queue(
+    reviewed_authority_gate: dict[str, Any],
+    board_pick: dict[str, Any],
+    training_rollouts: dict[str, Any],
+    *,
+    reviewed_mujoco_bundle: dict[str, Any] | None = None,
+    mujoco_scene: dict[str, Any] | None = None,
+    chess_env: dict[str, Any] | None = None,
+    contact_probe: dict[str, Any] | None = None,
+    grasp_probe: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    reviewed_mujoco_bundle = (
+        reviewed_mujoco_bundle if isinstance(reviewed_mujoco_bundle, dict) else {}
+    )
+    mujoco_scene = mujoco_scene if isinstance(mujoco_scene, dict) else {}
+    chess_env = chess_env if isinstance(chess_env, dict) else {}
+    contact_probe = contact_probe if isinstance(contact_probe, dict) else {}
+    grasp_probe = grasp_probe if isinstance(grasp_probe, dict) else {}
+
+    reviewed_authority_ready = reviewed_authority_gate.get("ready") is True
+    reviewed_motion_ready = (
+        reviewed_authority_gate.get("physical_reviewed_model_motion_checked") is True
+    )
+    downstream_handoff_contract = (
+        so101_reviewed_mujoco_downstream_handoff_contract(reviewed_mujoco_bundle)
+    )
+    reviewed_downstream_handoff_ready = downstream_handoff_contract.get("ready") is True
+    fixture_downstream_handoff_ready = (
+        downstream_handoff_contract.get(
+            "fixture_handoff_ready_not_physical_so101_authority"
+        )
+        is True
+    )
+    mujoco_scene_automation_ready = mujoco_scene.get("status") == "ok"
+    mujoco_scene_training_ready = (
+        reviewed_authority_ready
+        and reviewed_motion_ready
+        and reviewed_downstream_handoff_ready
+        and mujoco_scene_automation_ready
+        and mujoco_scene.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
+    )
+    gym_automation_ready = chess_env.get("status") == "ok"
+    gym_training_ready = (
+        mujoco_scene_training_ready
+        and gym_automation_ready
+        and chess_env.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
+    )
+    contact_automation_ready = (
+        contact_probe.get("all_board_contacts_observed") is True
+        or contact_probe.get("status") == "ok"
+    )
+    grasp_automation_ready = (
+        grasp_probe.get("status") == "contact_grasp_lift_place_physics_verified"
+        or grasp_probe.get("contact_grasp_lift_place_physics_verified") is True
+    )
+    board_pick_reviewed_model_authority_ready = (
+        board_pick.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
+    )
+    board_pick_detailed_evidence_ready = so101_board_pick_detailed_evidence_ready(
+        board_pick
+    )
+    board_pick_authority_contract = so101_board_pick_authority_contract(
+        board_pick,
+        detailed_evidence_ready=board_pick_detailed_evidence_ready,
+    )
+    board_pick_priority_action_ids = so101_board_pick_priority_action_ids(
+        board_pick,
+        board_pick_authority_contract,
+    )
+    reviewed_model_backed_board_pick_place = (
+        board_pick_authority_contract.get("ready") is True
+    )
+    scripted_pick_place_automation_ready = (
+        contact_automation_ready
+        and grasp_automation_ready
+        and board_pick_detailed_evidence_ready
+    )
+    scripted_pick_place_training_ready = (
+        gym_training_ready and reviewed_model_backed_board_pick_place
+    )
+    rollout_action_contract = so101_rollout_action_contract(training_rollouts)
+    rollout_policy_training_authority_ready = (
+        training_rollouts.get("ready_for_policy_training") is True
+        and training_rollouts.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
+        and training_rollouts.get("status") == "ok"
+        and (
+            training_rollouts.get("training_authority_status")
+            == "reviewed_policy_training_rollouts_ready"
+        )
+        and training_rollouts.get("rollout_use") == "policy_training"
+        and (
+            training_rollouts.get("observed_evidence_is_policy_training_authority")
+            is True
+        )
+        and not training_rollouts.get("serious_policy_training_blockers")
+        and rollout_action_contract.get("action_ids_sync_ok") is True
+        and rollout_action_contract.get("ready_has_no_open_actions") is True
+    )
+    rollout_automation_ready = training_rollouts.get("status") == "ok"
+    rollout_training_ready = (
+        scripted_pick_place_training_ready and rollout_policy_training_authority_ready
+    )
+
+    stage_specs = [
+        {
+            "gate_id": "reviewed_model_authority",
+            "title": "Reviewed SO-101 model authority",
+            "required_state": "reviewed_model_authority_ready",
+            "training_ready": reviewed_authority_ready,
+            "automation_evidence_ready": reviewed_authority_ready,
+            "next_action_ids": (
+                reviewed_authority_gate.get("next_required_action_ids")
+                or reviewed_authority_gate.get("blocker_packet_next_action_ids")
+                or reviewed_authority_gate.get("blockers")
+                or ["supply_reviewed_so101_model_bundle_manifest"]
+            ),
+            "evidence_artifact_paths": [
+                _summary_path(reviewed_authority_gate),
+            ],
+        },
+        {
+            "gate_id": "mujoco_scene_validity",
+            "title": "MuJoCo scene validity with reviewed handoff",
+            "required_state": "reviewed_mujoco_downstream_handoff_ready",
+            "training_ready": mujoco_scene_training_ready,
+            "automation_evidence_ready": (
+                mujoco_scene_automation_ready
+                or fixture_downstream_handoff_ready
+            ),
+            "next_action_ids": [
+                *downstream_handoff_contract.get("next_action_ids", []),
+                "make_reviewed_mujoco_downstream_handoff_ready",
+                "load_reviewed_model_in_mujoco",
+                "prove_physical_reviewed_model_motion",
+            ],
+            "evidence_artifact_paths": [
+                _summary_path(reviewed_authority_gate),
+                _summary_path(reviewed_mujoco_bundle),
+                _summary_path(mujoco_scene),
+            ],
+        },
+        {
+            "gate_id": "gymnasium_task_wiring",
+            "title": "Gymnasium SO-101 chess task wiring",
+            "required_state": "reviewed_model_backed_gymnasium_task_wiring",
+            "training_ready": gym_training_ready,
+            "automation_evidence_ready": gym_automation_ready,
+            "next_action_ids": ["wire_reviewed_so101_chess_gymnasium_task"],
+            "evidence_artifact_paths": [
+                _summary_path(chess_env),
+            ],
+        },
+        {
+            "gate_id": "scripted_contact_grasp_pick_place",
+            "title": "Scripted contact, grasp, pick, place, and release evidence",
+            "required_state": "reviewed_model_backed_board_source_pick_place",
+            "training_ready": scripted_pick_place_training_ready,
+            "automation_evidence_ready": scripted_pick_place_automation_ready,
+            "next_action_ids": board_pick_priority_action_ids,
+            "evidence_artifact_paths": [
+                _summary_path(contact_probe),
+                _summary_path(grasp_probe),
+                _summary_path(board_pick),
+            ],
+        },
+        {
+            "gate_id": "focused_training_rollouts",
+            "title": "Focused training rollouts",
+            "required_state": "policy_training_rollouts_ready",
+            "training_ready": rollout_training_ready,
+            "automation_evidence_ready": rollout_automation_ready,
+            "next_action_ids": (
+                rollout_action_contract.get("serious_policy_training_blocker_action_ids")
+                or rollout_action_contract.get("next_required_action_ids")
+                or ["run_focused_training_rollouts_after_reviewed_pick_place"]
+            ),
+            "evidence_artifact_paths": [
+                _summary_path(training_rollouts),
+            ],
+        },
+    ]
+
+    stages: list[dict[str, Any]] = []
+    prior_ready = True
+    for priority, spec in enumerate(stage_specs, start=1):
+        training_ready = bool(spec["training_ready"])
+        automation_ready = bool(spec["automation_evidence_ready"])
+        if training_ready:
+            status = "ready"
+        elif not prior_ready:
+            status = "blocked_by_prior_requirements"
+        elif automation_ready:
+            status = "development_evidence_only"
+        else:
+            status = "action_required"
+        next_action_ids = unique_string_values(spec.get("next_action_ids") or [])
+        development_evidence_only_not_training_truth = (
+            automation_ready and not training_ready
+        )
+        stages.append(
+            {
+                "priority": priority,
+                "gate_id": spec["gate_id"],
+                "title": spec["title"],
+                "required_state": spec["required_state"],
+                "status": status,
+                "training_ready": training_ready,
+                "automation_evidence_ready": automation_ready,
+                "automation_evidence_is_training_authority": training_ready,
+                "development_evidence_only_not_training_truth": (
+                    development_evidence_only_not_training_truth
+                ),
+                "training_blocker_action_ids": (
+                    [] if training_ready else next_action_ids
+                ),
+                "blocked_by_prior_gate_ids": [
+                    stage["gate_id"] for stage in stages if stage["training_ready"] is False
+                ]
+                if status == "blocked_by_prior_requirements"
+                else [],
+                "next_action_ids": [] if training_ready else next_action_ids,
+                "evidence_artifact_paths": [
+                    path
+                    for path in spec.get("evidence_artifact_paths", [])
+                    if isinstance(path, str) and path
+                ],
+            }
+        )
+        prior_ready = prior_ready and training_ready
+
+    next_stage = next(
+        (
+            stage
+            for stage in stages
+            if stage.get("status") in {"action_required", "development_evidence_only"}
+        ),
+        None,
+    )
+    blocked_stage_ids = [
+        stage["gate_id"]
+        for stage in stages
+        if stage.get("status") == "blocked_by_prior_requirements"
+    ]
+    development_only_stage_ids = [
+        stage["gate_id"]
+        for stage in stages
+        if stage.get("status") == "development_evidence_only"
+    ]
+    return {
+        "priority_gate_queue": stages,
+        "priority_gate_order": list(SO101_TRAINING_PRIORITY_STAGE_IDS),
+        "next_priority_gate_id": next_stage.get("gate_id") if next_stage else None,
+        "next_priority_action_ids": (
+            next_stage.get("next_action_ids") if next_stage else []
+        ),
+        "blocked_by_prior_gate_ids": blocked_stage_ids,
+        "development_evidence_only_gate_ids": development_only_stage_ids,
+        "priority_gate_training_blocker_action_ids_by_gate_id": {
+            stage["gate_id"]: stage["training_blocker_action_ids"]
+            for stage in stages
+        },
+        "priority_gate_development_evidence_only_not_training_truth_by_gate_id": {
+            stage["gate_id"]: stage["development_evidence_only_not_training_truth"]
+            for stage in stages
+        },
+    }
+
+
+def so101_training_readiness_gate_section(
+    reviewed_authority_gate: dict[str, Any],
+    board_pick: dict[str, Any],
+    training_rollouts: dict[str, Any],
+    *,
+    reviewed_mujoco_bundle: dict[str, Any] | None = None,
+    mujoco_scene: dict[str, Any] | None = None,
+    chess_env: dict[str, Any] | None = None,
+    contact_probe: dict[str, Any] | None = None,
+    grasp_probe: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    reviewed_mujoco_bundle = (
+        reviewed_mujoco_bundle if isinstance(reviewed_mujoco_bundle, dict) else {}
+    )
+    reviewed_authority_ready = reviewed_authority_gate.get("ready") is True
+    reviewed_model_physical_motion_checked = (
+        reviewed_authority_gate.get("physical_reviewed_model_motion_checked") is True
+    )
+    downstream_handoff_contract = (
+        so101_reviewed_mujoco_downstream_handoff_contract(reviewed_mujoco_bundle)
+    )
+    reviewed_mujoco_downstream_handoff_ready = (
+        downstream_handoff_contract.get("ready") is True
+    )
+    reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority = (
+        downstream_handoff_contract.get(
+            "fixture_handoff_ready_not_physical_so101_authority"
+        )
+        is True
+    )
+    reviewed_mujoco_downstream_handoff_physical_truth_claimed = (
+        downstream_handoff_contract.get("physical_truth_claimed") is True
+    )
+    board_pick_reviewed_model_authority_ready = (
+        board_pick.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
+    )
+    board_pick_detailed_evidence_ready = so101_board_pick_detailed_evidence_ready(
+        board_pick
+    )
+    board_pick_authority_contract = so101_board_pick_authority_contract(
+        board_pick,
+        detailed_evidence_ready=board_pick_detailed_evidence_ready,
+    )
+    reviewed_model_backed_board_pick_place = (
+        board_pick_authority_contract.get("ready") is True
+    )
+    rollout_action_contract = so101_rollout_action_contract(training_rollouts)
+    rollout_policy_training_authority_ready = (
+        training_rollouts.get("ready_for_policy_training") is True
+        and training_rollouts.get("model_authority") == REVIEWED_SO101_MODEL_AUTHORITY
+        and training_rollouts.get("status") == "ok"
+        and (
+            training_rollouts.get("training_authority_status")
+            == "reviewed_policy_training_rollouts_ready"
+        )
+        and training_rollouts.get("rollout_use") == "policy_training"
+        and (
+            training_rollouts.get("observed_evidence_is_policy_training_authority")
+            is True
+        )
+        and not training_rollouts.get("serious_policy_training_blockers")
+        and rollout_action_contract.get("action_ids_sync_ok") is True
+        and rollout_action_contract.get("ready_has_no_open_actions") is True
+    )
+    priority_queue = so101_training_priority_gate_queue(
+        reviewed_authority_gate,
+        board_pick,
+        training_rollouts,
+        reviewed_mujoco_bundle=reviewed_mujoco_bundle,
+        mujoco_scene=mujoco_scene,
+        chess_env=chess_env,
+        contact_probe=contact_probe,
+        grasp_probe=grasp_probe,
+    )
+    priority_gate_queue_ready = all(
+        stage.get("training_ready") is True
+        for stage in priority_queue.get("priority_gate_queue", [])
+    )
+    blockers = unique_string_values(
+        [
+            *(
+                []
+                if downstream_handoff_contract.get("contract_ok") is True
+                else downstream_handoff_contract.get("blockers", [])
+            ),
+            *(
+                []
+                if reviewed_authority_ready
+                else reviewed_authority_gate.get("blockers", [])
+            ),
+            *(
+                []
+                if reviewed_model_backed_board_pick_place
+                else ["reviewed_model_backed_board_source_pick_place"]
+            ),
+            *(
+                []
+                if rollout_policy_training_authority_ready
+                else (
+                    rollout_action_contract.get(
+                        "serious_policy_training_blocker_action_ids"
+                    )
+                    or rollout_action_contract.get("next_required_action_ids")
+                    or training_rollouts.get("serious_policy_training_blockers")
+                    or ["run_focused_training_rollouts_after_reviewed_pick_place"]
+                )
+            ),
+            *(
+                []
+                if priority_gate_queue_ready
+                else priority_queue.get("next_priority_action_ids", [])
+            ),
+        ]
+    )
+    ready = (
+        reviewed_authority_ready
+        and reviewed_model_backed_board_pick_place
+        and rollout_policy_training_authority_ready
+        and priority_gate_queue_ready
+    )
+    return {
+        "status": "serious_training_ready" if ready else "serious_training_blocked",
+        "ready": ready,
+        "reviewed_model_authority_ready": reviewed_authority_ready,
+        "reviewed_model_authority_status": reviewed_authority_gate.get("status"),
+        "reviewed_model_physical_motion_checked": reviewed_model_physical_motion_checked,
+        "reviewed_mujoco_downstream_handoff_status": downstream_handoff_contract.get(
+            "status"
+        ),
+        "reviewed_mujoco_downstream_handoff_contract_status": (
+            downstream_handoff_contract.get("contract_status")
+        ),
+        "reviewed_mujoco_downstream_handoff_contract_ok": (
+            downstream_handoff_contract.get("contract_ok")
+        ),
+        "reviewed_mujoco_downstream_handoff_raw_ready": (
+            downstream_handoff_contract.get("raw_ready")
+        ),
+        "reviewed_mujoco_downstream_handoff_ready": (
+            reviewed_mujoco_downstream_handoff_ready
+        ),
+        "reviewed_mujoco_downstream_handoff_schema": (
+            downstream_handoff_contract.get("schema")
+        ),
+        "reviewed_mujoco_downstream_handoff_expected_schema": (
+            downstream_handoff_contract.get("expected_schema")
+        ),
+        "reviewed_mujoco_downstream_handoff_model_authority": (
+            downstream_handoff_contract.get("model_authority")
+        ),
+        "reviewed_mujoco_downstream_handoff_model_identity_contract_ok": (
+            downstream_handoff_contract.get("model_identity_contract_ok")
+        ),
+        "reviewed_mujoco_downstream_handoff_model_identity_status": (
+            downstream_handoff_contract.get("model_identity_status")
+        ),
+        "reviewed_mujoco_downstream_handoff_model_identity_matches": (
+            downstream_handoff_contract.get("model_identity_matches")
+        ),
+        "reviewed_mujoco_downstream_handoff_model_path": (
+            downstream_handoff_contract.get("model_path")
+        ),
+        "reviewed_mujoco_downstream_handoff_declared_model_sha256": (
+            downstream_handoff_contract.get("model_declared_sha256")
+        ),
+        "reviewed_mujoco_downstream_handoff_observed_model_sha256": (
+            downstream_handoff_contract.get("model_observed_sha256")
+        ),
+        "reviewed_mujoco_downstream_handoff_observed_evidence_is_authority": (
+            downstream_handoff_contract.get("observed_evidence_is_authority")
+        ),
+        "reviewed_mujoco_downstream_handoff_physical_truth_claimed": (
+            reviewed_mujoco_downstream_handoff_physical_truth_claimed
+        ),
+        "reviewed_mujoco_downstream_handoff_policy_training_authority_claimed": (
+            downstream_handoff_contract.get("policy_training_authority_claimed")
+        ),
+        "reviewed_mujoco_downstream_handoff_development_fixture_evidence_not_physical_so101_truth": (
+            downstream_handoff_contract.get(
+                "development_fixture_evidence_not_physical_so101_truth"
+            )
+        ),
+        "reviewed_mujoco_downstream_handoff_development_fixture_evidence_not_policy_training_truth": (
+            downstream_handoff_contract.get(
+                "development_fixture_evidence_not_policy_training_truth"
+            )
+        ),
+        "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority": (
+            reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority
+        ),
+        "reviewed_mujoco_downstream_handoff_raw_fixture_ready_not_physical_so101_authority": (
+            downstream_handoff_contract.get(
+                "raw_fixture_handoff_ready_not_physical_so101_authority"
+            )
+        ),
+        "reviewed_mujoco_downstream_handoff_motion_authority_status": (
+            downstream_handoff_contract.get("motion_authority_status")
+        ),
+        "reviewed_mujoco_downstream_handoff_physical_motion_checked": (
+            downstream_handoff_contract.get("physical_motion_checked")
+        ),
+        "reviewed_mujoco_downstream_handoff_hardware_free_fixture_motion_checked": (
+            downstream_handoff_contract.get("hardware_free_fixture_motion_checked")
+        ),
+        "reviewed_mujoco_downstream_handoff_reviewed_model_motion_checked": (
+            downstream_handoff_contract.get("reviewed_model_motion_checked")
+        ),
+        "reviewed_mujoco_downstream_handoff_physical_so101_model_authority_ready": (
+            downstream_handoff_contract.get("physical_so101_model_authority_ready")
+        ),
+        "reviewed_mujoco_downstream_handoff_motion_evidence_not_physical_so101_authority": (
+            downstream_handoff_contract.get(
+                "motion_evidence_not_physical_so101_authority"
+            )
+        ),
+        "reviewed_mujoco_downstream_handoff_joint_limit_enablement_ok": (
+            downstream_handoff_contract.get("joint_limit_enablement_ok")
+        ),
+        "reviewed_mujoco_downstream_handoff_joint_limit_enablement_status": (
+            downstream_handoff_contract.get("joint_limit_enablement_status")
+        ),
+        "reviewed_mujoco_downstream_handoff_missing_limited_joints": (
+            downstream_handoff_contract.get("missing_limited_joints")
+        ),
+        "reviewed_mujoco_downstream_handoff_required_limited_joints": (
+            downstream_handoff_contract.get("required_limited_joints")
+        ),
+        "reviewed_mujoco_downstream_handoff_item_count": (
+            downstream_handoff_contract.get("item_count")
+        ),
+        "reviewed_mujoco_downstream_handoff_item_ids": (
+            downstream_handoff_contract.get("item_ids")
+        ),
+        "reviewed_mujoco_downstream_handoff_missing_item_ids": (
+            downstream_handoff_contract.get("missing_item_ids")
+        ),
+        "reviewed_mujoco_downstream_handoff_priority_gate_id": (
+            downstream_handoff_contract.get("priority_gate_id")
+        ),
+        "reviewed_mujoco_downstream_handoff_priority_gate_order": (
+            downstream_handoff_contract.get("priority_gate_order")
+        ),
+        "reviewed_mujoco_downstream_handoff_next_downstream_gate_after_ready": (
+            downstream_handoff_contract.get("next_downstream_gate_after_ready")
+        ),
+        "reviewed_mujoco_downstream_handoff_blocks_downstream_gates_until_ready": (
+            downstream_handoff_contract.get("blocks_downstream_gates_until_ready")
+        ),
+        "reviewed_mujoco_downstream_handoff_ready_does_not_imply_policy_training_ready": (
+            downstream_handoff_contract.get(
+                "ready_does_not_imply_policy_training_ready"
+            )
+        ),
+        "reviewed_mujoco_downstream_handoff_priority_contract_ok": (
+            downstream_handoff_contract.get("priority_contract_ok")
+        ),
+        "reviewed_mujoco_downstream_handoff_missing_inputs": (
+            downstream_handoff_contract.get("missing_inputs")
+        ),
+        "reviewed_mujoco_downstream_handoff_pending_action_ids": (
+            downstream_handoff_contract.get("pending_action_ids")
+        ),
+        "reviewed_mujoco_downstream_handoff_ready_has_open_work": (
+            downstream_handoff_contract.get("ready_handoff_has_open_work")
+        ),
+        "reviewed_mujoco_downstream_handoff_contract_blockers": (
+            downstream_handoff_contract.get("blockers")
+        ),
+        "reviewed_model_backed_board_source_pick_place": reviewed_model_backed_board_pick_place,
+        "board_pick_status": board_pick.get("status"),
+        "board_pick_model_authority": board_pick.get("model_authority"),
+        "board_pick_reviewed_model_authority_ready": board_pick_reviewed_model_authority_ready,
+        "board_pick_authority_status": board_pick_authority_contract.get("status"),
+        "board_pick_authority_blockers": board_pick_authority_contract.get("blockers"),
+        "board_pick_detailed_evidence_ready": board_pick_detailed_evidence_ready,
+        "board_pick_observed_evidence_is_physical_so101_authority": board_pick.get(
+            "observed_evidence_is_physical_so101_authority"
+        ),
+        "board_pick_observed_evidence_is_policy_training_authority": board_pick.get(
+            "observed_evidence_is_policy_training_authority"
+        ),
+        "board_pick_ready_for_policy_training": board_pick.get(
+            "ready_for_policy_training"
+        ),
+        "board_pick_physical_truth_claimed": board_pick_authority_contract.get(
+            "physical_truth_claimed"
+        ),
+        "board_pick_policy_training_claimed": board_pick_authority_contract.get(
+            "policy_training_claimed"
+        ),
+        "board_pick_policy_authority_claimed": board_pick_authority_contract.get(
+            "policy_authority_claimed"
+        ),
+        "board_pick_ready_for_model_backed_ik": board_pick.get("ready_for_model_backed_ik"),
+        "board_pick_ik_provenance_status": board_pick.get("ik_provenance_status"),
+        "board_pick_ik_solution_source": board_pick.get("ik_solution_source"),
+        "board_pick_ik_review_status": board_pick.get("ik_review_status"),
+        "board_pick_ik_uses_reviewed_model": board_pick.get(
+            "ik_uses_reviewed_model"
+        ),
+        "board_pick_ik_uses_reviewed_tcp_and_base_to_board_alignment": board_pick.get(
+            "ik_uses_reviewed_tcp_and_base_to_board_alignment"
+        ),
+        "board_pick_ik_uses_seeded_joint_targets": board_pick.get(
+            "ik_uses_seeded_joint_targets"
+        ),
+        "board_pick_ik_authority_blocker_action_ids": board_pick.get(
+            "ik_authority_blocker_action_ids"
+        ),
+        "board_pick_authority_ik_solution_source": board_pick_authority_contract.get(
+            "ik_solution_source"
+        ),
+        "board_pick_authority_ik_uses_reviewed_model": board_pick_authority_contract.get(
+            "ik_uses_reviewed_model"
+        ),
+        "board_pick_authority_ik_uses_reviewed_tcp_and_base_to_board_alignment": (
+            board_pick_authority_contract.get(
+                "ik_uses_reviewed_tcp_and_base_to_board_alignment"
+            )
+        ),
+        "board_pick_authority_ik_uses_seeded_joint_targets": (
+            board_pick_authority_contract.get("ik_uses_seeded_joint_targets")
+        ),
+        "board_pick_next_required_action_ids": board_pick.get(
+            "next_required_action_ids"
+        ),
+        "board_pick_next_required_for_goal_action_ids": board_pick.get(
+            "next_required_for_goal_action_ids"
+        ),
+        "board_pick_next_required_action_ids_match_next_required": board_pick.get(
+            "next_required_action_ids_match_next_required"
+        ),
+        "board_pick_next_required_action_ids_missing_from_next_required": (
+            board_pick.get("next_required_action_ids_missing_from_next_required")
+        ),
+        "board_pick_next_required_actions_missing_from_action_ids": board_pick.get(
+            "next_required_actions_missing_from_action_ids"
+        ),
+        "board_pick_source_pick_started_at_source": board_pick.get(
+            "source_pick_started_at_source"
+        ),
+        "board_pick_close_two_finger_contact_observed": board_pick.get(
+            "close_two_finger_contact_observed"
+        ),
+        "board_pick_lift_verified": board_pick.get("lift_verified"),
+        "board_pick_board_contact_cleared_during_lift": board_pick.get(
+            "board_contact_cleared_during_lift"
+        ),
+        "board_pick_transfer_verified": board_pick.get("transfer_verified"),
+        "board_pick_lower_contact_retained_before_release": board_pick.get(
+            "lower_contact_retained_before_release"
+        ),
+        "board_pick_lower_board_contact_observed_before_release": board_pick.get(
+            "lower_board_contact_observed_before_release"
+        ),
+        "board_pick_lower_target_within_tolerance_before_release": board_pick.get(
+            "lower_target_within_tolerance_before_release"
+        ),
+        "board_pick_lower_place_z_within_tolerance_before_release": board_pick.get(
+            "lower_place_z_within_tolerance_before_release"
+        ),
+        "board_pick_lower_target_xy_error_m": board_pick.get("lower_target_xy_error_m"),
+        "board_pick_lower_place_z_error_m": board_pick.get("lower_place_z_error_m"),
+        "board_pick_place_without_manual_piece_pose_verified": board_pick.get(
+            "place_without_manual_piece_pose_verified"
+        ),
+        "board_pick_release_contact_cleared_after_retreat": board_pick.get(
+            "release_contact_cleared_after_retreat"
+        ),
+        "board_pick_final_board_contact_observed": board_pick.get(
+            "final_board_contact_observed"
+        ),
+        "board_pick_final_target_xy_error_m": board_pick.get("final_target_xy_error_m"),
+        "board_pick_target_xy_tolerance_m": board_pick.get("target_xy_tolerance_m"),
+        "board_pick_lower_target_xy_within_tolerance": (
+            _json_number(board_pick.get("lower_target_xy_error_m")) is not None
+            and _json_number(board_pick.get("target_xy_tolerance_m")) is not None
+            and _json_number(board_pick.get("lower_target_xy_error_m"))
+            <= _json_number(board_pick.get("target_xy_tolerance_m"))
+        ),
+        "board_pick_final_place_z_error_m": board_pick.get("final_place_z_error_m"),
+        "board_pick_place_z_tolerance_m": board_pick.get("place_z_tolerance_m"),
+        "board_pick_lower_place_z_within_tolerance": (
+            _json_number(board_pick.get("lower_place_z_error_m")) is not None
+            and _json_number(board_pick.get("place_z_tolerance_m")) is not None
+            and _json_number(board_pick.get("lower_place_z_error_m"))
+            <= _json_number(board_pick.get("place_z_tolerance_m"))
+        ),
+        "board_pick_final_place_z_within_tolerance": (
+            _json_number(board_pick.get("final_place_z_error_m")) is not None
+            and _json_number(board_pick.get("place_z_tolerance_m")) is not None
+            and _json_number(board_pick.get("final_place_z_error_m"))
+            <= _json_number(board_pick.get("place_z_tolerance_m"))
+        ),
+        "board_pick_phase_evidence_ready": so101_board_pick_phase_evidence_ready(
+            board_pick
+        ),
+        "board_pick_stage_sequence_ready": so101_board_pick_stage_sequence_ready(
+            board_pick
+        ),
+        "board_pick_phase_ids": board_pick.get("pick_place_phase_ids"),
+        "board_pick_failed_phase_ids": board_pick.get("pick_place_failed_phase_ids"),
+        "board_pick_phase_count": board_pick.get("pick_place_phase_count"),
+        "board_pick_all_required_phases_verified": board_pick.get(
+            "pick_place_all_required_phases_verified"
+        ),
+        "board_pick_phase_evidence_count": len(board_pick.get("pick_place_phase_evidence"))
+        if isinstance(board_pick.get("pick_place_phase_evidence"), list)
+        else None,
+        "board_pick_required_stage_sequence": board_pick.get("required_stage_sequence"),
+        "board_pick_observed_stage_sequence": board_pick.get("observed_stage_sequence"),
+        "board_pick_missing_stage_ids": board_pick.get("missing_stage_ids"),
+        "board_pick_unexpected_stage_ids": board_pick.get("unexpected_stage_ids"),
+        "board_pick_stage_sequence_order_ok": board_pick.get("stage_sequence_order_ok"),
+        "board_pick_stage_sequence_contract_ok": board_pick.get(
+            "stage_sequence_contract_ok"
+        ),
+        "board_pick_stage_sequence_contract_errors": board_pick.get(
+            "stage_sequence_contract_errors"
+        ),
+        "board_pick_manual_piece_pose_after_reset_stage_ids": board_pick.get(
+            "manual_piece_pose_after_reset_stage_ids"
+        ),
+        "board_pick_robot_pose_seeded_for_source_fixture": board_pick.get(
+            "robot_pose_seeded_for_source_fixture"
+        ),
+        "board_pick_manual_piece_pose_used_after_reset": board_pick.get(
+            "manual_piece_pose_used_after_reset"
+        ),
+        "rollout_ready_for_policy_training": training_rollouts.get(
+            "ready_for_policy_training"
+        ),
+        "rollout_training_authority_status": training_rollouts.get(
+            "training_authority_status"
+        ),
+        "rollout_status": training_rollouts.get("status"),
+        "rollout_model_authority": training_rollouts.get("model_authority"),
+        "rollout_observed_evidence_is_policy_training_authority": training_rollouts.get(
+            "observed_evidence_is_policy_training_authority"
+        ),
+        "rollout_policy_training_authority_ready": rollout_policy_training_authority_ready,
+        "rollout_use": training_rollouts.get("rollout_use"),
+        "rollout_serious_policy_training_blockers": training_rollouts.get(
+            "serious_policy_training_blockers"
+        ),
+        "rollout_serious_policy_training_blocker_action_ids": (
+            rollout_action_contract.get("serious_policy_training_blocker_action_ids")
+        ),
+        "rollout_next_required_for_goal": rollout_action_contract.get(
+            "next_required_for_goal"
+        ),
+        "rollout_next_required_action_ids": rollout_action_contract.get(
+            "next_required_action_ids"
+        ),
+        "rollout_next_required_for_goal_action_ids": rollout_action_contract.get(
+            "next_required_for_goal_action_ids"
+        ),
+        "rollout_next_required_action_ids_match_next_required": (
+            rollout_action_contract.get("next_required_action_ids_match_next_required")
+        ),
+        "rollout_next_required_action_ids_missing_from_next_required": (
+            rollout_action_contract.get(
+                "next_required_action_ids_missing_from_next_required"
+            )
+        ),
+        "rollout_next_required_actions_missing_from_action_ids": (
+            rollout_action_contract.get(
+                "next_required_actions_missing_from_action_ids"
+            )
+        ),
+        "rollout_next_required_action_count": rollout_action_contract.get(
+            "next_required_action_count"
+        ),
+        "rollout_action_ids_sync_ok": rollout_action_contract.get(
+            "action_ids_sync_ok"
+        ),
+        "rollout_ready_has_no_open_actions": rollout_action_contract.get(
+            "ready_has_no_open_actions"
+        ),
+        "development_fixture_evidence_not_policy_training_truth": (
+            not ready
+            or not board_pick_reviewed_model_authority_ready
+            or not rollout_policy_training_authority_ready
+        ),
+        "blockers": blockers,
+        "blocker_count": len(blockers),
+        **priority_queue,
+        "reviewed_model_authority_gate_summary_path": reviewed_authority_gate.get(
+            "summary_path"
+        ),
+        "reviewed_mujoco_bundle_summary_path": reviewed_mujoco_bundle.get(
+            "summary_path"
+        ),
+        "board_pick_summary_path": board_pick.get("summary_path"),
+        "training_rollouts_summary_path": training_rollouts.get("summary_path"),
+        "notes": [
+            "This gate is false until the reviewed model-authority gate is ready, the reviewed MuJoCo downstream handoff is ready, board-source pick/place is repeated with reviewed model-backed IK, and policy rollout evidence is no longer development-scaffold-only.",
+            "priority_gate_queue preserves the MuJoCo-first gate order: reviewed model authority, reviewed MuJoCo handoff and scene validity, Gymnasium wiring, scripted contact/grasp/pick/place, then focused training rollouts.",
+            "Development rollout JSONL remains useful for debugging and narrow imitation-curriculum tests, not serious policy training truth.",
+        ],
+    }
+
+
+def write_so101_training_readiness_gate_artifacts(
+    output_dir: Path,
+    gate: dict[str, Any],
+) -> dict[str, Any]:
+    gate_dir = output_dir / SO101_TRAINING_READINESS_GATE_DIR_NAME
+    summary_path = gate_dir / SO101_TRAINING_READINESS_GATE_SUMMARY_NAME
+    checklist_path = gate_dir / SO101_TRAINING_READINESS_GATE_CHECKLIST_NAME
+    priority_queue_path = gate_dir / SO101_TRAINING_READINESS_GATE_PRIORITY_QUEUE_NAME
+    readme_path = gate_dir / SO101_TRAINING_READINESS_GATE_README_NAME
+    artifacts = {
+        "summary_json": str(summary_path),
+        "checklist_csv": str(checklist_path),
+        "priority_gate_queue_csv": str(priority_queue_path),
+        "readme_md": str(readme_path),
+    }
+    payload = {
+        "schema": SO101_TRAINING_READINESS_GATE_SCHEMA,
+        **gate,
+        "ok": bool(gate.get("ready")),
+        "summary_path": str(summary_path),
+        "artifact_dir": str(gate_dir),
+        "artifacts": artifacts,
+    }
+    checklist_rows = [
+        {
+            "requirement_id": "reviewed_model_authority_ready",
+            "category": "reviewed_model_authority",
+            "status": "ok"
+            if gate.get("reviewed_model_authority_ready") is True
+            else "action_required",
+            "observed_value": markdown_bool(gate.get("reviewed_model_authority_ready")),
+            "expected_value": "true",
+            "blockers": "; ".join(gate.get("blockers", [])),
+            "notes": "Serious policy training must wait for reviewed SO-101 model authority.",
+        },
+        {
+            "requirement_id": "reviewed_mujoco_downstream_handoff_schema_current",
+            "category": "mujoco_scene_validity",
+            "status": "ok"
+            if gate.get("reviewed_mujoco_downstream_handoff_schema")
+            == gate.get("reviewed_mujoco_downstream_handoff_expected_schema")
+            else "action_required",
+            "observed_value": str(
+                gate.get("reviewed_mujoco_downstream_handoff_schema")
+            ),
+            "expected_value": str(
+                gate.get("reviewed_mujoco_downstream_handoff_expected_schema")
+            ),
+            "blockers": "; ".join(
+                gate.get("reviewed_mujoco_downstream_handoff_contract_blockers") or []
+            ),
+            "notes": "The aggregate training gate fails closed on stale or missing reviewed MuJoCo handoff schemas.",
+        },
+        {
+            "requirement_id": "reviewed_mujoco_downstream_handoff_ready",
+            "category": "mujoco_scene_validity",
+            "status": "ok"
+            if gate.get("reviewed_mujoco_downstream_handoff_ready") is True
+            else "action_required",
+            "observed_value": markdown_bool(
+                gate.get("reviewed_mujoco_downstream_handoff_ready")
+            ),
+            "expected_value": "true",
+            "blockers": "; ".join(gate.get("blockers", [])),
+            "notes": "Scene, Gymnasium, pick/place, and rollout gates must consume a contract-valid reviewed MuJoCo handoff, not a fixture or malformed raw-ready handoff.",
+        },
+        {
+            "requirement_id": "reviewed_mujoco_downstream_handoff_model_identity",
+            "category": "mujoco_scene_validity",
+            "status": "ok"
+            if gate.get("reviewed_mujoco_downstream_handoff_model_identity_contract_ok")
+            is True
+            else "action_required",
+            "observed_value": json.dumps(
+                {
+                    "status": gate.get(
+                        "reviewed_mujoco_downstream_handoff_model_identity_status"
+                    ),
+                    "matches": gate.get(
+                        "reviewed_mujoco_downstream_handoff_model_identity_matches"
+                    ),
+                    "model_path": gate.get(
+                        "reviewed_mujoco_downstream_handoff_model_path"
+                    ),
+                    "declared_sha256": gate.get(
+                        "reviewed_mujoco_downstream_handoff_declared_model_sha256"
+                    ),
+                    "observed_sha256": gate.get(
+                        "reviewed_mujoco_downstream_handoff_observed_model_sha256"
+                    ),
+                },
+                sort_keys=True,
+            ),
+            "expected_value": "present matching reviewed model path and SHA-256",
+            "blockers": "; ".join(
+                gate.get("reviewed_mujoco_downstream_handoff_contract_blockers") or []
+            ),
+            "notes": "Ready MuJoCo handoffs must carry reviewed model path evidence plus matching declared and observed model digests.",
+        },
+        {
+            "requirement_id": "reviewed_model_backed_board_pick_place",
+            "category": "scripted_pick_place_evidence",
+            "status": "ok"
+            if gate.get("reviewed_model_backed_board_source_pick_place") is True
+            else "action_required",
+            "observed_value": markdown_bool(
+                gate.get("reviewed_model_backed_board_source_pick_place")
+            ),
+            "expected_value": "true",
+            "blockers": "; ".join(gate.get("blockers", [])),
+            "notes": "Development seeded board-source pick/place does not close the reviewed model-backed pick/place gate.",
+        },
+        {
+            "requirement_id": "board_pick_authority_contract",
+            "category": "scripted_pick_place_evidence",
+            "status": "ok"
+            if gate.get("board_pick_authority_status")
+            == "reviewed_model_backed_board_source_pick_place_verified"
+            else "action_required",
+            "observed_value": str(gate.get("board_pick_authority_status")),
+            "expected_value": "reviewed_model_backed_board_source_pick_place_verified",
+            "blockers": "; ".join(gate.get("board_pick_authority_blockers") or []),
+            "notes": "This explains why detailed board-pick evidence is still not reviewed-model-backed pick/place authority.",
+        },
+        {
+            "requirement_id": "board_pick_authority_overclaim_boundary",
+            "category": "authority_boundary",
+            "status": "ok"
+            if gate.get("board_pick_physical_truth_claimed") is False
+            and gate.get("board_pick_policy_training_claimed") is False
+            and gate.get("board_pick_policy_authority_claimed") is False
+            else "action_required",
+            "observed_value": json.dumps(
+                {
+                    "physical_truth_claimed": gate.get(
+                        "board_pick_physical_truth_claimed"
+                    ),
+                    "policy_training_claimed": gate.get(
+                        "board_pick_policy_training_claimed"
+                    ),
+                    "policy_authority_claimed": gate.get(
+                        "board_pick_policy_authority_claimed"
+                    ),
+                },
+                sort_keys=True,
+            ),
+            "expected_value": "all false",
+            "blockers": "; ".join(gate.get("board_pick_authority_blockers") or []),
+            "notes": "Board-source pick/place evidence cannot independently claim physical SO-101 truth or policy-training authority.",
+        },
+        {
+            "requirement_id": "policy_training_rollouts_ready",
+            "category": "training_rollouts",
+            "status": "ok"
+            if gate.get("rollout_policy_training_authority_ready") is True
+            else "action_required",
+            "observed_value": markdown_bool(
+                gate.get("rollout_policy_training_authority_ready")
+            ),
+            "expected_value": "true with reviewed SO-101 model authority",
+            "blockers": "; ".join(gate.get("blockers", [])),
+            "notes": "Development JSONL rollouts or rollouts without reviewed SO-101 model authority are debug/imitation-curriculum evidence only.",
+        },
+        {
+            "requirement_id": "development_fixture_caveat",
+            "category": "authority_boundary",
+            "status": "ok"
+            if gate.get("development_fixture_evidence_not_policy_training_truth") is True
+            else "review_required",
+            "observed_value": markdown_bool(
+                gate.get("development_fixture_evidence_not_policy_training_truth")
+            ),
+            "expected_value": "true while training is blocked or fixture-only evidence exists",
+            "blockers": "; ".join(gate.get("blockers", [])),
+            "notes": "This caveat prevents treating scaffold rollouts as serious training truth.",
+        },
+        {
+            "requirement_id": "priority_gate_queue",
+            "category": "automation_priority",
+            "status": "ok"
+            if gate.get("priority_gate_order") == list(SO101_TRAINING_PRIORITY_STAGE_IDS)
+            and isinstance(gate.get("priority_gate_queue"), list)
+            and len(gate.get("priority_gate_queue")) == len(SO101_TRAINING_PRIORITY_STAGE_IDS)
+            else "review_required",
+            "observed_value": markdown_list_value(gate.get("priority_gate_order")),
+            "expected_value": markdown_list_value(SO101_TRAINING_PRIORITY_STAGE_IDS),
+            "blockers": "; ".join(gate.get("next_priority_action_ids") or []),
+            "notes": "The gate queue keeps missing work ordered before serious training rollouts.",
+        },
+    ]
+    gate_dir.mkdir(parents=True, exist_ok=True)
+    write_json(summary_path, payload)
+    fieldnames = (
+        "requirement_id",
+        "category",
+        "status",
+        "observed_value",
+        "expected_value",
+        "blockers",
+        "notes",
+    )
+    with checklist_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in checklist_rows:
+            writer.writerow(row)
+
+    priority_fieldnames = (
+        "priority",
+        "gate_id",
+        "title",
+        "required_state",
+        "status",
+        "training_ready",
+        "automation_evidence_ready",
+        "automation_evidence_is_training_authority",
+        "development_evidence_only_not_training_truth",
+        "training_blocker_action_ids",
+        "blocked_by_prior_gate_ids",
+        "next_action_ids",
+        "evidence_artifact_paths",
+    )
+    with priority_queue_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=priority_fieldnames)
+        writer.writeheader()
+        for stage in gate.get("priority_gate_queue", []):
+            if isinstance(stage, dict):
+                writer.writerow(
+                    {
+                        field: csv_cell(stage.get(field))
+                        for field in priority_fieldnames
+                    }
+                )
+
+    blocker_lines = (
+        [f"- `{blocker}`" for blocker in gate.get("blockers", [])]
+        if gate.get("blockers")
+        else ["- none"]
+    )
+    readme_path.write_text(
+        "\n".join(
+            [
+                "# SO-101 Training Readiness Gate",
+                "",
+                f"- Status: `{gate.get('status')}`",
+                f"- Ready: `{markdown_bool(gate.get('ready'))}`",
+                "- Reviewed model authority ready: "
+                f"`{markdown_bool(gate.get('reviewed_model_authority_ready'))}`",
+                "- Reviewed MuJoCo downstream handoff status: "
+                f"`{gate.get('reviewed_mujoco_downstream_handoff_status')}`",
+                "- Reviewed MuJoCo downstream handoff contract: "
+                f"`{gate.get('reviewed_mujoco_downstream_handoff_contract_status')}` / "
+                f"`{markdown_bool(gate.get('reviewed_mujoco_downstream_handoff_contract_ok'))}`",
+                "- Reviewed MuJoCo downstream handoff schema: "
+                f"`{gate.get('reviewed_mujoco_downstream_handoff_schema')}` "
+                f"(expected `{gate.get('reviewed_mujoco_downstream_handoff_expected_schema')}`)",
+                "- Reviewed MuJoCo downstream handoff raw ready: "
+                f"`{markdown_bool(gate.get('reviewed_mujoco_downstream_handoff_raw_ready'))}`",
+                "- Reviewed MuJoCo downstream handoff ready: "
+                f"`{markdown_bool(gate.get('reviewed_mujoco_downstream_handoff_ready'))}`",
+                "- Fixture MuJoCo handoff is not physical SO-101 authority: "
+                f"`{markdown_bool(gate.get('reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority'))}`",
+                "- Reviewed MuJoCo downstream handoff missing items: "
+                f"`{markdown_list_value(gate.get('reviewed_mujoco_downstream_handoff_missing_item_ids'))}`",
+                "- Reviewed MuJoCo downstream handoff model identity: "
+                f"`{markdown_bool(gate.get('reviewed_mujoco_downstream_handoff_model_identity_contract_ok'))}`",
+                "- Reviewed MuJoCo downstream handoff model SHA-256: "
+                f"`{gate.get('reviewed_mujoco_downstream_handoff_declared_model_sha256')}` / "
+                f"`{gate.get('reviewed_mujoco_downstream_handoff_observed_model_sha256')}`",
+                "- Reviewed model-backed board-source pick/place: "
+                f"`{markdown_bool(gate.get('reviewed_model_backed_board_source_pick_place'))}`",
+                "- Board-pick reviewed model authority ready: "
+                f"`{markdown_bool(gate.get('board_pick_reviewed_model_authority_ready'))}`",
+                "- Board-pick authority status: "
+                f"`{gate.get('board_pick_authority_status')}`",
+                "- Board-pick authority blockers: "
+                f"`{markdown_list_value(gate.get('board_pick_authority_blockers'))}`",
+                "- Board-pick detailed evidence ready: "
+                f"`{markdown_bool(gate.get('board_pick_detailed_evidence_ready'))}`",
+                "- Board-pick phase evidence ready: "
+                f"`{markdown_bool(gate.get('board_pick_phase_evidence_ready'))}`",
+                "- Board-pick phase IDs: "
+                f"`{markdown_list_value(gate.get('board_pick_phase_ids'))}`",
+                "- Board-pick failed phase IDs: "
+                f"`{markdown_list_value(gate.get('board_pick_failed_phase_ids'))}`",
+                "- Board-pick final z error/tolerance: "
+                f"`{gate.get('board_pick_final_place_z_error_m')}` / "
+                f"`{gate.get('board_pick_place_z_tolerance_m')}`",
+                "- Rollout ready for policy training: "
+                f"`{markdown_bool(gate.get('rollout_ready_for_policy_training'))}`",
+                "- Rollout policy-training authority ready: "
+                f"`{markdown_bool(gate.get('rollout_policy_training_authority_ready'))}`",
+                "- Rollout blocker action IDs: "
+                f"`{markdown_list_value(gate.get('rollout_serious_policy_training_blocker_action_ids'))}`",
+                "- Rollout derived action IDs: "
+                f"`{markdown_list_value(gate.get('rollout_next_required_for_goal_action_ids'))}`",
+                "- Rollout action IDs sync: "
+                f"`{markdown_bool(gate.get('rollout_action_ids_sync_ok'))}`",
+                "- Rollout has no open actions: "
+                f"`{markdown_bool(gate.get('rollout_ready_has_no_open_actions'))}`",
+                "- Development fixture evidence is not policy training truth: "
+                f"`{markdown_bool(gate.get('development_fixture_evidence_not_policy_training_truth'))}`",
+                "- Next priority gate: "
+                f"`{gate.get('next_priority_gate_id') or 'none'}`",
+                "- Next priority actions: "
+                f"`{markdown_list_value(gate.get('next_priority_action_ids'))}`",
+                "- Priority gate order: "
+                f"`{markdown_list_value(gate.get('priority_gate_order'))}`",
+                f"- Priority gate queue rows: `{priority_queue_path}`",
+                "",
+                "## Blockers",
+                "",
+                *blocker_lines,
+                "",
+                "## Evidence Sources",
+                "",
+                f"- Reviewed model authority gate: `{gate.get('reviewed_model_authority_gate_summary_path')}`",
+                f"- Reviewed MuJoCo downstream handoff: `{gate.get('reviewed_mujoco_bundle_summary_path')}`",
+                f"- Board-source pick/place: `{gate.get('board_pick_summary_path')}`",
+                f"- Training rollouts: `{gate.get('training_rollouts_summary_path')}`",
+                "",
+                "This artifact is a hardware-free readiness summary. It is ready only when reviewed authority, reviewed model-backed board-source pick/place, and policy-ready rollout evidence are all true.",
+                "",
+            ]
+        )
+    )
+    return payload
 
 
 def visual_review_section(visual_review: dict[str, Any] | None, summary_path: Path) -> dict[str, Any]:
@@ -3284,6 +10493,25 @@ def main() -> int:
         args=args,
         bundle=so101_model_bundle_manifest,
     )
+    so101_reviewed_mujoco_bundle_dir = output_dir / SO101_REVIEWED_MUJOCO_BUNDLE_DIR_NAME
+    so101_reviewed_mujoco_bundle_summary_path = (
+        so101_reviewed_mujoco_bundle_dir / SO101_REVIEWED_MUJOCO_BUNDLE_SUMMARY_NAME
+    )
+    so101_reviewed_mujoco_bundle_record, so101_reviewed_mujoco_bundle = run_child(
+        name="so101_reviewed_mujoco_bundle",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_so101_reviewed_mujoco_bundle.py"),
+            "--output-dir",
+            str(so101_reviewed_mujoco_bundle_dir),
+            "--manifest-summary-path",
+            str(so101_model_bundle_manifest_summary_path),
+            "--python",
+            python,
+        ],
+        output_dir=so101_reviewed_mujoco_bundle_dir,
+        expected_json_path=so101_reviewed_mujoco_bundle_summary_path,
+    )
     effective_ik_model_path = path_from_string(so101_bundle_forwarding.get("effective_ik_model_path"))
     effective_ik_model_asset_roots = paths_from_strings(
         so101_bundle_forwarding.get("effective_ik_model_asset_roots")
@@ -3303,6 +10531,11 @@ def main() -> int:
     so101_model_source_inventory_summary_path = (
         so101_model_source_inventory_dir / SO101_MODEL_SOURCE_INVENTORY_SUMMARY_NAME
     )
+    so101_source_authority_review = so101_source_authority_review_forwarding(
+        args=args,
+        bundle=so101_model_bundle_manifest,
+        bundle_inventory_forwarding=so101_bundle_inventory_forwarding,
+    )
     so101_source_config = so101_model_source_inventory_config(
         args,
         model_source_roots=effective_model_source_roots,
@@ -3310,6 +10543,7 @@ def main() -> int:
         authoritative_model_paths=effective_authoritative_model_paths,
         authoritative_model_roots=effective_authoritative_model_roots,
         bundle_inventory_forwarding=so101_bundle_inventory_forwarding,
+        source_authority_review=so101_source_authority_review,
         effective_ik_model_path=effective_ik_model_path,
     )
     so101_contract_config = so101_model_contract_config(
@@ -3327,9 +10561,53 @@ def main() -> int:
             model_source_extra_roots=effective_model_source_extra_roots,
             authoritative_model_paths=effective_authoritative_model_paths,
             authoritative_model_roots=effective_authoritative_model_roots,
+            source_authority_review=so101_source_authority_review,
         ),
         output_dir=so101_model_source_inventory_dir,
         expected_json_path=so101_model_source_inventory_summary_path,
+    )
+
+    so101_public_candidate_intake_matrix_dir = (
+        output_dir / SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_DIR_NAME
+    )
+    so101_public_candidate_intake_matrix_summary_path = (
+        so101_public_candidate_intake_matrix_dir
+        / SO101_PUBLIC_CANDIDATE_INTAKE_MATRIX_SUMMARY_NAME
+    )
+    (
+        so101_public_candidate_intake_matrix_record,
+        so101_public_candidate_intake_matrix,
+    ) = run_child(
+        name="so101_public_candidate_intake_matrix",
+        command=so101_public_candidate_intake_matrix_command(
+            python=python,
+            matrix_dir=so101_public_candidate_intake_matrix_dir,
+        ),
+        output_dir=so101_public_candidate_intake_matrix_dir,
+        expected_json_path=so101_public_candidate_intake_matrix_summary_path,
+    )
+
+    so101_model_bundle_probe_dir = output_dir / SO101_MODEL_BUNDLE_PROBE_DIR_NAME
+    so101_model_bundle_probe_summary_path = (
+        so101_model_bundle_probe_dir / SO101_MODEL_BUNDLE_PROBE_SUMMARY_NAME
+    )
+    so101_model_bundle_probe_model_path = recommended_contract_model_path(
+        so101_model_source_inventory
+    )
+    if so101_model_bundle_probe_model_path is None:
+        so101_model_bundle_probe_model_path = effective_ik_model_path
+    so101_model_bundle_probe_record, so101_model_bundle_probe = run_child(
+        name="so101_model_bundle_probe",
+        command=so101_model_bundle_probe_command(
+            python=python,
+            probe_dir=so101_model_bundle_probe_dir,
+            model_path=so101_model_bundle_probe_model_path,
+            asset_roots=effective_ik_model_asset_roots,
+            target_frame="gripper_frame_link",
+            source_authority_review=so101_source_authority_review,
+        ),
+        output_dir=so101_model_bundle_probe_dir,
+        expected_json_path=so101_model_bundle_probe_summary_path,
     )
 
     so101_model_contract_dir = output_dir / "so101_model_contract"
@@ -3366,6 +10644,147 @@ def main() -> int:
         command=ik_reachability_command,
         output_dir=ik_reachability_dir,
         expected_json_path=ik_reachability_summary_path,
+    )
+
+    so101_mujoco_scene_dir = output_dir / SO101_MUJOCO_SCENE_DIR_NAME
+    so101_mujoco_scene_summary_path = so101_mujoco_scene_dir / SO101_MUJOCO_SCENE_SUMMARY_NAME
+    so101_reviewed_mujoco_downstream_handoff_path = (
+        so101_reviewed_mujoco_bundle_dir
+        / SO101_REVIEWED_MUJOCO_BUNDLE_DOWNSTREAM_HANDOFF_NAME
+    )
+    so101_mujoco_scene_record, so101_mujoco_scene = run_child(
+        name="so101_mujoco_scene",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_so101_mujoco_scene.py"),
+            "--output-dir",
+            str(so101_mujoco_scene_dir),
+            "--source-square",
+            str(args.source_square),
+            "--target-square",
+            str(args.target_square),
+            "--reviewed-mujoco-handoff-json",
+            str(so101_reviewed_mujoco_downstream_handoff_path),
+        ],
+        output_dir=so101_mujoco_scene_dir,
+        expected_json_path=so101_mujoco_scene_summary_path,
+    )
+
+    so101_chess_env_dir = output_dir / SO101_CHESS_ENV_DIR_NAME
+    so101_chess_env_summary_path = so101_chess_env_dir / SO101_CHESS_ENV_SUMMARY_NAME
+    so101_mujoco_scene_artifacts = (
+        so101_mujoco_scene.get("artifacts") if isinstance(so101_mujoco_scene, dict) else {}
+    )
+    so101_mujoco_scene_artifacts = (
+        so101_mujoco_scene_artifacts if isinstance(so101_mujoco_scene_artifacts, dict) else {}
+    )
+    so101_development_model_path = so101_mujoco_scene_artifacts.get("model_xml")
+    if isinstance(so101_development_model_path, str) and Path(so101_development_model_path).is_file():
+        so101_chess_env_record, so101_chess_env = run_child(
+            name="so101_chess_env",
+            command=[
+                python,
+                str(REPO_ROOT / "scripts" / "smoke_sim_so101_chess_env.py"),
+                "--output-dir",
+                str(so101_chess_env_dir),
+                "--require-gymnasium",
+                "--require-mujoco",
+                "--mujoco-model-path",
+                so101_development_model_path,
+            ],
+            output_dir=so101_chess_env_dir,
+            expected_json_path=so101_chess_env_summary_path,
+        )
+    else:
+        so101_chess_env_record = skipped_child(
+            "so101_chess_env",
+            "development MuJoCo scene model was not available",
+            so101_chess_env_summary_path,
+        )
+        so101_chess_env = None
+
+    so101_env_resets_dir = output_dir / SO101_ENV_RESETS_DIR_NAME
+    so101_env_resets_summary_path = so101_env_resets_dir / SO101_ENV_RESETS_SUMMARY_NAME
+    so101_env_resets_record, so101_env_resets = run_child(
+        name="so101_env_resets",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_so101_env_resets.py"),
+            "--output-dir",
+            str(so101_env_resets_dir),
+        ],
+        output_dir=so101_env_resets_dir,
+        expected_json_path=so101_env_resets_summary_path,
+    )
+
+    so101_mujoco_contact_probe_dir = output_dir / SO101_MUJOCO_CONTACT_PROBE_DIR_NAME
+    so101_mujoco_contact_probe_summary_path = (
+        so101_mujoco_contact_probe_dir / SO101_MUJOCO_CONTACT_PROBE_SUMMARY_NAME
+    )
+    so101_mujoco_contact_probe_record, so101_mujoco_contact_probe = run_child(
+        name="so101_mujoco_contact_probe",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_so101_mujoco_contact_probe.py"),
+            "--output-dir",
+            str(so101_mujoco_contact_probe_dir),
+        ],
+        output_dir=so101_mujoco_contact_probe_dir,
+        expected_json_path=so101_mujoco_contact_probe_summary_path,
+    )
+
+    so101_mujoco_grasp_probe_dir = output_dir / SO101_MUJOCO_GRASP_PROBE_DIR_NAME
+    so101_mujoco_grasp_probe_summary_path = (
+        so101_mujoco_grasp_probe_dir / SO101_MUJOCO_GRASP_PROBE_SUMMARY_NAME
+    )
+    so101_mujoco_grasp_probe_record, so101_mujoco_grasp_probe = run_child(
+        name="so101_mujoco_grasp_probe",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_so101_mujoco_grasp_probe.py"),
+            "--output-dir",
+            str(so101_mujoco_grasp_probe_dir),
+        ],
+        output_dir=so101_mujoco_grasp_probe_dir,
+        expected_json_path=so101_mujoco_grasp_probe_summary_path,
+    )
+
+    so101_mujoco_board_pick_probe_dir = output_dir / SO101_MUJOCO_BOARD_PICK_PROBE_DIR_NAME
+    so101_mujoco_board_pick_probe_summary_path = (
+        so101_mujoco_board_pick_probe_dir / SO101_MUJOCO_BOARD_PICK_PROBE_SUMMARY_NAME
+    )
+    so101_mujoco_board_pick_probe_record, so101_mujoco_board_pick_probe = run_child(
+        name="so101_mujoco_board_pick_probe",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_so101_mujoco_board_pick_probe.py"),
+            "--output-dir",
+            str(so101_mujoco_board_pick_probe_dir),
+            "--source-square",
+            str(args.source_square),
+            "--target-square",
+            str(args.target_square),
+        ],
+        output_dir=so101_mujoco_board_pick_probe_dir,
+        expected_json_path=so101_mujoco_board_pick_probe_summary_path,
+    )
+
+    so101_training_rollouts_dir = output_dir / SO101_TRAINING_ROLLOUTS_DIR_NAME
+    so101_training_rollouts_summary_path = (
+        so101_training_rollouts_dir / SO101_TRAINING_ROLLOUTS_SUMMARY_NAME
+    )
+    so101_training_rollouts_record, so101_training_rollouts = run_child(
+        name="so101_training_rollouts",
+        command=[
+            python,
+            str(REPO_ROOT / "scripts" / "smoke_sim_so101_training_rollouts.py"),
+            "--output-dir",
+            str(so101_training_rollouts_dir),
+            "--development-board-pick-summary-json",
+            str(so101_mujoco_board_pick_probe_summary_path),
+        ],
+        output_dir=so101_training_rollouts_dir,
+        expected_json_path=so101_training_rollouts_summary_path,
     )
 
     pov_dir = output_dir / "gripper_camera_pov_review"
@@ -3446,15 +10865,101 @@ def main() -> int:
         "perception_regression_fixture": fixture_record,
         "sim_camera_pose_fixture": pose_fixture_record,
         "so101_model_bundle_manifest": so101_model_bundle_manifest_record,
+        "so101_reviewed_mujoco_bundle": so101_reviewed_mujoco_bundle_record,
         "so101_model_source_inventory": so101_model_source_inventory_record,
+        "so101_public_candidate_intake_matrix": so101_public_candidate_intake_matrix_record,
+        "so101_model_bundle_probe": so101_model_bundle_probe_record,
         "so101_model_contract": so101_model_contract_record,
         "ik_reachability_drill": ik_reachability_record,
+        "so101_mujoco_scene": so101_mujoco_scene_record,
+        "so101_chess_env": so101_chess_env_record,
+        "so101_env_resets": so101_env_resets_record,
+        "so101_mujoco_contact_probe": so101_mujoco_contact_probe_record,
+        "so101_mujoco_grasp_probe": so101_mujoco_grasp_probe_record,
+        "so101_mujoco_board_pick_probe": so101_mujoco_board_pick_probe_record,
+        "so101_training_rollouts": so101_training_rollouts_record,
         "gripper_camera_pov_review": pov_record,
         "pick_place_scenario_matrix": matrix_record,
     }
     if negative_record is not None:
         child_records["negative_empty_inventory_comparison_set"] = negative_record
     child_records["app_entrypoint_metadata"] = app_entrypoint_record
+
+    so101_source_inventory_section = so101_model_source_inventory_section(
+        so101_model_source_inventory,
+        so101_model_source_inventory_summary_path,
+        so101_source_config,
+    )
+    so101_public_candidate_intake_matrix_section_row = (
+        so101_public_candidate_intake_matrix_section(
+            so101_public_candidate_intake_matrix,
+            so101_public_candidate_intake_matrix_summary_path,
+        )
+    )
+    so101_bundle_probe_section = so101_model_bundle_probe_section(
+        so101_model_bundle_probe,
+        so101_model_bundle_probe_summary_path,
+        so101_model_bundle_probe_model_path,
+        effective_ik_model_asset_roots,
+    )
+    so101_bundle_manifest_section = so101_model_bundle_manifest_section(
+        so101_model_bundle_manifest,
+        so101_model_bundle_manifest_summary_path,
+        so101_bundle_config,
+        so101_bundle_forwarding,
+    )
+    so101_reviewed_mujoco_bundle_section = so101_mujoco_smoke_section(
+        so101_reviewed_mujoco_bundle,
+        so101_reviewed_mujoco_bundle_summary_path,
+    )
+    so101_reviewed_authority_gate = so101_reviewed_model_authority_gate_section(
+        so101_source_inventory_section,
+        so101_bundle_manifest_section,
+        so101_reviewed_mujoco_bundle_section,
+        so101_public_candidate_intake_matrix_section_row,
+    )
+    so101_reviewed_authority_gate = write_so101_reviewed_model_authority_gate_artifacts(
+        output_dir,
+        so101_reviewed_authority_gate,
+    )
+    so101_mujoco_scene_section = so101_mujoco_smoke_section(
+        so101_mujoco_scene,
+        so101_mujoco_scene_summary_path,
+    )
+    so101_chess_env_section = so101_mujoco_smoke_section(
+        so101_chess_env,
+        so101_chess_env_summary_path,
+    )
+    so101_mujoco_contact_probe_section = so101_mujoco_smoke_section(
+        so101_mujoco_contact_probe,
+        so101_mujoco_contact_probe_summary_path,
+    )
+    so101_mujoco_grasp_probe_section = so101_mujoco_smoke_section(
+        so101_mujoco_grasp_probe,
+        so101_mujoco_grasp_probe_summary_path,
+    )
+    so101_mujoco_board_pick_probe_section = so101_mujoco_smoke_section(
+        so101_mujoco_board_pick_probe,
+        so101_mujoco_board_pick_probe_summary_path,
+    )
+    so101_training_rollouts_section = so101_mujoco_smoke_section(
+        so101_training_rollouts,
+        so101_training_rollouts_summary_path,
+    )
+    so101_training_readiness_gate = so101_training_readiness_gate_section(
+        so101_reviewed_authority_gate,
+        so101_mujoco_board_pick_probe_section,
+        so101_training_rollouts_section,
+        reviewed_mujoco_bundle=so101_reviewed_mujoco_bundle_section,
+        mujoco_scene=so101_mujoco_scene_section,
+        chess_env=so101_chess_env_section,
+        contact_probe=so101_mujoco_contact_probe_section,
+        grasp_probe=so101_mujoco_grasp_probe_section,
+    )
+    so101_training_readiness_gate = write_so101_training_readiness_gate_artifacts(
+        output_dir,
+        so101_training_readiness_gate,
+    )
 
     required_ok = all(record["ok"] for record in child_records.values())
     selected_candidate = selected_from_session(session, int(args.select_rank))
@@ -3552,17 +11057,14 @@ def main() -> int:
             pose_fixture,
             pose_fixture_summary_path,
         ),
-        "so101_model_source_inventory": so101_model_source_inventory_section(
-            so101_model_source_inventory,
-            so101_model_source_inventory_summary_path,
-            so101_source_config,
+        "so101_model_source_inventory": so101_source_inventory_section,
+        "so101_public_candidate_intake_matrix": (
+            so101_public_candidate_intake_matrix_section_row
         ),
-        "so101_model_bundle_manifest": so101_model_bundle_manifest_section(
-            so101_model_bundle_manifest,
-            so101_model_bundle_manifest_summary_path,
-            so101_bundle_config,
-            so101_bundle_forwarding,
-        ),
+        "so101_model_bundle_probe": so101_bundle_probe_section,
+        "so101_model_bundle_manifest": so101_bundle_manifest_section,
+        "so101_reviewed_mujoco_bundle": so101_reviewed_mujoco_bundle_section,
+        "so101_reviewed_model_authority_gate": so101_reviewed_authority_gate,
         "so101_model_contract": so101_model_contract_section(
             so101_model_contract,
             so101_model_contract_summary_path,
@@ -3571,6 +11073,17 @@ def main() -> int:
             ik_reachability,
             ik_reachability_summary_path,
         ),
+        "so101_mujoco_scene": so101_mujoco_scene_section,
+        "so101_chess_env": so101_chess_env_section,
+        "so101_env_resets": so101_mujoco_smoke_section(
+            so101_env_resets,
+            so101_env_resets_summary_path,
+        ),
+        "so101_mujoco_contact_probe": so101_mujoco_contact_probe_section,
+        "so101_mujoco_grasp_probe": so101_mujoco_grasp_probe_section,
+        "so101_mujoco_board_pick_probe": so101_mujoco_board_pick_probe_section,
+        "so101_training_readiness_gate": so101_training_readiness_gate,
+        "so101_training_rollouts": so101_training_rollouts_section,
         "gripper_camera_pov_review": gripper_camera_pov_section(pov, pov_summary_path),
         "pick_place_scenario_matrix": matrix_summary_section(matrix, matrix_summary_path),
         "app_entrypoint_metadata": app_entrypoint_metadata_section(
@@ -3619,6 +11132,7 @@ def main() -> int:
             "This suite intentionally calls existing smoke scripts as subprocesses instead of duplicating their internals.",
             "It does not mutate simulator rendering, camera profiles, perception algorithms, robot execution, dependencies, or canonical calibration constants.",
             "SimCamera intrinsics/extrinsics are simulator reference metadata for downstream tool compatibility, not physical calibration truth.",
+            "MuJoCo SO-101 chess evidence is prioritized as a development-plumbing gate until a reviewed model bundle, TCP/gripper offset, and base-to-board alignment make model-backed training evidence trustworthy.",
         ],
     }
     write_json(summary_path, summary)

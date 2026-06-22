@@ -1,0 +1,2777 @@
+#!/usr/bin/env python3
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS_DIR = REPO_ROOT / "scripts"
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from smoke_sim_so101_bundle_ready_forwarding import create_fixtures  # noqa: E402
+from smoke_sim_so101_model_bundle_manifest import (  # noqa: E402
+    EXPECTED_SO101_JOINTS,
+    EXPECTED_TARGET_FRAME,
+)
+
+DEFAULT_OUTPUT_DIR = (
+    Path("/private/tmp") / "lerobot_sim" / "so101_model_bundle_manifest_matrix"
+)
+SCHEMA = "lerobot.sim.so101_model_bundle_manifest_matrix.v1"
+MANIFEST_SCRIPT = REPO_ROOT / "scripts" / "smoke_sim_so101_model_bundle_manifest.py"
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Run a hardware-free contract matrix over the SO-101 model bundle "
+            "manifest gate. Fixture manifests are generated under the output "
+            "directory and are not reviewed physical SO-101 evidence."
+        )
+    )
+    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument(
+        "--python",
+        type=Path,
+        default=Path(sys.executable),
+        help="Python executable used for child manifest checks.",
+    )
+    parser.add_argument(
+        "--keep-existing",
+        action="store_true",
+        help="Do not delete an existing output directory before running.",
+    )
+    return parser.parse_args()
+
+
+def normalize_path(path: Path) -> Path:
+    return path.expanduser().resolve(strict=False)
+
+
+def executable_arg(path: Path) -> str:
+    raw = str(path)
+    expanded = path.expanduser()
+    if expanded.is_absolute():
+        return str(expanded)
+    if "/" in raw:
+        return str((REPO_ROOT / expanded).absolute())
+    return raw
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+def csv_cell(value: Any) -> str:
+    if isinstance(value, (dict, list, tuple)):
+        return json.dumps(value, sort_keys=True)
+    if value is None:
+        return ""
+    return str(value)
+
+
+def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    fieldnames = (
+        "case_id",
+        "ok",
+        "return_code",
+        "status",
+        "ready_for_model_backed_ik",
+        "model_authority",
+        "physical_so101_model_authority_ready",
+        "hardware_free_regression_fixture_ready",
+        "physical_authority_gate_status",
+        "physical_authority_contract_status",
+        "physical_authority_contract_ok",
+        "physical_authority_contract_errors",
+        "physical_authority_contract_fixture_ready_not_physical_so101_authority",
+        "candidate_handoff_context_status",
+        "candidate_handoff_context_model_authority",
+        "candidate_handoff_context_field_ids",
+        "candidate_handoff_context_locations_by_field",
+        "candidate_handoff_context_digest_authority_boundary",
+        "candidate_handoff_context_digest_row_count",
+        "candidate_handoff_context_digest_expected_file_count",
+        "candidate_handoff_context_digest_extra_lockable_file_count",
+        "model_path_status",
+        "model_path_suffix",
+        "model_path_supported_suffix",
+        "model_path_diagnostics",
+        "model_identity_status",
+        "model_identity_diagnostics",
+        "authority_status",
+        "provenance_status",
+        "asset_roots_status",
+        "asset_roots_diagnostics",
+        "joint_limits_status",
+        "joint_limit_unexpected_joints",
+        "joint_limits_diagnostics",
+        "joint_limit_review_alias_conflict",
+        "joint_limit_review_alias_not_ready_fields",
+        "gripper_mapping_status",
+        "gripper_mapping_review_open_work_fields",
+        "gripper_mapping_review_invalid_fields",
+        "mesh_assets_status",
+        "mesh_asset_review_alias_conflict",
+        "mesh_asset_review_alias_not_ready_fields",
+        "collision_policy_status",
+        "collision_policy_review_open_work_fields",
+        "collision_policy_review_invalid_fields",
+        "target_frame_status",
+        "target_frame_review_alias_conflict",
+        "target_frame_review_alias_not_ready_fields",
+        "tcp_offset_status",
+        "tcp_offset_review_alias_conflict",
+        "tcp_offset_review_alias_not_ready_fields",
+        "alignment_status",
+        "alignment_review_alias_conflict",
+        "alignment_review_alias_not_ready_fields",
+        "contract_checker_status",
+        "contract_checker_diagnostics",
+        "authority_review_open_work_fields",
+        "joint_limits_review_open_work_fields",
+        "mesh_assets_review_open_work_fields",
+        "target_frame_review_open_work_fields",
+        "tcp_offset_review_open_work_fields",
+        "alignment_review_open_work_fields",
+        "missing_inputs",
+        "next_required_action_ids",
+        "review_packet_status",
+        "review_packet_actions_match_next_required",
+        "review_packet_actions_missing_from_next_required",
+        "next_required_actions_missing_from_review_packet",
+        "review_requirements_status",
+        "review_requirements_url_fields",
+        "bundle_intake_status",
+        "bundle_intake_action_ids",
+        "bundle_intake_actions_match_next_required",
+        "bundle_intake_actions_missing_from_next_required",
+        "next_required_actions_missing_from_bundle_intake",
+        "bundle_intake_related_requirement_ids_by_action_id",
+        "bundle_intake_field_check_diagnostics_by_action_id",
+        "contract_preflight_intake_manifest_fields",
+        "contract_preflight_intake_required_inputs",
+        "synthetic_fixture_authority_fields",
+        "expected_ready",
+        "errors",
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: csv_cell(row.get(field)) for field in fieldnames})
+
+
+def add_error(errors: list[str], label: str, actual: Any, expected: Any) -> None:
+    if actual != expected:
+        errors.append(f"{label}: expected {expected!r}, got {actual!r}")
+
+
+def expect_contains(errors: list[str], label: str, values: Any, expected: list[str]) -> None:
+    values = values if isinstance(values, list) else []
+    for item in expected:
+        if item not in values:
+            errors.append(f"{label}: expected {item!r} in {values!r}")
+
+
+def expect_contains_prefix(
+    errors: list[str],
+    label: str,
+    values: Any,
+    expected_prefixes: list[str],
+) -> None:
+    values = [str(value) for value in values] if isinstance(values, list) else []
+    for prefix in expected_prefixes:
+        if not any(value.startswith(prefix) for value in values):
+            errors.append(f"{label}: expected prefix {prefix!r} in {values!r}")
+
+
+def nested_status(summary: dict[str, Any], key: str) -> Any:
+    value = summary.get(key)
+    return value.get("status") if isinstance(value, dict) else None
+
+
+def review_open_work_fields(summary: dict[str, Any], key: str) -> list[str]:
+    value = summary.get(key)
+    value = value if isinstance(value, dict) else {}
+    review = value.get("review")
+    review = review if isinstance(review, dict) else value
+    fields = review.get("review_evidence_open_work_fields")
+    return fields if isinstance(fields, list) else []
+
+
+def review_invalid_fields(summary: dict[str, Any], key: str) -> list[str]:
+    value = summary.get(key)
+    value = value if isinstance(value, dict) else {}
+    review = value.get("review")
+    review = review if isinstance(review, dict) else value
+    fields = review.get("review_evidence_invalid_fields")
+    return fields if isinstance(fields, list) else []
+
+
+def field_check_status(summary: dict[str, Any], requirement_id: str) -> str | None:
+    for check in summary.get("field_checks") or []:
+        if isinstance(check, dict) and check.get("requirement_id") == requirement_id:
+            return "ok" if check.get("ok") is True else "action_required"
+    return None
+
+
+def field_check_diagnostics(summary: dict[str, Any], requirement_id: str) -> list[str]:
+    for check in summary.get("field_checks") or []:
+        if isinstance(check, dict) and check.get("requirement_id") == requirement_id:
+            diagnostics = check.get("diagnostics")
+            return diagnostics if isinstance(diagnostics, list) else []
+    return []
+
+
+def review_requirement_by_id(
+    review_requirements: dict[str, Any],
+    requirement_id: str,
+) -> dict[str, Any]:
+    for requirement in review_requirements.get("requirements") or []:
+        if (
+            isinstance(requirement, dict)
+            and requirement.get("requirement_id") == requirement_id
+        ):
+            return requirement
+    return {}
+
+
+def bundle_intake_action_by_id(
+    bundle_intake: dict[str, Any],
+    action_id: str,
+) -> dict[str, Any]:
+    for action in bundle_intake.get("actions") or []:
+        if isinstance(action, dict) and action.get("action_id") == action_id:
+            return action
+    return {}
+
+
+def assert_review_requirements_url_policy(
+    errors: list[str],
+    case_id: str,
+    review_requirements: dict[str, Any],
+) -> list[str]:
+    expected_url_fields = ["cad_url", "license_url", "repository_url", "source_url"]
+    url_policy = review_requirements.get("url_field_policy")
+    url_policy = url_policy if isinstance(url_policy, dict) else {}
+    add_error(
+        errors,
+        f"{case_id}.review_requirements.url_field_policy.http_url_fields",
+        url_policy.get("http_url_fields"),
+        expected_url_fields,
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_requirements.url_field_policy.required_schemes",
+        url_policy.get("required_schemes"),
+        ["http", "https"],
+    )
+    expect_contains(
+        errors,
+        f"{case_id}.review_requirements.url_field_policy.non_url_source_handle_fields",
+        url_policy.get("non_url_source_handle_fields"),
+        ["source_path", "source_reference"],
+    )
+
+    provenance_requirement = review_requirement_by_id(review_requirements, "provenance")
+    provenance_url_policy = provenance_requirement.get("url_field_policy")
+    provenance_url_policy = (
+        provenance_url_policy if isinstance(provenance_url_policy, dict) else {}
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_requirements.provenance.url_field_policy.http_url_fields",
+        provenance_url_policy.get("http_url_fields"),
+        expected_url_fields,
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_requirements.provenance.url_field_policy.required_schemes",
+        provenance_url_policy.get("required_schemes"),
+        ["http", "https"],
+    )
+    return expected_url_fields
+
+
+def assert_reviewed_manifest_template_contract(
+    errors: list[str],
+    case_id: str,
+    summary: dict[str, Any],
+    artifacts: dict[str, Any],
+) -> None:
+    template = summary.get("reviewed_manifest_template")
+    template = template if isinstance(template, dict) else {}
+    template_path = artifacts.get("reviewed_manifest_template_json")
+    if isinstance(template_path, str) and Path(template_path).is_file():
+        try:
+            template_from_file = json.loads(Path(template_path).read_text())
+        except json.JSONDecodeError as exc:
+            errors.append(
+                f"{case_id}.reviewed_manifest_template_json: invalid JSON {exc}"
+            )
+        else:
+            add_error(
+                errors,
+                f"{case_id}.reviewed_manifest_template_json_matches_summary",
+                template_from_file,
+                template,
+            )
+
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.model_authority",
+        template.get("model_authority"),
+        "reviewed_manifest_template_not_authority",
+    )
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.ready_for_model_backed_ik",
+        template.get("ready_for_model_backed_ik"),
+        False,
+    )
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.physical_so101_model_authority_ready",
+        template.get("physical_so101_model_authority_ready"),
+        False,
+    )
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.observed_evidence_is_authority",
+        template.get("observed_evidence_is_authority"),
+        False,
+    )
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.physical_so101_truth_claimed",
+        template.get("physical_so101_truth_claimed"),
+        False,
+    )
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.development_fixture_boundary",
+        template.get("development_fixture_evidence_not_physical_so101_truth"),
+        True,
+    )
+    expected_scope_map = {
+        "authority": ["model_identity", "provenance", "license"],
+        "target_frame_authority": ["target_frame"],
+        "joint_limit_authority": ["joint_limits"],
+        "gripper_mapping_authority": ["gripper_mapping"],
+        "mesh_asset_authority": ["mesh_assets"],
+        "collision_policy_authority": ["collision_policy"],
+        "tcp_offset_authority": ["tcp_offset"],
+        "base_to_board_alignment_authority": ["base_to_board_alignment"],
+    }
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.required_review_scopes_by_field",
+        template.get("required_review_scopes_by_field"),
+        expected_scope_map,
+    )
+
+    manifest_template = template.get("manifest_template")
+    manifest_template = manifest_template if isinstance(manifest_template, dict) else {}
+    expected_fields = [
+        "model_path",
+        "model_sha256",
+        "asset_roots",
+        "authority",
+        "provenance",
+        "target_frame",
+        "target_frame_authority",
+        "joint_limits_deg",
+        "joint_limit_authority",
+        "gripper_mapping_authority",
+        "mesh_asset_authority",
+        "collision_policy_authority",
+        "tcp_offset_m",
+        "tcp_offset_authority",
+        "base_to_board_transform",
+        "base_to_board_alignment_authority",
+    ]
+    for field in expected_fields:
+        if field not in manifest_template:
+            errors.append(
+                f"{case_id}.reviewed_manifest_template.manifest_template.{field}: expected field"
+            )
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.manifest_template.target_frame",
+        manifest_template.get("target_frame"),
+        EXPECTED_TARGET_FRAME,
+    )
+
+    authority = manifest_template.get("authority")
+    authority = authority if isinstance(authority, dict) else {}
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.authority.review_scopes",
+        authority.get("review_scopes"),
+        ["model_identity", "provenance", "license"],
+    )
+    expected_single_scope_fields = {
+        "target_frame_authority": "target_frame",
+        "joint_limit_authority": "joint_limits",
+        "gripper_mapping_authority": "gripper_mapping",
+        "mesh_asset_authority": "mesh_assets",
+        "collision_policy_authority": "collision_policy",
+        "tcp_offset_authority": "tcp_offset",
+        "base_to_board_alignment_authority": "base_to_board_alignment",
+    }
+    for field, expected_scope in expected_single_scope_fields.items():
+        review = manifest_template.get(field)
+        review = review if isinstance(review, dict) else {}
+        add_error(
+            errors,
+            f"{case_id}.reviewed_manifest_template.{field}.review_scope",
+            review.get("review_scope"),
+            expected_scope,
+        )
+
+    joint_limits = manifest_template.get("joint_limits_deg")
+    joint_limits = joint_limits if isinstance(joint_limits, dict) else {}
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.joint_limits_deg.keys",
+        sorted(joint_limits.keys()),
+        sorted(EXPECTED_SO101_JOINTS),
+    )
+    for joint in EXPECTED_SO101_JOINTS:
+        value = joint_limits.get(joint)
+        if not isinstance(value, list) or len(value) != 2:
+            errors.append(
+                f"{case_id}.reviewed_manifest_template.joint_limits_deg.{joint}: expected lower/upper placeholder pair"
+            )
+
+    tcp_offset = manifest_template.get("tcp_offset_m")
+    tcp_offset = tcp_offset if isinstance(tcp_offset, dict) else {}
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.tcp_offset_m.keys",
+        sorted(tcp_offset.keys()),
+        ["x", "y", "z"],
+    )
+    alignment = manifest_template.get("base_to_board_transform")
+    alignment = alignment if isinstance(alignment, dict) else {}
+    translation = alignment.get("translation_m")
+    translation = translation if isinstance(translation, dict) else {}
+    rotation = alignment.get("rotation_rpy_rad")
+    rotation = rotation if isinstance(rotation, dict) else {}
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.base_to_board.translation_m.keys",
+        sorted(translation.keys()),
+        ["x", "y", "z"],
+    )
+    add_error(
+        errors,
+        f"{case_id}.reviewed_manifest_template.base_to_board.rotation_rpy_rad.keys",
+        sorted(rotation.keys()),
+        ["pitch", "roll", "yaw"],
+    )
+
+
+def case_specs(fixtures: dict[str, Path]) -> list[dict[str, Any]]:
+    return [
+        {
+            "case_id": "missing_manifest_nonfailing",
+            "manifest_path": None,
+            "expect": {
+                "status": "model_bundle_manifest_not_supplied",
+                "ready": False,
+                "model_authority": "reviewed_bundle_required",
+                "physical_ready": False,
+                "fixture_ready": False,
+                "missing_inputs": ["--manifest-path"],
+                "next_actions": ["supply_reviewed_so101_model_bundle_manifest"],
+            },
+        },
+        {
+            "case_id": "raw_nonstandard_json_constant_parse_error",
+            "manifest_path": fixtures["raw_nonstandard_json_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_parse_error",
+                "ready": False,
+                "model_authority": "reviewed_bundle_required",
+                "physical_ready": False,
+                "fixture_ready": False,
+                "missing_inputs": ["--manifest-path"],
+                "next_actions": ["supply_reviewed_so101_model_bundle_manifest"],
+            },
+        },
+        {
+            "case_id": "ready_synthetic_fixture_manifest_not_physical_authority",
+            "manifest_path": fixtures["ready_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_ready_for_model_backed_ik",
+                "ready": True,
+                "model_authority": (
+                    "hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": True,
+                "physical_authority_gate_status": (
+                    "hardware_free_fixture_ready_not_physical_authority"
+                ),
+                "missing_inputs_exact": [],
+                "synthetic_fields_contain": [
+                    "authority",
+                    "provenance",
+                    "joint_limits",
+                    "gripper_mapping",
+                    "mesh_assets",
+                    "collision_policy",
+                    "target_frame",
+                    "tcp_offset",
+                    "base_to_board_alignment",
+                ],
+            },
+        },
+        {
+            "case_id": "reviewed_contract_manifest_physical_authority_ready",
+            "manifest_path": fixtures["reviewed_contract_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_ready_for_model_backed_ik",
+                "ready": True,
+                "model_authority": "reviewed_so101_model_bundle_manifest",
+                "physical_ready": True,
+                "fixture_ready": False,
+                "physical_authority_gate_status": "physical_reviewed_authority_ready",
+                "missing_inputs_exact": [],
+                "synthetic_fields_exact": [],
+                "authority_status": "present",
+                "provenance_status": "present",
+                "joint_limits_status": "present",
+                "gripper_mapping_status": "present",
+                "mesh_assets_status": "present",
+                "collision_policy_status": "present",
+                "target_frame_status": "present",
+                "tcp_offset_status": "present",
+                "alignment_status": "present",
+            },
+        },
+        {
+            "case_id": "missing_model_file_not_ready",
+            "manifest_path": fixtures["missing_model_file_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_authority": (
+                    "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": False,
+                "model_path_status": "unavailable",
+                "model_identity_status": "invalid",
+                "mesh_assets_status": "missing",
+                "missing_inputs": [
+                    "model_path",
+                    "model_sha256",
+                    "mesh_assets",
+                    "non_blocking_contract_checker_result",
+                ],
+                "next_actions": [
+                    "select_reviewed_so101_model_path",
+                    "record_reviewed_so101_model_file_sha256",
+                    "resolve_so101_mesh_assets",
+                    "clear_model_contract_and_asset_preflight",
+                ],
+            },
+        },
+        {
+            "case_id": "unsupported_model_suffix_not_ready",
+            "manifest_path": fixtures["unsupported_suffix_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_authority": (
+                    "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": False,
+                "model_path_status": "unsupported_suffix",
+                "model_path_supported_suffix": False,
+                "model_path_diagnostics_contains": [
+                    "model_path_unsupported_suffix:.txt",
+                ],
+                "model_identity_status": "present",
+                "missing_inputs": [
+                    "model_path",
+                    "non_blocking_contract_checker_result",
+                ],
+                "next_actions": [
+                    "select_reviewed_so101_model_path",
+                    "clear_model_contract_and_asset_preflight",
+                ],
+            },
+        },
+        {
+            "case_id": "invalid_model_path_type_not_ready",
+            "manifest_path": fixtures["invalid_model_path_type_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_authority": (
+                    "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": False,
+                "model_path_status": "invalid",
+                "model_path_supported_suffix": False,
+                "model_path_diagnostics_contains": [
+                    "model_path_not_string",
+                ],
+                "model_identity_status": "invalid",
+                "model_identity_diagnostics_contains": [
+                    "model_sha256_observed_unavailable",
+                ],
+                "missing_inputs": [
+                    "mesh_assets",
+                    "model_path",
+                    "model_sha256",
+                    "non_blocking_contract_checker_result",
+                ],
+                "next_actions": [
+                    "select_reviewed_so101_model_path",
+                    "record_reviewed_so101_model_file_sha256",
+                    "resolve_so101_mesh_assets",
+                    "clear_model_contract_and_asset_preflight",
+                ],
+            },
+        },
+        {
+            "case_id": "model_path_directory_not_ready",
+            "manifest_path": fixtures["model_path_directory_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_authority": (
+                    "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": False,
+                "model_path_status": "unavailable",
+                "model_path_supported_suffix": False,
+                "model_path_diagnostics_contains": [
+                    "model_path_not_file",
+                ],
+                "model_identity_status": "invalid",
+                "missing_inputs": [
+                    "mesh_assets",
+                    "model_path",
+                    "model_sha256",
+                    "non_blocking_contract_checker_result",
+                ],
+                "next_actions": [
+                    "select_reviewed_so101_model_path",
+                    "record_reviewed_so101_model_file_sha256",
+                    "resolve_so101_mesh_assets",
+                    "clear_model_contract_and_asset_preflight",
+                ],
+            },
+        },
+        {
+            "case_id": "invalid_asset_roots_not_ready",
+            "manifest_path": fixtures["invalid_asset_roots_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_authority": (
+                    "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": False,
+                "asset_roots_status": "invalid",
+                "asset_roots_diagnostics_contains": ["asset_roots_not_list"],
+                "missing_inputs": ["asset_roots"],
+                "next_actions": ["declare_model_asset_roots"],
+            },
+        },
+        {
+            "case_id": "invalid_asset_root_entries_not_ready",
+            "manifest_path": fixtures["invalid_asset_root_entries_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_authority": (
+                    "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": False,
+                "asset_roots_status": "needs_follow_up",
+                "asset_roots_diagnostics_contains": [
+                    "asset_root_0_not_string",
+                    "asset_root_1_not_string",
+                ],
+                "missing_inputs": ["asset_roots"],
+                "next_actions": ["declare_model_asset_roots"],
+            },
+        },
+        {
+            "case_id": "unavailable_asset_root_not_ready",
+            "manifest_path": fixtures["unavailable_asset_root_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_authority": (
+                    "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": False,
+                "asset_roots_status": "needs_follow_up",
+                "asset_roots_diagnostics_prefixes": ["asset_root_unavailable:"],
+                "missing_inputs": ["asset_roots"],
+                "next_actions": ["declare_model_asset_roots"],
+            },
+        },
+        {
+            "case_id": "file_asset_root_not_ready",
+            "manifest_path": fixtures["file_asset_root_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_authority": (
+                    "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": False,
+                "asset_roots_status": "needs_follow_up",
+                "asset_roots_diagnostics_prefixes": ["asset_root_not_directory:"],
+                "missing_inputs": ["asset_roots"],
+                "next_actions": ["declare_model_asset_roots"],
+            },
+        },
+        {
+            "case_id": "placeholder_alignment_manifest_not_ready",
+            "manifest_path": fixtures["placeholder_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_authority": (
+                    "incomplete_hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": False,
+                "missing_inputs": ["base_to_board_transform"],
+                "alignment_status": "placeholder_only",
+            },
+        },
+        {
+            "case_id": "placeholder_review_metadata_not_ready",
+            "manifest_path": fixtures["placeholder_review_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "physical_ready": False,
+                "fixture_ready": False,
+                "authority_status": "needs_review",
+                "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
+                "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
+                "target_frame_status": "needs_review",
+                "tcp_offset_status": "needs_review",
+                "alignment_status": "needs_review",
+                "missing_inputs": [
+                    "authority",
+                    "joint_limit_authority",
+                    "gripper_mapping_authority",
+                    "mesh_asset_authority",
+                    "collision_policy_authority",
+                    "target_frame_authority",
+                    "tcp_offset_authority",
+                    "base_to_board_alignment_authority",
+                ],
+            },
+        },
+        {
+            "case_id": "thin_review_metadata_not_ready",
+            "manifest_path": fixtures["thin_review_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "authority_status": "needs_review",
+                "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
+                "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
+                "target_frame_status": "needs_review",
+                "tcp_offset_status": "needs_review",
+                "alignment_status": "needs_review",
+                "missing_inputs": [
+                    "authority",
+                    "joint_limit_authority",
+                    "gripper_mapping_authority",
+                    "mesh_asset_authority",
+                    "collision_policy_authority",
+                    "target_frame_authority",
+                    "tcp_offset_authority",
+                    "base_to_board_alignment_authority",
+                ],
+            },
+        },
+        {
+            "case_id": "invalid_review_url_not_ready",
+            "manifest_path": fixtures["invalid_review_url_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "authority_status": "needs_review",
+                "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
+                "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
+                "target_frame_status": "needs_review",
+                "tcp_offset_status": "needs_review",
+                "alignment_status": "needs_review",
+                "missing_inputs": [
+                    "authority",
+                    "joint_limit_authority",
+                    "gripper_mapping_authority",
+                    "mesh_asset_authority",
+                    "collision_policy_authority",
+                    "target_frame_authority",
+                    "tcp_offset_authority",
+                    "base_to_board_alignment_authority",
+                ],
+            },
+        },
+        {
+            "case_id": "invalid_reviewed_at_not_ready",
+            "manifest_path": fixtures["invalid_reviewed_at_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "authority_status": "needs_review",
+                "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
+                "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
+                "target_frame_status": "needs_review",
+                "tcp_offset_status": "needs_review",
+                "alignment_status": "needs_review",
+                "missing_inputs": [
+                    "authority",
+                    "joint_limit_authority",
+                    "gripper_mapping_authority",
+                    "mesh_asset_authority",
+                    "collision_policy_authority",
+                    "target_frame_authority",
+                    "tcp_offset_authority",
+                    "base_to_board_alignment_authority",
+                ],
+                "review_invalid_fields": ["reviewed_at"],
+            },
+        },
+        {
+            "case_id": "future_reviewed_at_not_ready",
+            "manifest_path": fixtures["future_reviewed_at_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "authority_status": "needs_review",
+                "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
+                "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
+                "target_frame_status": "needs_review",
+                "tcp_offset_status": "needs_review",
+                "alignment_status": "needs_review",
+                "missing_inputs": [
+                    "authority",
+                    "joint_limit_authority",
+                    "gripper_mapping_authority",
+                    "mesh_asset_authority",
+                    "collision_policy_authority",
+                    "target_frame_authority",
+                    "tcp_offset_authority",
+                    "base_to_board_alignment_authority",
+                ],
+                "review_invalid_fields": ["reviewed_at"],
+            },
+        },
+        {
+            "case_id": "generic_review_scope_not_ready",
+            "manifest_path": fixtures["generic_review_scope_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "authority_status": "needs_review",
+                "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
+                "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
+                "target_frame_status": "needs_review",
+                "tcp_offset_status": "needs_review",
+                "alignment_status": "needs_review",
+                "missing_inputs": [
+                    "authority",
+                    "joint_limit_authority",
+                    "gripper_mapping_authority",
+                    "mesh_asset_authority",
+                    "collision_policy_authority",
+                    "target_frame_authority",
+                    "tcp_offset_authority",
+                    "base_to_board_alignment_authority",
+                ],
+            },
+        },
+        {
+            "case_id": "pending_review_metadata_not_ready",
+            "manifest_path": fixtures["pending_review_metadata_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "physical_ready": False,
+                "fixture_ready": False,
+                "authority_status": "needs_review",
+                "joint_limits_status": "needs_review",
+                "gripper_mapping_status": "needs_review",
+                "mesh_assets_status": "needs_review",
+                "collision_policy_status": "needs_review",
+                "target_frame_status": "needs_review",
+                "tcp_offset_status": "needs_review",
+                "alignment_status": "needs_review",
+                "missing_inputs": [
+                    "authority",
+                    "joint_limit_authority",
+                    "gripper_mapping_authority",
+                    "mesh_asset_authority",
+                    "collision_policy_authority",
+                    "target_frame_authority",
+                    "tcp_offset_authority",
+                    "base_to_board_alignment_authority",
+                ],
+                "authority_open_work_fields": [
+                    "missing_inputs",
+                    "next_required_action_ids",
+                ],
+                "review_open_work_fields": ["next_required_action_ids"],
+            },
+        },
+        {
+            "case_id": "weak_review_manifest_not_ready",
+            "manifest_path": fixtures["weak_review_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "authority_status": "needs_review",
+                "provenance_status": "needs_review",
+                "missing_inputs": ["authority", "provenance"],
+            },
+        },
+        {
+            "case_id": "placeholder_provenance_not_ready",
+            "manifest_path": fixtures["placeholder_provenance_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "provenance_status": "needs_review",
+                "missing_inputs": ["provenance"],
+            },
+        },
+        {
+            "case_id": "invalid_provenance_url_not_ready",
+            "manifest_path": fixtures["invalid_provenance_url_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "provenance_status": "needs_review",
+                "missing_inputs": ["provenance"],
+            },
+        },
+        {
+            "case_id": "reviewed_status_with_fixture_provenance_not_physical_authority",
+            "manifest_path": fixtures["fixture_provenance_reviewed_authority_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_ready_for_model_backed_ik",
+                "ready": True,
+                "model_authority": (
+                    "hardware_free_regression_fixture_not_physical_so101_authority"
+                ),
+                "physical_ready": False,
+                "fixture_ready": True,
+                "missing_inputs_exact": [],
+                "synthetic_fields_contain": ["provenance"],
+            },
+        },
+        {
+            "case_id": "weak_joint_limit_authority_not_ready",
+            "manifest_path": fixtures["weak_joint_limits_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "joint_limits_status": "needs_review",
+                "missing_inputs": ["joint_limit_authority"],
+            },
+        },
+        {
+            "case_id": "conflicting_joint_limit_review_alias_not_ready",
+            "manifest_path": fixtures[
+                "conflicting_joint_limit_review_alias_manifest_path"
+            ],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "joint_limits_status": "needs_review",
+                "joint_limit_review_alias_conflict": False,
+                "joint_limit_review_alias_not_ready_fields": [
+                    "joint_limits_review"
+                ],
+                "joint_limits_diagnostics_contains": [
+                    "joint_limit_authority_review_alias_not_ready:joint_limits_review"
+                ],
+                "missing_inputs": ["joint_limit_authority"],
+            },
+        },
+        {
+            "case_id": "unexpected_joint_limit_name_not_ready",
+            "manifest_path": fixtures["unexpected_joint_limit_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "joint_limits_status": "invalid",
+                "joint_limit_unexpected_joints": ["unknown_aux_joint"],
+                "missing_inputs": ["joint_limits_deg"],
+            },
+        },
+        {
+            "case_id": "nonfinite_joint_limit_not_ready",
+            "manifest_path": fixtures["nonfinite_joint_limit_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "joint_limits_status": "invalid",
+                "joint_limits_diagnostics_contains": [
+                    "joint_limit_invalid:shoulder_pan:joint_limit_non_finite",
+                ],
+                "missing_inputs": ["joint_limits_deg"],
+            },
+        },
+        {
+            "case_id": "reversed_joint_limit_not_ready",
+            "manifest_path": fixtures["reversed_joint_limit_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "joint_limits_status": "invalid",
+                "joint_limits_diagnostics_contains": [
+                    "joint_limit_invalid:shoulder_pan:joint_limit_lower_not_below_upper",
+                ],
+                "missing_inputs": ["joint_limits_deg"],
+            },
+        },
+        {
+            "case_id": "unexpected_model_joint_not_ready",
+            "manifest_path": fixtures["unexpected_model_joint_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "contract_checker_status": "model_suffix_supported_not_directly_usable",
+                "contract_checker_diagnostics_contains": [
+                    "model_structure_unexpected_joints:['unknown_aux_joint']",
+                ],
+                "missing_inputs": ["non_blocking_contract_checker_result"],
+                "next_actions": ["clear_model_contract_and_asset_preflight"],
+            },
+        },
+        {
+            "case_id": "conflicting_joint_limit_alias_not_ready",
+            "manifest_path": fixtures["conflicting_joint_limit_alias_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "joint_limits_status": "invalid",
+                "missing_inputs": ["joint_limits_deg"],
+            },
+        },
+        {
+            "case_id": "conflicting_joint_limit_nested_alias_not_ready",
+            "manifest_path": fixtures[
+                "conflicting_joint_limit_nested_alias_manifest_path"
+            ],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "joint_limits_status": "invalid",
+                "missing_inputs": ["joint_limits_deg"],
+            },
+        },
+        {
+            "case_id": "weak_gripper_mapping_authority_not_ready",
+            "manifest_path": fixtures["weak_gripper_mapping_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "gripper_mapping_status": "missing",
+                "missing_inputs": ["gripper_mapping_authority"],
+                "next_actions": ["record_gripper_mapping_authority"],
+            },
+        },
+        {
+            "case_id": "weak_mesh_asset_authority_not_ready",
+            "manifest_path": fixtures["weak_mesh_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "mesh_assets_status": "needs_review",
+                "missing_inputs": ["mesh_asset_authority"],
+            },
+        },
+        {
+            "case_id": "weak_collision_policy_authority_not_ready",
+            "manifest_path": fixtures["weak_collision_policy_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "collision_policy_status": "missing",
+                "missing_inputs": ["collision_policy_authority"],
+                "next_actions": ["record_collision_policy_authority"],
+            },
+        },
+        {
+            "case_id": "candidate_source_lock_only_mesh_authority_not_ready",
+            "manifest_path": fixtures[
+                "candidate_source_lock_only_mesh_manifest_path"
+            ],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "mesh_assets_status": "needs_review",
+                "missing_inputs": ["mesh_asset_authority"],
+                "next_actions": ["record_mesh_asset_authority"],
+                "candidate_handoff_context_status": (
+                    "candidate_handoff_context_present"
+                ),
+                "candidate_handoff_context_field_ids": [
+                    "candidate_source_lock_digest_handoff"
+                ],
+                "candidate_handoff_context_digest_authority_boundary": (
+                    "candidate_source_lock_digest_not_authority"
+                ),
+                "candidate_handoff_context_digest_row_count": 33,
+                "candidate_handoff_context_digest_expected_file_count": 20,
+                "candidate_handoff_context_digest_extra_lockable_file_count": 13,
+            },
+        },
+        {
+            "case_id": "conflicting_mesh_asset_review_alias_not_ready",
+            "manifest_path": fixtures["conflicting_mesh_review_alias_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "mesh_assets_status": "needs_review",
+                "missing_inputs": ["mesh_asset_authority"],
+            },
+        },
+        {
+            "case_id": "weak_target_frame_authority_not_ready",
+            "manifest_path": fixtures["weak_target_frame_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "target_frame_status": "needs_review",
+                "missing_inputs": ["target_frame_authority"],
+            },
+        },
+        {
+            "case_id": "conflicting_target_frame_review_alias_not_ready",
+            "manifest_path": fixtures[
+                "conflicting_target_frame_review_alias_manifest_path"
+            ],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "target_frame_status": "needs_review",
+                "missing_inputs": ["target_frame_authority"],
+            },
+        },
+        {
+            "case_id": "wrong_target_frame_not_ready",
+            "manifest_path": fixtures["wrong_target_frame_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "target_frame_status": "invalid",
+                "missing_inputs": ["target_frame"],
+            },
+        },
+        {
+            "case_id": "invalid_target_frame_type_not_ready",
+            "manifest_path": fixtures["invalid_target_frame_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "target_frame_status": "invalid",
+                "target_frame_diagnostics_contains": [
+                    "target_frame_not_nonempty_string"
+                ],
+                "missing_inputs": ["target_frame"],
+            },
+        },
+        {
+            "case_id": "weak_tcp_offset_authority_not_ready",
+            "manifest_path": fixtures["weak_tcp_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "tcp_offset_status": "needs_review",
+                "missing_inputs": ["tcp_offset_authority"],
+            },
+        },
+        {
+            "case_id": "conflicting_tcp_offset_review_alias_not_ready",
+            "manifest_path": fixtures["conflicting_tcp_review_alias_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "tcp_offset_status": "needs_review",
+                "tcp_offset_review_alias_conflict": False,
+                "tcp_offset_review_alias_not_ready_fields": ["tcp_offset_review"],
+                "tcp_offset_diagnostics_contains": [
+                    "tcp_offset_authority_review_alias_not_ready:tcp_offset_review"
+                ],
+                "missing_inputs": ["tcp_offset_authority"],
+            },
+        },
+        {
+            "case_id": "invalid_tcp_offset_shape_not_ready",
+            "manifest_path": fixtures["invalid_tcp_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "tcp_offset_status": "invalid",
+                "missing_inputs": ["tcp_offset_m"],
+            },
+        },
+        {
+            "case_id": "nonfinite_tcp_offset_not_ready",
+            "manifest_path": fixtures["nonfinite_tcp_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "tcp_offset_status": "invalid",
+                "missing_inputs": ["tcp_offset_m"],
+            },
+        },
+        {
+            "case_id": "oversized_tcp_offset_not_ready",
+            "manifest_path": fixtures["oversized_tcp_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "tcp_offset_status": "invalid",
+                "tcp_offset_diagnostics_contains": [
+                    "tcp_offset_norm_exceeds_limit:"
+                ],
+                "tcp_offset_diagnostics_contains_prefix": True,
+                "missing_inputs": ["tcp_offset_m"],
+            },
+        },
+        {
+            "case_id": "conflicting_tcp_offset_alias_not_ready",
+            "manifest_path": fixtures["conflicting_tcp_alias_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "tcp_offset_status": "invalid",
+                "missing_inputs": ["tcp_offset_m"],
+            },
+        },
+        {
+            "case_id": "weak_alignment_authority_not_ready",
+            "manifest_path": fixtures["weak_alignment_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "alignment_status": "needs_review",
+                "missing_inputs": ["base_to_board_alignment_authority"],
+            },
+        },
+        {
+            "case_id": "conflicting_alignment_review_alias_not_ready",
+            "manifest_path": fixtures[
+                "conflicting_alignment_review_alias_manifest_path"
+            ],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "alignment_status": "needs_review",
+                "alignment_review_alias_conflict": False,
+                "alignment_review_alias_not_ready_fields": [
+                    "base_to_board_alignment_review"
+                ],
+                "alignment_diagnostics_contains": [
+                    "base_to_board_alignment_authority_review_alias_not_ready:base_to_board_alignment_review"
+                ],
+                "missing_inputs": ["base_to_board_alignment_authority"],
+            },
+        },
+        {
+            "case_id": "invalid_alignment_transform_not_ready",
+            "manifest_path": fixtures["invalid_alignment_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "alignment_status": "invalid",
+                "missing_inputs": ["base_to_board_transform"],
+            },
+        },
+        {
+            "case_id": "nonfinite_alignment_transform_not_ready",
+            "manifest_path": fixtures["nonfinite_alignment_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "alignment_status": "invalid",
+                "missing_inputs": ["base_to_board_transform"],
+            },
+        },
+        {
+            "case_id": "oversized_alignment_rotation_not_ready",
+            "manifest_path": fixtures["oversized_alignment_rotation_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "alignment_status": "invalid",
+                "alignment_diagnostics_contains": [
+                    "rotation_rpy:base_to_board_rotation_abs_exceeds_limit:"
+                ],
+                "alignment_diagnostics_contains_prefix": True,
+                "missing_inputs": ["base_to_board_transform"],
+            },
+        },
+        {
+            "case_id": "oversized_alignment_translation_not_ready",
+            "manifest_path": fixtures["oversized_alignment_translation_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "alignment_status": "invalid",
+                "alignment_diagnostics_contains": [
+                    "translation:base_to_board_translation_norm_exceeds_limit:"
+                ],
+                "alignment_diagnostics_contains_prefix": True,
+                "missing_inputs": ["base_to_board_transform"],
+            },
+        },
+        {
+            "case_id": "conflicting_alignment_alias_not_ready",
+            "manifest_path": fixtures["conflicting_alignment_alias_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "alignment_status": "invalid",
+                "missing_inputs": ["base_to_board_transform"],
+            },
+        },
+        {
+            "case_id": "conflicting_alignment_nested_alias_not_ready",
+            "manifest_path": fixtures[
+                "conflicting_alignment_nested_alias_manifest_path"
+            ],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "alignment_status": "invalid",
+                "missing_inputs": ["base_to_board_transform"],
+            },
+        },
+        {
+            "case_id": "missing_model_sha_not_ready",
+            "manifest_path": fixtures["missing_model_sha_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_identity_status": "missing",
+                "model_identity_diagnostics_contains": ["model_sha256_missing"],
+                "missing_inputs": ["model_sha256"],
+            },
+        },
+        {
+            "case_id": "mismatched_model_sha_not_ready",
+            "manifest_path": fixtures["mismatched_model_sha_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_identity_status": "invalid",
+                "missing_inputs": ["model_sha256"],
+            },
+        },
+        {
+            "case_id": "invalid_model_sha_not_ready",
+            "manifest_path": fixtures["invalid_model_sha_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_identity_status": "invalid",
+                "model_identity_diagnostics_contains": ["model_sha256_invalid"],
+                "missing_inputs": ["model_sha256"],
+            },
+        },
+        {
+            "case_id": "conflicting_model_sha_alias_not_ready",
+            "manifest_path": fixtures["conflicting_model_sha_alias_manifest_path"],
+            "expect": {
+                "status": "model_bundle_manifest_needs_follow_up",
+                "ready": False,
+                "model_identity_status": "invalid",
+                "missing_inputs": ["model_sha256"],
+            },
+        },
+    ]
+
+
+def run_case(
+    *,
+    spec: dict[str, Any],
+    python_path: Path,
+    output_dir: Path,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    case_id = str(spec["case_id"])
+    case_dir = output_dir / "cases" / case_id
+    summary_path = case_dir / "so101_model_bundle_manifest_summary.json"
+    python_executable = executable_arg(python_path)
+    command = [
+        python_executable,
+        str(MANIFEST_SCRIPT),
+        "--output-dir",
+        str(case_dir),
+        "--python",
+        python_executable,
+    ]
+    manifest_path = spec.get("manifest_path")
+    if isinstance(manifest_path, Path):
+        command.extend(["--manifest-path", str(manifest_path)])
+
+    case_dir.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        command,
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    stdout_path = case_dir / f"{case_id}_stdout.txt"
+    stderr_path = case_dir / f"{case_id}_stderr.txt"
+    stdout_path.write_text(result.stdout)
+    stderr_path.write_text(result.stderr)
+    try:
+        summary = json.loads(summary_path.read_text())
+    except Exception as exc:
+        summary = {
+            "ok": False,
+            "status": "summary_unavailable",
+            "summary_error": f"{type(exc).__name__}: {exc}",
+        }
+    record = {
+        "case_id": case_id,
+        "command": command,
+        "return_code": result.returncode,
+        "stdout_path": str(stdout_path),
+        "stderr_path": str(stderr_path),
+        "summary_path": str(summary_path),
+    }
+    return record, summary
+
+
+def summarize_case(
+    *,
+    spec: dict[str, Any],
+    record: dict[str, Any],
+    summary: dict[str, Any],
+) -> dict[str, Any]:
+    case_id = str(spec["case_id"])
+    expect = spec["expect"]
+    errors: list[str] = []
+    artifacts = summary.get("artifacts")
+    artifacts = artifacts if isinstance(artifacts, dict) else {}
+    bundle_intake = summary.get("bundle_intake_checklist")
+    bundle_intake = bundle_intake if isinstance(bundle_intake, dict) else {}
+    contract_preflight_intake = bundle_intake_action_by_id(
+        bundle_intake,
+        "clear_model_contract_and_asset_preflight",
+    )
+    review_requirements = summary.get("review_requirements")
+    review_requirements = review_requirements if isinstance(review_requirements, dict) else {}
+    review_packet = summary.get("review_packet")
+    review_packet = review_packet if isinstance(review_packet, dict) else {}
+    review_requirements_url_fields = assert_review_requirements_url_policy(
+        errors,
+        case_id,
+        review_requirements,
+    )
+    assert_reviewed_manifest_template_contract(
+        errors,
+        case_id,
+        summary,
+        artifacts,
+    )
+
+    add_error(errors, f"{case_id}.return_code", record.get("return_code"), 0)
+    add_error(errors, f"{case_id}.ok", summary.get("ok"), True)
+    add_error(errors, f"{case_id}.status", summary.get("status"), expect["status"])
+    add_error(
+        errors,
+        f"{case_id}.ready_for_model_backed_ik",
+        summary.get("ready_for_model_backed_ik"),
+        expect["ready"],
+    )
+    if "model_authority" in expect:
+        add_error(
+            errors,
+            f"{case_id}.model_authority",
+            summary.get("model_authority"),
+            expect["model_authority"],
+        )
+    add_error(
+        errors,
+        f"{case_id}.physical_so101_model_authority_ready",
+        summary.get("physical_so101_model_authority_ready"),
+        expect.get("physical_ready", False),
+    )
+    add_error(
+        errors,
+        f"{case_id}.hardware_free_regression_fixture_ready",
+        summary.get("hardware_free_regression_fixture_ready"),
+        expect.get("fixture_ready", False),
+    )
+    if "physical_authority_gate_status" in expect:
+        add_error(
+            errors,
+            f"{case_id}.physical_authority_gate_status",
+            summary.get("physical_authority_gate_status"),
+            expect["physical_authority_gate_status"],
+        )
+    physical_authority_contract = summary.get("physical_authority_contract")
+    if not isinstance(physical_authority_contract, dict):
+        errors.append(f"{case_id}.physical_authority_contract: expected dict")
+        physical_authority_contract = {}
+    expected_contract_status = (
+        "physical_authority_ready"
+        if expect.get("physical_ready", False)
+        else "fixture_ready_not_physical_authority"
+        if expect.get("fixture_ready", False)
+        else "physical_authority_blocked"
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.ok",
+        physical_authority_contract.get("ok"),
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.status",
+        physical_authority_contract.get("status"),
+        expected_contract_status,
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.ready_for_model_backed_ik",
+        physical_authority_contract.get("ready_for_model_backed_ik"),
+        expect["ready"],
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.model_authority",
+        physical_authority_contract.get("model_authority"),
+        summary.get("model_authority"),
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.physical_authority_gate_status",
+        physical_authority_contract.get("physical_authority_gate_status"),
+        summary.get("physical_authority_gate_status"),
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.physical_so101_model_authority_ready",
+        physical_authority_contract.get("physical_so101_model_authority_ready"),
+        expect.get("physical_ready", False),
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.hardware_free_regression_fixture_ready",
+        physical_authority_contract.get("hardware_free_regression_fixture_ready"),
+        expect.get("fixture_ready", False),
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.fixture_ready_not_physical_so101_authority",
+        physical_authority_contract.get(
+            "fixture_ready_not_physical_so101_authority"
+        ),
+        expect.get("fixture_ready", False),
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.synthetic_fixture_authority_fields",
+        physical_authority_contract.get("synthetic_fixture_authority_fields"),
+        summary.get("synthetic_fixture_authority_fields"),
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.physical_authority_blockers",
+        physical_authority_contract.get("physical_authority_blockers"),
+        summary.get("physical_authority_blockers"),
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.next_required_action_ids",
+        physical_authority_contract.get("next_required_action_ids"),
+        summary.get("next_required_action_ids") or [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.physical_ready_requires_no_synthetic_fixture_fields",
+        physical_authority_contract.get(
+            "physical_ready_requires_no_synthetic_fixture_fields"
+        ),
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.fixture_ready_requires_synthetic_fixture_fields",
+        physical_authority_contract.get(
+            "fixture_ready_requires_synthetic_fixture_fields"
+        ),
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.physical_authority_contract.errors",
+        physical_authority_contract.get("errors"),
+        [],
+    )
+    candidate_handoff_context = summary.get("candidate_handoff_context")
+    candidate_handoff_context = (
+        candidate_handoff_context
+        if isinstance(candidate_handoff_context, dict)
+        else {}
+    )
+    if "candidate_handoff_context_status" in expect:
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.status",
+            candidate_handoff_context.get("status"),
+            expect["candidate_handoff_context_status"],
+        )
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.model_authority",
+            candidate_handoff_context.get("model_authority"),
+            "candidate_handoff_context_not_authority",
+        )
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.ready_for_model_backed_ik",
+            candidate_handoff_context.get("ready_for_model_backed_ik"),
+            False,
+        )
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.physical_authority",
+            candidate_handoff_context.get(
+                "observed_evidence_is_physical_so101_authority"
+            ),
+            False,
+        )
+    if "candidate_handoff_context_field_ids" in expect:
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.handoff_field_ids",
+            candidate_handoff_context.get("handoff_field_ids"),
+            expect["candidate_handoff_context_field_ids"],
+        )
+    if "candidate_handoff_context_digest_authority_boundary" in expect:
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.digest_authority_boundary",
+            candidate_handoff_context.get("digest_handoff_authority_boundary"),
+            expect["candidate_handoff_context_digest_authority_boundary"],
+        )
+    if "candidate_handoff_context_digest_row_count" in expect:
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.digest_row_count",
+            candidate_handoff_context.get("digest_handoff_row_count"),
+            expect["candidate_handoff_context_digest_row_count"],
+        )
+    if "candidate_handoff_context_digest_expected_file_count" in expect:
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.digest_expected_file_count",
+            candidate_handoff_context.get("digest_handoff_expected_file_count"),
+            expect["candidate_handoff_context_digest_expected_file_count"],
+        )
+    if "candidate_handoff_context_digest_extra_lockable_file_count" in expect:
+        add_error(
+            errors,
+            f"{case_id}.candidate_handoff_context.digest_extra_lockable_file_count",
+            candidate_handoff_context.get(
+                "digest_handoff_extra_lockable_file_count"
+            ),
+            expect["candidate_handoff_context_digest_extra_lockable_file_count"],
+        )
+
+    for key, summary_key in (
+        ("model_path_status", ("model_path",)),
+        ("model_identity_status", ("model_identity",)),
+        ("authority_status", ("authority",)),
+        ("provenance_status", ("provenance",)),
+        ("asset_roots_status", ("asset_roots",)),
+        ("joint_limits_status", ("joint_limits",)),
+        ("gripper_mapping_status", ("gripper_mapping",)),
+        ("mesh_assets_status", ("mesh_assets",)),
+        ("collision_policy_status", ("collision_policy",)),
+        ("target_frame_status", ("target_frame",)),
+        ("tcp_offset_status", ("tcp_offset",)),
+        ("alignment_status", ("base_to_board_alignment",)),
+    ):
+        if key in expect:
+            nested = summary.get(summary_key[0])
+            actual = nested.get("status") if isinstance(nested, dict) else None
+            add_error(errors, f"{case_id}.{key}", actual, expect[key])
+    if "joint_limit_unexpected_joints" in expect:
+        joint_limits = summary.get("joint_limits")
+        actual = (
+            joint_limits.get("unexpected_joints")
+            if isinstance(joint_limits, dict)
+            else None
+        )
+        add_error(
+            errors,
+            f"{case_id}.joint_limit_unexpected_joints",
+            actual,
+            expect["joint_limit_unexpected_joints"],
+        )
+    if "model_path_supported_suffix" in expect:
+        model_path = summary.get("model_path")
+        actual = (
+            model_path.get("supported_suffix")
+            if isinstance(model_path, dict)
+            else None
+        )
+        add_error(
+            errors,
+            f"{case_id}.model_path_supported_suffix",
+            actual,
+            expect["model_path_supported_suffix"],
+        )
+    if "model_path_diagnostics_contains" in expect:
+        model_path = summary.get("model_path")
+        diagnostics = (
+            model_path.get("diagnostics") if isinstance(model_path, dict) else []
+        )
+        expect_contains(
+            errors,
+            f"{case_id}.model_path.diagnostics",
+            diagnostics,
+            expect["model_path_diagnostics_contains"],
+        )
+    if "asset_roots_diagnostics_contains" in expect:
+        asset_roots = summary.get("asset_roots")
+        diagnostics = (
+            asset_roots.get("diagnostics") if isinstance(asset_roots, dict) else []
+        )
+        expect_contains(
+            errors,
+            f"{case_id}.asset_roots.diagnostics",
+            diagnostics,
+            expect["asset_roots_diagnostics_contains"],
+        )
+    if "model_identity_diagnostics_contains" in expect:
+        model_identity = summary.get("model_identity")
+        diagnostics = (
+            model_identity.get("diagnostics")
+            if isinstance(model_identity, dict)
+            else []
+        )
+        expect_contains(
+            errors,
+            f"{case_id}.model_identity.diagnostics",
+            diagnostics,
+            expect["model_identity_diagnostics_contains"],
+        )
+    if "asset_roots_diagnostics_prefixes" in expect:
+        asset_roots = summary.get("asset_roots")
+        diagnostics = (
+            asset_roots.get("diagnostics") if isinstance(asset_roots, dict) else []
+        )
+        expect_contains_prefix(
+            errors,
+            f"{case_id}.asset_roots.diagnostics",
+            diagnostics,
+            expect["asset_roots_diagnostics_prefixes"],
+        )
+    if "joint_limits_diagnostics_contains" in expect:
+        joint_limits = summary.get("joint_limits")
+        diagnostics = (
+            joint_limits.get("diagnostics")
+            if isinstance(joint_limits, dict)
+            else []
+        )
+        expect_contains(
+            errors,
+            f"{case_id}.joint_limits.diagnostics",
+            diagnostics,
+            expect["joint_limits_diagnostics_contains"],
+        )
+    if "joint_limit_review_alias_conflict" in expect:
+        joint_review = (summary.get("joint_limits") or {}).get("review") or {}
+        add_error(
+            errors,
+            f"{case_id}.joint_limits.review.review_alias_conflict",
+            joint_review.get("review_alias_conflict"),
+            expect["joint_limit_review_alias_conflict"],
+        )
+    if "joint_limit_review_alias_not_ready_fields" in expect:
+        joint_review = (summary.get("joint_limits") or {}).get("review") or {}
+        add_error(
+            errors,
+            f"{case_id}.joint_limits.review.review_alias_not_ready_fields",
+            joint_review.get("review_alias_not_ready_fields"),
+            expect["joint_limit_review_alias_not_ready_fields"],
+        )
+    if "target_frame_diagnostics_contains" in expect:
+        target_frame = summary.get("target_frame")
+        diagnostics = (
+            target_frame.get("diagnostics")
+            if isinstance(target_frame, dict)
+            else []
+        )
+        expect_contains(
+            errors,
+            f"{case_id}.target_frame.diagnostics",
+            diagnostics,
+            expect["target_frame_diagnostics_contains"],
+        )
+    if "tcp_offset_diagnostics_contains" in expect:
+        tcp_offset = summary.get("tcp_offset")
+        diagnostics = (
+            tcp_offset.get("diagnostics") if isinstance(tcp_offset, dict) else []
+        )
+        if expect.get("tcp_offset_diagnostics_contains_prefix") is True:
+            expect_contains_prefix(
+                errors,
+                f"{case_id}.tcp_offset.diagnostics",
+                diagnostics,
+                expect["tcp_offset_diagnostics_contains"],
+            )
+        else:
+            expect_contains(
+                errors,
+                f"{case_id}.tcp_offset.diagnostics",
+                diagnostics,
+                expect["tcp_offset_diagnostics_contains"],
+            )
+    if "tcp_offset_review_alias_conflict" in expect:
+        tcp_review = (summary.get("tcp_offset") or {}).get("review") or {}
+        add_error(
+            errors,
+            f"{case_id}.tcp_offset.review.review_alias_conflict",
+            tcp_review.get("review_alias_conflict"),
+            expect["tcp_offset_review_alias_conflict"],
+        )
+    if "tcp_offset_review_alias_not_ready_fields" in expect:
+        tcp_review = (summary.get("tcp_offset") or {}).get("review") or {}
+        add_error(
+            errors,
+            f"{case_id}.tcp_offset.review.review_alias_not_ready_fields",
+            tcp_review.get("review_alias_not_ready_fields"),
+            expect["tcp_offset_review_alias_not_ready_fields"],
+        )
+    if "tcp_offset_review_open_work_fields" in expect:
+        expect_contains(
+            errors,
+            f"{case_id}.tcp_offset.review_open_work_fields",
+            review_open_work_fields(summary, "tcp_offset"),
+            expect["tcp_offset_review_open_work_fields"],
+        )
+    if "alignment_diagnostics_contains" in expect:
+        alignment = summary.get("base_to_board_alignment")
+        diagnostics = (
+            alignment.get("diagnostics") if isinstance(alignment, dict) else []
+        )
+        if expect.get("alignment_diagnostics_contains_prefix") is True:
+            expect_contains_prefix(
+                errors,
+                f"{case_id}.base_to_board_alignment.diagnostics",
+                diagnostics,
+                expect["alignment_diagnostics_contains"],
+            )
+        else:
+            expect_contains(
+                errors,
+                f"{case_id}.base_to_board_alignment.diagnostics",
+                diagnostics,
+                expect["alignment_diagnostics_contains"],
+            )
+    if "alignment_review_alias_conflict" in expect:
+        alignment_review = (
+            (summary.get("base_to_board_alignment") or {}).get("review") or {}
+        )
+        add_error(
+            errors,
+            f"{case_id}.base_to_board_alignment.review.review_alias_conflict",
+            alignment_review.get("review_alias_conflict"),
+            expect["alignment_review_alias_conflict"],
+        )
+    if "alignment_review_alias_not_ready_fields" in expect:
+        alignment_review = (
+            (summary.get("base_to_board_alignment") or {}).get("review") or {}
+        )
+        add_error(
+            errors,
+            f"{case_id}.base_to_board_alignment.review.review_alias_not_ready_fields",
+            alignment_review.get("review_alias_not_ready_fields"),
+            expect["alignment_review_alias_not_ready_fields"],
+        )
+    if "contract_checker_status" in expect:
+        add_error(
+            errors,
+            f"{case_id}.contract_checker_status",
+            (summary.get("contract_checker") or {}).get("status"),
+            expect["contract_checker_status"],
+        )
+    if "contract_checker_diagnostics_contains" in expect:
+        expect_contains(
+            errors,
+            f"{case_id}.contract_checker_diagnostics",
+            field_check_diagnostics(summary, "contract_checker_result"),
+            expect["contract_checker_diagnostics_contains"],
+        )
+
+    missing_inputs = summary.get("missing_inputs")
+    if "missing_inputs_exact" in expect:
+        add_error(
+            errors,
+            f"{case_id}.missing_inputs",
+            missing_inputs,
+            expect["missing_inputs_exact"],
+        )
+    else:
+        expect_contains(
+            errors,
+            f"{case_id}.missing_inputs",
+            missing_inputs,
+            expect.get("missing_inputs", []),
+        )
+    next_required_action_ids = summary.get("next_required_action_ids")
+    expect_contains(
+        errors,
+        f"{case_id}.next_required_action_ids",
+        next_required_action_ids,
+        expect.get("next_actions", []),
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_packet_actions_match_next_required",
+        summary.get("review_packet_actions_match_next_required"),
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_packet_actions_missing_from_next_required",
+        summary.get("review_packet_actions_missing_from_next_required"),
+        [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.next_required_actions_missing_from_review_packet",
+        summary.get("next_required_actions_missing_from_review_packet"),
+        [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_packet.next_required_action_ids",
+        (review_packet or {}).get("next_required_action_ids"),
+        next_required_action_ids,
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_packet.review_actions_match_next_required",
+        (review_packet or {}).get("review_actions_match_next_required"),
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_packet.review_actions_missing_from_next_required",
+        (review_packet or {}).get("review_actions_missing_from_next_required"),
+        [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_packet.next_required_actions_missing_from_review_packet",
+        (review_packet or {}).get("next_required_actions_missing_from_review_packet"),
+        [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.bundle_intake.action_ids",
+        bundle_intake.get("action_ids"),
+        next_required_action_ids,
+    )
+    add_error(
+        errors,
+        f"{case_id}.bundle_intake_actions_match_next_required",
+        summary.get("bundle_intake_actions_match_next_required"),
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.bundle_intake_actions_missing_from_next_required",
+        summary.get("bundle_intake_actions_missing_from_next_required"),
+        [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.next_required_actions_missing_from_bundle_intake",
+        summary.get("next_required_actions_missing_from_bundle_intake"),
+        [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.bundle_intake.actions_match_next_required",
+        bundle_intake.get("actions_match_next_required"),
+        True,
+    )
+    add_error(
+        errors,
+        f"{case_id}.bundle_intake.actions_missing_from_next_required",
+        bundle_intake.get("actions_missing_from_next_required"),
+        [],
+    )
+    add_error(
+        errors,
+        f"{case_id}.bundle_intake.next_required_actions_missing_from_bundle_intake",
+        bundle_intake.get("next_required_actions_missing_from_bundle_intake"),
+        [],
+    )
+    if isinstance(next_required_action_ids, list) and next_required_action_ids:
+        for action_id in next_required_action_ids:
+            action = bundle_intake_action_by_id(bundle_intake, str(action_id))
+            if not isinstance(action.get("related_requirement_ids"), list) or not action.get(
+                "related_requirement_ids"
+            ):
+                errors.append(
+                    f"{case_id}.bundle_intake.{action_id}.related_requirement_ids: expected non-empty list"
+                )
+            if not isinstance(action.get("field_check_context"), list) or not action.get(
+                "field_check_context"
+            ):
+                errors.append(
+                    f"{case_id}.bundle_intake.{action_id}.field_check_context: expected non-empty list"
+                )
+    if (
+        "clear_model_contract_and_asset_preflight"
+        in (next_required_action_ids if isinstance(next_required_action_ids, list) else [])
+    ):
+        add_error(
+            errors,
+            f"{case_id}.contract_preflight_intake.manifest_fields",
+            contract_preflight_intake.get("manifest_fields"),
+            ["model_path", "asset_roots", "target_frame"],
+        )
+        expect_contains(
+            errors,
+            f"{case_id}.contract_preflight_intake.required_inputs",
+            contract_preflight_intake.get("required_inputs"),
+            [
+                "contract checker non-blocking",
+                "SO-101 joints visible",
+                "target frame visible",
+                "mesh asset preflight non-blocking",
+            ],
+        )
+    if "synthetic_fields_exact" in expect:
+        add_error(
+            errors,
+            f"{case_id}.synthetic_fixture_authority_fields",
+            summary.get("synthetic_fixture_authority_fields"),
+            expect["synthetic_fields_exact"],
+        )
+    else:
+        expect_contains(
+            errors,
+            f"{case_id}.synthetic_fixture_authority_fields",
+            summary.get("synthetic_fixture_authority_fields"),
+            expect.get("synthetic_fields_contain", []),
+        )
+    if "authority_open_work_fields" in expect:
+        expect_contains(
+            errors,
+            f"{case_id}.authority_review_open_work_fields",
+            review_open_work_fields(summary, "authority"),
+            expect["authority_open_work_fields"],
+        )
+    if "review_open_work_fields" in expect:
+        for label, summary_key in (
+            ("joint_limits", "joint_limits"),
+            ("gripper_mapping", "gripper_mapping"),
+            ("mesh_assets", "mesh_assets"),
+            ("collision_policy", "collision_policy"),
+            ("target_frame", "target_frame"),
+            ("tcp_offset", "tcp_offset"),
+            ("alignment", "base_to_board_alignment"),
+        ):
+            expect_contains(
+                errors,
+                f"{case_id}.{label}_review_open_work_fields",
+                review_open_work_fields(summary, summary_key),
+                expect["review_open_work_fields"],
+            )
+    if "review_invalid_fields" in expect:
+        for label, summary_key in (
+            ("authority", "authority"),
+            ("joint_limits", "joint_limits"),
+            ("gripper_mapping", "gripper_mapping"),
+            ("mesh_assets", "mesh_assets"),
+            ("collision_policy", "collision_policy"),
+            ("target_frame", "target_frame"),
+            ("tcp_offset", "tcp_offset"),
+            ("alignment", "base_to_board_alignment"),
+        ):
+            expect_contains(
+                errors,
+                f"{case_id}.{label}_review_invalid_fields",
+                review_invalid_fields(summary, summary_key),
+                expect["review_invalid_fields"],
+            )
+
+    if summary.get("ready_for_model_backed_ik") is True:
+        add_error(
+            errors,
+            f"{case_id}.next_required_action_ids_when_ready",
+            next_required_action_ids,
+            [],
+        )
+    add_error(
+        errors,
+        f"{case_id}.review_packet_observed_evidence_is_authority",
+        review_packet.get("observed_evidence_is_authority"),
+        False,
+    )
+    add_error(
+        errors,
+        f"{case_id}.review_packet_development_fixture_boundary",
+        review_packet.get("development_fixture_evidence_not_physical_so101_truth"),
+        True,
+    )
+
+    for artifact_key in (
+        "summary_json",
+        "checklist_csv",
+        "readme_md",
+        "review_packet_json",
+        "review_packet_csv",
+        "review_requirements_json",
+        "review_requirements_csv",
+        "bundle_intake_checklist_json",
+        "bundle_intake_checklist_csv",
+        "reviewed_manifest_template_json",
+    ):
+        artifact_path = artifacts.get(artifact_key)
+        if not isinstance(artifact_path, str) or not Path(artifact_path).is_file():
+            errors.append(f"{case_id}.artifacts.{artifact_key}: expected existing file")
+
+    return {
+        "case_id": case_id,
+        "ok": not errors,
+        "status": "ok" if not errors else "failed",
+        "errors": errors,
+        "expected": expect,
+        "record": record,
+        "summary_path": record["summary_path"],
+        "observations": {
+            "status": summary.get("status"),
+            "ready_for_model_backed_ik": summary.get("ready_for_model_backed_ik"),
+            "model_authority": summary.get("model_authority"),
+            "physical_so101_model_authority_ready": summary.get(
+                "physical_so101_model_authority_ready"
+            ),
+            "hardware_free_regression_fixture_ready": summary.get(
+                "hardware_free_regression_fixture_ready"
+            ),
+            "physical_authority_gate_status": summary.get(
+                "physical_authority_gate_status"
+            ),
+            "physical_authority_contract_status": (
+                physical_authority_contract.get("status")
+            ),
+            "physical_authority_contract_ok": physical_authority_contract.get("ok"),
+            "physical_authority_contract_errors": (
+                physical_authority_contract.get("errors")
+            ),
+            "physical_authority_contract_fixture_ready_not_physical_so101_authority": (
+                physical_authority_contract.get(
+                    "fixture_ready_not_physical_so101_authority"
+                )
+            ),
+            "candidate_handoff_context_status": candidate_handoff_context.get(
+                "status"
+            ),
+            "candidate_handoff_context_model_authority": (
+                candidate_handoff_context.get("model_authority")
+            ),
+            "candidate_handoff_context_field_ids": candidate_handoff_context.get(
+                "handoff_field_ids"
+            ),
+            "candidate_handoff_context_locations_by_field": (
+                candidate_handoff_context.get("locations_by_field")
+            ),
+            "candidate_handoff_context_digest_authority_boundary": (
+                candidate_handoff_context.get("digest_handoff_authority_boundary")
+            ),
+            "candidate_handoff_context_digest_row_count": (
+                candidate_handoff_context.get("digest_handoff_row_count")
+            ),
+            "candidate_handoff_context_digest_expected_file_count": (
+                candidate_handoff_context.get("digest_handoff_expected_file_count")
+            ),
+            "candidate_handoff_context_digest_extra_lockable_file_count": (
+                candidate_handoff_context.get(
+                    "digest_handoff_extra_lockable_file_count"
+                )
+            ),
+            "model_path_status": nested_status(summary, "model_path"),
+            "model_path_suffix": (summary.get("model_path") or {}).get("suffix"),
+            "model_path_supported_suffix": (summary.get("model_path") or {}).get(
+                "supported_suffix"
+            ),
+            "model_path_diagnostics": (summary.get("model_path") or {}).get(
+                "diagnostics"
+            ),
+            "model_identity_status": nested_status(summary, "model_identity"),
+            "model_identity_diagnostics": (summary.get("model_identity") or {}).get(
+                "diagnostics"
+            ),
+            "authority_status": nested_status(summary, "authority"),
+            "provenance_status": nested_status(summary, "provenance"),
+            "asset_roots_status": nested_status(summary, "asset_roots"),
+            "asset_roots_diagnostics": (summary.get("asset_roots") or {}).get(
+                "diagnostics"
+            ),
+            "joint_limits_status": nested_status(summary, "joint_limits"),
+            "joint_limit_unexpected_joints": (
+                summary.get("joint_limits") or {}
+            ).get("unexpected_joints"),
+            "joint_limits_diagnostics": (
+                summary.get("joint_limits") or {}
+            ).get("diagnostics"),
+            "joint_limit_alias_conflict": (
+                summary.get("joint_limits") or {}
+            ).get("joint_limit_alias_conflict"),
+            "joint_limit_review_alias_conflict": (
+                ((summary.get("joint_limits") or {}).get("review") or {}).get(
+                    "review_alias_conflict"
+                )
+            ),
+            "joint_limit_review_alias_not_ready_fields": (
+                ((summary.get("joint_limits") or {}).get("review") or {}).get(
+                    "review_alias_not_ready_fields"
+                )
+            ),
+            "top_level_joint_limit_alias_conflict": (
+                summary.get("joint_limits") or {}
+            ).get("top_level_joint_limit_alias_conflict"),
+            "nested_joint_limit_alias_conflict": (
+                summary.get("joint_limits") or {}
+            ).get("nested_joint_limit_alias_conflict"),
+            "gripper_mapping_status": nested_status(summary, "gripper_mapping"),
+            "mesh_assets_status": nested_status(summary, "mesh_assets"),
+            "mesh_asset_review_alias_conflict": (
+                ((summary.get("mesh_assets") or {}).get("review") or {}).get(
+                    "mesh_asset_review_alias_conflict"
+                )
+            ),
+            "mesh_asset_review_alias_not_ready_fields": (
+                ((summary.get("mesh_assets") or {}).get("review") or {}).get(
+                    "mesh_asset_review_alias_not_ready_fields"
+                )
+            ),
+            "collision_policy_status": nested_status(summary, "collision_policy"),
+            "target_frame_status": nested_status(summary, "target_frame"),
+            "target_frame_review_alias_conflict": (
+                ((summary.get("target_frame") or {}).get("review") or {}).get(
+                    "review_alias_conflict"
+                )
+            ),
+            "target_frame_review_alias_not_ready_fields": (
+                ((summary.get("target_frame") or {}).get("review") or {}).get(
+                    "review_alias_not_ready_fields"
+                )
+            ),
+            "tcp_offset_status": nested_status(summary, "tcp_offset"),
+            "tcp_offset_review_alias_conflict": (
+                ((summary.get("tcp_offset") or {}).get("review") or {}).get(
+                    "review_alias_conflict"
+                )
+            ),
+            "tcp_offset_review_alias_not_ready_fields": (
+                ((summary.get("tcp_offset") or {}).get("review") or {}).get(
+                    "review_alias_not_ready_fields"
+                )
+            ),
+            "tcp_offset_alias_conflict": (
+                summary.get("tcp_offset") or {}
+            ).get("tcp_offset_alias_conflict"),
+            "alignment_status": nested_status(summary, "base_to_board_alignment"),
+            "alignment_review_alias_conflict": (
+                ((summary.get("base_to_board_alignment") or {}).get("review") or {}).get(
+                    "review_alias_conflict"
+                )
+            ),
+            "alignment_review_alias_not_ready_fields": (
+                ((summary.get("base_to_board_alignment") or {}).get("review") or {}).get(
+                    "review_alias_not_ready_fields"
+                )
+            ),
+            "alignment_alias_conflict": (
+                summary.get("base_to_board_alignment") or {}
+            ).get("alignment_alias_conflict"),
+            "top_level_alignment_alias_conflict": (
+                summary.get("base_to_board_alignment") or {}
+            ).get("top_level_alignment_alias_conflict"),
+            "nested_alignment_alias_conflict": (
+                summary.get("base_to_board_alignment") or {}
+            ).get("nested_alignment_alias_conflict"),
+            "contract_checker_status": (summary.get("contract_checker") or {}).get(
+                "status"
+            ),
+            "contract_checker_diagnostics": field_check_diagnostics(
+                summary,
+                "contract_checker_result",
+            ),
+            "authority_review_open_work_fields": review_open_work_fields(
+                summary, "authority"
+            ),
+            "authority_review_invalid_fields": review_invalid_fields(
+                summary, "authority"
+            ),
+            "joint_limits_review_open_work_fields": review_open_work_fields(
+                summary, "joint_limits"
+            ),
+            "joint_limits_review_invalid_fields": review_invalid_fields(
+                summary, "joint_limits"
+            ),
+            "gripper_mapping_review_open_work_fields": review_open_work_fields(
+                summary, "gripper_mapping"
+            ),
+            "gripper_mapping_review_invalid_fields": review_invalid_fields(
+                summary, "gripper_mapping"
+            ),
+            "mesh_assets_review_open_work_fields": review_open_work_fields(
+                summary, "mesh_assets"
+            ),
+            "mesh_assets_review_invalid_fields": review_invalid_fields(
+                summary, "mesh_assets"
+            ),
+            "collision_policy_review_open_work_fields": review_open_work_fields(
+                summary, "collision_policy"
+            ),
+            "collision_policy_review_invalid_fields": review_invalid_fields(
+                summary, "collision_policy"
+            ),
+            "target_frame_review_open_work_fields": review_open_work_fields(
+                summary, "target_frame"
+            ),
+            "target_frame_review_invalid_fields": review_invalid_fields(
+                summary, "target_frame"
+            ),
+            "tcp_offset_review_open_work_fields": review_open_work_fields(
+                summary, "tcp_offset"
+            ),
+            "tcp_offset_review_invalid_fields": review_invalid_fields(
+                summary, "tcp_offset"
+            ),
+            "alignment_review_open_work_fields": review_open_work_fields(
+                summary, "base_to_board_alignment"
+            ),
+            "alignment_review_invalid_fields": review_invalid_fields(
+                summary, "base_to_board_alignment"
+            ),
+            "missing_inputs": missing_inputs,
+            "next_required_action_ids": next_required_action_ids,
+            "review_packet_status": summary.get("review_packet_status"),
+            "review_packet_actions_match_next_required": summary.get(
+                "review_packet_actions_match_next_required"
+            ),
+            "review_packet_actions_missing_from_next_required": summary.get(
+                "review_packet_actions_missing_from_next_required"
+            ),
+            "next_required_actions_missing_from_review_packet": summary.get(
+                "next_required_actions_missing_from_review_packet"
+            ),
+            "review_requirements_status": review_requirements.get("status"),
+            "review_requirements_url_fields": review_requirements_url_fields,
+            "bundle_intake_status": bundle_intake.get("status"),
+            "bundle_intake_action_ids": bundle_intake.get("action_ids"),
+            "bundle_intake_actions_match_next_required": summary.get(
+                "bundle_intake_actions_match_next_required"
+            ),
+            "bundle_intake_actions_missing_from_next_required": summary.get(
+                "bundle_intake_actions_missing_from_next_required"
+            ),
+            "next_required_actions_missing_from_bundle_intake": summary.get(
+                "next_required_actions_missing_from_bundle_intake"
+            ),
+            "bundle_intake_related_requirement_ids_by_action_id": {
+                action.get("action_id"): action.get("related_requirement_ids")
+                for action in bundle_intake.get("actions") or []
+                if isinstance(action, dict) and isinstance(action.get("action_id"), str)
+            },
+            "bundle_intake_field_check_diagnostics_by_action_id": {
+                action.get("action_id"): action.get("field_check_diagnostics")
+                for action in bundle_intake.get("actions") or []
+                if isinstance(action, dict) and isinstance(action.get("action_id"), str)
+            },
+            "contract_preflight_intake_manifest_fields": (
+                contract_preflight_intake.get("manifest_fields")
+            ),
+            "contract_preflight_intake_required_inputs": (
+                contract_preflight_intake.get("required_inputs")
+            ),
+            "synthetic_fixture_authority_fields": summary.get(
+                "synthetic_fixture_authority_fields"
+            ),
+            "field_check_status_by_requirement_id": {
+                requirement_id: field_check_status(summary, requirement_id)
+                for requirement_id in (
+                    "manifest_path",
+                    "model_path",
+                    "model_sha256",
+                    "asset_roots",
+                    "authority",
+                    "provenance",
+                    "joint_limits_deg",
+                    "gripper_mapping_authority",
+                    "mesh_assets",
+                    "collision_policy_authority",
+                    "target_frame",
+                    "tcp_offset_m",
+                    "base_to_board_transform",
+                    "contract_checker_result",
+                )
+            },
+        },
+    }
+
+
+def flatten_case(case: dict[str, Any]) -> dict[str, Any]:
+    obs = case["observations"]
+    return {
+        "case_id": case["case_id"],
+        "ok": case["ok"],
+        "return_code": case["record"].get("return_code"),
+        "status": obs.get("status"),
+        "ready_for_model_backed_ik": obs.get("ready_for_model_backed_ik"),
+        "model_authority": obs.get("model_authority"),
+        "physical_so101_model_authority_ready": obs.get(
+            "physical_so101_model_authority_ready"
+        ),
+        "hardware_free_regression_fixture_ready": obs.get(
+            "hardware_free_regression_fixture_ready"
+        ),
+        "physical_authority_gate_status": obs.get("physical_authority_gate_status"),
+        "physical_authority_contract_status": obs.get(
+            "physical_authority_contract_status"
+        ),
+        "physical_authority_contract_ok": obs.get("physical_authority_contract_ok"),
+        "physical_authority_contract_errors": obs.get(
+            "physical_authority_contract_errors"
+        ),
+        "physical_authority_contract_fixture_ready_not_physical_so101_authority": obs.get(
+            "physical_authority_contract_fixture_ready_not_physical_so101_authority"
+        ),
+        "candidate_handoff_context_status": obs.get(
+            "candidate_handoff_context_status"
+        ),
+        "candidate_handoff_context_model_authority": obs.get(
+            "candidate_handoff_context_model_authority"
+        ),
+        "candidate_handoff_context_field_ids": obs.get(
+            "candidate_handoff_context_field_ids"
+        ),
+        "candidate_handoff_context_locations_by_field": obs.get(
+            "candidate_handoff_context_locations_by_field"
+        ),
+        "candidate_handoff_context_digest_authority_boundary": obs.get(
+            "candidate_handoff_context_digest_authority_boundary"
+        ),
+        "candidate_handoff_context_digest_row_count": obs.get(
+            "candidate_handoff_context_digest_row_count"
+        ),
+        "candidate_handoff_context_digest_expected_file_count": obs.get(
+            "candidate_handoff_context_digest_expected_file_count"
+        ),
+        "candidate_handoff_context_digest_extra_lockable_file_count": obs.get(
+            "candidate_handoff_context_digest_extra_lockable_file_count"
+        ),
+        "model_path_status": obs.get("model_path_status"),
+        "model_identity_status": obs.get("model_identity_status"),
+        "authority_status": obs.get("authority_status"),
+        "provenance_status": obs.get("provenance_status"),
+        "asset_roots_status": obs.get("asset_roots_status"),
+        "joint_limits_status": obs.get("joint_limits_status"),
+        "joint_limit_unexpected_joints": obs.get("joint_limit_unexpected_joints"),
+        "joint_limits_diagnostics": obs.get("joint_limits_diagnostics"),
+        "joint_limit_alias_conflict": obs.get("joint_limit_alias_conflict"),
+        "joint_limit_review_alias_conflict": obs.get(
+            "joint_limit_review_alias_conflict"
+        ),
+        "joint_limit_review_alias_not_ready_fields": obs.get(
+            "joint_limit_review_alias_not_ready_fields"
+        ),
+        "gripper_mapping_status": obs.get("gripper_mapping_status"),
+        "gripper_mapping_review_open_work_fields": obs.get(
+            "gripper_mapping_review_open_work_fields"
+        ),
+        "gripper_mapping_review_invalid_fields": obs.get(
+            "gripper_mapping_review_invalid_fields"
+        ),
+        "top_level_joint_limit_alias_conflict": obs.get(
+            "top_level_joint_limit_alias_conflict"
+        ),
+        "nested_joint_limit_alias_conflict": obs.get(
+            "nested_joint_limit_alias_conflict"
+        ),
+        "mesh_assets_status": obs.get("mesh_assets_status"),
+        "mesh_asset_review_alias_conflict": obs.get(
+            "mesh_asset_review_alias_conflict"
+        ),
+        "mesh_asset_review_alias_not_ready_fields": obs.get(
+            "mesh_asset_review_alias_not_ready_fields"
+        ),
+        "collision_policy_status": obs.get("collision_policy_status"),
+        "collision_policy_review_open_work_fields": obs.get(
+            "collision_policy_review_open_work_fields"
+        ),
+        "collision_policy_review_invalid_fields": obs.get(
+            "collision_policy_review_invalid_fields"
+        ),
+        "target_frame_status": obs.get("target_frame_status"),
+        "target_frame_review_alias_conflict": obs.get(
+            "target_frame_review_alias_conflict"
+        ),
+        "target_frame_review_alias_not_ready_fields": obs.get(
+            "target_frame_review_alias_not_ready_fields"
+        ),
+        "tcp_offset_status": obs.get("tcp_offset_status"),
+        "tcp_offset_review_alias_conflict": obs.get(
+            "tcp_offset_review_alias_conflict"
+        ),
+        "tcp_offset_review_alias_not_ready_fields": obs.get(
+            "tcp_offset_review_alias_not_ready_fields"
+        ),
+        "tcp_offset_alias_conflict": obs.get("tcp_offset_alias_conflict"),
+        "alignment_status": obs.get("alignment_status"),
+        "alignment_review_alias_conflict": obs.get(
+            "alignment_review_alias_conflict"
+        ),
+        "alignment_review_alias_not_ready_fields": obs.get(
+            "alignment_review_alias_not_ready_fields"
+        ),
+        "alignment_alias_conflict": obs.get("alignment_alias_conflict"),
+        "top_level_alignment_alias_conflict": obs.get(
+            "top_level_alignment_alias_conflict"
+        ),
+        "nested_alignment_alias_conflict": obs.get(
+            "nested_alignment_alias_conflict"
+        ),
+        "contract_checker_status": obs.get("contract_checker_status"),
+        "contract_checker_diagnostics": obs.get("contract_checker_diagnostics"),
+        "authority_review_open_work_fields": obs.get(
+            "authority_review_open_work_fields"
+        ),
+        "joint_limits_review_open_work_fields": obs.get(
+            "joint_limits_review_open_work_fields"
+        ),
+        "mesh_assets_review_open_work_fields": obs.get(
+            "mesh_assets_review_open_work_fields"
+        ),
+        "target_frame_review_open_work_fields": obs.get(
+            "target_frame_review_open_work_fields"
+        ),
+        "tcp_offset_review_open_work_fields": obs.get(
+            "tcp_offset_review_open_work_fields"
+        ),
+        "alignment_review_open_work_fields": obs.get(
+            "alignment_review_open_work_fields"
+        ),
+        "missing_inputs": obs.get("missing_inputs"),
+        "next_required_action_ids": obs.get("next_required_action_ids"),
+        "review_packet_status": obs.get("review_packet_status"),
+        "review_packet_actions_match_next_required": obs.get(
+            "review_packet_actions_match_next_required"
+        ),
+        "review_packet_actions_missing_from_next_required": obs.get(
+            "review_packet_actions_missing_from_next_required"
+        ),
+        "next_required_actions_missing_from_review_packet": obs.get(
+            "next_required_actions_missing_from_review_packet"
+        ),
+        "review_requirements_status": obs.get("review_requirements_status"),
+        "review_requirements_url_fields": obs.get("review_requirements_url_fields"),
+        "bundle_intake_status": obs.get("bundle_intake_status"),
+        "bundle_intake_action_ids": obs.get("bundle_intake_action_ids"),
+        "bundle_intake_actions_match_next_required": obs.get(
+            "bundle_intake_actions_match_next_required"
+        ),
+        "bundle_intake_actions_missing_from_next_required": obs.get(
+            "bundle_intake_actions_missing_from_next_required"
+        ),
+        "next_required_actions_missing_from_bundle_intake": obs.get(
+            "next_required_actions_missing_from_bundle_intake"
+        ),
+        "bundle_intake_related_requirement_ids_by_action_id": obs.get(
+            "bundle_intake_related_requirement_ids_by_action_id"
+        ),
+        "bundle_intake_field_check_diagnostics_by_action_id": obs.get(
+            "bundle_intake_field_check_diagnostics_by_action_id"
+        ),
+        "contract_preflight_intake_manifest_fields": obs.get(
+            "contract_preflight_intake_manifest_fields"
+        ),
+        "contract_preflight_intake_required_inputs": obs.get(
+            "contract_preflight_intake_required_inputs"
+        ),
+        "synthetic_fixture_authority_fields": obs.get(
+            "synthetic_fixture_authority_fields"
+        ),
+        "expected_ready": case["expected"].get("ready"),
+        "errors": case["errors"],
+    }
+
+
+def write_readme(path: Path, summary: dict[str, Any]) -> None:
+    lines = [
+        "# SO-101 Model Bundle Manifest Matrix",
+        "",
+        f"- `status`: `{summary['status']}`",
+        f"- `case_count`: `{summary['case_count']}`",
+        f"- `failed_cases`: `{', '.join(summary['failed_case_ids']) if summary['failed_case_ids'] else 'none'}`",
+        f"- `summary_json`: `{summary['artifacts']['summary_json']}`",
+        f"- `cases_csv`: `{summary['artifacts']['cases_csv']}`",
+        "",
+        "Synthetic fixture caveat: ready fixture manifests exercise manifest-gate plumbing only; they are not reviewed physical SO-101 authority.",
+        "",
+        "## Cases",
+        "",
+        "| Case | Status | Ready | Authority | Physical | Fixture | Missing Inputs | Summary |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for case in summary["cases"]:
+        obs = case["observations"]
+        lines.append(
+            "| `{case_id}` | `{status}` | `{ready}` | `{authority}` | `{physical}` | `{fixture}` | `{missing}` | `{summary_path}` |".format(
+                case_id=case["case_id"],
+                status=obs.get("status"),
+                ready=obs.get("ready_for_model_backed_ik"),
+                authority=obs.get("model_authority"),
+                physical=obs.get("physical_so101_model_authority_ready"),
+                fixture=obs.get("hardware_free_regression_fixture_ready"),
+                missing=", ".join(obs.get("missing_inputs") or []),
+                summary_path=case["summary_path"],
+            )
+        )
+    lines.extend(
+        [
+            "",
+            "## Authority Boundary",
+            "",
+            "- Placeholder review metadata, generic review scopes, invalid review URLs, malformed or future-dated review timestamps, weak field-specific authority, placeholder or malformed provenance, wrong target frame, invalid TCP/alignment, and model SHA mismatch all remain not ready.",
+            "- The reviewed contract fixture proves the physical-authority-ready branch only as generated matrix data; it is not itself reviewed physical SO-101 evidence.",
+            "- The ready synthetic fixture cases may set `ready_for_model_backed_ik: true` but must keep `physical_so101_model_authority_ready: false`.",
+            "- Review packets, intake checklists, and generated templates are operator intake only and never promote fixture evidence into physical SO-101 truth.",
+        ]
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n")
+
+
+def main() -> int:
+    args = parse_args()
+    output_dir = normalize_path(args.output_dir)
+    if output_dir.exists() and not args.keep_existing:
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    fixtures = create_fixtures(output_dir)
+    cases: list[dict[str, Any]] = []
+    for spec in case_specs(fixtures):
+        record, case_summary = run_case(
+            spec=spec,
+            python_path=args.python,
+            output_dir=output_dir,
+        )
+        cases.append(summarize_case(spec=spec, record=record, summary=case_summary))
+
+    ok = all(case["ok"] for case in cases)
+    summary_path = output_dir / "so101_model_bundle_manifest_matrix_summary.json"
+    csv_path = output_dir / "so101_model_bundle_manifest_matrix_cases.csv"
+    readme_path = output_dir / "README.md"
+    summary = {
+        "schema": SCHEMA,
+        "ok": ok,
+        "status": "ok" if ok else "validation_failed",
+        "repo_root": str(REPO_ROOT),
+        "output_dir": str(output_dir),
+        "model_authority": "model_bundle_manifest_matrix_not_authority",
+        "observed_evidence_is_physical_so101_authority": False,
+        "ready_for_policy_training": False,
+        "hardware_skipped": True,
+        "gui_skipped": True,
+        "openai_skipped": True,
+        "case_count": len(cases),
+        "case_ids": [case["case_id"] for case in cases],
+        "failed_case_ids": [case["case_id"] for case in cases if not case["ok"]],
+        "fixtures": {key: str(normalize_path(value)) for key, value in fixtures.items()},
+        "cases": cases,
+        "artifacts": {
+            "summary_json": str(summary_path),
+            "cases_csv": str(csv_path),
+            "readme_md": str(readme_path),
+        },
+        "limitations": [
+            "This matrix injects generated local fixture manifests and does not review a real SO-101 model bundle.",
+            "Ready fixture cases exercise the manifest state machine only and remain non-physical SO-101 truth.",
+            "This smoke does not open robot hardware, cameras, GUI flows, network resources, or LLM/OpenAI paths.",
+        ],
+    }
+    write_json(summary_path, summary)
+    write_csv(csv_path, [flatten_case(case) for case in cases])
+    write_readme(readme_path, summary)
+
+    print(
+        json.dumps(
+            {
+                "ok": ok,
+                "status": summary["status"],
+                "summary_json": str(summary_path),
+                "cases_csv": str(csv_path),
+                "readme_md": str(readme_path),
+                "case_ids": summary["case_ids"],
+                "failed_cases": summary["failed_case_ids"],
+            },
+            sort_keys=True,
+        )
+    )
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

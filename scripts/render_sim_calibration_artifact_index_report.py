@@ -28,15 +28,27 @@ CATEGORY_ORDER = {
     "perception_fixture": 13,
     "sim_camera_pose_fixture": 14,
     "so101_model_source_inventory": 15,
-    "so101_model_bundle_manifest": 16,
-    "so101_model_contract": 17,
-    "so101_model_asset_preflight": 18,
-    "ik_reachability": 19,
-    "gripper_camera_pov": 20,
-    "app_entrypoint": 21,
-    "pick_place_scenario": 22,
-    "negative_check": 23,
-    "logs": 24,
+    "so101_public_candidate_intake_matrix": 16,
+    "so101_reviewed_model_authority_gate": 17,
+    "so101_model_bundle_probe": 18,
+    "so101_model_bundle_manifest": 19,
+    "so101_reviewed_mujoco_bundle": 20,
+    "so101_model_contract": 21,
+    "so101_model_asset_preflight": 22,
+    "ik_reachability": 23,
+    "so101_mujoco_scene": 24,
+    "so101_chess_env": 25,
+    "so101_env_resets": 26,
+    "so101_mujoco_contact_probe": 27,
+    "so101_mujoco_grasp_probe": 28,
+    "so101_mujoco_board_pick_probe": 29,
+    "so101_training_readiness_gate": 30,
+    "so101_training_rollouts": 31,
+    "gripper_camera_pov": 32,
+    "app_entrypoint": 33,
+    "pick_place_scenario": 34,
+    "negative_check": 35,
+    "logs": 36,
 }
 CATEGORY_LABELS = {
     "reference_media_inventory": "Reference Media Inventory",
@@ -55,10 +67,22 @@ CATEGORY_LABELS = {
     "perception_fixture": "Perception Fixture Evidence",
     "sim_camera_pose_fixture": "SimCamera Pose Fixture",
     "so101_model_source_inventory": "SO-101 Model Source Inventory",
+    "so101_public_candidate_intake_matrix": "SO-101 Public Candidate Intake Matrix",
+    "so101_reviewed_model_authority_gate": "SO-101 Reviewed Model Authority Gate",
+    "so101_model_bundle_probe": "SO-101 Model Bundle Probe",
     "so101_model_bundle_manifest": "SO-101 Model Bundle Manifest",
+    "so101_reviewed_mujoco_bundle": "SO-101 Reviewed MuJoCo Bundle",
     "so101_model_contract": "SO-101 Model Contract",
     "so101_model_asset_preflight": "SO-101 Model Asset Preflight",
     "ik_reachability": "IK Reachability Drill",
+    "so101_mujoco_scene": "SO-101 MuJoCo Scene",
+    "so101_chess_env": "SO-101 Chess Gymnasium Env",
+    "so101_env_resets": "SO-101 Env Resets",
+    "so101_mujoco_contact_probe": "SO-101 MuJoCo Contact Probe",
+    "so101_mujoco_grasp_probe": "SO-101 MuJoCo Grasp Probe",
+    "so101_mujoco_board_pick_probe": "SO-101 MuJoCo Board Pick Probe",
+    "so101_training_readiness_gate": "SO-101 Training Readiness Gate",
+    "so101_training_rollouts": "SO-101 Training Rollouts",
     "gripper_camera_pov": "Gripper-Camera POV Review",
     "app_entrypoint": "App Entrypoint Metadata",
     "pick_place_scenario": "Pick/Place Release Frames",
@@ -163,6 +187,26 @@ def compact_list(value: Any) -> str:
     if not isinstance(value, list) or not value:
         return ""
     return "<br>".join(markdown_code(item) for item in value)
+
+
+def compact_mapping_value(value: Any) -> str:
+    if isinstance(value, dict):
+        return "{" + ", ".join(
+            f"{key}={compact_mapping_value(mapped)}"
+            for key, mapped in sorted(value.items(), key=lambda item: str(item[0]))
+        ) + "}"
+    if isinstance(value, list):
+        return "[" + ", ".join(compact_mapping_value(item) for item in value) + "]"
+    return str(value)
+
+
+def compact_mapping(value: Any) -> str:
+    if not isinstance(value, dict) or not value:
+        return ""
+    parts = []
+    for key, mapped in sorted(value.items(), key=lambda item: str(item[0])):
+        parts.append(markdown_code(f"{key}={compact_mapping_value(mapped)}"))
+    return "<br>".join(parts)
 
 
 def source_root_summary(metrics: dict[str, Any]) -> str:
@@ -1221,10 +1265,110 @@ def so101_model_source_inventory_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("likely_candidate_count", ""),
         metrics.get("direct_contract_candidate_count", ""),
         metrics.get("authoritative_candidate_count", ""),
+        metrics.get("authoritative_source_selection_status", ""),
+        metrics.get("selected_authoritative_candidate_path", ""),
+        metrics.get("selected_authoritative_candidate_sha256", ""),
         metrics.get("source_scan_mode", ""),
         source_root_summary(metrics),
         source_authority_summary(metrics),
+        metrics.get("source_authority_review_status", ""),
+        metrics.get("source_authority_review_ready", ""),
+        metrics.get("source_authority_review_scope_ready", ""),
+        compact_list(metrics.get("source_authority_missing_review_scope_ids")),
+        metrics.get("source_authority_gate_status", ""),
+        compact_list(metrics.get("source_authority_blockers")),
         metrics.get("recommended_contract_check_path", ""),
+        metrics.get("next_required_action_count", ""),
+        compact_list(metrics.get("next_required_action_ids")),
+        metrics.get("review_packet_status", ""),
+        metrics.get("review_packet_model_authority", ""),
+        metrics.get("review_packet_item_count", ""),
+        compact_list(metrics.get("review_packet_action_ids")),
+        metrics.get("review_packet_observed_evidence_is_authority", ""),
+        metrics.get("review_packet_development_fixture_evidence_not_physical_so101_truth", ""),
+        metrics.get("review_packet_physical_so101_model_authority_ready", ""),
+        metrics.get("source_review_requirements_status", ""),
+        metrics.get("source_review_requirements_model_authority", ""),
+        metrics.get("source_review_requirements_requirement_count", ""),
+        compact_list(
+            metrics.get("source_review_requirements_action_required_requirement_ids")
+        ),
+        metrics.get("source_review_requirements_observed_evidence_is_authority", ""),
+        metrics.get("source_review_requirements_physical_so101_model_authority_ready", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def so101_reviewed_model_authority_gate_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("review_status", ""),
+        metrics.get("model_authority", ""),
+        metrics.get("ready", ""),
+        metrics.get("observed_evidence_is_physical_so101_authority", ""),
+        metrics.get("observed_evidence_is_policy_training_authority", ""),
+        metrics.get("development_fixture_evidence_not_policy_training_truth", ""),
+        metrics.get("ready_for_model_backed_ik", ""),
+        metrics.get("ready_for_policy_training", ""),
+        metrics.get("source_authority_ready", ""),
+        metrics.get("source_authority_gate_status", ""),
+        metrics.get("physical_so101_model_authority_ready", ""),
+        metrics.get("physical_authority_gate_status", ""),
+        metrics.get("source_bundle_consistency_ready", ""),
+        metrics.get("source_bundle_consistency_status", ""),
+        metrics.get("reviewed_mujoco_motion_bundle_consistency_ready", ""),
+        metrics.get("reviewed_mujoco_motion_bundle_consistency_status", ""),
+        metrics.get("physical_reviewed_model_motion_checked", ""),
+        metrics.get("physical_reviewed_model_motion_reported", ""),
+        metrics.get("physical_reviewed_model_motion_status_ready", ""),
+        metrics.get("physical_reviewed_model_motion_child_ready", ""),
+        metrics.get("reviewed_mujoco_bundle_status", ""),
+        metrics.get("reviewed_mujoco_motion_authority_status", ""),
+        metrics.get("training_priority_gate_id", ""),
+        compact_list(metrics.get("training_priority_gate_order")),
+        metrics.get("next_training_gate_after_ready", ""),
+        metrics.get("blocks_serious_policy_training_until_ready", ""),
+        metrics.get("serious_policy_training_dependency_status", ""),
+        metrics.get("ready_does_not_imply_policy_training_ready", ""),
+        metrics.get("development_fixture_evidence_not_physical_so101_truth", ""),
+        metrics.get("blocker_count", ""),
+        compact_list(metrics.get("blockers")),
+        metrics.get("blocker_packet_status", ""),
+        metrics.get("blocker_packet_model_authority", ""),
+        metrics.get("blocker_packet_item_count", ""),
+        metrics.get("blocker_packet_action_required_count", ""),
+        compact_list(metrics.get("blocker_packet_blocked_by_prior_requirements_item_ids")),
+        compact_list(metrics.get("blocker_packet_next_action_ids")),
+        metrics.get("operator_action_status", ""),
+        metrics.get("operator_action_model_authority", ""),
+        metrics.get("operator_action_count", ""),
+        metrics.get("operator_action_immediate_action_count", ""),
+        compact_list(metrics.get("operator_action_immediate_action_ids")),
+        metrics.get("operator_action_immediate_actions_match_blocker_packet", ""),
+        compact_list(
+            metrics.get("operator_action_immediate_actions_missing_from_blocker_packet")
+        ),
+        compact_list(metrics.get("blocker_packet_actions_missing_from_operator_actions")),
+        metrics.get("operator_action_command_template_count", ""),
+        compact_list(metrics.get("operator_action_command_scopes")),
+        compact_mapping(metrics.get("checklist_status_by_requirement_id")),
+        compact_mapping(metrics.get("checklist_next_action_ids_by_requirement_id")),
+        compact_mapping(
+            metrics.get(
+                "checklist_blocked_by_prior_requirement_ids_by_requirement_id"
+            )
+        ),
+        compact_mapping(
+            metrics.get(
+                "checklist_blocked_by_prior_requirement_statuses_by_requirement_id"
+            )
+        ),
         "ok" if artifact.get("exists") is True else "missing",
     ]
 
@@ -1240,8 +1384,39 @@ def so101_model_bundle_manifest_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("status", ""),
         metrics.get("manifest_request_status", ""),
         metrics.get("ready_for_model_backed_ik", ""),
+        metrics.get("model_authority", ""),
+        metrics.get("physical_authority_gate_status", ""),
+        metrics.get("physical_so101_model_authority_ready", ""),
+        compact_list(metrics.get("physical_authority_blockers")),
+        metrics.get("hardware_free_regression_fixture_ready", ""),
+        compact_list(metrics.get("synthetic_fixture_authority_fields")),
+        metrics.get("review_packet_status", ""),
+        metrics.get("review_packet_model_authority", ""),
+        metrics.get("review_packet_item_count", ""),
+        compact_list(metrics.get("review_packet_action_ids")),
+        metrics.get("review_packet_actions_match_next_required", ""),
+        compact_list(metrics.get("review_packet_actions_missing_from_next_required")),
+        compact_list(metrics.get("next_required_actions_missing_from_review_packet")),
+        metrics.get("review_requirements_status", ""),
+        metrics.get("review_requirements_model_authority", ""),
+        metrics.get("review_requirements_requirement_count", ""),
+        compact_list(metrics.get("review_requirements_requirement_ids")),
+        metrics.get("bundle_intake_status", ""),
+        metrics.get("bundle_intake_model_authority", ""),
+        metrics.get("bundle_intake_action_count", ""),
+        compact_list(metrics.get("bundle_intake_action_ids")),
+        metrics.get("bundle_intake_actions_match_next_required", ""),
+        compact_list(metrics.get("bundle_intake_actions_missing_from_next_required")),
+        compact_list(metrics.get("next_required_actions_missing_from_bundle_intake")),
+        metrics.get("reviewed_manifest_template_status", ""),
+        metrics.get("reviewed_manifest_template_model_authority", ""),
+        metrics.get("next_required_action_count", ""),
+        compact_list(metrics.get("next_required_action_ids")),
         metrics.get("model_path", ""),
         compact_list(metrics.get("asset_roots")),
+        metrics.get("joint_limits_status", ""),
+        metrics.get("mesh_assets_status", ""),
+        metrics.get("mesh_assets_mesh_reference_count", ""),
         metrics.get("target_frame", ""),
         metrics.get("tcp_offset_field", ""),
         metrics.get("base_to_board_alignment_status", ""),
@@ -1249,6 +1424,214 @@ def so101_model_bundle_manifest_row(artifact: dict[str, Any]) -> list[Any]:
         metrics.get("asset_preflight_status", ""),
         metrics.get("diagnostic_only", ""),
         metrics.get("diagnostic_only_reason", ""),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def so101_model_bundle_probe_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("model_authority", ""),
+        metrics.get("selected_model_path", ""),
+        metrics.get("model_request_status", ""),
+        metrics.get("contract_status", ""),
+        metrics.get("asset_preflight_status", ""),
+        metrics.get("asset_preflight_mesh_reference_count", ""),
+        metrics.get("asset_preflight_missing_asset_count", ""),
+        metrics.get("asset_preflight_unresolved_reference_count", ""),
+        metrics.get("observed_source_hints_status", ""),
+        metrics.get("observed_joint_limits_status", ""),
+        metrics.get("observed_joint_limits_complete", ""),
+        metrics.get("mesh_asset_review_status", ""),
+        metrics.get("manifest_status", ""),
+        metrics.get("ready_for_model_backed_ik", ""),
+        metrics.get("review_packet_status", ""),
+        metrics.get("review_packet_model_authority", ""),
+        metrics.get("review_packet_item_count", ""),
+        compact_list(metrics.get("review_packet_item_ids")),
+        metrics.get("next_required_action_count", ""),
+        compact_list(metrics.get("next_required_action_ids")),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def so101_mujoco_smoke_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("model_authority", ""),
+        metrics.get("physical_so101_model_authority_ready", ""),
+        metrics.get("hardware_free_regression_fixture_ready", ""),
+        metrics.get("ready_for_model_backed_ik", ""),
+        metrics.get("reviewed_model_motion_checked", ""),
+        metrics.get("motion_authority_status", ""),
+        metrics.get("physical_reviewed_model_motion_checked", ""),
+        metrics.get("hardware_free_fixture_motion_checked", ""),
+        metrics.get("downstream_handoff_status", ""),
+        metrics.get("downstream_handoff_ready", ""),
+        metrics.get("fixture_handoff_ready_not_physical_so101_authority", ""),
+        metrics.get("downstream_handoff_model_authority", ""),
+        metrics.get("downstream_handoff_model_identity_contract_ok", ""),
+        metrics.get("downstream_handoff_model_identity_status", ""),
+        metrics.get("downstream_handoff_model_path", ""),
+        metrics.get("downstream_priority_gate_id", ""),
+        compact_list(metrics.get("downstream_priority_gate_order")),
+        metrics.get("next_downstream_gate_after_ready", ""),
+        metrics.get("blocks_downstream_gates_until_ready", ""),
+        metrics.get("ready_does_not_imply_policy_training_ready", ""),
+        metrics.get("mujoco_joint_limit_enablement_status", ""),
+        compact_list(metrics.get("mujoco_joint_limit_missing_limited_joints")),
+        metrics.get("reviewed_mujoco_handoff_intake_status", ""),
+        metrics.get("reviewed_mujoco_handoff_contract_ok", ""),
+        metrics.get("reviewed_mujoco_handoff_ready", ""),
+        metrics.get("reviewed_mujoco_handoff_model_authority", ""),
+        metrics.get("reviewed_mujoco_handoff_model_identity_contract_ok", ""),
+        metrics.get("reviewed_mujoco_handoff_model_identity_status", ""),
+        metrics.get("reviewed_mujoco_handoff_model_path", ""),
+        metrics.get("reviewed_mujoco_handoff_physical_truth_claimed", ""),
+        metrics.get("reviewed_mujoco_handoff_joint_limit_enablement_status", ""),
+        compact_list(metrics.get("reviewed_mujoco_handoff_missing_limited_joints")),
+        compact_list(metrics.get("reviewed_mujoco_handoff_explicit_action_ids")),
+        compact_list(metrics.get("reviewed_mujoco_handoff_next_required_action_ids")),
+        metrics.get("reviewed_mujoco_handoff_action_ids_match_next_required", ""),
+        compact_list(
+            metrics.get("reviewed_mujoco_handoff_action_ids_missing_from_next_required")
+        ),
+        compact_list(
+            metrics.get(
+                "reviewed_mujoco_handoff_next_required_actions_missing_from_action_ids"
+            )
+        ),
+        metrics.get("reviewed_mujoco_handoff_priority_gate_id", ""),
+        compact_list(metrics.get("reviewed_mujoco_handoff_priority_gate_order")),
+        metrics.get("reviewed_mujoco_handoff_next_downstream_gate_after_ready", ""),
+        metrics.get("reviewed_mujoco_handoff_priority_contract_ok", ""),
+        metrics.get("scene_uses_reviewed_mujoco_handoff", ""),
+        metrics.get("gymnasium_available", ""),
+        metrics.get("mujoco_available", ""),
+        metrics.get("all_resets_ok", ""),
+        metrics.get("all_board_contacts_observed", ""),
+        metrics.get("gripper_contact_observed", ""),
+        metrics.get("lift_place_physics_verified", ""),
+        metrics.get("source_pick_started_at_source", ""),
+        metrics.get("board_source_pick_place_verified", ""),
+        metrics.get("robot_pose_seeded_for_source_fixture", ""),
+        metrics.get("final_board_contact_observed", ""),
+        metrics.get("final_target_xy_error_m", ""),
+        metrics.get("episode_count", ""),
+        metrics.get("transition_count", ""),
+        compact_list(metrics.get("explicit_next_required_action_ids")),
+        compact_list(metrics.get("next_required_for_goal_action_ids")),
+        metrics.get("next_required_action_ids_match_next_required", ""),
+        compact_list(metrics.get("next_required_action_ids_missing_from_next_required")),
+        compact_list(metrics.get("next_required_actions_missing_from_action_ids")),
+        compact_list(metrics.get("next_required_action_ids") or metrics.get("next_required_for_goal")),
+        "ok" if artifact.get("exists") is True else "missing",
+    ]
+
+
+def so101_training_readiness_gate_row(artifact: dict[str, Any]) -> list[Any]:
+    metrics = artifact.get("metrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    path = display_path(artifact)
+    return [
+        artifact.get("kind", ""),
+        artifact.get("label", ""),
+        markdown_link(path, link_path(artifact)) if path else "",
+        metrics.get("status", ""),
+        metrics.get("ready", ""),
+        metrics.get("reviewed_model_authority_ready", ""),
+        metrics.get("reviewed_model_authority_status", ""),
+        metrics.get("reviewed_model_physical_motion_checked", ""),
+        metrics.get("reviewed_mujoco_downstream_handoff_contract_ok", ""),
+        metrics.get("reviewed_mujoco_downstream_handoff_contract_status", ""),
+        metrics.get("reviewed_mujoco_downstream_handoff_raw_ready", ""),
+        metrics.get("reviewed_mujoco_downstream_handoff_ready", ""),
+        metrics.get("reviewed_mujoco_downstream_handoff_status", ""),
+        metrics.get("reviewed_mujoco_downstream_handoff_model_authority", ""),
+        metrics.get(
+            "reviewed_mujoco_downstream_handoff_model_identity_contract_ok", ""
+        ),
+        metrics.get("reviewed_mujoco_downstream_handoff_model_identity_status", ""),
+        metrics.get("reviewed_mujoco_downstream_handoff_model_path", ""),
+        metrics.get("reviewed_mujoco_downstream_handoff_declared_model_sha256", ""),
+        metrics.get("reviewed_mujoco_downstream_handoff_observed_model_sha256", ""),
+        metrics.get("reviewed_mujoco_downstream_handoff_physical_truth_claimed", ""),
+        compact_list(
+            metrics.get("reviewed_mujoco_downstream_handoff_missing_item_ids")
+        ),
+        metrics.get("reviewed_mujoco_downstream_handoff_priority_gate_id", ""),
+        compact_list(
+            metrics.get("reviewed_mujoco_downstream_handoff_priority_gate_order")
+        ),
+        metrics.get(
+            "reviewed_mujoco_downstream_handoff_next_downstream_gate_after_ready",
+            "",
+        ),
+        metrics.get("reviewed_mujoco_downstream_handoff_priority_contract_ok", ""),
+        metrics.get(
+            "reviewed_mujoco_downstream_handoff_joint_limit_enablement_status",
+            "",
+        ),
+        compact_list(
+            metrics.get("reviewed_mujoco_downstream_handoff_missing_limited_joints")
+        ),
+        metrics.get(
+            "reviewed_mujoco_downstream_fixture_handoff_ready_not_physical_so101_authority",
+            "",
+        ),
+        metrics.get("reviewed_model_backed_board_source_pick_place", ""),
+        metrics.get("board_pick_status", ""),
+        metrics.get("board_pick_model_authority", ""),
+        metrics.get("board_pick_reviewed_model_authority_ready", ""),
+        metrics.get("board_pick_authority_status", ""),
+        compact_list(metrics.get("board_pick_authority_blockers")),
+        metrics.get("board_pick_detailed_evidence_ready", ""),
+        metrics.get("board_pick_ready_for_model_backed_ik", ""),
+        compact_list(metrics.get("board_pick_next_required_action_ids")),
+        compact_list(metrics.get("board_pick_next_required_for_goal_action_ids")),
+        metrics.get("board_pick_next_required_action_ids_match_next_required", ""),
+        compact_list(
+            metrics.get("board_pick_next_required_action_ids_missing_from_next_required")
+        ),
+        compact_list(
+            metrics.get("board_pick_next_required_actions_missing_from_action_ids")
+        ),
+        metrics.get("board_pick_robot_pose_seeded_for_source_fixture", ""),
+        metrics.get("rollout_ready_for_policy_training", ""),
+        metrics.get("rollout_policy_training_authority_ready", ""),
+        metrics.get("rollout_training_authority_status", ""),
+        metrics.get("rollout_model_authority", ""),
+        metrics.get("rollout_use", ""),
+        compact_list(metrics.get("rollout_serious_policy_training_blocker_action_ids")),
+        compact_list(metrics.get("rollout_next_required_for_goal_action_ids")),
+        metrics.get("rollout_action_ids_sync_ok", ""),
+        compact_list(
+            metrics.get("rollout_next_required_action_ids_missing_from_next_required")
+        ),
+        compact_list(
+            metrics.get("rollout_next_required_actions_missing_from_action_ids")
+        ),
+        metrics.get("rollout_ready_has_no_open_actions", ""),
+        metrics.get("development_fixture_evidence_not_policy_training_truth", ""),
+        compact_list(metrics.get("priority_gate_order")),
+        metrics.get("next_priority_gate_id", ""),
+        compact_list(metrics.get("next_priority_action_ids")),
+        compact_list(metrics.get("development_evidence_only_gate_ids")),
+        compact_list(metrics.get("blocked_by_prior_gate_ids")),
+        metrics.get("blocker_count", ""),
+        compact_list(metrics.get("blockers")),
         "ok" if artifact.get("exists") is True else "missing",
     ]
 
@@ -2613,10 +2996,34 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Likely",
                 "Direct Contract",
                 "Authoritative",
+                "Authority Selection",
+                "Selected Authority Path",
+                "Selected Authority SHA-256",
                 "Source Mode",
                 "Configured Roots",
                 "Authority Inputs",
+                "Authority Review",
+                "Review Ready",
+                "Scope Ready",
+                "Missing Scopes",
+                "Authority Gate",
+                "Authority Blockers",
                 "Recommended Contract Path",
+                "Action Count",
+                "Next Actions",
+                "Review Packet",
+                "Packet Authority",
+                "Packet Items",
+                "Packet Actions",
+                "Observed Evidence Is Authority",
+                "Fixture Evidence Not Physical Truth",
+                "Physical Authority Ready",
+                "Source Review Requirements",
+                "Source Review Authority",
+                "Source Review Requirement Count",
+                "Source Review Action Required",
+                "Source Review Evidence Is Authority",
+                "Source Review Physical Ready",
                 "Artifact Status",
             ],
             [so101_model_source_inventory_row(row) for row in so101_model_source_inventory],
@@ -2625,14 +3032,141 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         else ["_No SO-101 model source inventory artifacts indexed._"]
     )
 
+    so101_reviewed_model_authority_gate = grouped.get(
+        "so101_reviewed_model_authority_gate",
+        [],
+    )
+    lines.extend(["", "### SO-101 Reviewed Model Authority Gate"])
+    lines.append(
+        "This aggregate gate summarizes the highest-priority SO-101 blocker before "
+        "serious model-backed IK or training: source authority, physical bundle "
+        "authority, and physical-reviewed MuJoCo motion must all be true. Development "
+        "fixture evidence remains useful automation coverage only."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Review Status",
+                "Authority",
+                "Ready",
+                "Observed Physical Authority",
+                "Observed Policy Authority",
+                "Fixture Not Policy Truth",
+                "Model-Backed IK Ready",
+                "Policy Ready",
+                "Source Authority",
+                "Source Gate",
+                "Physical Authority",
+                "Physical Gate",
+                "Source/Bundle Match",
+                "Match Status",
+                "Motion/Bundle Match",
+                "Motion Match Status",
+                "Reviewed Motion",
+                "Motion Reported",
+                "Motion Status Ready",
+                "Motion Child Ready",
+                "MuJoCo Bundle",
+                "Motion Authority",
+                "Training Gate",
+                "Training Gate Order",
+                "Next Training Gate",
+                "Blocks Training",
+                "Training Dependency",
+                "Ready Is Not Policy Ready",
+                "Fixture Caveat",
+                "Blocker Count",
+                "Blockers",
+                "Blocker Packet",
+                "Packet Authority",
+                "Packet Items",
+                "Action Required",
+                "Blocked Prior",
+                "Packet Next Actions",
+                "Operator Status",
+                "Operator Authority",
+                "Operator Actions",
+                "Immediate Actions",
+                "Immediate Action IDs",
+                "Immediate Actions Match Packet",
+                "Immediate Missing From Packet",
+                "Packet Missing From Operator",
+                "Command Templates",
+                "Command Scopes",
+                "Checklist Statuses",
+                "Checklist Next Actions",
+                "Checklist Prior Blockers",
+                "Checklist Prior Statuses",
+                "Artifact Status",
+            ],
+            [
+                so101_reviewed_model_authority_gate_row(row)
+                for row in so101_reviewed_model_authority_gate
+            ],
+        )
+        if so101_reviewed_model_authority_gate
+        else ["_No SO-101 reviewed model authority gate artifacts indexed._"]
+    )
+
+    so101_model_bundle_probe = grouped.get("so101_model_bundle_probe", [])
+    lines.extend(["", "### SO-101 Model Bundle Probe"])
+    lines.append(
+        "This hardware-free child turns a selected candidate model path, when one exists, "
+        "into a candidate bundle manifest draft and nested contract/manifest diagnostics. "
+        "With no selected model it still emits a template artifact. Probe output is "
+        "review scaffolding only and does not create source authority, physical model "
+        "authority, or physical reviewed MuJoCo motion evidence."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Authority",
+                "Selected Model",
+                "Model Request",
+                "Contract",
+                "Asset Preflight",
+                "Mesh Refs",
+                "Missing Mesh",
+                "Unresolved Mesh",
+                "Source Hints",
+                "Joint Limits",
+                "Limits Complete",
+                "Mesh Review",
+                "Manifest Status",
+                "Ready",
+                "Review Packet",
+                "Review Packet Authority",
+                "Review Items",
+                "Review Item IDs",
+                "Action Count",
+                "Next Actions",
+                "Artifact Status",
+            ],
+            [so101_model_bundle_probe_row(row) for row in so101_model_bundle_probe],
+        )
+        if so101_model_bundle_probe
+        else ["_No SO-101 model bundle probe artifacts indexed._"]
+    )
+
     so101_model_bundle_manifest = grouped.get("so101_model_bundle_manifest", [])
     lines.extend(["", "### SO-101 Model Bundle Manifest"])
     lines.append(
         "This hardware-free child records one reviewed SO-101 model bundle manifest, "
-        "including model path, asset roots, target frame, TCP/gripper-tip offset, "
-        "base-to-board alignment, child contract diagnostics, and nested asset-preflight "
+        "including model path, asset roots, joint-limit authority, mesh evidence, target frame, "
+        "TCP/gripper-tip offset, base-to-board alignment, child contract diagnostics, and nested asset-preflight "
         "diagnostics. Manifest fields remain diagnostic-only unless "
-        "`ready_for_model_backed_ik` is true; explicit suite CLI model inputs take precedence."
+        "`ready_for_model_backed_ik` is true; fixture-only readiness stays labeled separately "
+        "from physical SO-101 model authority and explicit suite CLI model inputs take precedence."
+        " The manifest review packet is indexed as operator intake only and remains "
+        "`review_packet_not_authority`."
     )
     lines.extend(
         linked_table(
@@ -2643,8 +3177,39 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
                 "Status",
                 "Request",
                 "Ready",
+                "Authority",
+                "Authority Gate",
+                "Physical Authority",
+                "Authority Blockers",
+                "Fixture Ready",
+                "Synthetic Fields",
+                "Review Packet",
+                "Review Packet Authority",
+                "Review Items",
+                "Review Actions",
+                "Review Action Sync",
+                "Review Extra Actions",
+                "Review Missing Next Actions",
+                "Review Requirements",
+                "Requirements Authority",
+                "Requirements Count",
+                "Requirement IDs",
+                "Bundle Intake",
+                "Intake Authority",
+                "Intake Actions",
+                "Intake Action IDs",
+                "Intake Action Sync",
+                "Intake Extra Actions",
+                "Intake Missing Next Actions",
+                "Manifest Template",
+                "Template Authority",
+                "Action Count",
+                "Next Actions",
                 "Model Path",
                 "Asset Roots",
+                "Joint Limits",
+                "Mesh Assets",
+                "Mesh Refs",
                 "Target Frame",
                 "TCP Field",
                 "Alignment",
@@ -2744,6 +3309,184 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
         )
         if ik_reachability
         else ["_No IK reachability artifacts indexed._"]
+    )
+
+    so101_training_readiness_gate = grouped.get("so101_training_readiness_gate", [])
+    lines.extend(["", "### SO-101 Training Readiness Gate"])
+    lines.append(
+        "This gate is the hard boundary before serious policy training. It stays blocked "
+        "until reviewed model authority is ready, board-source pick/place has been repeated "
+        "with reviewed model-backed IK, and rollout evidence is no longer development-scaffold-only."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Ready",
+                "Authority Ready",
+                "Authority Status",
+                "Reviewed Motion",
+                "Handoff Contract",
+                "Handoff Contract Status",
+                "Handoff Raw Ready",
+                "Handoff Ready",
+                "Handoff Status",
+                "Handoff Authority",
+                "Handoff Identity OK",
+                "Handoff Identity",
+                "Handoff Model Path",
+                "Handoff Declared SHA",
+                "Handoff Observed SHA",
+                "Handoff Truth Claimed",
+                "Handoff Missing Items",
+                "Handoff Gate",
+                "Handoff Gate Order",
+                "Handoff Next Gate",
+                "Priority Contract",
+                "Handoff Joint Limits",
+                "Handoff Missing Limited",
+                "Fixture Handoff Caveat",
+                "Reviewed Board Pick",
+                "Board Pick Status",
+                "Board Pick Authority",
+                "Board Authority Ready",
+                "Board Authority Status",
+                "Board Authority Blockers",
+                "Board Detail Ready",
+                "Board Pick IK Ready",
+                "Board Explicit Actions",
+                "Board Derived Actions",
+                "Board Action Sync",
+                "Board Extra Actions",
+                "Board Missing Actions",
+                "Seeded Pose",
+                "Rollout Ready",
+                "Rollout Authority Ready",
+                "Rollout Authority Status",
+                "Rollout Authority",
+                "Rollout Use",
+                "Rollout Explicit Actions",
+                "Rollout Derived Actions",
+                "Rollout Action Sync",
+                "Rollout Extra Actions",
+                "Rollout Missing Actions",
+                "Rollout No Open Actions",
+                "Fixture Caveat",
+                "Priority Order",
+                "Next Gate",
+                "Next Actions",
+                "Development Only Gates",
+                "Blocked Prior Gates",
+                "Blocker Count",
+                "Blockers",
+                "Artifact Status",
+            ],
+            [
+                so101_training_readiness_gate_row(row)
+                for row in so101_training_readiness_gate
+            ],
+        )
+        if so101_training_readiness_gate
+        else ["_No SO-101 training readiness gate artifacts indexed._"]
+    )
+
+    so101_mujoco_rows = []
+    for category in (
+        "so101_reviewed_mujoco_bundle",
+        "so101_mujoco_scene",
+        "so101_chess_env",
+        "so101_env_resets",
+        "so101_mujoco_contact_probe",
+        "so101_mujoco_grasp_probe",
+        "so101_mujoco_board_pick_probe",
+        "so101_training_rollouts",
+    ):
+        so101_mujoco_rows.extend(grouped.get(category, []))
+    lines.extend(["", "### SO-101 MuJoCo Development Gates"])
+    lines.append(
+        "These hardware-free children prioritize the MuJoCo/Gymnasium training path: "
+        "reviewed bundle handoff into MuJoCo, development scene load, env reset/step, "
+        "freejoint/contact checks, gripper-contact lift/place verification, board-source pick/place probing, and scripted rollout collection. The development scene "
+        "still uses a generated scaffold; serious training remains blocked until the "
+        "reviewed bundle gate reports MuJoCo motion checked and seeded board-source pickup is replaced with reviewed model-backed IK."
+    )
+    lines.extend(
+        linked_table(
+            [
+                "Kind",
+                "Label",
+                "Path",
+                "Status",
+                "Authority",
+                "Physical Authority",
+                "Fixture Ready",
+                "Ready",
+                "Reviewed Motion",
+                "Motion Authority",
+                "Physical Motion",
+                "Fixture Motion",
+                "Handoff Status",
+                "Handoff Ready",
+                "Fixture Handoff",
+                "Handoff Authority",
+                "Handoff Identity OK",
+                "Handoff Identity",
+                "Handoff Model Path",
+                "Handoff Gate",
+                "Handoff Gate Order",
+                "Handoff Next Gate",
+                "Blocks Downstream",
+                "Not Training Ready",
+                "MuJoCo Joint Limits",
+                "MuJoCo Missing Limited",
+                "Scene Handoff Intake",
+                "Scene Handoff Contract",
+                "Scene Handoff Ready",
+                "Scene Handoff Authority",
+                "Scene Handoff Identity OK",
+                "Scene Handoff Identity",
+                "Scene Handoff Model Path",
+                "Scene Handoff Truth Claimed",
+                "Scene Handoff Joint Limits",
+                "Scene Handoff Missing Limited",
+                "Scene Handoff Explicit Actions",
+                "Scene Handoff Next Actions",
+                "Scene Handoff Action Sync",
+                "Scene Handoff Extra Actions",
+                "Scene Handoff Missing Next Actions",
+                "Scene Handoff Gate",
+                "Scene Handoff Gate Order",
+                "Scene Handoff Next Gate",
+                "Scene Priority Contract",
+                "Scene Uses Handoff",
+                "Gymnasium",
+                "MuJoCo",
+                "Resets",
+                "Board Contact",
+                "Gripper Contact",
+                "Lift/Place Physics",
+                "Source Pick",
+                "Board Pick/Place",
+                "Seeded Pose",
+                "Final Board",
+                "Target XY Error",
+                "Episodes",
+                "Transitions",
+                "Explicit Next Actions",
+                "Derived Next Actions",
+                "Next Action Sync",
+                "Extra Next Actions",
+                "Missing Next Actions",
+                "Next Required",
+                "Artifact Status",
+            ],
+            [so101_mujoco_smoke_row(row) for row in so101_mujoco_rows],
+        )
+        if so101_mujoco_rows
+        else ["_No SO-101 MuJoCo development gate artifacts indexed._"]
     )
 
     pov = [
@@ -2850,6 +3593,7 @@ def render_report(index: dict[str, Any], suite: dict[str, Any] | None, artifact_
             "- The SO-101 model bundle manifest checker is hardware-free evidence for one reviewed bundle; it forwards model path and asset roots only when `ready_for_model_backed_ik` is true and explicit IK CLI inputs do not take precedence.",
             "- The SO-101 model contract checker is a hardware-free preflight for model availability, direct RobotKinematics usability, and joint/frame/TCP alignment inputs.",
             "- The IK reachability drill is a hardware-free feasibility gate; `model_unavailable_fallback_complete` remains a deliberate non-failing status until a repo-local SO-101 model is wired in.",
+            "- The SO-101 MuJoCo development gates exercise the Gymnasium/MuJoCo path with a generated scaffold; gripper-contact fixture lift/place and seeded board-source pick/place evidence are separate from reviewed physical model truth, and reviewed model authority, TCP/gripper offset, base-to-board alignment, and reviewed model-backed IK remain required before serious policy training.",
             "- The SimCamera profile sweep is deterministic synthetic review evidence; its full-frame image deltas are coarse prompts, not physical calibration truth.",
             "- The SimCamera tuning before/after section compares the documented 72px baseline against the current canonical profile and keeps missing real depth and pick/place video gaps open.",
             "- The reference capture manifest section records local input readiness for real depth-reference and pick/place-video captures; readiness is not physical calibration truth.",

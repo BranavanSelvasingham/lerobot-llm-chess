@@ -13,8 +13,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from lerobot.cameras.utils import make_cameras_from_configs
-from lerobot.robots.utils import make_robot_from_config
-from lerobot.sim import SimCameraConfig, SimRobotConfig
+from lerobot.sim import SimCameraConfig, SimRobot, SimRobotConfig
 
 
 def main() -> int:
@@ -45,7 +44,7 @@ def main() -> int:
         initial_positions={"shoulder_pan": 1.0, "gripper": 80.0},
         use_mujoco=True,
     )
-    robot = make_robot_from_config(robot_cfg)
+    robot = SimRobot(robot_cfg)
     robot.connect()
     assert robot.is_connected
     assert robot.is_calibrated

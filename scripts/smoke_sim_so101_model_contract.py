@@ -27,6 +27,7 @@ DRILL_PATH = REPO_ROOT / "scripts" / "smoke_sim_ik_reachability_drill.py"
 ASSET_PREFLIGHT_PATH = REPO_ROOT / "scripts" / "smoke_sim_so101_model_asset_preflight.py"
 SUPPORTED_SUFFIXES = {".urdf", ".xml", ".mjcf", ".xacro"}
 EXPECTED_TARGET_FRAME = "gripper_frame_link"
+ACCEPTED_TARGET_FRAMES = (EXPECTED_TARGET_FRAME, "gripperframe")
 EXPECTED_TCP_FIELD_NAMES = (
     "tcp_offset",
     "gripper_tip_offset",
@@ -149,7 +150,11 @@ def module_available(name: str) -> bool:
 def load_sim_robot_metadata() -> dict[str, Any]:
     tree = ast.parse(ROBOT_METADATA_PATH.read_text())
     assignments: dict[str, Any] = {}
-    desired_names = {"JOINT_LIMITS_DEG", "SO101_BODY_JOINTS", "DEFAULT_JOINT_POSITIONS_DEG"}
+    desired_names = {
+        "JOINT_LIMITS_DEG",
+        "SO101_BODY_JOINTS",
+        "DEFAULT_JOINT_POSITIONS_DEG",
+    }
     for node in tree.body:
         if isinstance(node, ast.Assign):
             for target in node.targets:
@@ -162,6 +167,7 @@ def load_sim_robot_metadata() -> dict[str, Any]:
     if missing:
         raise KeyError(f"Could not read simulator robot metadata from {ROBOT_METADATA_PATH}: {missing}")
     body_joints = tuple(str(joint) for joint in assignments["SO101_BODY_JOINTS"])
+    all_joints = (*body_joints, "gripper")
     joint_limits = {
         str(name): (float(bounds[0]), float(bounds[1]))
         for name, bounds in assignments["JOINT_LIMITS_DEG"].items()
@@ -172,6 +178,7 @@ def load_sim_robot_metadata() -> dict[str, Any]:
     return {
         "source_path": str(ROBOT_METADATA_PATH),
         "body_joints": body_joints,
+        "all_joints": all_joints,
         "joint_limits_deg": joint_limits,
         "default_joint_positions_deg": default_positions,
     }
@@ -385,7 +392,12 @@ def parse_urdf_limits_deg(limit_node: ET.Element | None) -> list[float] | None:
     return [lower, upper]
 
 
-def inspect_xml_model(model_request: dict[str, Any], target_frame: str, expected_joints: tuple[str, ...]) -> dict[str, Any]:
+def inspect_xml_model(
+    model_request: dict[str, Any],
+    target_frame: str,
+    expected_joints: tuple[str, ...],
+    allowed_joints: tuple[str, ...],
+) -> dict[str, Any]:
     if not model_request["exists"] or not model_request["supported_suffix"]:
         return {
             "status": "not_inspected",
@@ -408,6 +420,13 @@ def inspect_xml_model(model_request: dict[str, Any], target_frame: str, expected
             if tag_name(node) == "link" and node.attrib.get("name")
         }
     )
+    mjcf_frames = sorted(
+        {
+            node.attrib["name"]
+            for node in root.iter()
+            if tag_name(node) in {"body", "site", "geom"} and node.attrib.get("name")
+        }
+    )
     joints: list[dict[str, Any]] = []
     for node in root.iter():
         if tag_name(node) != "joint" or not node.attrib.get("name"):
@@ -422,21 +441,30 @@ def inspect_xml_model(model_request: dict[str, Any], target_frame: str, expected
     joint_names = [joint["name"] for joint in joints]
     present_expected = [joint for joint in expected_joints if joint in joint_names]
     missing_expected = [joint for joint in expected_joints if joint not in joint_names]
-    target_frame_present = target_frame in links or target_frame in joint_names
+    allowed_joint_names = set(allowed_joints)
+    unexpected_joint_names = [
+        joint for joint in joint_names if joint not in allowed_joint_names
+    ]
+    target_frame_present = target_frame in links or target_frame in joint_names or target_frame in mjcf_frames
 
     status = "xml_inspected"
     if path.suffix.lower() == ".urdf" and not missing_expected and target_frame_present:
         status = "urdf_contract_visible"
+    elif tag_name(root) == "mujoco" and not missing_expected and target_frame_present:
+        status = "mjcf_contract_visible"
 
     return {
         "status": status,
         "path": str(path),
         "root_tag": tag_name(root),
         "link_names": links,
+        "mjcf_frame_names": mjcf_frames,
         "joint_names": joint_names,
         "joints": joints,
+        "allowed_joint_names": list(allowed_joints),
         "expected_joint_names_present": present_expected,
         "expected_joint_names_missing": missing_expected,
+        "unexpected_joint_names": unexpected_joint_names,
         "target_frame_present": target_frame_present,
     }
 
@@ -682,13 +710,13 @@ def build_checklist_rows(
         row(
             "target_frame",
             "frame_contract",
-            "ok" if target_frame == EXPECTED_TARGET_FRAME else "action_required",
+            "ok" if target_frame in ACCEPTED_TARGET_FRAMES else "action_required",
             "warning",
             str(KINEMATICS_PATH),
             target_frame,
-            EXPECTED_TARGET_FRAME,
+            {"default": EXPECTED_TARGET_FRAME, "accepted": list(ACCEPTED_TARGET_FRAMES)},
             None,
-            "Default target frame for current RobotKinematics usage.",
+            "Default target frame for current RobotKinematics usage; gripperframe is accepted for the pinned upstream SO-ARM100 MuJoCo model.",
         ),
         row(
             "tcp_offset_source",
@@ -715,20 +743,24 @@ def build_checklist_rows(
     ]
 
     if xml_inspection["status"] != "not_inspected":
+        unexpected_joints = xml_inspection.get("unexpected_joint_names") or []
+        missing_joints = xml_inspection.get("expected_joint_names_missing") or []
         rows.append(
             row(
                 "xml_joint_visibility",
                 "model_structure",
-                "ok" if not xml_inspection.get("expected_joint_names_missing") else "action_required",
+                "ok" if not missing_joints and not unexpected_joints else "action_required",
                 "warning",
                 str(model_request.get("path")),
                 {
                     "present": xml_inspection.get("expected_joint_names_present"),
-                    "missing": xml_inspection.get("expected_joint_names_missing"),
+                    "missing": missing_joints,
+                    "unexpected": unexpected_joints,
+                    "allowed": xml_inspection.get("allowed_joint_names"),
                 },
                 expected_joints,
-                xml_inspection.get("expected_joint_names_missing"),
-                "Static XML inspection only. This does not prove dynamic FK/IK compatibility.",
+                (missing_joints + unexpected_joints) or None,
+                "Static XML inspection only. Extra model joints must be reviewed before the structure can satisfy the contract.",
             )
         )
         rows.append(
@@ -830,7 +862,12 @@ def main() -> int:
     model_request = inspect_model_request(args.model_path)
     robot_kinematics_path = inspect_robot_kinematics_path(model_request)
     asset_preflight = run_asset_preflight(output_dir, model_request, asset_roots)
-    xml_inspection = inspect_xml_model(model_request, str(args.target_frame), metadata["body_joints"])
+    xml_inspection = inspect_xml_model(
+        model_request,
+        str(args.target_frame),
+        metadata["body_joints"],
+        metadata["all_joints"],
+    )
     kinematics_init = try_robot_kinematics_init(
         model_request,
         asset_preflight,

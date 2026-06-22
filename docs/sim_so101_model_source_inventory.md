@@ -10,9 +10,50 @@ The script writes:
 
 - `so101_model_source_inventory_summary.json`
 - `so101_model_source_candidates.csv`
+- `so101_model_source_inventory_review_packet.json`
+- `so101_model_source_inventory_review_packet.csv`
+- `so101_model_source_intake_checklist.json`
+- `so101_model_source_intake_checklist.csv`
+- `so101_model_source_review_requirements.json`
+- `so101_model_source_review_requirements.csv`
 - `README.md`
 
-It exits `0` even when no candidates exist. In that state the JSON reports `ok: true`, `status: "missing_authoritative_model"`, `candidate_count: 0`, `authoritative_candidate_count: 0`, and a `missing_authoritative_model` diagnostic listing the source inputs still required.
+It exits `0` even when no candidates exist. In that state the JSON reports `ok: true`, `status: "missing_authoritative_model"`, `candidate_count: 0`, `authoritative_candidate_count: 0`, `model_authority: "model_source_inventory_not_authority"`, false `observed_evidence_is_physical_so101_authority`, false `observed_evidence_is_policy_training_authority`, true development-fixture caveats for physical and policy truth, false physical-authority/model-backed-IK/policy-training readiness, `source_authority_gate_status: "source_authority_blocked_missing_authoritative_model"`, a `source_authority_blockers` list for the missing source-authority work, a `missing_authoritative_model` diagnostic listing the source inputs still required, and `next_required_for_goal`/`next_required_action_ids` entries that keep the operator sequence explicit.
+The review packet mirrors that operator sequence with `review_packet_status`,
+`review_packet_model_authority: "review_packet_not_authority"`,
+`review_packet_item_count`, `review_packet_action_ids`, and false
+`review_packet_observed_evidence_is_authority` /
+`review_packet_physical_so101_model_authority_ready` flags. It is intake for
+human review; it does not make candidate filenames, joint names, provenance
+hints, or local fixture evidence reviewed physical SO-101 truth.
+The source-intake checklist is narrower: it records the scanned roots, missing
+source-authority review fields/scopes, `source_intake_status`,
+`source_intake_action_ids`, and command templates for the current
+`next_required_action_ids`. Source-review command templates include the required
+license basis, source reference, review scopes, reviewer identity, and at least
+one review trace field so following the checklist can close the source-authority
+metadata gate when the supplied values are real and non-placeholder. It reports
+`source_intake_model_authority: "source_intake_not_authority"` plus false
+observed-evidence and physical-authority flags, so it remains operator guidance
+rather than reviewed SO-101 model authority.
+The source-review requirements artifact then expands the same gate into
+individual required inputs: one selected SO-101-relevant authoritative model,
+review actor/trace/artifact evidence, `model_identity`, `provenance`, and
+`license` review scopes, source reference, and license basis. It reports
+`source_review_requirements_model_authority` as
+`source_review_requirements_not_authority` plus false observed-evidence and
+physical-authority flags. It is a deterministic requirements checklist for the
+operator review, not reviewed physical SO-101 truth.
+When the inventory finds a high/medium SO-101 candidate, the source-intake
+checklist also records a `recommended_candidate` object and mirrors
+`recommended_candidate_path`, `recommended_candidate_source_root`, and
+`recommended_candidate_authoritative` on each action row. The generated review
+and bundle-probe commands use that observed path/root as operator convenience
+only; the checklist still reports false authority flags until an operator
+declares the reviewed source and supplies non-placeholder review metadata. When
+multiple unreviewed candidates have equal relevance, the recommendation is
+deterministic and prefers non-archive, non-`nomesh`, shallower paths before
+falling back to lexical ordering.
 
 The full hardware-free simulator calibration regression suite now runs this
 inventory automatically under `so101_model_source_inventory/` before
@@ -32,15 +73,64 @@ suite-level names:
 - `--so101-authoritative-model-root` maps to inventory `--authoritative-root`.
 
 Use the authoritative flags only after source provenance, license, mesh
-dependencies, and authority have been reviewed. Supplying an empty reviewed root
-or authority root is still a non-failing diagnostic: the suite should report
-`missing_authoritative_model`, `candidate_count: 0`, and
-`authoritative_candidate_count: 0` rather than inventing a model. The suite
-preserves the configured values under
+dependencies, and authority have been reviewed. When an authoritative path/root
+is declared, also pass `--so101-source-authority-source-reference`,
+`--so101-source-authority-license-basis`, every required
+`--so101-source-authority-review-scope` value (`model_identity`, `provenance`,
+and `license`), `--so101-source-authority-reviewed-by`, plus a stable artifact
+handle: `--so101-source-authority-review-id` or
+`--so101-source-authority-review-url`. Without those metadata fields the
+inventory can report an authoritative candidate, but it also reports
+`source_authority_review_status: "review_metadata_missing"` and queues
+`record_source_authority_review_metadata`. The summary keeps
+`source_authority_gate_status` as one of
+`source_authority_blocked_missing_authoritative_model`,
+`source_authority_blocked_ambiguous_authoritative_model`,
+`source_authority_blocked_candidate_not_so101_relevant`,
+`source_authority_blocked_review_metadata`, or `source_authority_ready`, and
+keeps `source_authority_blockers` empty only when exactly one authoritative
+candidate, SO-101-relevant candidate evidence, and non-placeholder
+source-authority review metadata are all present.
+If an authoritative root matches multiple model files, the inventory reports
+`status: "ambiguous_authoritative_model"`,
+`authoritative_source_selection_status: "multiple_authoritative_candidates"`,
+and queues `select_single_authoritative_so101_model_source` rather than
+implicitly choosing one.
+If an authoritative path/root resolves to a generic supported model file whose
+candidate relevance is below the high/medium SO-101 threshold, the inventory
+reports `status: "authoritative_model_not_so101_relevant"`, queues
+`select_so101_relevant_authoritative_model_source`, and does not queue
+`run_so101_model_bundle_probe`.
+
+Review evidence, source reference, and license basis must be non-placeholder
+metadata. Values such as `TODO`, `TBD`, `unknown`, `placeholder`, or `review
+required` are preserved in the summary as `review_evidence_placeholder_fields`
+or `required_metadata_placeholder_fields`, but they keep
+`source_authority_review_ready: false` and do not satisfy source-authority
+readiness. A non-placeholder reviewer identity alone is also insufficient; the
+inventory reports `review_evidence_required_groups`,
+`review_evidence_satisfied_required_groups`, and
+`review_evidence_missing_required_groups`, and blocks thin metadata as
+`authority_review_evidence:review_trace` and
+`authority_review_evidence:review_artifact` until a stable artifact handle
+(`review_id` or HTTP(S) `review_url`) is supplied. Use `review_id` for ticket
+IDs, commit IDs, or other non-URL handles; malformed `review_url` values are
+reported as invalid review evidence. The inventory also reports
+`source_authority_review_scope_ready`,
+`source_authority_required_review_scope_ids`,
+`source_authority_supplied_review_scope_ids`, and
+`source_authority_missing_review_scope_ids` so a generic reviewer token cannot
+close source authority without explicit review scope coverage.
+
+Supplying an empty reviewed root or authority root is still a non-failing
+diagnostic: the suite should report `missing_authoritative_model`,
+`candidate_count: 0`, and `authoritative_candidate_count: 0` rather than
+inventing a model. The suite preserves the configured values under
 `calibration_regression_summary.json.so101_model_source_inventory.source_configuration`,
 mirrors them in `so101_model_source_inventory_config`, writes the exact forwarded
 child command under `child_commands.so101_model_source_inventory.command`, and
-surfaces them in the generated artifact index/report.
+surfaces them in the generated artifact index/report, including the source
+authority gate status and blocker list.
 
 After selecting a candidate model source, run the focused
 [SO-101 model asset preflight](sim_so101_model_asset_preflight.md) before the
@@ -63,13 +153,329 @@ treated as model-backed IK readiness evidence.
 
 By default the inventory scans repo-local roots: `models/`, `assets/`, `SO101/`, `src/`, `docs/`, `archive/`, `data/`, and the repo root. Missing roots are reported as roots with `exists: false`; they are not errors.
 
+## Public SO-ARM100/SO101 Candidate Intake
+
+There is a public upstream candidate bundle at
+`https://github.com/TheRobotStudio/SO-ARM100/tree/main/Simulation/SO101`.
+Treat it as a candidate source only until this repository records an import or
+operator-intake decision, an immutable upstream commit, file digests, license
+and provenance review, joint-limit/TCP/base-board review, and bundle-manifest
+validation. The upstream `Simulation/SO101` README describes URDF and MuJoCo
+files generated with `onshape-to-robot`, relative mesh paths, removed base
+collision meshes, and a caveat that LeRobot's `0` closed to `100` open gripper
+linear-joint mapping is not yet reflected in the current URDF/MuJoCo files.
+
+Operator intake should pin the source before scanning it. Either vendor a
+reviewed copy into the repository or keep the checkout outside the repository
+and record the exact commit in the review artifact:
+
+```bash
+git clone https://github.com/TheRobotStudio/SO-ARM100 /private/tmp/SO-ARM100
+git -C /private/tmp/SO-ARM100 rev-parse HEAD
+git -C /private/tmp/SO-ARM100 checkout <pinned-so-arm100-commit-sha>
+```
+
+Then run the existing hardware-free gates against the local pinned checkout:
+
+```bash
+python scripts/smoke_sim_so101_public_candidate_intake.py \
+  --source-root /private/tmp/SO-ARM100/Simulation/SO101 \
+  --upstream-commit <pinned-so-arm100-commit-sha> \
+  --output-dir /private/tmp/lerobot_sim/soarm100_so101_public_candidate_intake
+
+python scripts/smoke_sim_so101_model_source_inventory.py \
+  --root /private/tmp/SO-ARM100/Simulation/SO101 \
+  --output-dir /private/tmp/lerobot_sim/soarm100_so101_source_inventory_candidate
+
+python scripts/smoke_sim_so101_model_bundle_probe.py \
+  --model-path /private/tmp/SO-ARM100/Simulation/SO101/so101_new_calib.urdf \
+  --asset-root /private/tmp/SO-ARM100/Simulation/SO101 \
+  --output-dir /private/tmp/lerobot_sim/soarm100_so101_bundle_probe_candidate
+```
+
+The public-candidate intake smoke writes
+`so101_public_candidate_intake_summary.json`,
+`so101_public_candidate_intake_files.csv`,
+`so101_public_candidate_source_lock.json`,
+`so101_public_candidate_manifest_draft.json`,
+`so101_public_candidate_seeded_review_manifest_template.json`,
+`so101_public_candidate_review_manifest_template.direct.json`,
+`so101_public_candidate_review_checklist.json`,
+`so101_public_candidate_review_checklist.csv`,
+`so101_public_candidate_reviewed_manifest_rerun_plan.json`,
+`so101_public_candidate_operator_intake_requirements.csv`, and `README.md`.
+It hashes the local candidate files and records the pinned upstream commit as
+intake evidence only. The source-lock JSON is the compact review handoff for
+that candidate: upstream commit, selected model path/digest, expected file
+digests, and the reviewed-manifest rerun command template. It uses
+`candidate_source_lock_not_authority`, keeps model-backed IK readiness false,
+and does not claim physical SO-101 truth. The summary also includes
+`candidate_review_observations`: README caveat
+detection for `onshape-to-robot`, relative mesh paths, removed base collision
+meshes, and the missing LeRobot gripper linear-joint mapping, plus parsed
+URDF/MJCF metadata such as root tags, model names, joint counts, joint
+limit/range counts, and mesh references. Those observations use
+`candidate_review_observations_not_authority`, false physical SO-101 authority,
+and `ready_for_model_backed_ik: false`; they organize review work but do not
+promote the public candidate to reviewed model truth. Its manifest draft uses
+`model_sha256_observed` rather than a reviewed `model_sha256`, keeps
+`authority` and `provenance` empty, and always reports
+`ready_for_model_backed_ik: false`; copy those observed values into the real
+bundle manifest only after review.
+
+The reviewed-manifest rerun-plan JSON is the machine-readable handoff from the
+candidate source lock to `scripts/smoke_sim_so101_model_bundle_manifest.py`.
+It stays `candidate_reviewed_manifest_rerun_plan_not_authority`, keeps
+`ready_for_model_backed_ik: false`, and records the command template plus
+required success conditions. Those conditions explicitly require reviewed
+manifest authority for the SO-ARM100/SO101 gripper linear-joint mapping caveat
+and removed base-collision policy caveat before the manifest rerun can be
+treated as a successful handoff. A locked source without an explicit
+external-source or vendor-bundle decision remains blocked; a selected intake
+decision makes only the operator rerun handoff ready.
+
+The seeded review-manifest template follows the reviewed bundle manifest field
+shape and pre-fills observable candidate path, asset-root, upstream, and source
+reference values for operator convenience. It intentionally keeps
+`model_sha256` and every authority/calibration field as placeholders, reports
+`candidate_seeded_review_manifest_template_not_authority`, and stays
+`ready_for_model_backed_ik: false`. Use it as a starting document only: replace
+all placeholders, including `gripper_mapping_authority` and
+`collision_policy_authority`, with reviewed values, then run
+`scripts/smoke_sim_so101_model_bundle_manifest.py --manifest-path <reviewed-manifest>`
+and require `physical_so101_model_authority_ready: true` before using it for
+model-backed IK or downstream simulation claims.
+The direct template file contains only the nested manifest object, so it can be
+edited and passed directly to the manifest checker after review instead of
+manually extracting `manifest_template` from the wrapper JSON.
+The focused matrix runs the regular bundle-manifest checker against that direct
+template JSON and requires the checker to keep `ready_for_model_backed_ik: false`,
+`physical_so101_model_authority_ready: false`, and missing reviewed inputs such
+as `model_sha256` and `authority`. That preview proves the handoff fails closed
+until a reviewer replaces candidate observations and placeholders with reviewed
+bundle fields.
+
+The review checklist is the operator queue for that replacement work. It covers
+pinning the upstream commit, locking file digests, selecting one model variant,
+reviewing source/license/export provenance, reviewing mesh paths, reviewing
+collision policy, reviewing joint limits, reviewing gripper mapping, reviewing
+target-frame/TCP/base alignment, and rerunning the reviewed bundle manifest
+checker. It reports
+`candidate_review_checklist_not_authority`, false physical SO-101 authority,
+and `ready_for_model_backed_ik: false`; it is an intake checklist, not a model
+approval.
+
+Use the focused matrix when changing the public-candidate intake smoke:
+
+```bash
+python scripts/smoke_sim_so101_public_candidate_intake_matrix.py \
+  --output-dir /private/tmp/lerobot_sim/so101_public_candidate_intake_matrix \
+  --python python
+```
+
+The matrix creates synthetic SO-ARM100-shaped folders and verifies no-root,
+missing-root, incomplete-candidate, and complete-candidate cases. All cases must
+keep `public_candidate_intake_not_authority`, false physical SO-101 authority,
+and `ready_for_model_backed_ik: false`; the complete fixture only proves digest
+locking, review-observation extraction, candidate-seeded template generation,
+candidate review-checklist generation, reviewed-manifest rerun-plan generation,
+fail-closed manifest-checker preview, and artifact generation for review.
+
+If the source is later declared authoritative, rerun the inventory with
+`--authoritative-path` for exactly one reviewed URDF/MJCF file plus
+`--authority-source-reference`, `--authority-license-basis`, all three required
+`--authority-review-scope` values, reviewer identity, and a stable review
+artifact handle. Do not use `--authoritative-root` on `Simulation/SO101` unless
+the root has been narrowed to one selected model file; the folder contains new
+and old calibration variants plus scene/support XML files.
+
+Current candidate-source decision uses upstream commit
+`fda892cba81032c46c40976a48c9ceadbf40a9ca` and selected model
+`Simulation/SO101/so101_new_calib.xml` from
+`https://github.com/TheRobotStudio/SO-ARM100`. This is the approved external
+pinned source-root path for the next manifest-review step; it is not a vendored
+asset import and is not, by itself, physical SO-101 calibration truth. The
+selected MJCF digest is
+`d75253eb568e8a7214db9c631ab7bed4217f608a26f7276ebe9a7636cac82580`, and the
+upstream license basis is the pinned Apache-2.0 `LICENSE` file.
+
+The source-authority inventory can be rerun against the pinned checkout:
+
+```bash
+python scripts/smoke_sim_so101_model_source_inventory.py \
+  --root /private/tmp/lerobot_sim/soarm100_candidate/Simulation/SO101 \
+  --authoritative-path /private/tmp/lerobot_sim/soarm100_candidate/Simulation/SO101/so101_new_calib.xml \
+  --authority-source-reference https://github.com/TheRobotStudio/SO-ARM100/tree/fda892cba81032c46c40976a48c9ceadbf40a9ca/Simulation/SO101 \
+  --authority-license-basis https://github.com/TheRobotStudio/SO-ARM100/blob/fda892cba81032c46c40976a48c9ceadbf40a9ca/LICENSE \
+  --authority-review-scope model_identity \
+  --authority-review-scope provenance \
+  --authority-review-scope license \
+  --authority-reviewed-by user-approved-source-decision \
+  --authority-reviewed-at 2026-06-21 \
+  --authority-review-id user-approval-soarm100-fda892c-so101-new-calib-2026-06-21 \
+  --output-dir /private/tmp/lerobot_sim/soarm100_so101_source_inventory_authoritative_xml
+```
+
+Expected key fields from that run are `status: "authoritative_model_found"`,
+`authoritative_candidate_count: 1`,
+`source_authority_gate_status: "source_authority_ready"`,
+`source_authority_review_ready: true`, and next actions
+`run_so101_model_bundle_probe` plus
+`supply_reviewed_so101_model_bundle_manifest`.
+
+The bundle-manifest draft for this source decision is
+`/private/tmp/lerobot_sim/soarm100_so101_reviewed_manifest_external_source_draft/so101_model_bundle.reviewed_source_draft.json`.
+It records the approved external pin, selected model digest, provenance,
+license basis, asset roots, and mesh source-lock evidence, while preserving the
+upstream caveats as unresolved simulation work: the README says base collision
+meshes were removed and the LeRobot gripper linear-joint mapping is not yet
+reflected in the current URDF/MuJoCo files. Rechecking that draft with the
+bundle-manifest checker should remain fail-closed for physical authority:
+
+```bash
+python scripts/smoke_sim_so101_model_bundle_manifest.py \
+  --manifest-path /private/tmp/lerobot_sim/soarm100_so101_reviewed_manifest_external_source_draft/so101_model_bundle.reviewed_source_draft.json \
+  --output-dir /private/tmp/lerobot_sim/soarm100_so101_reviewed_manifest_external_source_draft/check \
+  --python python
+```
+
+Expected key fields are `status: "model_bundle_manifest_needs_follow_up"`,
+`mesh_assets_status: "present"`, `ready_for_model_backed_ik: false`,
+`physical_so101_model_authority_ready: false`, and blockers
+`record_collision_policy_authority`, `declare_reviewed_joint_limits`,
+`record_gripper_mapping_authority`, `declare_target_frame`,
+`calibrate_tcp_offset`, `calibrate_base_to_board_transform`, and
+`clear_model_contract_and_asset_preflight`.
+
+After filling simulation-derived fields from the pinned MJCF and the supplied
+board-center offset, the hardware-free simulation manifest is:
+
+`/private/tmp/lerobot_sim/soarm100_so101_simulation_manifest/so101_model_bundle.simulation_authority.json`
+
+It uses:
+
+- `target_frame: "gripperframe"` from the pinned MJCF site.
+- Body-joint limits extracted from MJCF `range` attributes and converted from
+  radians to degrees.
+- `gripper: [0.0, 100.0]` as the LeRobot command range, linearly mapped to the
+  pinned MJCF gripper joint range.
+- TCP offset `{x: 0.0, y: 0.0, z: 0.0}` because `gripperframe` is treated as
+  the simulation TCP/reference frame.
+- Base-to-board transform `translation_m: {x: 0.05, y: 0.0, z: 0.0}` and zero
+  RPY, using the supplied 5 cm board-center offset.
+- The upstream removed-base-collision policy as hardware-free simulation
+  collision authority.
+
+Validation against that manifest:
+
+```bash
+python scripts/smoke_sim_so101_model_bundle_manifest.py \
+  --manifest-path /private/tmp/lerobot_sim/soarm100_so101_simulation_manifest/so101_model_bundle.simulation_authority.json \
+  --output-dir /private/tmp/lerobot_sim/soarm100_so101_simulation_manifest/check \
+  --python python
+
+python scripts/smoke_sim_so101_reviewed_mujoco_bundle.py \
+  --manifest-path /private/tmp/lerobot_sim/soarm100_so101_simulation_manifest/so101_model_bundle.simulation_authority.json \
+  --output-dir /private/tmp/lerobot_sim/soarm100_so101_reviewed_mujoco_bundle_simulation_authority \
+  --python python
+```
+
+Expected key fields are `ready_for_model_backed_ik: true`,
+`hardware_free_regression_fixture_ready: true`, and
+`physical_so101_model_authority_ready: false`. The reviewed-MuJoCo bundle gate
+should report `status: "reviewed_mujoco_bundle_motion_checked"`,
+`reviewed_model_motion_checked: true`, and
+`motion_authority_status: "hardware_free_fixture_motion_checked_not_physical_so101_authority"`.
+
+Earlier local candidate evidence used the same upstream commit as an intake
+snapshot only:
+
+- Source inventory against `Simulation/SO101` found `candidate_count: 6`,
+  `likely_candidate_count: 4`, and `direct_contract_candidate_count: 2`, with
+  `so101_new_calib.urdf` recommended and SHA-256
+  `3a65d2d35e68a8d2f0c2cc176d19b884506543c93ba72980145b80abe276022c`.
+- The source-authority gate stayed blocked with
+  `source_authority_gate_status: "source_authority_blocked_missing_authoritative_model"`
+  and `source_intake_model_authority: "source_intake_not_authority"`.
+- The bundle probe on `so101_new_calib.urdf` resolved mesh references
+  (`asset_preflight_missing_asset_count: 0`) and observed complete unreviewed
+  joint limits, but stayed `candidate_manifest_needs_review` with
+  `ready_for_model_backed_ik: false` because `model_sha256`, authority,
+  provenance, mesh authority, gripper mapping, collision policy, target-frame
+  authority, TCP offset, base-to-board transform, reviewed joint limits, and a
+  non-blocking contract result still need review.
+
 To inspect an external or installed model location without importing assets:
 
 ```bash
 python scripts/smoke_sim_so101_model_source_inventory.py --root /absolute/path/to/model/root --output-dir /private/tmp/lerobot_sim/so101_model_source_inventory_external
 ```
 
-Use `--authoritative-path` or `--authoritative-root` only after the model source, license, and authority have been reviewed. Without those flags, a SO-101-looking file remains `source_authority_status: "unverified"` and does not count as authoritative.
+Use `--authoritative-path` or `--authoritative-root` only after the model source,
+license, and authority have been reviewed. Pair them with
+`--authority-source-reference`, `--authority-license-basis`, all three required
+`--authority-review-scope` values (`model_identity`, `provenance`, and `license`),
+`--authority-reviewed-by`, and a stable artifact handle:
+`--authority-review-id` or `--authority-review-url` so the artifact
+distinguishes a bare authoritative-path declaration from a reviewed
+source-authority declaration. If `--authority-reviewed-at` is supplied, it must
+be an ISO `YYYY-MM-DD` date or ISO datetime and must not be in the future;
+malformed or future-dated review timestamps are treated as invalid review
+evidence.
+Without authoritative flags, a SO-101-looking file remains
+`source_authority_status: "unverified"` and does not count as authoritative.
+Without complete review metadata and scope coverage, an authoritative candidate
+remains explicit but reports `source_authority_review_ready: false`.
+
+## Source Authority Matrix Smoke
+
+Use the matrix smoke when changing source-authority logic or workflow checks:
+
+```bash
+python scripts/smoke_sim_so101_source_authority_matrix.py --output-dir /private/tmp/lerobot_sim/so101_source_authority_matrix --python python
+```
+
+The smoke generates synthetic URDF fixtures under the output directory and runs
+the inventory through fifteen non-hardware cases: missing source root,
+unverified candidate, candidate recommendation preference, authoritative path
+without review metadata, authoritative path with placeholder review metadata,
+authoritative path with angle-bracket template metadata, authoritative path with
+reviewer-only thin review metadata, authoritative path with invalid review URL,
+authoritative path with invalid review timestamp, authoritative path with
+placeholder source/license metadata, authoritative path with future-dated review
+timestamp, non-SO-101 authoritative relevance rejection, authoritative path with
+complete source-review metadata, single authoritative root with complete source-review metadata, and ambiguous
+authoritative root. It writes:
+
+- `so101_source_authority_matrix_summary.json`
+- `so101_source_authority_matrix_cases.csv`
+- `README.md`
+
+The complete-source-review fixture must reach
+`source_authority_gate_status: "source_authority_ready"` and
+`source_intake_status: "source_authority_ready_waiting_for_bundle_manifest"`.
+The non-SO-101 authoritative fixture must remain blocked with
+`source_authority_blocked_candidate_not_so101_relevant` even when complete
+review metadata is supplied.
+The single-root ready fixture must resolve to the same
+`selected_authoritative_candidate_path` as the explicit authoritative-path
+fixture, expose the selected candidate SHA-256, and carry the selected
+path/source root into the generated `run_so101_model_bundle_probe` command;
+those model identity fields are later compared against the reviewed bundle
+manifest.
+The ambiguous-root fixture must remain
+`source_authority_blocked_ambiguous_authoritative_model` and queue
+`select_single_authoritative_so101_model_source`. Every matrix case keeps
+`source_intake_model_authority: "source_intake_not_authority"`,
+`review_packet_model_authority: "review_packet_not_authority"`,
+and `source_review_requirements_model_authority` as
+`source_review_requirements_not_authority`, with false physical SO-101 authority
+flags; the smoke proves the inventory state machine, not a reviewed robot
+model.
+The candidate recommendation fixture also proves that source-intake commands
+carry the selected top-level model path and asset/source root into the review and
+bundle-probe rerun commands without converting that recommendation into
+authority.
 
 ## Owner Check Evidence
 
@@ -85,8 +491,26 @@ Key fields:
 - `status: "missing_authoritative_model"`
 - `candidate_count: 0`
 - `authoritative_candidate_count: 0`
+- `source_authority_gate_status: "source_authority_blocked_missing_authoritative_model"`
+- `source_authority_blockers: ["scan_or_supply_so101_model_source_root", "review_and_declare_authoritative_so101_model_source"]`
+- `source_authority_review_scope_ready: false`
+- `source_authority_missing_review_scope_ids: ["model_identity", "provenance", "license"]`
+- `model_authority: "model_source_inventory_not_authority"`
+- `observed_evidence_is_physical_so101_authority: false`
+- `observed_evidence_is_policy_training_authority: false`
+- `development_fixture_evidence_not_physical_so101_truth: true`
+- `development_fixture_evidence_not_policy_training_truth: true`
+- `physical_so101_model_authority_ready: false`
+- `ready_for_model_backed_ik: false`
+- `ready_for_policy_training: false`
 - `artifacts.summary_json: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_inventory_summary.json`
 - `artifacts.candidates_csv: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_candidates.csv`
+- `artifacts.review_packet_json: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_inventory_review_packet.json`
+- `artifacts.review_packet_csv: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_inventory_review_packet.csv`
+- `artifacts.source_intake_checklist_json: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_intake_checklist.json`
+- `artifacts.source_intake_checklist_csv: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_intake_checklist.csv`
+- `artifacts.source_review_requirements_json: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_review_requirements.json`
+- `artifacts.source_review_requirements_csv: /private/tmp/lerobot_sim/so101_model_source_inventory_owner_check/so101_model_source_review_requirements.csv`
 
 Empty-root validation:
 
@@ -134,6 +558,7 @@ That means the URDF path is directly compatible with the current `RobotKinematic
 Before model-backed residuals are trusted, capture these inputs:
 
 - `authoritative_model_asset`: repo-local or explicitly declared SO-101 URDF/MJCF/Xacro source with stable provenance, license, and source authority.
+- `single_authoritative_model_asset`: exactly one reviewed model file selected with `--authoritative-path`, or an authoritative root narrowed so it resolves to a single reviewed model file.
 - `model_generation_provenance`: CAD/export source URL or commit, export tool/version, and any local edits.
 - `license_and_redistribution_basis`: clear license file or SPDX/header evidence permitting use in this repo.
 - `joint_and_frame_alignment`: confirmation that model joints match `shoulder_pan` through `wrist_roll` and target frame `gripper_frame_link` matches simulator expectations.

@@ -3,18 +3,78 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from lerobot.cameras.utils import make_cameras_from_configs
-from lerobot.motors import Motor, MotorNormMode
-from lerobot.robots.robot import Robot
-from lerobot.robots.utils import ensure_safe_goal_position
 from lerobot.utils.errors import DeviceAlreadyConnectedError, DeviceNotConnectedError
 
 from .config import SimRobotConfig
+
+try:
+    from lerobot.robots.utils import ensure_safe_goal_position
+except ModuleNotFoundError as exc:  # pragma: no cover - dependency-light sim runtime.
+    if exc.name != "torch":
+        raise
+
+    def ensure_safe_goal_position(
+        goal_present_pos: dict[str, tuple[float, float]], max_relative_target: float | dict[str, float]
+    ) -> dict[str, float]:
+        if isinstance(max_relative_target, float):
+            diff_cap = dict.fromkeys(goal_present_pos, max_relative_target)
+        elif isinstance(max_relative_target, dict):
+            diff_cap = max_relative_target
+        else:
+            raise TypeError(max_relative_target)
+
+        safe_goal_positions = {}
+        for key, (goal_pos, present_pos) in goal_present_pos.items():
+            max_diff = diff_cap[key]
+            diff = goal_pos - present_pos
+            safe_goal_positions[key] = present_pos + min(max(diff, -max_diff), max_diff)
+        return safe_goal_positions
+
+try:
+    from lerobot.motors import Motor, MotorNormMode
+except ModuleNotFoundError as exc:  # pragma: no cover - dependency-light sim runtime.
+    if exc.name != "torch":
+        raise
+
+    class MotorNormMode(str, Enum):
+        RANGE_0_100 = "range_0_100"
+        DEGREES = "degrees"
+
+    @dataclass(frozen=True)
+    class Motor:
+        id: int
+        model: str
+        norm_mode: MotorNormMode
+
+
+try:
+    from lerobot.robots.robot import Robot
+except ModuleNotFoundError as exc:  # pragma: no cover - dependency-light sim runtime.
+    if exc.name != "torch":
+        raise
+
+    class Robot:
+        """Small simulator-only stand-in for the LeRobot base class.
+
+        The full base class imports the training stack through motor utilities.
+        The SO-101 simulator only needs calibration path bookkeeping for
+        hardware-free Gymnasium/MuJoCo smoke tests.
+        """
+
+        def __init__(self, config: SimRobotConfig):
+            self.robot_type = getattr(self, "name", "sim_so101")
+            self.id = config.id
+            self.calibration_dir = Path(config.calibration_dir)
+            self.calibration_dir.mkdir(parents=True, exist_ok=True)
+            self.calibration_fpath = self.calibration_dir / f"{self.id}.json"
+            self.calibration = {}
 
 SO101_BODY_JOINTS: tuple[str, ...] = (
     "shoulder_pan",
@@ -50,6 +110,8 @@ class _MujocoBackend:
     model: Any
     data: Any
     joint_qpos_addr: dict[str, int]
+    gripper_qpos_addr: int | None = None
+    gripper_qpos_range: tuple[float, float] | None = None
 
 
 class _SimSO101Bus:
@@ -302,6 +364,78 @@ class SimRobot(Robot):
     def sim_status(self) -> dict[str, Any]:
         return dict(self.mujoco_status)
 
+    def set_mujoco_freejoint_pose(
+        self,
+        joint_name: str,
+        position_xyz_m: tuple[float, float, float] | list[float],
+        *,
+        quat_wxyz: tuple[float, float, float, float] | list[float] = (1.0, 0.0, 0.0, 0.0),
+        reason: str = "manual",
+    ) -> dict[str, Any]:
+        backend = self._mujoco_backend
+        if backend is None:
+            return {"ok": False, "joint_name": joint_name, "reason": "mujoco_backend_unavailable", "sync_reason": reason}
+        try:
+            joint_id = backend.module.mj_name2id(
+                backend.model,
+                backend.module.mjtObj.mjOBJ_JOINT,
+                joint_name,
+            )
+            if joint_id < 0:
+                return {"ok": False, "joint_name": joint_name, "reason": "joint_not_found", "sync_reason": reason}
+            qpos_addr = int(backend.model.jnt_qposadr[joint_id])
+            backend.data.qpos[qpos_addr : qpos_addr + 7] = [
+                float(position_xyz_m[0]),
+                float(position_xyz_m[1]),
+                float(position_xyz_m[2]),
+                float(quat_wxyz[0]),
+                float(quat_wxyz[1]),
+                float(quat_wxyz[2]),
+                float(quat_wxyz[3]),
+            ]
+            qvel_addr = int(backend.model.jnt_dofadr[joint_id])
+            backend.data.qvel[qvel_addr : qvel_addr + 6] = 0.0
+            backend.module.mj_forward(backend.model, backend.data)
+            return {
+                "ok": True,
+                "joint_name": joint_name,
+                "qpos_addr": qpos_addr,
+                "position_xyz_m": [float(v) for v in position_xyz_m],
+                "quat_wxyz": [float(v) for v in quat_wxyz],
+                "sync_reason": reason,
+            }
+        except Exception as e:
+            return {
+                "ok": False,
+                "joint_name": joint_name,
+                "reason": f"{type(e).__name__}: {e}",
+                "sync_reason": reason,
+            }
+
+    def mujoco_freejoint_pose(self, joint_name: str) -> dict[str, Any]:
+        backend = self._mujoco_backend
+        if backend is None:
+            return {"ok": False, "joint_name": joint_name, "reason": "mujoco_backend_unavailable"}
+        try:
+            joint_id = backend.module.mj_name2id(
+                backend.model,
+                backend.module.mjtObj.mjOBJ_JOINT,
+                joint_name,
+            )
+            if joint_id < 0:
+                return {"ok": False, "joint_name": joint_name, "reason": "joint_not_found"}
+            qpos_addr = int(backend.model.jnt_qposadr[joint_id])
+            qpos = backend.data.qpos[qpos_addr : qpos_addr + 7]
+            return {
+                "ok": True,
+                "joint_name": joint_name,
+                "qpos_addr": qpos_addr,
+                "position_xyz_m": [float(qpos[0]), float(qpos[1]), float(qpos[2])],
+                "quat_wxyz": [float(qpos[3]), float(qpos[4]), float(qpos[5]), float(qpos[6])],
+            }
+        except Exception as e:
+            return {"ok": False, "joint_name": joint_name, "reason": f"{type(e).__name__}: {e}"}
+
     def _initialize_mujoco(self) -> None:
         if not self.config.use_mujoco:
             self.mujoco_status = {
@@ -351,14 +485,34 @@ class SimRobot(Robot):
                 joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint)
                 if joint_id >= 0:
                     joint_qpos_addr[joint] = int(model.jnt_qposadr[joint_id])
-            self._mujoco_backend = _MujocoBackend(mujoco, model, data, joint_qpos_addr)
+            gripper_qpos_addr: int | None = None
+            gripper_qpos_range: tuple[float, float] | None = None
+            gripper_joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "gripper")
+            if gripper_joint_id >= 0:
+                gripper_qpos_addr = int(model.jnt_qposadr[gripper_joint_id])
+                gripper_qpos_range = (
+                    float(model.jnt_range[gripper_joint_id][0]),
+                    float(model.jnt_range[gripper_joint_id][1]),
+                )
+            self._mujoco_backend = _MujocoBackend(
+                mujoco,
+                model,
+                data,
+                joint_qpos_addr,
+                gripper_qpos_addr=gripper_qpos_addr,
+                gripper_qpos_range=gripper_qpos_range,
+            )
+            mapped_joints = sorted(joint_qpos_addr)
+            if gripper_qpos_addr is not None:
+                mapped_joints.append("gripper")
             self.mujoco_status = {
                 "ok": True,
                 "enabled": True,
                 "fallback": None,
                 "model_path": str(path),
-                "mapped_joints": sorted(joint_qpos_addr),
-                "missing_joints": [j for j in SO101_BODY_JOINTS if j not in joint_qpos_addr],
+                "mapped_joints": mapped_joints,
+                "missing_joints": [j for j in SO101_JOINTS if j not in mapped_joints],
+                "gripper_qpos_range": list(gripper_qpos_range) if gripper_qpos_range else None,
             }
         except Exception as e:
             self._mujoco_backend = None
@@ -376,6 +530,10 @@ class SimRobot(Robot):
         try:
             for joint, qpos_addr in backend.joint_qpos_addr.items():
                 backend.data.qpos[qpos_addr] = np.deg2rad(self.bus.positions_deg[joint])
+            if backend.gripper_qpos_addr is not None and backend.gripper_qpos_range is not None:
+                lo, hi = backend.gripper_qpos_range
+                opening = np.clip(self.bus.positions_deg["gripper"], 0.0, 100.0) / 100.0
+                backend.data.qpos[backend.gripper_qpos_addr] = lo + opening * (hi - lo)
             backend.module.mj_forward(backend.model, backend.data)
         except Exception as e:
             self.mujoco_status = {
